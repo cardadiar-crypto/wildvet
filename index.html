@@ -1774,6 +1774,160 @@ async function setCoverPhoto(spId, input) {
   img.src = url;
 }
 
+function downloadSpeciesTemplate() {
+  const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='UTF-8'><style>
+body{font-family:Calibri,Arial;font-size:11pt;margin:2cm}
+h1{font-size:16pt;color:#0f3d22;border-bottom:2pt solid #0f3d22;padding-bottom:4pt}
+h2{font-size:13pt;color:#1a6b3f;margin-top:14pt}
+h3{font-size:11pt;color:#228b52;margin-top:10pt}
+table{border-collapse:collapse;width:100%;margin-bottom:10pt}
+th{background:#e8faf0;padding:5pt 8pt;border:1pt solid #c2f0d3;text-align:left;font-size:10pt}
+td{padding:4pt 8pt;border:1pt solid #e0e0e0;font-size:10pt;vertical-align:top}
+.field{color:#888;font-style:italic}
+</style></head><body>
+
+<h1>FICHA DE ESPECIE — WILDVET</h1>
+<p style="color:#888;font-size:9pt">Complete esta plantilla y súbala en WildVet → Admin → Nueva Especie → Importar archivo. La IA leerá automáticamente todos los campos.</p>
+
+<h2>GENERALIDADES</h2>
+<table><tr><th width="35%">Campo</th><th>Valor</th></tr>
+<tr><td><b>Nombre común *</b></td><td class="field">Ej: Danta de tierras bajas</td></tr>
+<tr><td><b>Nombre científico</b></td><td class="field">Ej: Tapirus terrestris</td></tr>
+<tr><td><b>Orden</b></td><td class="field">Ej: Perissodactyla</td></tr>
+<tr><td><b>Familia</b></td><td class="field">Ej: Tapiridae</td></tr>
+<tr><td><b>Descripción general</b></td><td class="field">Historia natural, importancia ecológica, características...</td></tr>
+</table>
+
+<h2>ESTADO DE CONSERVACIÓN</h2>
+<table><tr><th>Categoría</th><th>Estado</th></tr>
+<tr><td>UICN Mundial</td><td class="field">LC / NT / VU / EN / CR / EW / EX / DD</td></tr>
+<tr><td>UICN Colombia</td><td class="field">LC / NT / VU / EN / CR / EW / EX / DD</td></tr>
+<tr><td>CITES</td><td class="field">Apéndice I / II / III / No listada</td></tr>
+<tr><td>Resolución 0126 de 2024 (Colombia)</td><td class="field">Categoría</td></tr>
+</table>
+
+<h2>BIOMETRÍA</h2>
+<table><tr><th>Parámetro</th><th>Macho</th><th>Hembra</th></tr>
+<tr><td>Peso promedio (kg)</td><td class="field"></td><td class="field"></td></tr>
+<tr><td>Rango de peso (kg)</td><td class="field">mín – máx</td><td class="field">mín – máx</td></tr>
+<tr><td>Longitud cabeza-cuerpo (cm)</td><td class="field"></td><td class="field"></td></tr>
+<tr><td>Longitud de cola (cm)</td><td class="field"></td><td class="field"></td></tr>
+<tr><td>Altura a la cruz (cm)</td><td class="field"></td><td class="field"></td></tr>
+</table>
+
+<h2>LONGEVIDAD Y REPRODUCCIÓN</h2>
+<table><tr><th>Parámetro</th><th>Vida silvestre</th><th>Bajo cuidado profesional</th></tr>
+<tr><td>Esperanza de vida</td><td class="field"></td><td class="field"></td></tr>
+<tr><td>Edad promedio</td><td class="field"></td><td class="field"></td></tr>
+<tr><td>Edad máxima registrada</td><td class="field"></td><td class="field"></td></tr>
+<tr><td>Edad de madurez sexual</td><td class="field"></td><td class="field"></td></tr>
+<tr><td>Período de gestación</td><td class="field"></td><td class="field"></td></tr>
+</table>
+
+<h2>DISTRIBUCIÓN Y HÁBITAT</h2>
+<table><tr><th>Campo</th><th>Valor</th></tr>
+<tr><td>Distribución geográfica</td><td class="field"></td></tr>
+<tr><td>Dieta en vida silvestre</td><td class="field"></td></tr>
+<tr><td>Temperatura óptima (°C)</td><td class="field">mín – máx</td></tr>
+<tr><td>Humedad relativa (%)</td><td class="field">mín – máx</td></tr>
+</table>
+
+<h2>FISIOLOGÍA — CONSTANTES VITALES</h2>
+<table><tr><th>Parámetro</th><th>Rango de referencia</th></tr>
+<tr><td>Temperatura corporal (°C)</td><td class="field"></td></tr>
+<tr><td>Frecuencia cardíaca (bpm)</td><td class="field"></td></tr>
+<tr><td>Frecuencia respiratoria (rpm)</td><td class="field"></td></tr>
+<tr><td>Presión arterial (mmHg)</td><td class="field"></td></tr>
+<tr><td>Volumen sanguíneo</td><td class="field">% del peso corporal</td></tr>
+</table>
+
+<h3>Hematología</h3>
+<table><tr><th>Parámetro</th><th>Valor de referencia</th></tr>
+<tr><td>Eritrocitos</td><td class="field">x10⁶/μL</td></tr>
+<tr><td>Hematocrito</td><td class="field">%</td></tr>
+<tr><td>Hemoglobina</td><td class="field">g/dL</td></tr>
+<tr><td>Leucocitos</td><td class="field">x10³/μL</td></tr>
+<tr><td>Neutrófilos</td><td class="field">%</td></tr>
+<tr><td>Plaquetas</td><td class="field">x10³/μL</td></tr>
+<tr><td class="field">Agregar más filas según necesidad...</td><td></td></tr>
+</table>
+
+<h3>Bioquímica sérica</h3>
+<table><tr><th>Parámetro</th><th>Valor de referencia</th></tr>
+<tr><td>ALT</td><td class="field">U/L</td></tr>
+<tr><td>AST</td><td class="field">U/L</td></tr>
+<tr><td>Creatinina</td><td class="field">mg/dL</td></tr>
+<tr><td>BUN</td><td class="field">mg/dL</td></tr>
+<tr><td>Glucosa</td><td class="field">mg/dL</td></tr>
+<tr><td>Proteínas totales</td><td class="field">g/dL</td></tr>
+</table>
+
+<h2>NUTRICIÓN EN CAUTIVERIO</h2>
+<table><tr><th>Campo</th><th>Valor</th></tr>
+<tr><td>Dieta en cautiverio</td><td class="field">Descripción de la dieta...</td></tr>
+<tr><td>Requerimiento energético (kcal/kg/día)</td><td class="field">Ej: 50–80 kcal/kg/día</td></tr>
+<tr><td>Frecuencia de alimentación</td><td class="field">Ej: 2–3 veces al día</td></tr>
+<tr><td>Suplementos</td><td class="field">Nombre y dosis</td></tr>
+</table>
+
+<h3>Requerimiento energético por categoría</h3>
+<table><tr><th>Categoría</th><th>kcal/kg/día</th><th>Notas</th></tr>
+<tr><td class="field">Macho adulto</td><td class="field"></td><td class="field"></td></tr>
+<tr><td class="field">Hembra adulta</td><td class="field"></td><td class="field"></td></tr>
+<tr><td class="field">Cachorro / Juvenil</td><td class="field"></td><td class="field"></td></tr>
+<tr><td class="field">Hembra gestante</td><td class="field"></td><td class="field"></td></tr>
+</table>
+
+<h3>Tóxicos y prohibidos</h3>
+<table><tr><th>Alimento / Sustancia</th><th>Efecto tóxico</th></tr>
+<tr><td class="field">Aguacate</td><td class="field">Toxicidad cardíaca</td></tr>
+<tr><td class="field">Agregar más...</td><td class="field"></td></tr>
+</table>
+
+<h2>COMPORTAMIENTO</h2>
+<table><tr><th>Categoría</th><th>Descripción</th></tr>
+<tr><td>En vida silvestre</td><td class="field"></td></tr>
+<tr><td>Bajo cuidado profesional</td><td class="field"></td></tr>
+<tr><td>Bajo estrés (señales)</td><td class="field"></td></tr>
+<tr><td>Reproductivo</td><td class="field"></td></tr>
+</table>
+
+<h2>ENFERMEDADES PREVALENTES</h2>
+<table><tr><th>Sistema</th><th>Enfermedad</th><th>Agente / Causa</th><th>Signos clínicos</th><th>Diagnóstico</th><th>Tratamiento</th></tr>
+<tr><td>Gastrointestinal</td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td></tr>
+<tr><td>Respiratorio</td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td></tr>
+<tr><td>Infeccioso/Parasitario</td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td></tr>
+<tr><td class="field">Agregar más...</td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td></tr>
+</table>
+
+<h2>MEDICAMENTOS Y PROTOCOLOS ANESTÉSICOS</h2>
+<h3>Fármacos</h3>
+<table><tr><th>Nombre</th><th>Categoría</th><th>Conc. (mg/ml)</th><th>Dosis mín (mg/kg)</th><th>Dosis rec (mg/kg)</th><th>Dosis máx (mg/kg)</th><th>Vía</th><th>Frecuencia</th><th>Efectos adversos</th><th>Notas</th></tr>
+<tr><td class="field">Medetomidina</td><td class="field">Sedante α2</td><td class="field">1.0</td><td class="field">0.05</td><td class="field">0.07</td><td class="field">0.1</td><td class="field">IM</td><td class="field">Una dosis</td><td class="field">Bradicardia</td><td class="field">Revertir con Atipamezol</td></tr>
+<tr><td class="field">Agregar más...</td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td></tr>
+</table>
+
+<h3>Protocolos anestésicos</h3>
+<table><tr><th>Nombre del protocolo</th><th>Fármaco 1</th><th>Dosis 1 (mg/kg)</th><th>Fármaco 2</th><th>Dosis 2 (mg/kg)</th><th>Reversor</th><th>Dosis reversor</th><th>Inducción (min)</th><th>Duración (min)</th><th>Notas</th></tr>
+<tr><td class="field">Inmovilización estándar</td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td></tr>
+</table>
+
+<p style="color:#888;font-size:9pt;margin-top:20pt">* Campo obligatorio. Todos los demás son opcionales. Complete solo los campos que tenga disponibles.</p>
+</body></html>`;
+
+  const blob = new Blob([html], { type: 'application/msword' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = 'WildVet_Plantilla_Especie.doc';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('✓ Plantilla descargada — complétala y súbela para importar');
+}
+
 function previewFormCover(input) {
   if (!input.files?.[0]) return;
   const file = input.files[0];
@@ -3148,53 +3302,89 @@ async function importSpeciesFile(input) {
       return;
     }
 
+    const apiKey = document.getElementById('sp-api-key')?.value.trim() ||
+                   localStorage.getItem('wv_api_key') || '';
+    if (!apiKey) {
+      statusEl.textContent = '⚠ Ingresa tu API Key de Anthropic para importar archivos.';
+      statusEl.style.color = 'var(--r5)';
+      return;
+    }
+
     statusEl.textContent = '🤖 Extrayendo información con IA...';
 
-    const PROMPT = `Eres un asistente de veterinaria de fauna silvestre. Analiza el siguiente documento y extrae TODA la información disponible sobre la especie y devuélvela ÚNICAMENTE como un objeto JSON válido, sin texto adicional, sin markdown, sin explicaciones.
+    const PROMPT = `Eres un asistente experto en veterinaria de fauna silvestre. Analiza el documento y extrae TODA la información disponible sobre la especie. Devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional ni markdown.
 
-El JSON debe seguir EXACTAMENTE esta estructura (usa cadenas vacías "" para campos no encontrados, arrays vacíos [] si no hay datos):
+Usa cadenas vacías "" para campos no encontrados, arrays vacíos [] si no hay datos, 0 para números no encontrados.
+
 {
   "name": "nombre común",
   "sci": "nombre científico",
   "order": "orden taxonómico",
-  "family": "familia taxonómica",
-  "emoji": "emoji representativo (elige uno apropiado)",
+  "family": "familia",
+  "generalidades": "descripción general, historia natural, importancia ecológica",
   "uicn_world": "LC|NT|VU|EN|CR|EW|EX|DD",
   "uicn_colombia": "LC|NT|VU|EN|CR|EW|EX|DD",
-  "weight_avg": número_en_kg,
-  "weight_min": número_en_kg,
-  "weight_max": número_en_kg,
+  "conservacion": {
+    "cites": "Apéndice I / II / III / No listada",
+    "res0126": "categoría según resolución colombiana"
+  },
+  "weight_avg": número_kg,
+  "weight_min": número_kg,
+  "weight_max": número_kg,
+  "biometria": {
+    "peso_prom":   {"m": "valor con unidad", "f": "valor con unidad"},
+    "peso_rango":  {"m": "rango", "f": "rango"},
+    "long_cc":     {"m": "cm", "f": "cm"},
+    "long_cola":   {"m": "cm", "f": "cm"},
+    "altura_cruz": {"m": "cm", "f": "cm"},
+    "esp_vida":    {"silv": "años", "prof": "años"},
+    "edad_prom":   {"silv": "", "prof": ""},
+    "edad_max":    {"silv": "", "prof": ""},
+    "mad_sexual":  {"silv": "", "prof": ""},
+    "gestacion":   {"silv": "", "prof": ""}
+  },
   "lifespan": "texto",
   "dimorphism": "texto",
-  "temp_range": [min_número, max_número],
-  "humidity": [min_número, max_número],
+  "temp_range": [min, max],
+  "humidity": [min, max],
   "distribution": "texto",
   "diet_wild": "texto",
   "vitals": {
-    "temp": "rango en °C",
-    "fc": "rango en bpm",
-    "fr": "rango en rpm",
+    "temp": "rango °C",
+    "fc": "rango bpm",
+    "fr": "rango rpm",
     "ps": "texto mmHg",
-    "vol_sang": "texto % PC"
+    "vol_sang": "texto"
   },
   "hematology": [["Parámetro","Valor referencia"]],
   "biochem": [["Parámetro","Valor referencia"]],
   "nutrition": {
-    "captive": "texto",
-    "kcal_day": "texto",
-    "freq": "texto",
-    "supplements": "texto",
-    "toxic": "texto"
+    "captive": "descripción dieta cautiverio",
+    "kcal_day": "kcal/kg/día",
+    "freq": "frecuencia alimentación",
+    "supplements": "suplementos",
+    "toxic": "tóxicos prohibidos"
   },
+  "req_energetico": [{"cat": "categoría (macho adulto, cachorro...)", "kcal": número, "notes": ""}],
+  "toxicos_lista": [{"nombre": "sustancia", "efecto": "efecto tóxico"}],
+  "denticion": [{"num": "número", "tipo": "tipo diente", "sup": "cantidad superior", "inf": "cantidad inferior", "funcion": "función"}],
   "behavior": {
-    "wild": "texto",
-    "captive": "texto",
-    "stress": "texto",
-    "reproductive": "texto"
+    "wild": "comportamiento silvestre",
+    "captive": "bajo cuidado",
+    "stress": "señales de estrés",
+    "reproductive": "comportamiento reproductivo"
   },
-  "diseases": [{"name":"","agent":"","signs":"","dx":"","tx":""}],
-  "drugs": [{"name":"","cat":"","conc":0,"dose_min":0,"dose":0,"dose_max":0,"route":"","freq":"","effects":"","sites":"","notes":""}],
-  "protocols": [{"name":"","induction":0,"duration":0,"drugs":[{"name":"","dose":0,"conc":0}],"reversals":[{"name":"","dose":0,"conc":0,"route":""}],"notes":""}]
+  "enfermedades_sistemas": {
+    "dental":       {"notas": "", "enfermedades": [{"nombre":"","agente":"","signos":"","dx":"","tx":""}]},
+    "gastro":       {"notas": "", "enfermedades": []},
+    "renal":        {"notas": "", "enfermedades": []},
+    "cardiaco":     {"notas": "", "enfermedades": []},
+    "respiratorio": {"notas": "", "enfermedades": []},
+    "infeccioso":   {"notas": "", "enfermedades": []}
+  },
+  "diseases": [{"name":"nombre enfermedad","agent":"agente causante","signs":"signos clínicos","dx":"diagnóstico","tx":"tratamiento"}],
+  "drugs": [{"name":"","cat":"categoría farmacológica","conc":0,"dose_min":0,"dose":0,"dose_max":0,"route":"IM|IV|SC|VO","freq":"","effects":"efectos adversos","sites":"sitios venopunción","notes":""}],
+  "protocols": [{"name":"","induction":0,"duration":0,"drugs":[{"name":"","dose":0,"conc":0}],"reversals":[{"name":"","dose":0,"conc":0,"route":"IM"}],"notes":""}]
 }`;
 
     let messages;
@@ -3215,7 +3405,12 @@ El JSON debe seguir EXACTAMENTE esta estructura (usa cadenas vacías "" para cam
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 4000,
@@ -3347,29 +3542,89 @@ function fillSpeciesForm(data) {
   }
   // Store extracted arrays temporarily for saveSpecies to use
   window._importedSpeciesData = {
-    hematology: data.hematology || [],
-    biochem: data.biochem || [],
-    diseases: data.diseases || [],
-    drugs: data.drugs || [],
-    protocols: data.protocols || []
+    hematology:            data.hematology            || [],
+    biochem:               data.biochem               || [],
+    diseases:              data.diseases              || [],
+    drugs:                 data.drugs                 || [],
+    protocols:             data.protocols             || [],
+    req_energetico:        data.req_energetico        || [],
+    toxicos_lista:         data.toxicos_lista         || [],
+    denticion:             data.denticion             || [],
+    enfermedades_sistemas: data.enfermedades_sistemas || {},
+    biometria:             data.biometria             || {},
+    conservacion:          data.conservacion          || {}
   };
-  if (data.drugs?.length || data.diseases?.length) {
+
+  // Rellenar campos de biometría por sexo
+  if (data.biometria) {
+    const bmFields  = ['peso_prom','peso_rango','long_cc','long_cola','altura_cruz'];
+    const lifeFields = ['esp_vida','edad_prom','edad_max','mad_sexual','gestacion'];
+    bmFields.forEach(field => {
+      if (data.biometria[field]) {
+        set(`bm-${field}-m`, data.biometria[field].m || '');
+        set(`bm-${field}-f`, data.biometria[field].f || '');
+      }
+    });
+    lifeFields.forEach(field => {
+      if (data.biometria[field]) {
+        set(`bm-${field}-silv`, data.biometria[field].silv || '');
+        set(`bm-${field}-prof`, data.biometria[field].prof || '');
+      }
+    });
+  }
+
+  // Conservación
+  if (data.conservacion) {
+    set('sp-cons-cites',   data.conservacion.cites   || '');
+    set('sp-cons-res0126', data.conservacion.res0126 || '');
+  }
+
+  // Resumen de lo extraído
+  const counts = [];
+  if (data.drugs?.length)              counts.push(data.drugs.length + ' fármaco(s)');
+  if (data.diseases?.length)           counts.push(data.diseases.length + ' enfermedad(es)');
+  if (data.protocols?.length)          counts.push(data.protocols.length + ' protocolo(s)');
+  if (data.hematology?.length)         counts.push(data.hematology.length + ' param. hematológicos');
+  if (data.toxicos_lista?.length)      counts.push(data.toxicos_lista.length + ' tóxico(s)');
+  if (data.req_energetico?.length)     counts.push(data.req_energetico.length + ' req. energéticos');
+  if (counts.length) {
     const statusEl = document.getElementById('import-status');
-    if (statusEl) {
-      statusEl.textContent += ` · ${data.drugs?.length||0} fármaco(s) · ${data.diseases?.length||0} enfermedad(es) · ${data.protocols?.length||0} protocolo(s) extraídos.`;
-    }
+    if (statusEl) statusEl.textContent += ' · Extraídos: ' + counts.join(', ');
   }
 }
 
 function buildSpeciesForm(sp) {
   const f = document.getElementById('modal-species-form');
-  const v = (field, def='') => sp ? (sp[field]??def) : def;
-  const vn = (field, def=0) => sp ? (sp[field]??def) : def;
+  const v  = (field, def='') => sp ? (sp[field]??def) : def;
+  const vn = (field, def=0)  => sp ? (sp[field]??def) : def;
+  const bm = sp?.biometria || {};
+  const cons = sp?.conservacion || {};
+
+  // Helper para campos de biometría macho/hembra
+  const bmv = (field, sex) => bm[field]?.[sex] || '';
+
   f.innerHTML = `
+
+    <!-- ═══ IMPORTAR ARCHIVO ═══ -->
     <div style="background:var(--g0);border:2px dashed var(--g4);border-radius:var(--r);padding:1rem;margin-bottom:1rem;text-align:center">
       <div style="font-size:1.5rem;margin-bottom:.3rem">📄</div>
-      <div style="font-weight:600;font-size:.9rem;margin-bottom:.25rem">Importar desde archivo</div>
-      <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.75rem">PDF, Word (.docx) o Excel (.xlsx) — La IA extrae la información automáticamente</div>
+      <div style="font-weight:600;font-size:.9rem;margin-bottom:.15rem">Importar desde archivo</div>
+      <div style="font-size:.73rem;color:var(--txt3);margin-bottom:.5rem">PDF, Word (.docx) o Excel (.xlsx) — La IA extrae la información automáticamente</div>
+
+      <!-- API Key para importación -->
+      <div style="margin-bottom:.6rem;text-align:left">
+        <label style="font-size:.7rem;color:var(--txt3)">API Key de Anthropic (necesaria para importar)</label>
+        <div style="display:flex;gap:.3rem;margin-top:.2rem">
+          <input type="password" id="sp-api-key" class="form-control"
+            placeholder="sk-ant-api03-..."
+            value="${localStorage.getItem('wv_api_key')||''}"
+            style="font-size:.78rem;flex:1"
+            onchange="localStorage.setItem('wv_api_key',this.value)">
+          <a href="https://console.anthropic.com" target="_blank" class="btn btn-secondary btn-sm" style="white-space:nowrap;font-size:.7rem">Obtener key</a>
+        </div>
+        <div style="font-size:.68rem;color:var(--txt3);margin-top:.2rem">Se guarda solo en tu dispositivo. <a href="#" onclick="downloadSpeciesTemplate();return false;" style="color:var(--g6)">Descargar plantilla Word/Excel</a></div>
+      </div>
+
       <label for="sp-file-import" class="btn btn-primary" style="cursor:pointer;display:inline-flex">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Seleccionar archivo
@@ -3377,14 +3632,14 @@ function buildSpeciesForm(sp) {
       <input type="file" id="sp-file-import" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.csv" style="display:none" onchange="importSpeciesFile(this)">
       <div id="import-status" style="margin-top:.6rem;font-size:.8rem;color:var(--g6);min-height:1.2rem"></div>
     </div>
-    <div class="form-section-title" style="border-top:none;padding-top:0;margin-top:0">Generalidades</div>
-    <div class="form-group">
-      <label>Descripción general de la especie</label>
-      <textarea id="sp-generalidades" class="form-control" style="min-height:120px" placeholder="Historia natural, importancia ecológica, características distintivas, estado de conservación, curiosidades relevantes para el manejo clínico...">${v('generalidades')}</textarea>
+
+    <div style="font-size:.75rem;color:var(--g6);background:var(--g0);border-radius:var(--rsm);padding:.4rem .65rem;margin-bottom:.75rem">
+      ✓ Solo el <strong>nombre común</strong> es obligatorio. Todos los demás campos se pueden completar después.
     </div>
-    <div class="form-section-title">1. Información General</div>
+
+    <!-- ═══ FOTO ═══ -->
+    <div class="form-section-title" style="border-top:none;padding-top:0;margin-top:0">Foto de portada</div>
     <div class="form-group">
-      <label>Foto de portada</label>
       <div style="display:flex;align-items:center;gap:.75rem">
         <div style="position:relative;flex-shrink:0">
           ${sp?.cover_photo
@@ -3394,28 +3649,38 @@ function buildSpeciesForm(sp) {
                </div>
                <img id="form-cover-preview" src="" style="display:none;width:80px;height:60px;object-fit:cover;border-radius:var(--rsm);border:1px solid var(--bor)">`}
         </div>
-        <div style="flex:1">
-          <label class="btn btn-secondary btn-sm" for="sp-cover-file" style="cursor:pointer;display:inline-flex;gap:.4rem">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-            Elegir foto
-          </label>
+        <div>
+          <label class="btn btn-secondary btn-sm" for="sp-cover-file" style="cursor:pointer;display:inline-flex;gap:.4rem">📷 Elegir foto</label>
           <input type="file" id="sp-cover-file" accept="image/*" style="display:none" onchange="previewFormCover(this)">
-          <div style="font-size:.72rem;color:var(--txt3);margin-top:.3rem">JPG, PNG, WEBP — se comprimirá a 600px</div>
+          <div style="font-size:.7rem;color:var(--txt3);margin-top:.25rem">JPG, PNG — se comprimirá a 600px</div>
         </div>
       </div>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label>Nombre común</label><input id="sp-name" class="form-control" value="${v('name')}" placeholder="Ej: Danta"></div>
+
+    <!-- ═══ GENERALIDADES ═══ -->
+    <div class="form-section-title">Generalidades</div>
+    <div class="form-group">
+      <textarea id="sp-generalidades" class="form-control" style="min-height:100px"
+        placeholder="Historia natural, importancia ecológica, características distintivas...">${v('generalidades')}</textarea>
     </div>
-    <div class="form-group"><label>Nombre científico</label><input id="sp-sci" class="form-control" value="${v('sci')}" placeholder="Tapirus terrestris"></div>
+
+    <!-- ═══ 1. INFORMACIÓN GENERAL ═══ -->
+    <div class="form-section-title">1. Taxonomía e Identificación</div>
+    <div class="form-row">
+      <div class="form-group"><label>Nombre común <span style="color:var(--r5)">*</span></label><input id="sp-name" class="form-control" value="${v('name')}" placeholder="Ej: Danta de tierras bajas"></div>
+      <div class="form-group"><label>Nombre científico</label><input id="sp-sci" class="form-control" value="${v('sci')}" placeholder="Tapirus terrestris"></div>
+    </div>
     <div class="form-row">
       <div class="form-group"><label>Orden</label><input id="sp-order" class="form-control" value="${v('order')}" placeholder="Perissodactyla"></div>
       <div class="form-group"><label>Familia</label><input id="sp-family" class="form-control" value="${v('family')}" placeholder="Tapiridae"></div>
     </div>
+
+    <!-- ═══ ESTADO DE CONSERVACIÓN ═══ -->
+    <div class="form-section-title">2. Estado de Conservación</div>
     <div class="form-row">
       <div class="form-group"><label>UICN Mundial</label>
         <select id="sp-uicn-w" class="form-control">
-          ${['LC','NT','VU','EN','CR','EW','EX'].map(u=>`<option ${v('uicn_world')===u?'selected':''}>${u}</option>`).join('')}
+          ${['LC','NT','VU','EN','CR','EW','EX','DD'].map(u=>`<option ${v('uicn_world')===u?'selected':''}>${u}</option>`).join('')}
         </select>
       </div>
       <div class="form-group"><label>UICN Colombia</label>
@@ -3425,111 +3690,237 @@ function buildSpeciesForm(sp) {
       </div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Peso promedio (kg)</label><input id="sp-wavg" class="form-control" type="number" value="${vn('weight_avg',50)}" step="0.1"></div>
-      <div class="form-group"><label>Peso mín – máx (kg)</label>
-        <div style="display:flex;gap:.3rem"><input id="sp-wmin" class="form-control" type="number" value="${vn('weight_min',10)}" placeholder="mín" step="0.1"><input id="sp-wmax" class="form-control" type="number" value="${vn('weight_max',100)}" placeholder="máx" step="0.1"></div>
+      <div class="form-group"><label>CITES</label>
+        <input id="sp-cons-cites" class="form-control" value="${cons.cites||''}" placeholder="Apéndice I, II, III o No listada">
+      </div>
+      <div class="form-group"><label>Resolución 0126 de 2024 (Colombia)</label>
+        <input id="sp-cons-res0126" class="form-control" value="${cons.res0126||''}" placeholder="Categoría">
       </div>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label>Esperanza de vida</label><input id="sp-life" class="form-control" value="${v('lifespan')}" placeholder="15–20 años"></div>
-      <div class="form-group"><label>Dimorfismo sexual</label><input id="sp-dim" class="form-control" value="${v('dimorphism')}" placeholder="Mínimo"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>Temp. óptima °C (mín)</label><input id="sp-tmin" class="form-control" type="number" value="${(sp?.temp_range||[20,30])[0]}" step="0.5"></div>
-      <div class="form-group"><label>Temp. óptima °C (máx)</label><input id="sp-tmax" class="form-control" type="number" value="${(sp?.temp_range||[20,30])[1]}" step="0.5"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>Humedad % (mín)</label><input id="sp-hmin" class="form-control" type="number" value="${(sp?.humidity||[60,90])[0]}"></div>
-      <div class="form-group"><label>Humedad % (máx)</label><input id="sp-hmax" class="form-control" type="number" value="${(sp?.humidity||[60,90])[1]}"></div>
-    </div>
-    <div class="form-group"><label>Distribución geográfica</label><textarea id="sp-dist" class="form-control">${v('distribution')}</textarea></div>
-    <div class="form-group"><label>Dieta silvestre</label><textarea id="sp-diet" class="form-control">${v('diet_wild')}</textarea></div>
 
-    <div class="form-section-title">2. Fisiología — Constantes vitales</div>
-    <div class="form-row">
-      <div class="form-group"><label>Temperatura (°C)</label><input id="sp-vtemp" class="form-control" value="${sp?.vitals?.temp||''}" placeholder="37–39°C"></div>
-      <div class="form-group"><label>Frec. Cardíaca (bpm)</label><input id="sp-vfc" class="form-control" value="${sp?.vitals?.fc||''}" placeholder="60–100 bpm"></div>
+    <!-- ═══ BIOMETRÍA ═══ -->
+    <div class="form-section-title">3. Biometría</div>
+    <div style="overflow-x:auto;margin-bottom:.75rem">
+      <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+        <thead><tr style="background:var(--sur2)">
+          <th style="padding:.35rem .5rem;text-align:left;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Parámetro</th>
+          <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--g6)">Macho</th>
+          <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--r5)">Hembra</th>
+        </tr></thead>
+        <tbody>
+          ${[
+            ['Peso promedio (kg)',      'peso_prom'],
+            ['Rango de peso (kg)',      'peso_rango'],
+            ['Long. cabeza-cuerpo (cm)','long_cc'],
+            ['Longitud de cola (cm)',   'long_cola'],
+            ['Altura a la cruz (cm)',   'altura_cruz']
+          ].map(([label, field]) => `
+          <tr>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);color:var(--txt3)">${label}</td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
+              <input class="form-control" id="bm-${field}-m" value="${bmv(field,'m')}" placeholder="—" style="font-size:.82rem;text-align:center">
+            </td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
+              <input class="form-control" id="bm-${field}-f" value="${bmv(field,'f')}" placeholder="—" style="font-size:.82rem;text-align:center">
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Frec. Respiratoria (rpm)</label><input id="sp-vfr" class="form-control" value="${sp?.vitals?.fr||''}" placeholder="15–30 rpm"></div>
-      <div class="form-group"><label>Presión Arterial (mmHg)</label><input id="sp-vps" class="form-control" value="${sp?.vitals?.ps||''}" placeholder="120/80 mmHg"></div>
+      <div class="form-group"><label>Peso promedio general (kg)</label><input id="sp-wavg" class="form-control" type="number" value="${vn('weight_avg',0)||''}" step="0.1" placeholder="0"></div>
+      <div class="form-group"><label>Rango peso general (mín – máx kg)</label>
+        <div style="display:flex;gap:.3rem">
+          <input id="sp-wmin" class="form-control" type="number" value="${vn('weight_min',0)||''}" placeholder="mín" step="0.1">
+          <input id="sp-wmax" class="form-control" type="number" value="${vn('weight_max',0)||''}" placeholder="máx" step="0.1">
+        </div>
+      </div>
     </div>
-    <div class="form-group"><label>Volumen sanguíneo</label><input id="sp-vvs" class="form-control" value="${sp?.vitals?.vol_sang||''}" placeholder="7% PC"></div>
 
-    <div class="form-section-title">3. Nutrición en cautiverio</div>
-    <div class="form-group"><label>Dieta en cautiverio</label><textarea id="sp-ncap" class="form-control">${sp?.nutrition?.captive||''}</textarea></div>
-    <div class="form-row">
-      <div class="form-group"><label>Kcal/día</label><input id="sp-nkcal" class="form-control" value="${sp?.nutrition?.kcal_day||''}" placeholder="2000 kcal/día"></div>
-      <div class="form-group"><label>Frecuencia alimentación</label><input id="sp-nfreq" class="form-control" value="${sp?.nutrition?.freq||''}" placeholder="2 veces/día"></div>
+    <!-- ═══ LONGEVIDAD ═══ -->
+    <div class="form-section-title">4. Longevidad y Reproducción</div>
+    <div style="overflow-x:auto;margin-bottom:.75rem">
+      <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+        <thead><tr style="background:var(--sur2)">
+          <th style="padding:.35rem .5rem;text-align:left;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Parámetro</th>
+          <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--g6)">Vida silvestre</th>
+          <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--bl)">Bajo cuidado</th>
+        </tr></thead>
+        <tbody>
+          ${[
+            ['Esperanza de vida',       'esp_vida'],
+            ['Edad promedio',           'edad_prom'],
+            ['Edad máxima registrada',  'edad_max'],
+            ['Edad madurez sexual',     'mad_sexual'],
+            ['Período de gestación',    'gestacion']
+          ].map(([label, field]) => `
+          <tr>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);color:var(--txt3)">${label}</td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
+              <input class="form-control" id="bm-${field}-silv" value="${bm[field]?.silv||''}" placeholder="—" style="font-size:.82rem;text-align:center">
+            </td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
+              <input class="form-control" id="bm-${field}-prof" value="${bm[field]?.prof||''}" placeholder="—" style="font-size:.82rem;text-align:center">
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
     </div>
-    <div class="form-group"><label>Suplementos</label><input id="sp-nsup" class="form-control" value="${sp?.nutrition?.supplements||''}" placeholder="Vitamina A, calcio..."></div>
-    <div class="form-group"><label>Tóxicos / Prohibidos</label><input id="sp-ntox" class="form-control" value="${sp?.nutrition?.toxic||''}" placeholder="Aguacate, cebolla..."></div>
+    <div class="form-row">
+      <div class="form-group"><label>Esperanza de vida (texto general)</label><input id="sp-life" class="form-control" value="${v('lifespan')}" placeholder="15–20 años"></div>
+      <div class="form-group"><label>Dimorfismo sexual</label><input id="sp-dim" class="form-control" value="${v('dimorphism')}" placeholder="Mínimo / Machos más grandes"></div>
+    </div>
 
-    <div class="form-section-title">4. Comportamiento</div>
-    <div class="form-group"><label>Comportamiento silvestre</label><textarea id="sp-bwild" class="form-control">${sp?.behavior?.wild||''}</textarea></div>
-    <div class="form-group"><label>En cautiverio</label><textarea id="sp-bcap" class="form-control">${sp?.behavior?.captive||''}</textarea></div>
-    <div class="form-group"><label>Señales de estrés</label><textarea id="sp-bstress" class="form-control">${sp?.behavior?.stress||''}</textarea></div>
-    <div class="form-group"><label>Comportamiento reproductivo</label><textarea id="sp-brep" class="form-control">${sp?.behavior?.reproductive||''}</textarea></div>
+    <!-- ═══ DISTRIBUCIÓN ═══ -->
+    <div class="form-section-title">5. Distribución y Hábitat</div>
+    <div class="form-group"><label>Distribución geográfica</label><textarea id="sp-dist" class="form-control" style="min-height:60px">${v('distribution')}</textarea></div>
+    <div class="form-group"><label>Dieta en vida silvestre</label><textarea id="sp-diet" class="form-control" style="min-height:60px">${v('diet_wild')}</textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label>Temperatura óptima °C (mín)</label><input id="sp-tmin" class="form-control" type="number" value="${(sp?.temp_range||['',''])[0]}" step="0.5" placeholder="20"></div>
+      <div class="form-group"><label>Temperatura óptima °C (máx)</label><input id="sp-tmax" class="form-control" type="number" value="${(sp?.temp_range||['',''])[1]}" step="0.5" placeholder="30"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Humedad % (mín)</label><input id="sp-hmin" class="form-control" type="number" value="${(sp?.humidity||['',''])[0]}" placeholder="60"></div>
+      <div class="form-group"><label>Humedad % (máx)</label><input id="sp-hmax" class="form-control" type="number" value="${(sp?.humidity||['',''])[1]}" placeholder="90"></div>
+    </div>
+
+    <!-- ═══ FISIOLOGÍA ═══ -->
+    <div class="form-section-title">6. Fisiología — Constantes Vitales</div>
+    <div class="form-row">
+      <div class="form-group"><label>Temperatura corporal (°C)</label><input id="sp-vtemp" class="form-control" value="${sp?.vitals?.temp||''}" placeholder="37.5–39°C"></div>
+      <div class="form-group"><label>Frecuencia cardíaca (bpm)</label><input id="sp-vfc" class="form-control" value="${sp?.vitals?.fc||''}" placeholder="60–100 bpm"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Frecuencia respiratoria (rpm)</label><input id="sp-vfr" class="form-control" value="${sp?.vitals?.fr||''}" placeholder="15–30 rpm"></div>
+      <div class="form-group"><label>Presión arterial (mmHg)</label><input id="sp-vps" class="form-control" value="${sp?.vitals?.ps||''}" placeholder="120/80 mmHg"></div>
+    </div>
+    <div class="form-group"><label>Volumen sanguíneo</label><input id="sp-vvs" class="form-control" value="${sp?.vitals?.vol_sang||''}" placeholder="7% del peso corporal"></div>
+    <div style="font-size:.73rem;color:var(--txt3);margin-bottom:.5rem">Los parámetros de hematología y bioquímica se agregan desde la ficha de la especie → Fisiología.</div>
+
+    <!-- ═══ NUTRICIÓN ═══ -->
+    <div class="form-section-title">7. Nutrición en Cautiverio</div>
+    <div class="form-group"><label>Dieta en cautiverio</label><textarea id="sp-ncap" class="form-control" style="min-height:80px">${sp?.nutrition?.captive||''}</textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label>Requerimiento energético (kcal/kg/día)</label><input id="sp-nkcal" class="form-control" value="${sp?.nutrition?.kcal_day||''}" placeholder="50–80 kcal/kg/día"></div>
+      <div class="form-group"><label>Frecuencia de alimentación</label><input id="sp-nfreq" class="form-control" value="${sp?.nutrition?.freq||''}" placeholder="2–3 veces al día"></div>
+    </div>
+    <div class="form-group"><label>Suplementos (nombres y dosis básicas)</label><textarea id="sp-nsup" class="form-control">${sp?.nutrition?.supplements||''}</textarea></div>
+    <div class="form-group"><label>Tóxicos y prohibidos</label><textarea id="sp-ntox" class="form-control" placeholder="Aguacate (toxicidad cardíaca), cebolla...">${sp?.nutrition?.toxic||''}</textarea></div>
+
+    <!-- ═══ COMPORTAMIENTO ═══ -->
+    <div class="form-section-title">8. Comportamiento</div>
+    <div class="form-group"><label>En vida silvestre</label><textarea id="sp-bwild" class="form-control" style="min-height:60px">${sp?.behavior?.wild||''}</textarea></div>
+    <div class="form-group"><label>Bajo cuidado profesional</label><textarea id="sp-bcap" class="form-control" style="min-height:60px">${sp?.behavior?.captive||''}</textarea></div>
+    <div class="form-group"><label>Bajo estrés (señales y signos)</label><textarea id="sp-bstress" class="form-control" style="min-height:60px">${sp?.behavior?.stress||''}</textarea></div>
+    <div class="form-group"><label>Comportamiento reproductivo</label><textarea id="sp-brep" class="form-control" style="min-height:60px">${sp?.behavior?.reproductive||''}</textarea></div>
 
     <input type="hidden" id="sp-editing-id" value="${sp?.id||''}">
-    <div style="display:flex;gap:.5rem;margin-top:1rem">
+    <div style="display:flex;gap:.5rem;margin-top:1.25rem">
       <button class="btn btn-secondary" onclick="closeModal('modal-species')">Cancelar</button>
-      <button class="btn btn-primary" style="flex:1" onclick="saveSpecies()">💾 Guardar especie</button>
+      <button class="btn btn-primary" style="flex:1" onclick="saveSpecies()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        Guardar especie
+      </button>
     </div>
-    <p class="text-muted" style="margin-top:.5rem;text-align:center">Los medicamentos y protocolos se agregan desde la ficha de la especie</p>`;
+    <p class="text-muted" style="margin-top:.5rem;text-align:center;font-size:.72rem">
+      Medicamentos, protocolos, enfermedades, hematología y fórmula dentaria se completan desde la ficha de la especie
+    </p>`;
 }
 
 async function saveSpecies() {
   const name = document.getElementById('sp-name').value.trim();
-  if (!name) { toast('⚠ Ingresa el nombre de la especie'); return; }
+  if (!name) { toast('⚠ Solo el nombre es obligatorio'); document.getElementById('sp-name').focus(); return; }
   const editingId = document.getElementById('sp-editing-id').value;
   const existing = editingId ? SPECIES_DB.find(s=>s.id===editingId) : null;
   const id = editingId || 'sp_'+Date.now();
+
+  // Leer valores del formulario con fallback a existing para no perder datos
+  const g = (id, def='') => document.getElementById(id)?.value ?? existing?.[def] ?? '';
+  const gn = (id, def=0) => parseFloat(document.getElementById(id)?.value) || def;
+
   const sp = {
     id, name,
-    sci: document.getElementById('sp-sci').value.trim(),
-    order: document.getElementById('sp-order').value.trim(),
-    family: document.getElementById('sp-family').value.trim(),
-    emoji: '🐾',
-    cover_photo: window._formCoverPhoto || existing?.cover_photo || sp?.cover_photo || '',
-    uicn_world: document.getElementById('sp-uicn-w').value,
-    uicn_colombia: document.getElementById('sp-uicn-c').value,
-    weight_avg: parseFloat(document.getElementById('sp-wavg').value)||50,
-    weight_min: parseFloat(document.getElementById('sp-wmin').value)||10,
-    weight_max: parseFloat(document.getElementById('sp-wmax').value)||100,
-    lifespan: document.getElementById('sp-life').value,
-    dimorphism: document.getElementById('sp-dim').value,
-    temp_range: [parseFloat(document.getElementById('sp-tmin').value)||20, parseFloat(document.getElementById('sp-tmax').value)||30],
-    humidity: [parseFloat(document.getElementById('sp-hmin').value)||60, parseFloat(document.getElementById('sp-hmax').value)||90],
-    distribution: document.getElementById('sp-dist').value,
-    diet_wild: document.getElementById('sp-diet').value,
-    generalidades: document.getElementById('sp-generalidades')?.value || '',
+    sci:         document.getElementById('sp-sci')?.value.trim()   || existing?.sci   || '',
+    order:       document.getElementById('sp-order')?.value.trim() || existing?.order || '',
+    family:      document.getElementById('sp-family')?.value.trim()|| existing?.family|| '',
+    emoji:       existing?.emoji || '🐾',
+    cover_photo: window._formCoverPhoto || existing?.cover_photo   || '',
+    uicn_world:  document.getElementById('sp-uicn-w')?.value      || existing?.uicn_world   || 'LC',
+    uicn_colombia: document.getElementById('sp-uicn-c')?.value    || existing?.uicn_colombia || 'LC',
+    weight_avg:  gn('sp-wavg', existing?.weight_avg  || 50),
+    weight_min:  gn('sp-wmin', existing?.weight_min  || 10),
+    weight_max:  gn('sp-wmax', existing?.weight_max  || 100),
+    lifespan:    document.getElementById('sp-life')?.value         || existing?.lifespan     || '',
+    dimorphism:  document.getElementById('sp-dim')?.value          || existing?.dimorphism   || '',
+    temp_range:  [gn('sp-tmin', (existing?.temp_range||[20,30])[0]), gn('sp-tmax', (existing?.temp_range||[20,30])[1])],
+    humidity:    [gn('sp-hmin', (existing?.humidity||[60,90])[0]),   gn('sp-hmax', (existing?.humidity||[60,90])[1])],
+    distribution: document.getElementById('sp-dist')?.value        || existing?.distribution || '',
+    diet_wild:    document.getElementById('sp-diet')?.value        || existing?.diet_wild    || '',
+    generalidades: document.getElementById('sp-generalidades')?.value || existing?.generalidades || '',
     vitals: {
-      temp: document.getElementById('sp-vtemp').value,
-      fc: document.getElementById('sp-vfc').value,
-      fr: document.getElementById('sp-vfr').value,
-      ps: document.getElementById('sp-vps').value,
-      vol_sang: document.getElementById('sp-vvs').value
+      temp:     document.getElementById('sp-vtemp')?.value || existing?.vitals?.temp || '',
+      fc:       document.getElementById('sp-vfc')?.value   || existing?.vitals?.fc   || '',
+      fr:       document.getElementById('sp-vfr')?.value   || existing?.vitals?.fr   || '',
+      ps:       document.getElementById('sp-vps')?.value   || existing?.vitals?.ps   || '',
+      vol_sang: document.getElementById('sp-vvs')?.value   || existing?.vitals?.vol_sang || ''
     },
     nutrition: {
-      captive: document.getElementById('sp-ncap').value,
-      kcal_day: document.getElementById('sp-nkcal').value,
-      freq: document.getElementById('sp-nfreq').value,
-      supplements: document.getElementById('sp-nsup').value,
-      toxic: document.getElementById('sp-ntox').value
+      captive:     document.getElementById('sp-ncap')?.value  || existing?.nutrition?.captive     || '',
+      kcal_day:    document.getElementById('sp-nkcal')?.value || existing?.nutrition?.kcal_day    || '',
+      freq:        document.getElementById('sp-nfreq')?.value || existing?.nutrition?.freq        || '',
+      supplements: document.getElementById('sp-nsup')?.value  || existing?.nutrition?.supplements || '',
+      toxic:       document.getElementById('sp-ntox')?.value  || existing?.nutrition?.toxic       || ''
     },
     behavior: {
-      wild: document.getElementById('sp-bwild').value,
-      captive: document.getElementById('sp-bcap').value,
-      stress: document.getElementById('sp-bstress').value,
-      reproductive: document.getElementById('sp-brep').value
+      wild:         document.getElementById('sp-bwild')?.value   || existing?.behavior?.wild         || '',
+      captive:      document.getElementById('sp-bcap')?.value    || existing?.behavior?.captive      || '',
+      stress:       document.getElementById('sp-bstress')?.value || existing?.behavior?.stress       || '',
+      reproductive: document.getElementById('sp-brep')?.value    || existing?.behavior?.reproductive || ''
     },
-    hematology: existing?.hematology || window._importedSpeciesData?.hematology || [],
-    biochem: existing?.biochem || window._importedSpeciesData?.biochem || [],
-    diseases: existing?.diseases || window._importedSpeciesData?.diseases || [],
-    drugs: existing?.drugs || window._importedSpeciesData?.drugs || [],
-    protocols: existing?.protocols || window._importedSpeciesData?.protocols || []
+    // Biometría por sexo desde formulario
+    biometria: (() => {
+      const bm = existing?.biometria || {};
+      const bmFields = ['peso_prom','peso_rango','long_cc','long_cola','altura_cruz'];
+      const lifeFields = ['esp_vida','edad_prom','edad_max','mad_sexual','gestacion'];
+      bmFields.forEach(field => {
+        const m = document.getElementById(`bm-${field}-m`)?.value;
+        const f = document.getElementById(`bm-${field}-f`)?.value;
+        if (m || f) { if (!bm[field]) bm[field] = {}; if (m) bm[field].m = m; if (f) bm[field].f = f; }
+      });
+      lifeFields.forEach(field => {
+        const s = document.getElementById(`bm-${field}-silv`)?.value;
+        const p = document.getElementById(`bm-${field}-prof`)?.value;
+        if (s || p) { if (!bm[field]) bm[field] = {}; if (s) bm[field].silv = s; if (p) bm[field].prof = p; }
+      });
+      if (bm._extra) {} // preservar extras
+      return bm;
+    })(),
+    conservacion: (() => {
+      const c = existing?.conservacion || {};
+      const cites = document.getElementById('sp-cons-cites')?.value;
+      const res = document.getElementById('sp-cons-res0126')?.value;
+      if (cites) c.cites = cites;
+      if (res)   c.res0126 = res;
+      return c;
+    })(),
+    // Preservar TODOS los datos avanzados
+    hematology:              existing?.hematology              || window._importedSpeciesData?.hematology  || [],
+    biochem:                 existing?.biochem                 || window._importedSpeciesData?.biochem     || [],
+    diseases:                existing?.diseases                || window._importedSpeciesData?.diseases    || [],
+    enfermedades_sistemas:   existing?.enfermedades_sistemas   || {},
+    enfermedades_categorias: existing?.enfermedades_categorias || [],
+    drugs:                   existing?.drugs                   || window._importedSpeciesData?.drugs       || [],
+    protocols:               existing?.protocols               || window._importedSpeciesData?.protocols   || [],
+    biometria:               existing?.biometria               || {},
+    conservacion:            existing?.conservacion            || {},
+    req_energetico:          existing?.req_energetico          || [],
+    suplementos:             existing?.suplementos             || [],
+    toxicos_lista:           existing?.toxicos_lista           || [],
+    denticion:               existing?.denticion               || [],
+    dental_measures:         existing?.dental_measures         || [],
+    cover_photos:            existing?.cover_photos            || []
   };
+
   await dbPutSync('species', sp);
   if (editingId) {
     const idx = SPECIES_DB.findIndex(s=>s.id===editingId);
