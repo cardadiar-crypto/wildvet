@@ -2028,11 +2028,23 @@ function renderGeneral(el, sp) {
         onchange="saveBiometria('${field}','${subfield}',this.value)">`
     : `<span style="font-size:.82rem">${bm[field]?.[subfield]||'—'}</span>`;
 
-  const editConsCell = (field, placeholder='') => isAdmin
-    ? `<input type="text" value="${cons[field]||''}" placeholder="${placeholder}"
-        style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--sans);font-size:.82rem;color:var(--txt);padding:.1rem .2rem"
-        onchange="saveConservacion('${field}',this.value)">`
-    : `<span style="font-size:.82rem">${cons[field]||'—'}</span>`;
+  const editConsCell = (field, placeholder='') => {
+    const val = cons[field]||'';
+    if (!isAdmin) return `<span style="font-size:.82rem">${val||'—'}</span>`;
+    if (field === 'cites') {
+      const opts = ['No listada','Apéndice I','Apéndice II','Apéndice III'];
+      return `<select style="background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--sans);font-size:.82rem;color:var(--txt);padding:.1rem .2rem;width:100%" onchange="saveConservacion('cites',this.value)">
+        ${opts.map(o=>`<option ${val===o?'selected':''}>${o}</option>`).join('')}</select>`;
+    }
+    if (field === 'res0126') {
+      const cats = ['No evaluada','Preocupación menor (LC)','Casi amenazada (NT)','Vulnerable (VU)','En peligro (EN)','En peligro crítico (CR)','Extinta en estado silvestre (EW)','Extinta (EX)','Datos insuficientes (DD)'];
+      return `<select style="background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--sans);font-size:.82rem;color:var(--txt);padding:.1rem .2rem;width:100%" onchange="saveConservacion('res0126',this.value)">
+        ${cats.map(o=>`<option ${val===o?'selected':''}>${o}</option>`).join('')}</select>`;
+    }
+    return `<input type="text" value="${val}" placeholder="${placeholder}"
+      style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--sans);font-size:.82rem;color:var(--txt);padding:.1rem .2rem"
+      onchange="saveConservacion('${field}',this.value)">`;
+  };
 
   const tblH = `<tr style="background:var(--sur2)"><th style="padding:.4rem .6rem;font-size:.7rem;font-weight:600;color:var(--txt3);text-align:left;border-bottom:1px solid var(--bor)">Parámetro</th><th style="padding:.4rem .6rem;font-size:.7rem;font-weight:600;color:var(--g6);text-align:center;border-bottom:1px solid var(--bor)">Macho</th><th style="padding:.4rem .6rem;font-size:.7rem;font-weight:600;color:var(--r5);text-align:center;border-bottom:1px solid var(--bor)">Hembra</th></tr>`;
   const tblRow = (label, field) => `<tr><td style="padding:.35rem .6rem;font-size:.8rem;color:var(--txt3);border-bottom:1px solid var(--bor)">${label}</td><td style="padding:.35rem .6rem;text-align:center;border-bottom:1px solid var(--bor)">${editCell(field,'m',label+' macho')}</td><td style="padding:.35rem .6rem;text-align:center;border-bottom:1px solid var(--bor)">${editCell(field,'f',label+' hembra')}</td></tr>`;
@@ -2104,9 +2116,9 @@ function renderGeneral(el, sp) {
         </tr></thead>
         <tbody>
           <tr><td style="padding:.4rem .6rem;font-size:.8rem;border-bottom:1px solid var(--bor);color:var(--txt3)">UICN Mundial</td>
-            <td style="padding:.4rem .6rem;text-align:center;border-bottom:1px solid var(--bor)">${uicnBadge(sp.uicn_world)}</td></tr>
+            <td style="padding:.4rem .6rem;text-align:center;border-bottom:1px solid var(--bor)">${isAdmin?`<select style="background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--sans);font-size:.82rem;color:var(--txt);padding:.1rem .2rem" onchange="saveUICN('uicn_world',this.value)">${['LC','NT','VU','EN','CR','EW','EX','DD'].map(u=>`<option ${sp.uicn_world===u?'selected':''}>${u}</option>`).join('')}</select>`:uicnBadge(sp.uicn_world)}</td></tr>
           <tr><td style="padding:.4rem .6rem;font-size:.8rem;border-bottom:1px solid var(--bor);color:var(--txt3)">UICN Colombia</td>
-            <td style="padding:.4rem .6rem;text-align:center;border-bottom:1px solid var(--bor)">${uicnBadge(sp.uicn_colombia)}</td></tr>
+            <td style="padding:.4rem .6rem;text-align:center;border-bottom:1px solid var(--bor)">${isAdmin?`<select style="background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--sans);font-size:.82rem;color:var(--txt);padding:.1rem .2rem" onchange="saveUICN('uicn_colombia',this.value)">${['LC','NT','VU','EN','CR','EW','EX','DD'].map(u=>`<option ${sp.uicn_colombia===u?'selected':''}>${u}</option>`).join('')}</select>`:uicnBadge(sp.uicn_colombia)}</td></tr>
           <tr><td style="padding:.4rem .6rem;font-size:.8rem;border-bottom:1px solid var(--bor);color:var(--txt3)">CITES</td>
             <td style="padding:.4rem .6rem;text-align:center;border-bottom:1px solid var(--bor)">${editConsCell('cites','Ej: Apéndice I')}</td></tr>
           <tr><td style="padding:.4rem .6rem;font-size:.8rem;color:var(--txt3)">Resolución 0126 de 2024 (Colombia)</td>
@@ -2240,6 +2252,15 @@ async function saveConservacion(field, value) {
   if (!currentSpecies.conservacion) currentSpecies.conservacion = {};
   currentSpecies.conservacion[field] = value;
   await dbPutSync('species', currentSpecies);
+  toast('✓ Guardado');
+}
+async function saveUICN(field, value) {
+  currentSpecies[field] = value;
+  await dbPutSync('species', currentSpecies);
+  // Actualizar badge en el detail header
+  const badge = document.getElementById('detail-uicn-badge');
+  if (badge) { badge.textContent = value; badge.className = 'badge badge-'+value.toLowerCase(); }
+  toast('✓ UICN actualizado');
 }
 
 function editGeneralidades() {
@@ -2282,8 +2303,39 @@ function renderFisiologia(el, sp) {
       ${row('Rango normal', vit.fr||'N/D')}
     </div>
     <div class="info-card">
-      <div class="info-card-title">Sitios de venopunción (extracción de sangre)</div>
-      <p class="text-sm" style="line-height:1.7">${vit.venopuncion||vit.sites||'No especificado. Agregar desde la ficha de fármacos o editar la especie.'}</p>
+      <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
+        Sitios de venopunción
+        ${isAdmin?`<button class="btn btn-admin btn-sm" onclick="addVenopuncion()">+ Agregar</button>`:''}
+      </div>
+      ${(sp.venopuncion_lista||[]).length ? `
+      <table style="width:100%;font-size:.82rem;border-collapse:collapse">
+        <thead><tr>
+          <th style="text-align:left;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Sitio</th>
+          <th style="text-align:center;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Volumen máx.</th>
+          <th style="text-align:left;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Indicación</th>
+          ${isAdmin?'<th style="width:24px;border-bottom:1px solid var(--bor)"></th>':''}
+        </tr></thead>
+        <tbody>
+          ${(sp.venopuncion_lista||[]).map((v,i)=>`<tr>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-weight:600">${v.sitio||'—'}</td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:center;font-family:var(--mono)">${v.volumen||'—'}</td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);color:var(--txt3)">${v.indicacion||'—'}</td>
+            ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button onclick="removeVenopuncion(${i})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.7rem;padding:.1rem .3rem;font-weight:700">✕</button></td>`:''}
+          </tr>`).join('')}
+        </tbody>
+      </table>` : `<p style="font-size:.8rem;color:var(--txt3)">Sin sitios registrados.${isAdmin?' Toca + Agregar.':''}</p>`}
+      ${isAdmin?`
+      <div id="veno-form" style="display:none;margin-top:.5rem;background:var(--sur2);border-radius:var(--rsm);padding:.6rem">
+        <div style="display:grid;grid-template-columns:1fr 100px 1fr;gap:.4rem;margin-bottom:.4rem">
+          <div><label style="font-size:.7rem;color:var(--txt3)">Sitio de venopunción</label><input id="veno-sitio" class="form-control" placeholder="Vena yugular, safena..." style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">Volumen máx.</label><input id="veno-vol" class="form-control" placeholder="5 ml" style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">Indicación</label><input id="veno-ind" class="form-control" placeholder="Extracción de sangre, catéter..." style="font-size:.82rem"></div>
+        </div>
+        <div style="display:flex;gap:.4rem">
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('veno-form').style.display='none'">Cancelar</button>
+          <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveVenopuncion()">Guardar</button>
+        </div>
+      </div>`:''}
     </div>
     <div class="info-card">
       <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
@@ -2291,14 +2343,20 @@ function renderFisiologia(el, sp) {
         ${isAdmin?`<button class="btn btn-admin btn-sm" onclick="addHemoRow('hemo-table','hematology')">+ Agregar</button>`:''}
       </div>
       <table style="width:100%;font-size:.82rem;border-collapse:collapse" id="hemo-table">
-        <thead><tr><th style="text-align:left;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Parámetro</th><th style="text-align:right;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Valor referencia</th>${isAdmin?'<th style="width:28px;border-bottom:1px solid var(--bor)"></th>':''}</tr></thead>
+        <thead><tr>
+          <th style="text-align:left;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Parámetro</th>
+          <th style="text-align:center;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Unidades</th>
+          <th style="text-align:right;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Rango normal</th>
+          ${isAdmin?'<th style="width:28px;border-bottom:1px solid var(--bor)"></th>':''}
+        </tr></thead>
         <tbody>
           ${hem.map((h,i)=>`<tr>
             <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">${h[0]}</td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:center;color:var(--txt3);font-size:.78rem">${h[2]||'—'}</td>
             <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:right;font-family:var(--mono)">${h[1]}</td>
             ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button class="icon-btn danger" style="width:22px;height:22px;font-size:.65rem" onclick="removeHemoRow(${i},'hematology')">✕</button></td>`:''}
           </tr>`).join('')}
-          ${!hem.length?`<tr><td colspan="3" style="padding:.5rem;color:var(--txt3);font-size:.8rem;text-align:center">Sin datos registrados</td></tr>`:''}
+          ${!hem.length?`<tr><td colspan="4" style="padding:.5rem;color:var(--txt3);font-size:.8rem;text-align:center">Sin datos registrados</td></tr>`:''}
         </tbody>
       </table>
     </div>
@@ -2308,14 +2366,20 @@ function renderFisiologia(el, sp) {
         ${isAdmin?`<button class="btn btn-admin btn-sm" onclick="addHemoRow('bio-table','biochem')">+ Agregar</button>`:''}
       </div>
       <table style="width:100%;font-size:.82rem;border-collapse:collapse" id="bio-table">
-        <thead><tr><th style="text-align:left;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Parámetro</th><th style="text-align:right;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Valor referencia</th>${isAdmin?'<th style="width:28px;border-bottom:1px solid var(--bor)"></th>':''}</tr></thead>
+        <thead><tr>
+          <th style="text-align:left;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Parámetro</th>
+          <th style="text-align:center;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Unidades</th>
+          <th style="text-align:right;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Rango normal</th>
+          ${isAdmin?'<th style="width:28px;border-bottom:1px solid var(--bor)"></th>':''}
+        </tr></thead>
         <tbody>
           ${bio.map((b,i)=>`<tr>
             <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">${b[0]}</td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:center;color:var(--txt3);font-size:.78rem">${b[2]||'—'}</td>
             <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:right;font-family:var(--mono)">${b[1]}</td>
             ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button class="icon-btn danger" style="width:22px;height:22px;font-size:.65rem" onclick="removeHemoRow(${i},'biochem')">✕</button></td>`:''}
           </tr>`).join('')}
-          ${!bio.length?`<tr><td colspan="3" style="padding:.5rem;color:var(--txt3);font-size:.8rem;text-align:center">Sin datos registrados</td></tr>`:''}
+          ${!bio.length?`<tr><td colspan="4" style="padding:.5rem;color:var(--txt3);font-size:.8rem;text-align:center">Sin datos registrados</td></tr>`:''}
         </tbody>
       </table>
     </div>`;
@@ -2323,7 +2387,6 @@ function renderFisiologia(el, sp) {
 function addHemoRow(tableId, field) {
   const tbody = document.querySelector('#'+tableId+' tbody');
   if (!tbody) return;
-  const isAdmin = currentUser?.role==='admin';
   const idx = (currentSpecies[field]||[]).length;
   tbody.insertAdjacentHTML('beforeend', `
     <tr id="hrow_${field}_${idx}">
@@ -2331,7 +2394,10 @@ function addHemoRow(tableId, field) {
         <input style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--g4);outline:none;font-family:var(--sans);font-size:.82rem;color:var(--txt)" placeholder="Parámetro (ej: Cortisol)" id="hp_${field}_${idx}">
       </td>
       <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
-        <input style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--g4);outline:none;font-family:var(--mono);font-size:.82rem;color:var(--txt);text-align:right" placeholder="Valor ref." id="hv_${field}_${idx}">
+        <input style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--g4);outline:none;font-family:var(--sans);font-size:.78rem;color:var(--txt);text-align:center" placeholder="Unidades (ej: mg/dL)" id="hu_${field}_${idx}">
+      </td>
+      <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
+        <input style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--g4);outline:none;font-family:var(--mono);font-size:.82rem;color:var(--txt);text-align:right" placeholder="Rango normal" id="hv_${field}_${idx}">
       </td>
       <td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)">
         <button class="btn btn-primary btn-sm" style="padding:.2rem .4rem;font-size:.7rem" onclick="saveHemoRow('${field}',${idx})">✓</button>
@@ -2340,10 +2406,11 @@ function addHemoRow(tableId, field) {
 }
 async function saveHemoRow(field, idx) {
   const p = document.getElementById('hp_'+field+'_'+idx)?.value.trim();
+  const u = document.getElementById('hu_'+field+'_'+idx)?.value.trim();
   const v = document.getElementById('hv_'+field+'_'+idx)?.value.trim();
   if (!p) { toast('⚠ Ingresa el nombre del parámetro'); return; }
   if (!currentSpecies[field]) currentSpecies[field] = [];
-  currentSpecies[field].push([p, v||'N/D']);
+  currentSpecies[field].push([p, v||'N/D', u||'']);
   await dbPutSync('species', currentSpecies);
   renderTab('fisiologia');
   toast('✓ Parámetro agregado');
@@ -2405,7 +2472,7 @@ function renderNutricion(el, sp) {
       <div id="req-form" style="display:none;background:var(--sur2);border-radius:var(--rsm);padding:.6rem;margin-top:.4rem">
         <div style="display:grid;grid-template-columns:1fr 80px 1fr;gap:.4rem;margin-bottom:.4rem">
           <div><label style="font-size:.7rem;color:var(--txt3)">Categoría</label><input id="req-cat" class="form-control" placeholder="Macho adulto, Cachorro..." style="font-size:.82rem"></div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">kcal/kg/día</label><input id="req-kcal" class="form-control" type="number" step="0.1" placeholder="50" style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">Rango kcal/kg/día (ej: 50-80)</label><input id="req-kcal" class="form-control" placeholder="50-80" style="font-size:.82rem"></div>
           <div><label style="font-size:.7rem;color:var(--txt3)">Notas</label><input id="req-notes" class="form-control" placeholder="Observaciones..." style="font-size:.82rem"></div>
         </div>
         <div style="display:flex;gap:.4rem">
@@ -2451,7 +2518,7 @@ function renderNutricion(el, sp) {
       <div id="sup-form" style="display:none;background:var(--sur2);border-radius:var(--rsm);padding:.6rem;margin-top:.4rem">
         <div style="display:grid;grid-template-columns:1fr 80px 80px;gap:.4rem;margin-bottom:.4rem">
           <div><label style="font-size:.7rem;color:var(--txt3)">Nombre del suplemento</label><input id="sup-nombre" class="form-control" placeholder="Vitamina D3, Calcio..." style="font-size:.82rem"></div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis</label><input id="sup-dosis" class="form-control" type="number" step="0.001" placeholder="10" style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis (rango, ej: 10-20)</label><input id="sup-dosis" class="form-control" placeholder="10-20" style="font-size:.82rem"></div>
           <div><label style="font-size:.7rem;color:var(--txt3)">Unidad</label>
             <select id="sup-unit" class="form-control" style="font-size:.82rem">
               <option>mg/kg</option><option>UI/kg</option><option>mg/día</option><option>UI/día</option><option>g/kg</option><option>ml/kg</option>
@@ -2522,12 +2589,11 @@ function renderNutricion(el, sp) {
       <div style="overflow-x:auto;margin-bottom:.5rem">
         <table style="width:100%;border-collapse:collapse;font-size:.8rem">
           <thead><tr style="background:var(--sur2)">
-            ${['N° diente','Tipo de diente','Superior','Inferior','Función'].map(h=>`<th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.68rem;color:var(--txt3)">${h}</th>`).join('')}
+            ${['Tipo de diente','Superior','Inferior','Función'].map(h=>`<th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.68rem;color:var(--txt3)">${h}</th>`).join('')}
             ${isAdmin?'<th style="border-bottom:1px solid var(--bor);width:24px"></th>':''}
           </tr></thead>
           <tbody>
             ${denticion.map((d,i)=>`<tr>
-              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);font-weight:600">${d.num}</td>
               <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">${d.tipo}</td>
               <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)">${d.sup}</td>
               <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)">${d.inf}</td>
@@ -2539,9 +2605,8 @@ function renderNutricion(el, sp) {
       </div>` : `<p style="font-size:.8rem;color:var(--txt3);font-style:italic">Sin datos de fórmula dentaria.${isAdmin?' Toca + Diente para agregar.':''}</p>`}
       ${isAdmin ? `
       <div id="dient-form" style="display:none;background:var(--sur2);border-radius:var(--rsm);padding:.6rem;margin-top:.4rem">
-        <div style="display:grid;grid-template-columns:60px 1fr 60px 60px 1fr;gap:.4rem;margin-bottom:.4rem">
-          <div><label style="font-size:.68rem;color:var(--txt3)">N°</label><input id="dient-num" class="form-control" placeholder="1" style="font-size:.82rem"></div>
-          <div><label style="font-size:.68rem;color:var(--txt3)">Tipo</label><input id="dient-tipo" class="form-control" placeholder="Incisivo, Canino, Premolar, Molar" style="font-size:.82rem"></div>
+        <div style="display:grid;grid-template-columns:1fr 60px 60px 1fr;gap:.4rem;margin-bottom:.4rem">
+          <div><label style="font-size:.68rem;color:var(--txt3)">Tipo de diente</label><input id="dient-tipo" class="form-control" placeholder="Incisivo, Canino, Premolar, Molar" style="font-size:.82rem"></div>
           <div><label style="font-size:.68rem;color:var(--txt3)">Superior</label><input id="dient-sup" class="form-control" type="number" min="0" placeholder="2" style="font-size:.82rem"></div>
           <div><label style="font-size:.68rem;color:var(--txt3)">Inferior</label><input id="dient-inf" class="form-control" type="number" min="0" placeholder="2" style="font-size:.82rem"></div>
           <div><label style="font-size:.68rem;color:var(--txt3)">Función</label><input id="dient-func" class="form-control" placeholder="Corte, prensión..." style="font-size:.82rem"></div>
@@ -2569,17 +2634,31 @@ function renderNutricion(el, sp) {
       <div class="info-card-title">Medidas Odontológicas (colmillos, dientes)</div>
       <p class="text-sm text-muted" style="margin-bottom:.6rem">Registro por individuo — útil en hipopótamos, suidos, felinos</p>
       <div id="dental-measures-list">
-        ${(sp.dental_measures||[]).map((m,i)=>`
-          <div style="display:flex;align-items:center;gap:.5rem;padding:.35rem 0;border-bottom:1px solid var(--bor);font-size:.82rem">
-            <span style="flex:1">${m.date} — ${m.label}</span>
-            <span style="font-family:var(--mono);color:var(--g6)">${m.value}</span>
-            ${isAdmin?`<button onclick="removeDentalMeasure(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>`:''}
-          </div>`).join('')}
-        ${!(sp.dental_measures||[]).length?`<p style="font-size:.8rem;color:var(--txt3)">Sin medidas registradas</p>`:''}
+        ${(sp.dental_measures||[]).length ? `
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-bottom:.4rem">
+          <thead><tr style="background:var(--sur2)">
+            <th style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">N° Diente</th>
+            <th style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Descripción / Medida</th>
+            <th style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3);text-align:right">Valor</th>
+            <th style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Fecha</th>
+            ${isAdmin?'<th style="border-bottom:1px solid var(--bor);width:24px"></th>':''}
+          </tr></thead>
+          <tbody>
+            ${(sp.dental_measures||[]).map((m,i)=>`<tr>
+              <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-family:var(--mono);font-weight:600">${m.num||'—'}</td>
+              <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">${m.label}</td>
+              <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--g6);text-align:right">${m.value}</td>
+              <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-size:.75rem;color:var(--txt3)">${m.date}</td>
+              ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button onclick="removeDentalMeasure(${i})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.7rem;padding:.1rem .3rem;font-weight:700">✕</button></td>`:''}
+            </tr>`).join('')}
+          </tbody>
+        </table>` :
+        `<p style="font-size:.8rem;color:var(--txt3)">Sin medidas registradas</p>`}
       </div>
-      <div style="display:flex;gap:.5rem;margin-top:.5rem">
-        <input id="dm-label" class="form-control" placeholder="Ej: Colmillo sup. derecho" style="flex:2">
-        <input id="dm-value" class="form-control" placeholder="38.5 cm" style="flex:1">
+      <div style="display:grid;grid-template-columns:70px 1fr 90px auto;gap:.4rem;margin-top:.5rem">
+        <input id="dm-num"   class="form-control" placeholder="N° diente" style="font-size:.82rem">
+        <input id="dm-label" class="form-control" placeholder="Ej: Longitud colmillo sup. derecho">
+        <input id="dm-value" class="form-control" placeholder="38.5 cm">
         <button class="btn btn-primary btn-sm" onclick="addDentalMeasure()">+</button>
       </div>
       <div style="margin-top:.5rem">
@@ -2624,7 +2703,7 @@ async function saveReqEnergetico() {
   const cat = document.getElementById('req-cat')?.value.trim();
   if (!cat) { toast('⚠ Ingresa la categoría'); return; }
   if (!currentSpecies.req_energetico) currentSpecies.req_energetico = [];
-  currentSpecies.req_energetico.push({ cat, kcal: parseFloat(document.getElementById('req-kcal')?.value)||0, notes: document.getElementById('req-notes')?.value||'' });
+  currentSpecies.req_energetico.push({ cat, kcal: document.getElementById('req-kcal')?.value||'', notes: document.getElementById('req-notes')?.value||'' });
   await dbPutSync('species', currentSpecies);
   renderTab('nutricion'); toast('✓ Requerimiento energético agregado');
 }
@@ -2640,7 +2719,7 @@ async function saveSuplemento() {
   const nombre = document.getElementById('sup-nombre')?.value.trim();
   if (!nombre) { toast('⚠ Ingresa el nombre del suplemento'); return; }
   if (!currentSpecies.suplementos) currentSpecies.suplementos = [];
-  currentSpecies.suplementos.push({ nombre, dosis: parseFloat(document.getElementById('sup-dosis')?.value)||0, unit: document.getElementById('sup-unit')?.value||'mg/kg' });
+  currentSpecies.suplementos.push({ nombre, dosis: document.getElementById('sup-dosis')?.value||'', unit: document.getElementById('sup-unit')?.value||'mg/kg' });
   await dbPutSync('species', currentSpecies); renderTab('nutricion'); toast('✓ Suplemento agregado');
 }
 async function removeSuplemento(i) {
@@ -2653,6 +2732,54 @@ function calcSup(input, dosis, resultId) {
   const w = parseFloat(input.value), el = document.getElementById(resultId);
   if (!el) return;
   el.textContent = w > 0 ? (w*dosis).toFixed(3) : '—';
+}
+function calcSupRango(input, dosisStr, dosisNum, resultId) {
+  const w = parseFloat(input.value), el = document.getElementById(resultId);
+  if (!el || !w) { if(el) el.textContent='—'; return; }
+  const parts = String(dosisStr).split('-');
+  if (parts.length === 2) {
+    const min = (w * parseFloat(parts[0])).toFixed(2);
+    const max = (w * parseFloat(parts[1])).toFixed(2);
+    el.textContent = min + '–' + max;
+  } else {
+    el.textContent = (w * dosisNum).toFixed(2);
+  }
+}
+// Venopunción helpers
+function addVenopuncion() { document.getElementById('veno-form').style.display='block'; document.getElementById('veno-sitio')?.focus(); }
+async function saveVenopuncion() {
+  const sitio = document.getElementById('veno-sitio')?.value.trim();
+  if (!sitio) { toast('⚠ Ingresa el sitio'); return; }
+  if (!currentSpecies.venopuncion_lista) currentSpecies.venopuncion_lista = [];
+  currentSpecies.venopuncion_lista.push({
+    sitio, volumen: document.getElementById('veno-vol')?.value||'', indicacion: document.getElementById('veno-ind')?.value||''
+  });
+  await dbPutSync('species', currentSpecies);
+  renderTab('fisiologia'); toast('✓ Sitio de venopunción agregado');
+}
+async function removeVenopuncion(i) {
+  const ok = await confirmDelete('¿Eliminar sitio?', `Se eliminará "${currentSpecies.venopuncion_lista?.[i]?.sitio||''}".`);
+  if (!ok) return;
+  currentSpecies.venopuncion_lista.splice(i,1);
+  await dbPutSync('species', currentSpecies); renderTab('fisiologia');
+}
+// Fluid nota helpers
+function editFluidNota() {
+  document.getElementById('fluid-nota-view').style.display='none';
+  document.getElementById('fluid-nota-edit').style.display='block';
+  document.getElementById('fluid-nota-input')?.focus();
+}
+function cancelFluidNota() {
+  document.getElementById('fluid-nota-view').style.display='block';
+  document.getElementById('fluid-nota-edit').style.display='none';
+}
+async function saveFluidNota() {
+  const val = document.getElementById('fluid-nota-input')?.value || '';
+  currentSpecies.fluid_nota = val;
+  await dbPutSync('species', currentSpecies);
+  const view = document.getElementById('fluid-nota-view');
+  if (view) view.innerHTML = val || '—';
+  cancelFluidNota(); toast('✓ Nota guardada');
 }
 
 function addToxico() { document.getElementById('tox-form').style.display = 'block'; document.getElementById('tox-nombre')?.focus(); }
@@ -2670,13 +2797,12 @@ async function removeToxico(i) {
   await dbPutSync('species', currentSpecies); renderTab('nutricion');
 }
 
-function addDiente() { document.getElementById('dient-form').style.display = 'block'; document.getElementById('dient-num')?.focus(); }
+function addDiente() { document.getElementById('dient-form').style.display = 'block'; document.getElementById('dient-tipo')?.focus(); }
 async function saveDiente() {
-  const num = document.getElementById('dient-num')?.value.trim();
   const tipo = document.getElementById('dient-tipo')?.value.trim();
-  if (!num||!tipo) { toast('⚠ Ingresa número y tipo de diente'); return; }
+  if (!tipo) { toast('⚠ Ingresa el tipo de diente'); return; }
   if (!currentSpecies.denticion) currentSpecies.denticion = [];
-  currentSpecies.denticion.push({ num, tipo, sup: document.getElementById('dient-sup')?.value||'0', inf: document.getElementById('dient-inf')?.value||'0', funcion: document.getElementById('dient-func')?.value||'' });
+  currentSpecies.denticion.push({ tipo, sup: document.getElementById('dient-sup')?.value||'0', inf: document.getElementById('dient-inf')?.value||'0', funcion: document.getElementById('dient-func')?.value||'' });
   await dbPutSync('species', currentSpecies); renderTab('nutricion'); toast('✓ Diente agregado');
 }
 async function removeDiente(i) {
@@ -2686,11 +2812,12 @@ async function removeDiente(i) {
   await dbPutSync('species', currentSpecies); renderTab('nutricion');
 }
 async function addDentalMeasure() {
+  const num   = document.getElementById('dm-num')?.value.trim();
   const label = document.getElementById('dm-label')?.value.trim();
   const value = document.getElementById('dm-value')?.value.trim();
   if (!label) { toast('⚠ Describe la medida'); return; }
   if (!currentSpecies.dental_measures) currentSpecies.dental_measures = [];
-  currentSpecies.dental_measures.push({ label, value, date: new Date().toLocaleDateString('es-CO') });
+  currentSpecies.dental_measures.push({ num: num||'—', label, value, date: new Date().toLocaleDateString('es-CO') });
   await dbPutSync('species', currentSpecies);
   renderTab('nutricion');
   toast('✓ Medida registrada');
@@ -2905,11 +3032,27 @@ async function removeCategoria(id) {
 }
 
 function openAddEnfermedad(sistId) {
-  const s = SISTEMAS_ENFERMEDAD.find(x=>x.id===sistId);
+  const s = SISTEMAS_ENFERMEDAD.find(x=>x.id===sistId) ||
+            (currentSpecies.enfermedades_categorias||[]).find(x=>x.id===sistId);
+  document.getElementById('enf-modal')?.remove();
   document.body.insertAdjacentHTML('beforeend', `
     <div id="enf-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
-        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">Agregar enfermedad — ${s?.icon||''} ${s?.label||''}</div>
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.5rem">Agregar enfermedad — ${s?.icon||''} ${s?.label||sistId}</div>
+
+        <!-- Importar desde Excel -->
+        <div style="background:var(--g0);border-radius:var(--rsm);padding:.6rem;margin-bottom:.75rem">
+          <div style="font-size:.75rem;font-weight:600;color:var(--g6);margin-bottom:.3rem">📊 Importar desde Excel (requiere API Key)</div>
+          <div style="display:flex;gap:.4rem">
+            <input type="password" id="enf-api-key" class="form-control" style="flex:1;font-size:.75rem"
+              placeholder="sk-ant-api03-..." value="${localStorage.getItem('wv_api_key')||''}"
+              onchange="localStorage.setItem('wv_api_key',this.value)">
+            <label class="btn btn-secondary btn-sm" for="enf-file-import" style="cursor:pointer;white-space:nowrap">📁 Subir Excel</label>
+            <input type="file" id="enf-file-import" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="importEnfermedadesFile(this,'${sistId}')">
+          </div>
+          <div id="enf-import-status" style="font-size:.72rem;color:var(--g6);margin-top:.25rem;min-height:1rem"></div>
+        </div>
+
         <div class="form-group"><label>Nombre de la enfermedad <span style="color:var(--r5)">*</span></label>
           <input id="enf-nombre" class="form-control" placeholder="Ej: Panleucopenia felina"></div>
         <div class="form-group"><label>Agente / Causa</label>
@@ -2927,6 +3070,46 @@ function openAddEnfermedad(sistId) {
       </div>
     </div>`);
   document.getElementById('enf-nombre')?.focus();
+}
+
+async function importEnfermedadesFile(input, sistId) {
+  if (!input.files?.[0]) return;
+  const statusEl = document.getElementById('enf-import-status');
+  const apiKey = document.getElementById('enf-api-key')?.value.trim() || localStorage.getItem('wv_api_key') || '';
+  if (!apiKey) { statusEl.textContent = '⚠ Ingresa la API Key primero'; statusEl.style.color='var(--r5)'; return; }
+  statusEl.textContent = '⏳ Leyendo archivo...'; statusEl.style.color='var(--g6)';
+  try {
+    const text = await (input.files[0].name.match(/\.xlsx?$/i)
+      ? readExcel(input.files[0])
+      : input.files[0].text());
+    statusEl.textContent = '🤖 Extrayendo con IA...';
+    const sistLabel = (SISTEMAS_ENFERMEDAD.find(x=>x.id===sistId) ||
+                       (currentSpecies.enfermedades_categorias||[]).find(x=>x.id===sistId))?.label || sistId;
+    const prompt = `Analiza este documento y extrae TODAS las enfermedades del sistema "${sistLabel}". Devuelve SOLO un array JSON sin texto adicional:
+[{"nombre":"","agente":"","signos":"","dx":"","tx":""}]
+Documento:\n${text.substring(0,12000)}`;
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:3000, messages:[{role:'user',content:prompt}] })
+    });
+    if (!resp.ok) throw new Error('API error: ' + resp.status);
+    const data = await resp.json();
+    const raw = data.content.map(c=>c.text||'').join('');
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const start = clean.indexOf('['), end = clean.lastIndexOf(']');
+    const enfs = JSON.parse(clean.substring(start, end+1));
+    if (!currentSpecies.enfermedades_sistemas) currentSpecies.enfermedades_sistemas = {};
+    if (!currentSpecies.enfermedades_sistemas[sistId]) currentSpecies.enfermedades_sistemas[sistId] = {notas:'',enfermedades:[]};
+    currentSpecies.enfermedades_sistemas[sistId].enfermedades.push(...enfs);
+    await dbPutSync('species', currentSpecies);
+    document.getElementById('enf-modal')?.remove();
+    renderTab('enfermedades');
+    setTimeout(()=>{ toggleSistema(sistId); }, 100);
+    toast(`✓ ${enfs.length} enfermedad(es) importadas al sistema ${sistLabel}`);
+  } catch(e) {
+    statusEl.textContent = '⚠ ' + e.message; statusEl.style.color='var(--r5)';
+  }
 }
 
 async function saveEnfermedad(sistId) {
@@ -2961,12 +3144,53 @@ async function removeEnfermedad(sistId, idx) {
 }
 function renderComportamiento(el, sp) {
   const b = sp.behavior||{};
-  el.innerHTML = `
-    <div class="info-card"><div class="info-card-title">Comportamiento en vida silvestre</div><p class="text-sm" style="line-height:1.7">${b.wild||'N/D'}</p></div>
-    <div class="info-card"><div class="info-card-title">Comportamiento bajo cuidado profesional</div><p class="text-sm" style="line-height:1.7">${b.captive||'N/D'}</p></div>
-    <div class="info-card"><div class="info-card-title">Comportamiento social</div><p class="text-sm" style="line-height:1.7">${b.social||'N/D'}</p></div>
-    <div class="info-card" style="border-left:3px solid var(--am)"><div class="info-card-title" style="color:var(--am)">Comportamiento bajo estrés</div><p class="text-sm" style="line-height:1.7">${b.stress||'N/D'}</p></div>
-    <div class="info-card"><div class="info-card-title">Comportamiento reproductivo</div><p class="text-sm" style="line-height:1.7">${b.reproductive||'N/D'}</p></div>`;
+  const behaviors = [
+    {key:'wild',      title:'Comportamiento en vida silvestre',       color:''},
+    {key:'captive',   title:'Comportamiento bajo cuidado profesional',color:''},
+    {key:'social',    title:'Comportamiento social',                  color:''},
+    {key:'stress',    title:'Comportamiento bajo estrés',             color:'border-left:3px solid var(--am)'},
+    {key:'reproductive',title:'Comportamiento reproductivo',          color:''}
+  ];
+  el.innerHTML = behaviors.map(bh=>`
+    <div class="info-card" style="${bh.color}">
+      <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
+        ${bh.title}
+        <button onclick="editComportamiento('${bh.key}')" class="btn-inline-edit">✏️ Editar</button>
+      </div>
+      <div id="comp-view-${bh.key}">
+        ${b[bh.key]
+          ? `<p class="text-sm" style="line-height:1.7;white-space:pre-wrap">${b[bh.key]}</p>`
+          : `<p class="text-sm" style="color:var(--txt3);font-style:italic">Sin información registrada.</p>`}
+      </div>
+      <div id="comp-edit-${bh.key}" style="display:none;margin-top:.4rem">
+        <textarea id="comp-input-${bh.key}" class="form-control" style="min-height:80px;font-size:.875rem">${b[bh.key]||''}</textarea>
+        <div style="display:flex;gap:.5rem;margin-top:.4rem">
+          <button class="btn btn-secondary btn-sm" onclick="cancelComportamiento('${bh.key}')">Cancelar</button>
+          <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveComportamiento('${bh.key}')">💾 Guardar</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+function editComportamiento(key) {
+  document.getElementById('comp-view-'+key).style.display = 'none';
+  document.getElementById('comp-edit-'+key).style.display = 'block';
+  document.getElementById('comp-input-'+key)?.focus();
+}
+function cancelComportamiento(key) {
+  document.getElementById('comp-view-'+key).style.display = 'block';
+  document.getElementById('comp-edit-'+key).style.display = 'none';
+}
+async function saveComportamiento(key) {
+  const val = document.getElementById('comp-input-'+key)?.value || '';
+  if (!currentSpecies.behavior) currentSpecies.behavior = {};
+  currentSpecies.behavior[key] = val;
+  await dbPutSync('species', currentSpecies);
+  const viewEl = document.getElementById('comp-view-'+key);
+  if (viewEl) viewEl.innerHTML = val
+    ? `<p class="text-sm" style="line-height:1.7;white-space:pre-wrap">${val}</p>`
+    : `<p class="text-sm" style="color:var(--txt3);font-style:italic">Sin información registrada.</p>`;
+  cancelComportamiento(key);
+  toast('✓ Guardado');
 }
 function renderMedicamentos(el, sp) {
   const isAdmin = currentUser?.role==='admin';
@@ -3171,10 +3395,10 @@ function renderFluidoterapia(el, sp) {
         </div>
         <div class="fluid-input-group"><label>Mantenimiento (ml/kg/día)</label>
           <select id="fl-m" onchange="calcFluids()">
-            <option value="40">40 ml/kg — Reptiles</option>
-            <option value="50" selected>50 ml/kg — Mamíferos</option>
-            <option value="60">60 ml/kg — Aves / Neonatos</option>
-            <option value="80">80 ml/kg — Megavertebrados</option>
+            <option value="40">40 ml/kg/día</option>
+            <option value="50" selected>50 ml/kg/día</option>
+            <option value="60">60 ml/kg/día</option>
+            <option value="80">80 ml/kg/día</option>
           </select>
         </div>
         <div></div>
@@ -3200,9 +3424,21 @@ function renderFluidoterapia(el, sp) {
       <div class="drip-card"><div class="drip-type">Normogotero</div><div class="drip-value" id="drip-no">—</div><div class="drip-unit">gts/seg · 20 gts/ml</div></div>
       <div class="drip-card"><div class="drip-type">Macrogotero</div><div class="drip-value" id="drip-ma">—</div><div class="drip-unit">gts/seg · 10 gts/ml</div></div>
     </div>
-    <div class="note-box" style="margin-top:.75rem">
-      <strong>Protocolo:</strong> Reponer 50% del déficit en las primeras 6–8h + mantenimiento continuo. Reevaluar hidratación c/4–6h.<br>
-      <span style="font-size:.75rem;opacity:.85">Vómito: ~4 ml/kg/episodio · Diarrea: ~6 ml/kg/episodio (estimados estándar para mamíferos)</span>
+    <div class="note-box" style="margin-top:.75rem;position:relative">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.25rem">
+        <strong>Nota clínica</strong>
+        <button onclick="editFluidNota()" class="btn-inline-edit" style="font-size:.7rem">✏️ Editar</button>
+      </div>
+      <div id="fluid-nota-view">
+        ${sp.fluid_nota||'Reponer 50% del déficit en las primeras 6–8h + mantenimiento continuo. Reevaluar hidratación c/4–6h.<br><span style="font-size:.75rem;opacity:.85">Vómito: ~4 ml/kg/episodio · Diarrea: ~6 ml/kg/episodio</span>'}
+      </div>
+      <div id="fluid-nota-edit" style="display:none;margin-top:.4rem">
+        <textarea id="fluid-nota-input" class="form-control" style="min-height:80px;font-size:.82rem">${sp.fluid_nota||'Reponer 50% del déficit en las primeras 6–8h + mantenimiento continuo. Reevaluar hidratación c/4–6h.'}</textarea>
+        <div style="display:flex;gap:.4rem;margin-top:.4rem">
+          <button class="btn btn-secondary btn-sm" onclick="cancelFluidNota()">Cancelar</button>
+          <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveFluidNota()">💾 Guardar nota</button>
+        </div>
+      </div>
     </div>`;
   calcFluids();
 }
@@ -3691,10 +3927,14 @@ function buildSpeciesForm(sp) {
     </div>
     <div class="form-row">
       <div class="form-group"><label>CITES</label>
-        <input id="sp-cons-cites" class="form-control" value="${cons.cites||''}" placeholder="Apéndice I, II, III o No listada">
+        <select id="sp-cons-cites" class="form-control">
+          ${['No listada','Apéndice I','Apéndice II','Apéndice III'].map(o=>`<option ${(cons.cites||'No listada')===o?'selected':''}>${o}</option>`).join('')}
+        </select>
       </div>
       <div class="form-group"><label>Resolución 0126 de 2024 (Colombia)</label>
-        <input id="sp-cons-res0126" class="form-control" value="${cons.res0126||''}" placeholder="Categoría">
+        <select id="sp-cons-res0126" class="form-control">
+          ${['No evaluada','Preocupación menor (LC)','Casi amenazada (NT)','Vulnerable (VU)','En peligro (EN)','En peligro crítico (CR)','Extinta en estado silvestre (EW)','Extinta (EX)','Datos insuficientes (DD)'].map(o=>`<option ${(cons.res0126||'No evaluada')===o?'selected':''}>${o}</option>`).join('')}
+        </select>
       </div>
     </div>
 
@@ -3970,6 +4210,19 @@ async function deleteSpecies(id) {
 function openAddSpeciesDrug() {
   const f = document.getElementById('modal-species-drug-form');
   f.innerHTML = `
+    <!-- Importar desde Excel -->
+    <div style="background:var(--g0);border-radius:var(--rsm);padding:.6rem;margin-bottom:.75rem">
+      <div style="font-size:.75rem;font-weight:600;color:var(--g6);margin-bottom:.3rem">📊 Importar fármacos desde Excel (requiere API Key)</div>
+      <div style="display:flex;gap:.4rem">
+        <input type="password" id="drug-api-key" class="form-control" style="flex:1;font-size:.75rem"
+          placeholder="sk-ant-api03-..." value="${localStorage.getItem('wv_api_key')||''}"
+          onchange="localStorage.setItem('wv_api_key',this.value)">
+        <label class="btn btn-secondary btn-sm" for="drug-file-import" style="cursor:pointer;white-space:nowrap">📁 Subir Excel</label>
+        <input type="file" id="drug-file-import" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="importFarmacosFile(this)">
+      </div>
+      <div id="drug-import-status" style="font-size:.72rem;color:var(--g6);margin-top:.25rem;min-height:1rem"></div>
+    </div>
+
     <div class="form-group"><label>Nombre del fármaco</label><input id="sdrug-name" class="form-control" placeholder="Ej: Ketamina"></div>
     <div class="form-row">
       <div class="form-group"><label>Categoría</label><input id="sdrug-cat" class="form-control" placeholder="Disociativo, AINE..."></div>
@@ -3992,6 +4245,45 @@ function openAddSpeciesDrug() {
       <button class="btn btn-primary" style="flex:1" onclick="saveSpeciesDrug()">Agregar fármaco</button>
     </div>`;
   document.getElementById('modal-species-drug').classList.add('open');
+}
+
+async function importFarmacosFile(input) {
+  if (!input.files?.[0]) return;
+  const statusEl = document.getElementById('drug-import-status');
+  const apiKey = document.getElementById('drug-api-key')?.value.trim() || localStorage.getItem('wv_api_key') || '';
+  if (!apiKey) { statusEl.textContent = '⚠ Ingresa la API Key primero'; statusEl.style.color='var(--r5)'; return; }
+  statusEl.textContent = '⏳ Leyendo archivo...'; statusEl.style.color='var(--g6)';
+  try {
+    const text = await (input.files[0].name.match(/\.xlsx?$/i)
+      ? readExcel(input.files[0])
+      : input.files[0].text());
+    statusEl.textContent = '🤖 Extrayendo fármacos con IA...';
+    const prompt = `Analiza este documento y extrae TODOS los fármacos/medicamentos para fauna silvestre. Devuelve SOLO un array JSON sin texto adicional:
+[{"name":"","cat":"categoría farmacológica","conc":0,"dose_min":0,"dose":0,"dose_max":0,"route":"IM","freq":"","effects":"","sites":"","notes":""}]
+Documento:\n${text.substring(0,12000)}`;
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:4000, messages:[{role:'user',content:prompt}] })
+    });
+    if (!resp.ok) throw new Error('API error: ' + resp.status);
+    const data = await resp.json();
+    const raw = data.content.map(c=>c.text||'').join('');
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const start = clean.indexOf('['), end = clean.lastIndexOf(']');
+    const drugs = JSON.parse(clean.substring(start, end+1));
+    if (!currentSpecies.drugs) currentSpecies.drugs = [];
+    currentSpecies.drugs.push(...drugs);
+    await dbPutSync('species', currentSpecies);
+    // Sincronizar con vademécum
+    for (const drug of drugs) await syncDrugToVademecum(drug, currentSpecies.name, currentSpecies.sci);
+    VADEMECUM_DB = await dbGetAll('vademecum');
+    closeModal('modal-species-drug');
+    renderTab('medicamentos');
+    toast(`✓ ${drugs.length} fármaco(s) importados`);
+  } catch(e) {
+    statusEl.textContent = '⚠ ' + e.message; statusEl.style.color='var(--r5)';
+  }
 }
 
 // ═══════════════════════════════════
