@@ -517,8 +517,8 @@ textarea.form-control{resize:vertical;min-height:70px}
             onkeydown="if(event.key==='Enter')addAdminEmail()">
           <button class="btn btn-primary btn-sm" onclick="addAdminEmail()">+ Agregar</button>
         </div>
-        <button class="btn btn-secondary btn-sm" style="margin-top:.4rem;width:100%" onclick="addAdminEmail(true)">
-          ✓ Agregar mi cuenta actual (${currentUser?.email||''})
+        <button class="btn btn-secondary btn-sm" style="margin-top:.4rem;width:100%" id="btn-add-my-account" onclick="addAdminEmail(true)">
+          ✓ Agregar mi cuenta actual
         </button>
       </div>
     </div>
@@ -1189,8 +1189,30 @@ async function loginWithGoogle() {
 let ADMIN_EMAILS = [];
 
 async function loadAdminEmails() {
+  // Intentar leer de Firestore primero (para que funcione en todos los dispositivos)
+  if (firestore && fbUid()) {
+    try {
+      const snap = await firestore.collection('settings').doc('admin_emails').get();
+      if (snap.exists) {
+        ADMIN_EMAILS = snap.data().value || [];
+        await dbPut('settings', { key: 'admin_emails', value: ADMIN_EMAILS });
+        return;
+      }
+    } catch(e) { /* fallback a local */ }
+  }
+  // Fallback: leer de IndexedDB local
   const saved = await dbGet('settings', 'admin_emails');
   ADMIN_EMAILS = saved?.value || [];
+}
+
+async function saveAdminEmails() {
+  await dbPut('settings', { key: 'admin_emails', value: ADMIN_EMAILS });
+  // Guardar en Firestore para sincronizar entre dispositivos
+  if (firestore && fbUid()) {
+    try {
+      await firestore.collection('settings').doc('admin_emails').set({ value: ADMIN_EMAILS });
+    } catch(e) { console.warn('No se pudo guardar admin_emails en Firestore:', e.message); }
+  }
 }
 
 async function addAdminEmail(useCurrent = false) {
@@ -1201,7 +1223,7 @@ async function addAdminEmail(useCurrent = false) {
   if (!email.includes('@')) { toast('⚠ Correo inválido'); return; }
   if (ADMIN_EMAILS.includes(email)) { toast('Este correo ya es admin'); return; }
   ADMIN_EMAILS.push(email);
-  await dbPut('settings', { key: 'admin_emails', value: ADMIN_EMAILS });
+  await saveAdminEmails();
   // Si es el usuario actual, actualizar rol inmediatamente
   if (currentUser?.email === email) {
     currentUser.role = 'admin';
@@ -1217,13 +1239,16 @@ async function removeAdminEmail(email) {
   const ok = await confirmDelete('¿Quitar acceso admin?', `"${email}" pasará a ser colaborador la próxima vez que inicie sesión.`);
   if (!ok) return;
   ADMIN_EMAILS = ADMIN_EMAILS.filter(e => e !== email);
-  await dbPut('settings', { key: 'admin_emails', value: ADMIN_EMAILS });
+  await saveAdminEmails();
   renderAdminEmailsList();
   toast('✓ Acceso admin removido de ' + email);
 }
 
 function renderAdminEmailsList() {
   const el = document.getElementById('admin-emails-list');
+  // Actualizar texto del botón con email actual
+  const btn = document.getElementById('btn-add-my-account');
+  if (btn && currentUser?.email) btn.textContent = '✓ Agregar mi cuenta actual (' + currentUser.email + ')';
   if (!el) return;
   if (!ADMIN_EMAILS.length) {
     el.innerHTML = '<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin cuentas admin configuradas.</p>';
@@ -1234,7 +1259,7 @@ function renderAdminEmailsList() {
       <div style="display:flex;align-items:center;gap:.4rem">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--g6)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span style="font-size:.78rem;color:var(--txt)">${email}</span>
-        ${email === currentUser?.email ? '<span style="font-size:.65rem;color:var(--g6);background:var(--g1);padding:.05rem .3rem;border-radius:var(--rxs)">tú</span>' : ''}
+        ${email === currentUser?.email ? '<span style="font-size:.65rem;color:var(--g6);background:var(--g1);padding:.05rem .3rem;border-radius:var(--rxs);margin-left:.3rem">tú</span>' : ''}
       </div>
       <button onclick="removeAdminEmail('${email}')" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem;padding:.1rem .3rem">✕</button>
     </div>`).join('');
@@ -1244,18 +1269,17 @@ async function finishGoogleLogin(profile) {
   const btn = document.getElementById('google-btn');
   if (btn) btn.disabled = false;
 
-  // Cargar lista de emails admin
+  // Cargar lista de emails admin (Firestore si disponible, sino local)
   await loadAdminEmails();
 
-  // Determinar rol: admin si el email está en la lista
-  const email = profile.email?.toLowerCase() || '';
-  const isAdminEmail = ADMIN_EMAILS.includes(email);
+  const email = (profile.email || '').toLowerCase();
+  const isAdminEmail = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email);
 
   currentUser = {
-    uid: profile.uid,
-    name: profile.name,
-    email: profile.email,
-    role: isAdminEmail ? 'admin' : 'colaborador',
+    uid:    profile.uid,
+    name:   profile.name,
+    email:  profile.email,
+    role:   isAdminEmail ? 'admin' : 'colaborador',
     avatar: profile.avatar
   };
 
@@ -1265,14 +1289,14 @@ async function finishGoogleLogin(profile) {
     if (saved?.value?.role) currentUser.role = saved.value.role;
   }
 
-  await dbPut('settings', { key: 'user', value: currentUser });
+  await dbPut('settings', { key: 'user',                value: currentUser });
   await dbPut('settings', { key: 'user_' + profile.uid, value: currentUser });
   document.getElementById('login-screen').style.display = 'none';
   updateUserUI();
   await loadData();
   updateAdminUI();
   renderSpeciesGrid();
-  const roleMsg = currentUser.role === 'admin' ? ' · Administrador' : '';
+  const roleMsg = currentUser.role === 'admin' ? ' · Administrador ✓' : '';
   toast('✓ Bienvenido, ' + currentUser.name.split(' ')[0] + roleMsg);
 }
 
@@ -6338,7 +6362,6 @@ if ('serviceWorker' in navigator) {
 // ═══════════════════════════════════
 async function init() {
   await initDB();
-  await loadAdminEmails(); // Cargar emails admin antes de cualquier login
   initFirebase(FIREBASE_CONFIG_BUILTIN);
   // Dar tiempo a Firebase para verificar sesión persistente (onAuthStateChanged)
   await new Promise(r => setTimeout(r, 900));
