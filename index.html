@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -525,6 +526,9 @@ textarea.form-control{resize:vertical;min-height:70px}
     <div style="display:flex;gap:.3rem;margin-left:.3rem">
       <button onclick="exportSpeciesWord(currentSpecies)" title="Descargar Word" style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .5rem;cursor:pointer;font-size:.7rem;font-family:var(--sans)">📄 Word</button>
       <button onclick="exportSpeciesPDF(currentSpecies)"  title="Exportar PDF"  style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .5rem;cursor:pointer;font-size:.7rem;font-family:var(--sans)">🖨 PDF</button>
+      <label for="multitab-excel-up" title="Importar Excel multi-pestaña" style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .5rem;cursor:pointer;font-size:.7rem;font-family:var(--sans);display:inline-flex;align-items:center;gap:.25rem">📊 Excel</label>
+      <input type="file" id="multitab-excel-up" accept=".xlsx,.xls" style="display:none" onchange="importExcelMultiTab(this)">
+      <div id="sp-import-multitab-status" style="font-size:.65rem;color:var(--g3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
     </div>
   </div>
   <div class="tabs-scroll">
@@ -1462,43 +1466,45 @@ async function loginDemo(role='colaborador') {
   toast('✓ Sesión iniciada — '+( role==='admin'?'Administrador':'Colaborador' ));
 }
 async function loadData() {
-  // ── 1. Cargar desde Firestore (fuente de verdad en la nube) ──
-  const fromCloud = firestore && fbUid();
+  // ── Cargar desde Firestore (fuente de verdad compartida) ──
+  const fromCloud = !!(firestore && fbUid());
 
   if (fromCloud) {
-    toast('⏳ Sincronizando con la nube...');
+    toast('⏳ Cargando datos...');
     try {
-      // Especies
-      const fsSpecies = await fsGetAll('species');
-      if (fsSpecies?.length) {
-        SPECIES_DB = fsSpecies;
-        // Actualizar cache local
-        for (const s of fsSpecies) await dbPut('species', s);
-      } else {
-        // Primera vez: subir defaults a Firestore
+      // ── Especies ──
+      let fsSpecies = await fsGetAll('species');
+
+      // Si Firestore vacío, subir las locales o las default
+      if (!fsSpecies?.length) {
         const localSpecies = await dbGetAll('species');
         SPECIES_DB = localSpecies.length ? localSpecies : [...DEFAULT_SPECIES];
-        if (!localSpecies.length) { for (const s of DEFAULT_SPECIES) await dbPut('species', s); }
-        for (const s of SPECIES_DB) await fsPut('species', s);
+        if (!localSpecies.length) {
+          for (const s of DEFAULT_SPECIES) await dbPut('species', s);
+        }
+        // Subir todas a Firestore
+        await Promise.all(SPECIES_DB.map(s => fsPut('species', s)));
+        toast('☁ Datos subidos a la nube');
+      } else {
+        SPECIES_DB = fsSpecies;
+        for (const s of fsSpecies) await dbPut('species', s);
       }
 
-      // Vademécum
+      // ── Vademécum ──
       const fsVad = await fsGetAll('vademecum');
       if (fsVad?.length) {
         VADEMECUM_DB = fsVad;
         for (const v of fsVad) await dbPut('vademecum', v);
       } else {
         const localVad = await dbGetAll('vademecum');
-        if (localVad.length) {
-          VADEMECUM_DB = localVad;
-          for (const v of localVad) await fsPut('vademecum', v);
-        } else {
-          VADEMECUM_DB = [...DEFAULT_VADEMECUM];
-          for (const v of DEFAULT_VADEMECUM) { await dbPut('vademecum', v); await fsPut('vademecum', v); }
+        VADEMECUM_DB = localVad.length ? localVad : [...DEFAULT_VADEMECUM];
+        if (!localVad.length) {
+          for (const v of DEFAULT_VADEMECUM) await dbPut('vademecum', v);
         }
+        await Promise.all(VADEMECUM_DB.map(v => fsPut('vademecum', v)));
       }
 
-      // Historias clínicas — solo las de este usuario
+      // ── Historias clínicas (solo del usuario actual) ──
       const fsRecords = await fsGetRecords();
       if (fsRecords?.length) {
         clinicalRecords = fsRecords;
@@ -1508,7 +1514,7 @@ async function loadData() {
         for (const r of clinicalRecords) await fsPut('records', { ...r, uid: fbUid() });
       }
 
-      // Inventario
+      // ── Inventario ──
       const fsInv = await fsGetAll('inventory');
       if (fsInv?.length) {
         inventoryItems = fsInv;
@@ -1519,8 +1525,8 @@ async function loadData() {
       }
 
     } catch(e) {
-      console.warn('Error sync Firestore, usando cache local:', e.message);
-      // Fallback a IndexedDB
+      console.warn('Firestore error, usando cache local:', e.message);
+      toast('⚠ Sin conexión — usando datos locales');
       clinicalRecords = await dbGetAll('records');
       inventoryItems  = await dbGetAll('inventory');
       const ls = await dbGetAll('species');
@@ -1529,7 +1535,7 @@ async function loadData() {
       VADEMECUM_DB = lv.length ? lv : [...DEFAULT_VADEMECUM];
     }
   } else {
-    // ── Sin Firestore: solo IndexedDB local ──
+    // ── Sin Firestore: solo cache local ──
     clinicalRecords = await dbGetAll('records');
     inventoryItems  = await dbGetAll('inventory');
     const savedSpecies = await dbGetAll('species');
@@ -2131,8 +2137,13 @@ function renderGeneral(el, sp) {
     <div class="info-card">
       <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
         Biometría
-        ${isAdmin?`<button onclick="addBiometriaRow()" class="btn btn-admin btn-sm" style="font-size:.68rem">+ Agregar dato</button>`:''}
+        ${isAdmin?`<div style="display:flex;gap:.4rem;align-items:center">
+          <label for="biom-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem">📊 Excel</label>
+          <input type="file" id="biom-excel-up" accept=".xlsx,.xls,.csv" style="display:none" onchange="importBiometriaExcel(this)">
+          <button onclick="addBiometriaRow()" class="btn btn-admin btn-sm" style="font-size:.68rem">+ Agregar dato</button>
+        </div>`:''}
       </div>
+      <div id="biom-excel-status" style="font-size:.72rem;color:var(--g6);min-height:.9rem"></div>
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse">
           <thead>${tblH}</thead>
@@ -2173,8 +2184,13 @@ function renderGeneral(el, sp) {
     <div class="info-card">
       <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
         Longevidad y Reproducción
-        ${isAdmin?`<span style="font-size:.68rem;color:var(--g6);font-weight:400">Toca los campos para editar</span>`:''}
+        ${isAdmin?`<div style="display:flex;gap:.4rem;align-items:center">
+          <label for="life-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem">📊 Excel</label>
+          <input type="file" id="life-excel-up" accept=".xlsx,.xls,.csv" style="display:none" onchange="importLongevidadExcel(this)">
+          <span style="font-size:.68rem;color:var(--g6);font-weight:400">Toca los campos para editar</span>
+        </div>`:''}
       </div>
+      <div id="life-excel-status" style="font-size:.72rem;color:var(--g6);min-height:.9rem"></div>
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse">
           <thead>${tblLifeH}</thead>
@@ -2340,8 +2356,13 @@ function renderFisiologia(el, sp) {
     <div class="info-card">
       <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
         Hematología básica
-        ${isAdmin?`<button class="btn btn-admin btn-sm" onclick="addHemoRow('hemo-table','hematology')">+ Agregar</button>`:''}
+        ${isAdmin?`<div style="display:flex;gap:.4rem;align-items:center">
+          <label for="hemo-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem">📊 Excel</label>
+          <input type="file" id="hemo-excel-up" accept=".xlsx,.xls,.csv" style="display:none" onchange="importHemoExcel(this,'hematology')">
+          <button class="btn btn-admin btn-sm" onclick="addHemoRow('hemo-table','hematology')">+ Agregar</button>
+        </div>`:''}
       </div>
+      <div id="hemo-excel-status" style="font-size:.72rem;color:var(--g6);min-height:.9rem"></div>
       <table style="width:100%;font-size:.82rem;border-collapse:collapse" id="hemo-table">
         <thead><tr>
           <th style="text-align:left;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Parámetro</th>
@@ -2363,8 +2384,13 @@ function renderFisiologia(el, sp) {
     <div class="info-card">
       <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
         Bioquímicas relevantes
-        ${isAdmin?`<button class="btn btn-admin btn-sm" onclick="addHemoRow('bio-table','biochem')">+ Agregar</button>`:''}
+        ${isAdmin?`<div style="display:flex;gap:.4rem;align-items:center">
+          <label for="bio-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem">📊 Excel</label>
+          <input type="file" id="bio-excel-up" accept=".xlsx,.xls,.csv" style="display:none" onchange="importHemoExcel(this,'biochem')">
+          <button class="btn btn-admin btn-sm" onclick="addHemoRow('bio-table','biochem')">+ Agregar</button>
+        </div>`:''}
       </div>
+      <div id="bio-excel-status" style="font-size:.72rem;color:var(--g6);min-height:.9rem"></div>
       <table style="width:100%;font-size:.82rem;border-collapse:collapse" id="bio-table">
         <thead><tr>
           <th style="text-align:left;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Parámetro</th>
@@ -2583,22 +2609,35 @@ function renderNutricion(el, sp) {
     <div class="info-card">
       <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
         Fórmula Dentaria
-        ${isAdmin?`<button onclick="addDiente()" class="btn btn-admin btn-sm">+ Diente</button>`:''}
+        ${isAdmin?`<div style="display:flex;gap:.4rem;align-items:center">
+          <label for="dent-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem">📊 Excel</label>
+          <input type="file" id="dent-excel-up" accept=".xlsx,.xls,.csv" style="display:none" onchange="importFormulaDentariaExcel(this)">
+          <button onclick="addDiente()" class="btn btn-admin btn-sm">+ Diente</button>
+        </div>`:''}
       </div>
+      <div id="dent-excel-status" style="font-size:.72rem;color:var(--g6);min-height:.9rem"></div>
       ${denticion.length ? `
       <div style="overflow-x:auto;margin-bottom:.5rem">
         <table style="width:100%;border-collapse:collapse;font-size:.8rem">
           <thead><tr style="background:var(--sur2)">
             ${['Tipo de diente','Superior','Inferior','Función'].map(h=>`<th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.68rem;color:var(--txt3)">${h}</th>`).join('')}
-            ${isAdmin?'<th style="border-bottom:1px solid var(--bor);width:24px"></th>':''}
+            ${isAdmin?'<th style="border-bottom:1px solid var(--bor);width:48px"></th>':''}
           </tr></thead>
           <tbody>
-            ${denticion.map((d,i)=>`<tr>
-              <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">${d.tipo}</td>
-              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)">${d.sup}</td>
-              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)">${d.inf}</td>
-              <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-size:.75rem;color:var(--txt3)">${d.funcion||'—'}</td>
-              ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button onclick="removeDiente(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button></td>`:''}
+            ${denticion.map((d,i)=>`<tr id="dent-row-${i}">
+              <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
+                ${isAdmin?`<input type="text" value="${d.tipo}" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--sans);font-size:.82rem;color:var(--txt)" onchange="editDiente(${i},'tipo',this.value)">`:d.tipo}
+              </td>
+              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor)">
+                ${isAdmin?`<input type="text" value="${d.sup}" style="width:50px;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.82rem;color:var(--txt);text-align:center" onchange="editDiente(${i},'sup',this.value)">`:d.sup}
+              </td>
+              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor)">
+                ${isAdmin?`<input type="text" value="${d.inf}" style="width:50px;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.82rem;color:var(--txt);text-align:center" onchange="editDiente(${i},'inf',this.value)">`:d.inf}
+              </td>
+              <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
+                ${isAdmin?`<input type="text" value="${d.funcion||''}" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--sans);font-size:.75rem;color:var(--txt3)" placeholder="Función..." onchange="editDiente(${i},'funcion',this.value)">`:d.funcion||'—'}
+              </td>
+              ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button onclick="removeDiente(${i})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.7rem;padding:.1rem .3rem;font-weight:700">✕</button></td>`:''}
             </tr>`).join('')}
           </tbody>
         </table>
@@ -2831,6 +2870,141 @@ async function removeDentalMeasure(i) {
   renderTab('nutricion');
   toast('Medida eliminada');
 }
+// ── Helper: importar Excel con IA para cualquier sección ──
+async function importExcelWithAI(file, prompt) {
+  const rawKey = localStorage.getItem('wv_api_key') || '';
+  const apiKey = rawKey.replace(/[\s\u200B\u00A0\uFEFF]/g, '').trim();
+  if (!apiKey || !apiKey.startsWith('sk-')) {
+    throw new Error('API Key inválida. Configurala en Admin → Nueva Especie → campo API Key');
+  }
+  const text = await (file.name.match(/\.xlsx?$/i) ? readExcel(file) : file.text());
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 3000,
+      messages: [{ role: 'user', content: prompt + '\n\nDocumento:\n' + text.substring(0, 12000) }]
+    })
+  });
+  if (!resp.ok) throw new Error('API error: ' + resp.status);
+  const data = await resp.json();
+  const raw = data.content.map(c => c.text || '').join('');
+  const clean = raw.replace(/```json|```/g, '').trim();
+  const s = clean.indexOf('['), e = clean.lastIndexOf(']');
+  if (s === -1) throw new Error('No se encontró JSON en la respuesta');
+  return JSON.parse(clean.substring(s, e + 1));
+}
+
+// Hematología / Bioquímica desde Excel
+async function importHemoExcel(input, field) {
+  if (!input.files?.[0]) return;
+  const statusId = field === 'hematology' ? 'hemo-excel-status' : 'bio-excel-status';
+  const statusEl = document.getElementById(statusId);
+  if (statusEl) { statusEl.textContent = '⏳ Procesando...'; statusEl.style.color = 'var(--g6)'; }
+  try {
+    const label = field === 'hematology' ? 'hematología' : 'bioquímica sérica';
+    const items = await importExcelWithAI(input.files[0],
+      `Extrae todos los parámetros de ${label} de este documento. Devuelve SOLO un array JSON:
+[["nombre parámetro", "rango normal", "unidades"]]
+Ejemplo: [["Eritrocitos", "4.5-6.5", "x10⁶/μL"], ["Hematocrito", "36-48", "%"]]`);
+    if (!currentSpecies[field]) currentSpecies[field] = [];
+    currentSpecies[field].push(...items);
+    await dbPutSync('species', currentSpecies);
+    renderTab('fisiologia');
+    if (statusEl) { statusEl.textContent = `✅ ${items.length} parámetros importados`; statusEl.style.color = 'var(--g5)'; }
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + e.message; statusEl.style.color = 'var(--r5)'; }
+  }
+}
+
+// Biometría desde Excel
+async function importBiometriaExcel(input) {
+  if (!input.files?.[0]) return;
+  const statusEl = document.getElementById('biom-excel-status');
+  if (statusEl) { statusEl.textContent = '⏳ Procesando...'; statusEl.style.color = 'var(--g6)'; }
+  try {
+    const items = await importExcelWithAI(input.files[0],
+      `Extrae los datos biométricos con valores por sexo. Devuelve SOLO un array JSON:
+[{"label":"nombre del parámetro","m":"valor macho","f":"valor hembra"}]
+Ejemplo: [{"label":"Peso promedio (kg)","m":"70-100","f":"55-80"},{"label":"Longitud cabeza-cuerpo (cm)","m":"112-185","f":"105-170"}]`);
+    if (!currentSpecies.biometria) currentSpecies.biometria = {};
+    if (!currentSpecies.biometria._extra) currentSpecies.biometria._extra = [];
+    // Mapear a campos conocidos o agregar como extra
+    const known = { 'peso promedio': 'peso_prom', 'rango de peso': 'peso_rango', 'longitud cabeza': 'long_cc', 'longitud de cola': 'long_cola', 'altura a la cruz': 'altura_cruz' };
+    items.forEach(item => {
+      const key = Object.keys(known).find(k => item.label?.toLowerCase().includes(k));
+      if (key) {
+        currentSpecies.biometria[known[key]] = { m: item.m || '', f: item.f || '' };
+      } else {
+        currentSpecies.biometria._extra.push({ label: item.label, m: item.m || '', f: item.f || '' });
+      }
+    });
+    await dbPutSync('species', currentSpecies);
+    renderTab('general');
+    if (statusEl) { statusEl.textContent = `✅ ${items.length} datos biométricos importados`; statusEl.style.color = 'var(--g5)'; }
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + e.message; statusEl.style.color = 'var(--r5)'; }
+  }
+}
+
+// Longevidad desde Excel
+async function importLongevidadExcel(input) {
+  if (!input.files?.[0]) return;
+  const statusEl = document.getElementById('life-excel-status');
+  if (statusEl) { statusEl.textContent = '⏳ Procesando...'; statusEl.style.color = 'var(--g6)'; }
+  try {
+    const items = await importExcelWithAI(input.files[0],
+      `Extrae datos de longevidad y reproducción con valores para vida silvestre y bajo cuidado profesional. Devuelve SOLO un array JSON:
+[{"campo":"nombre del parámetro","silv":"valor silvestre","prof":"valor bajo cuidado"}]
+Campos esperados: esperanza de vida, edad promedio, edad máxima, madurez sexual, gestación.
+Ejemplo: [{"campo":"esp_vida","silv":"10-12 años","prof":"18-22 años"},{"campo":"gestacion","silv":"93-105 días","prof":"93-105 días"}]
+Los campos deben ser uno de: esp_vida, edad_prom, edad_max, mad_sexual, gestacion`);
+    if (!currentSpecies.biometria) currentSpecies.biometria = {};
+    items.forEach(item => {
+      if (item.campo) currentSpecies.biometria[item.campo] = { silv: item.silv || '', prof: item.prof || '' };
+    });
+    await dbPutSync('species', currentSpecies);
+    renderTab('general');
+    if (statusEl) { statusEl.textContent = `✅ ${items.length} datos de longevidad importados`; statusEl.style.color = 'var(--g5)'; }
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + e.message; statusEl.style.color = 'var(--r5)'; }
+  }
+}
+
+// Fórmula dentaria desde Excel
+async function importFormulaDentariaExcel(input) {
+  if (!input.files?.[0]) return;
+  const statusEl = document.getElementById('dent-excel-status');
+  if (statusEl) { statusEl.textContent = '⏳ Procesando...'; statusEl.style.color = 'var(--g6)'; }
+  try {
+    const items = await importExcelWithAI(input.files[0],
+      `Extrae la fórmula dentaria. Devuelve SOLO un array JSON:
+[{"tipo":"tipo de diente","sup":"cantidad superior","inf":"cantidad inferior","funcion":"función"}]
+Ejemplo: [{"tipo":"Incisivo","sup":"3","inf":"3","funcion":"Corte"},{"tipo":"Canino","sup":"1","inf":"1","funcion":"Prensión, sujeción de presas"}]`);
+    if (!currentSpecies.denticion) currentSpecies.denticion = [];
+    currentSpecies.denticion.push(...items);
+    await dbPutSync('species', currentSpecies);
+    renderTab('nutricion');
+    if (statusEl) { statusEl.textContent = `✅ ${items.length} dientes importados`; statusEl.style.color = 'var(--g5)'; }
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + e.message; statusEl.style.color = 'var(--r5)'; }
+  }
+}
+
+// Editar campo de fórmula dentaria inline
+async function editDiente(i, field, value) {
+  if (!currentSpecies.denticion?.[i]) return;
+  currentSpecies.denticion[i][field] = value;
+  await dbPutSync('species', currentSpecies);
+}
+
+// importDentalMeasures actualizada con N° diente
 async function importDentalMeasures(input) {
   const statusEl = document.getElementById('dental-excel-status');
   if (!input.files||!input.files[0]) return;
@@ -2843,15 +3017,145 @@ async function importDentalMeasures(input) {
     lines.forEach(line => {
       const parts = line.split(',');
       if (parts.length >= 2 && parts[0].trim()) {
-        currentSpecies.dental_measures.push({ label: parts[0].trim(), value: parts[1]?.trim()||'', date: parts[2]?.trim()||new Date().toLocaleDateString('es-CO') });
+        // Formato: N°, descripción, valor, fecha  o  descripción, valor, fecha
+        const hasNum = parts.length >= 3 && !isNaN(parts[0].trim().replace(/[°#]/g,''));
+        if (hasNum) {
+          currentSpecies.dental_measures.push({ num: parts[0].trim(), label: parts[1]?.trim()||'', value: parts[2]?.trim()||'', date: parts[3]?.trim()||new Date().toLocaleDateString('es-CO') });
+        } else {
+          currentSpecies.dental_measures.push({ num: '—', label: parts[0].trim(), value: parts[1]?.trim()||'', date: parts[2]?.trim()||new Date().toLocaleDateString('es-CO') });
+        }
         added++;
       }
     });
     await dbPutSync('species', currentSpecies);
     renderTab('nutricion');
-    statusEl.textContent = `✅ ${added} filas importadas`;
+    statusEl.textContent = `✅ ${added} medidas importadas`;
   } catch(e) {
     statusEl.textContent = '⚠ Error al leer archivo';
+  }
+}
+
+// ═══════════════════════════════════
+// IMPORTACIÓN EXCEL MULTI-PESTAÑA (ficha completa)
+// ═══════════════════════════════════
+async function importExcelMultiTab(input) {
+  if (!input.files?.[0]) return;
+  const statusEl = document.getElementById('sp-import-multitab-status');
+  const rawKey = localStorage.getItem('wv_api_key') || document.getElementById('sp-api-key')?.value || '';
+  const apiKey = rawKey.replace(/[\s\u200B\u00A0\uFEFF]/g, '').trim();
+  if (!apiKey || !apiKey.startsWith('sk-')) {
+    if (statusEl) { statusEl.textContent = '⚠ API Key requerida'; statusEl.style.color = 'var(--r5)'; }
+    return;
+  }
+  if (statusEl) { statusEl.textContent = '⏳ Leyendo Excel multi-pestaña...'; statusEl.style.color = 'var(--g6)'; }
+  try {
+    // Leer todas las pestañas del Excel
+    const text = await readExcel(input.files[0]);
+    if (statusEl) statusEl.textContent = '🤖 Extrayendo información de todas las pestañas...';
+
+    const prompt = `Eres un experto en veterinaria de fauna silvestre. Este Excel tiene múltiples pestañas con información de una especie.
+Cada pestaña tiene nombre que indica la sección (Hematología, Bioquímica, Biometría, Longevidad, Fórmula Dentaria, Enfermedades, Fármacos, etc.).
+Extrae TODA la información y devuelve ÚNICAMENTE un JSON válido con esta estructura:
+
+{
+  "name": "nombre común de la especie (del nombre del archivo o primera pestaña)",
+  "hematology": [["parámetro","rango normal","unidades"]],
+  "biochem": [["parámetro","rango normal","unidades"]],
+  "biometria_extra": [{"label":"parámetro","m":"valor macho","f":"valor hembra"}],
+  "biometria_campos": {
+    "peso_prom": {"m":"","f":""}, "peso_rango": {"m":"","f":""},
+    "long_cc": {"m":"","f":""}, "long_cola": {"m":"","f":""},
+    "altura_cruz": {"m":"","f":""},
+    "esp_vida": {"silv":"","prof":""}, "edad_prom": {"silv":"","prof":""},
+    "edad_max": {"silv":"","prof":""}, "mad_sexual": {"silv":"","prof":""},
+    "gestacion": {"silv":"","prof":""}
+  },
+  "denticion": [{"tipo":"","sup":"","inf":"","funcion":""}],
+  "dental_measures": [{"num":"","label":"","value":""}],
+  "venopuncion_lista": [{"sitio":"","volumen":"","indicacion":""}],
+  "req_energetico": [{"cat":"categoría","kcal":"rango kcal/kg/día","notes":""}],
+  "toxicos_lista": [{"nombre":"","efecto":""}],
+  "suplementos": [{"nombre":"","dosis":"","unit":"mg/kg","notes":""}],
+  "enfermedades_sistemas": {
+    "dental": {"notas":"","enfermedades":[{"nombre":"","agente":"","signos":"","dx":"","tx":""}]},
+    "gastro": {"notas":"","enfermedades":[]},
+    "renal": {"notas":"","enfermedades":[]},
+    "respiratorio": {"notas":"","enfermedades":[]},
+    "infeccioso": {"notas":"","enfermedades":[]},
+    "musculo": {"notas":"","enfermedades":[]},
+    "dermatol": {"notas":"","enfermedades":[]},
+    "nervioso": {"notas":"","enfermedades":[]},
+    "cardiaco": {"notas":"","enfermedades":[]},
+    "otro": {"notas":"","enfermedades":[]}
+  },
+  "drugs": [{"name":"","cat":"","conc":0,"dose_min":0,"dose":0,"dose_max":0,"route":"IM","freq":"","effects":"","sites":"","notes":""}],
+  "protocols": [{"name":"","induction":0,"duration":0,"drugs":[{"name":"","dose":0,"conc":0}],"reversals":[{"name":"","dose":0,"conc":0,"route":"IM"}],"notes":""}]
+}`;
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 8000, messages: [{ role: 'user', content: prompt + '\n\nContenido del Excel:\n' + text.substring(0, 20000) }] })
+    });
+    if (!resp.ok) throw new Error('API error: ' + resp.status);
+    const data = await resp.json();
+    const raw = data.content.map(c => c.text || '').join('');
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const js = clean.indexOf('{'), je = clean.lastIndexOf('}');
+    const extracted = JSON.parse(clean.substring(js, je + 1));
+
+    // Aplicar datos extraídos a la especie actual
+    if (!currentSpecies) { toast('⚠ Abre una ficha de especie primero'); return; }
+    let changes = [];
+
+    if (extracted.hematology?.length) { currentSpecies.hematology = [...(currentSpecies.hematology||[]), ...extracted.hematology]; changes.push(extracted.hematology.length + ' parámetros hematológicos'); }
+    if (extracted.biochem?.length) { currentSpecies.biochem = [...(currentSpecies.biochem||[]), ...extracted.biochem]; changes.push(extracted.biochem.length + ' bioquímicas'); }
+    if (extracted.denticion?.length) { currentSpecies.denticion = [...(currentSpecies.denticion||[]), ...extracted.denticion]; changes.push(extracted.denticion.length + ' dientes'); }
+    if (extracted.dental_measures?.length) { currentSpecies.dental_measures = [...(currentSpecies.dental_measures||[]), ...extracted.dental_measures.map(m=>({...m, date:new Date().toLocaleDateString('es-CO')}))]; changes.push(extracted.dental_measures.length + ' medidas dentales'); }
+    if (extracted.venopuncion_lista?.length) { currentSpecies.venopuncion_lista = [...(currentSpecies.venopuncion_lista||[]), ...extracted.venopuncion_lista]; changes.push(extracted.venopuncion_lista.length + ' sitios venopunción'); }
+    if (extracted.req_energetico?.length) { currentSpecies.req_energetico = [...(currentSpecies.req_energetico||[]), ...extracted.req_energetico]; changes.push(extracted.req_energetico.length + ' req. energéticos'); }
+    if (extracted.toxicos_lista?.length) { currentSpecies.toxicos_lista = [...(currentSpecies.toxicos_lista||[]), ...extracted.toxicos_lista]; changes.push(extracted.toxicos_lista.length + ' tóxicos'); }
+    if (extracted.suplementos?.length) { currentSpecies.suplementos = [...(currentSpecies.suplementos||[]), ...extracted.suplementos]; changes.push(extracted.suplementos.length + ' suplementos'); }
+    if (extracted.drugs?.length) { currentSpecies.drugs = [...(currentSpecies.drugs||[]), ...extracted.drugs]; changes.push(extracted.drugs.length + ' fármacos'); }
+    if (extracted.protocols?.length) { currentSpecies.protocols = [...(currentSpecies.protocols||[]), ...extracted.protocols]; changes.push(extracted.protocols.length + ' protocolos'); }
+
+    if (extracted.biometria_campos) {
+      if (!currentSpecies.biometria) currentSpecies.biometria = {};
+      Object.entries(extracted.biometria_campos).forEach(([k,v]) => { if (v.m||v.f||v.silv||v.prof) currentSpecies.biometria[k] = v; });
+    }
+    if (extracted.biometria_extra?.length) {
+      if (!currentSpecies.biometria) currentSpecies.biometria = {};
+      if (!currentSpecies.biometria._extra) currentSpecies.biometria._extra = [];
+      currentSpecies.biometria._extra.push(...extracted.biometria_extra);
+      changes.push(extracted.biometria_extra.length + ' datos biométricos extra');
+    }
+    if (extracted.enfermedades_sistemas) {
+      if (!currentSpecies.enfermedades_sistemas) currentSpecies.enfermedades_sistemas = {};
+      let totalEnf = 0;
+      Object.entries(extracted.enfermedades_sistemas).forEach(([sistId, sist]) => {
+        if (sist.enfermedades?.length) {
+          if (!currentSpecies.enfermedades_sistemas[sistId]) currentSpecies.enfermedades_sistemas[sistId] = { notas: '', enfermedades: [] };
+          currentSpecies.enfermedades_sistemas[sistId].enfermedades.push(...sist.enfermedades);
+          totalEnf += sist.enfermedades.length;
+        }
+      });
+      if (totalEnf) changes.push(totalEnf + ' enfermedades');
+    }
+
+    await dbPutSync('species', currentSpecies);
+    // Sincronizar fármacos con vademécum
+    if (extracted.drugs?.length) {
+      for (const d of extracted.drugs) await syncDrugToVademecum(d, currentSpecies.name, currentSpecies.sci);
+      VADEMECUM_DB = await dbGetAll('vademecum');
+    }
+    const tab = document.querySelector('.tab-btn.active')?.dataset?.tab || 'general';
+    renderTab(tab);
+    const msg = changes.length ? changes.join(', ') : 'sin datos nuevos';
+    if (statusEl) { statusEl.textContent = `✅ Importado: ${msg}`; statusEl.style.color = 'var(--g5)'; }
+    toast(`✓ Excel importado — ${msg}`);
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + e.message; statusEl.style.color = 'var(--r5)'; }
+    toast('⚠ Error: ' + e.message);
   }
 }
 const SISTEMAS_ENFERMEDAD = [
@@ -3075,8 +3379,14 @@ function openAddEnfermedad(sistId) {
 async function importEnfermedadesFile(input, sistId) {
   if (!input.files?.[0]) return;
   const statusEl = document.getElementById('enf-import-status');
-  const apiKey = document.getElementById('enf-api-key')?.value.trim() || localStorage.getItem('wv_api_key') || '';
-  if (!apiKey) { statusEl.textContent = '⚠ Ingresa la API Key primero'; statusEl.style.color='var(--r5)'; return; }
+  // Limpiar la key de espacios, saltos de línea y caracteres invisibles
+  const rawKey = document.getElementById('enf-api-key')?.value || localStorage.getItem('wv_api_key') || '';
+  const apiKey = rawKey.replace(/[\s\u200B\u00A0\uFEFF]/g, '').trim();
+  if (!apiKey || !apiKey.startsWith('sk-')) {
+    statusEl.textContent = '⚠ API Key inválida — debe empezar con sk-ant-...';
+    statusEl.style.color = 'var(--r5)'; return;
+  }
+  localStorage.setItem('wv_api_key', apiKey);
   statusEl.textContent = '⏳ Leyendo archivo...'; statusEl.style.color='var(--g6)';
   try {
     const text = await (input.files[0].name.match(/\.xlsx?$/i)
@@ -3538,13 +3848,15 @@ async function importSpeciesFile(input) {
       return;
     }
 
-    const apiKey = document.getElementById('sp-api-key')?.value.trim() ||
+    const rawKey = document.getElementById('sp-api-key')?.value ||
                    localStorage.getItem('wv_api_key') || '';
-    if (!apiKey) {
-      statusEl.textContent = '⚠ Ingresa tu API Key de Anthropic para importar archivos.';
+    const apiKey = rawKey.replace(/[\s\u200B\u00A0\uFEFF]/g, '').trim();
+    if (!apiKey || !apiKey.startsWith('sk-')) {
+      statusEl.textContent = '⚠ API Key inválida. Debe empezar con sk-ant-... Obtén una en console.anthropic.com';
       statusEl.style.color = 'var(--r5)';
       return;
     }
+    localStorage.setItem('wv_api_key', apiKey);
 
     statusEl.textContent = '🤖 Extrayendo información con IA...';
 
@@ -4250,8 +4562,13 @@ function openAddSpeciesDrug() {
 async function importFarmacosFile(input) {
   if (!input.files?.[0]) return;
   const statusEl = document.getElementById('drug-import-status');
-  const apiKey = document.getElementById('drug-api-key')?.value.trim() || localStorage.getItem('wv_api_key') || '';
-  if (!apiKey) { statusEl.textContent = '⚠ Ingresa la API Key primero'; statusEl.style.color='var(--r5)'; return; }
+  const rawKey = document.getElementById('drug-api-key')?.value || localStorage.getItem('wv_api_key') || '';
+  const apiKey = rawKey.replace(/[\s\u200B\u00A0\uFEFF]/g, '').trim();
+  if (!apiKey || !apiKey.startsWith('sk-')) {
+    statusEl.textContent = '⚠ API Key inválida — debe empezar con sk-ant-...';
+    statusEl.style.color = 'var(--r5)'; return;
+  }
+  localStorage.setItem('wv_api_key', apiKey);
   statusEl.textContent = '⏳ Leyendo archivo...'; statusEl.style.color='var(--g6)';
   try {
     const text = await (input.files[0].name.match(/\.xlsx?$/i)
