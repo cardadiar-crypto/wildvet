@@ -130,19 +130,19 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 
 /* DETAIL */
 #species-detail{display:none;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
-.detail-header{background:var(--g9);padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem;position:fixed;top:56px;left:0;right:0;z-index:90;box-shadow:0 1px 0 rgba(78,180,110,.2)}
-.back-btn{background:rgba(78,180,110,.2);border:none;color:var(--g3);width:36px;height:36px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.detail-name{color:white;font-size:1.1rem;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.detail-sci{color:var(--g2);font-size:.78rem;font-style:italic}
+.detail-header{background:var(--g9);padding:.5rem .75rem;display:flex;align-items:center;gap:.5rem;position:fixed;top:56px;left:0;right:0;z-index:90;box-shadow:0 1px 0 rgba(78,180,110,.2);flex-wrap:nowrap;min-height:48px}
+.back-btn{background:rgba(78,180,110,.2);border:none;color:var(--g3);width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.detail-name{color:white;font-size:.95rem;font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.detail-sci{color:var(--g2);font-size:.7rem;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* TABS */
-.tabs-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--sur);border-bottom:1px solid var(--bor);position:fixed;top:108px;left:0;right:0;z-index:89}
+.tabs-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--sur);border-bottom:1px solid var(--bor);position:fixed;top:104px;left:0;right:0;z-index:89}
 .tabs-scroll::-webkit-scrollbar{display:none}
 .tabs{display:flex;min-width:max-content}
-.tab-btn{padding:.75rem 1rem;font-family:var(--sans);font-size:.8rem;font-weight:500;background:none;border:none;border-bottom:2px solid transparent;color:var(--txt3);cursor:pointer;white-space:nowrap;transition:all .15s}
+.tab-btn{padding:.6rem .85rem;font-family:var(--sans);font-size:.78rem;font-weight:500;background:none;border:none;border-bottom:2px solid transparent;color:var(--txt3);cursor:pointer;white-space:nowrap;transition:all .15s}
 .tab-btn.active{color:var(--g6);border-bottom-color:var(--g5)}
-/* spacer para compensar los dos fixed bars (56 topbar + 52 detail-header + 44 tabs = 152px) */
-.tab-content-spacer{height:152px;flex-shrink:0}
+/* spacer: 56px topbar + 48px detail-header + 40px tabs = 144px */
+.tab-content-spacer{height:144px;flex-shrink:0}
 .tab-content{display:none;padding:1rem;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
 .tab-content.active{display:block}
 
@@ -503,8 +503,23 @@ textarea.form-control{resize:vertical;min-height:70px}
         <span class="text-sm">PIN de administrador actual</span>
         <button class="btn btn-secondary btn-sm" onclick="openChangePIN()">Cambiar PIN</button>
       </div>
-      <div style="padding:.5rem 0">
+      <div style="padding:.5rem 0;border-bottom:1px solid var(--bor)">
         <span class="text-sm text-muted">PIN por defecto: <strong>1234</strong></span>
+      </div>
+      <!-- Emails con acceso admin automático -->
+      <div style="padding:.6rem 0">
+        <div style="font-size:.8rem;font-weight:600;margin-bottom:.4rem">Cuentas Google con rol Admin automático</div>
+        <p class="text-muted" style="margin-bottom:.5rem;font-size:.75rem">Estos correos siempre entran como administrador al iniciar sesión con Google.</p>
+        <div id="admin-emails-list" style="margin-bottom:.5rem"></div>
+        <div style="display:flex;gap:.4rem">
+          <input id="admin-email-input" class="form-control" type="email"
+            placeholder="correo@gmail.com" style="flex:1;font-size:.82rem"
+            onkeydown="if(event.key==='Enter')addAdminEmail()">
+          <button class="btn btn-primary btn-sm" onclick="addAdminEmail()">+ Agregar</button>
+        </div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:.4rem;width:100%" onclick="addAdminEmail(true)">
+          ✓ Agregar mi cuenta actual (${currentUser?.email||''})
+        </button>
       </div>
     </div>
   </div>
@@ -515,20 +530,19 @@ textarea.form-control{resize:vertical;min-height:70px}
 <div id="species-detail">
   <div class="detail-header" id="detail-header">
     <button class="back-btn" onclick="closeDetail()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
-    <div style="flex:1">
+    <div style="flex:1;min-width:0">
       <div class="detail-name" id="detail-name">Especie</div>
       <div class="detail-sci" id="detail-sci">Nombre científico</div>
     </div>
-    <span id="detail-uicn-badge" class="badge"></span>
-    <button id="detail-edit-btn" onclick="editCurrentSpecies()" style="display:none;margin-left:.5rem" class="btn btn-admin btn-sm">✏️ Editar</button>
-    <div style="display:flex;gap:.3rem;margin-left:.3rem">
-      <button onclick="exportSpeciesWord(currentSpecies)" title="Descargar Word" style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .5rem;cursor:pointer;font-size:.7rem;font-family:var(--sans)">📄 Word</button>
-      <button onclick="exportSpeciesPDF(currentSpecies)"  title="Exportar PDF"  style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .5rem;cursor:pointer;font-size:.7rem;font-family:var(--sans)">🖨 PDF</button>
-      <label for="multitab-excel-up" title="Importar Excel multi-pestaña" style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .5rem;cursor:pointer;font-size:.7rem;font-family:var(--sans);display:inline-flex;align-items:center;gap:.25rem">📊 Excel</label>
+    <span id="detail-uicn-badge" class="badge" style="flex-shrink:0"></span>
+    <button id="detail-edit-btn" onclick="editCurrentSpecies()" style="display:none;flex-shrink:0" class="btn btn-admin btn-sm">✏️</button>
+    <div style="display:flex;gap:.25rem;flex-shrink:0">
+      <button onclick="exportSpeciesWord(currentSpecies)" title="Word" style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .4rem;cursor:pointer;font-size:.65rem;font-family:var(--sans)">📄</button>
+      <button onclick="exportSpeciesPDF(currentSpecies)" title="PDF" style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .4rem;cursor:pointer;font-size:.65rem;font-family:var(--sans)">🖨</button>
+      <label for="multitab-excel-up" title="Importar Excel" style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .4rem;cursor:pointer;font-size:.65rem;font-family:var(--sans);display:inline-flex;align-items:center">📊</label>
       <input type="file" id="multitab-excel-up" accept=".xlsx,.xls" style="display:none" onchange="importExcelMultiTab(this)">
-      <div id="sp-import-multitab-status" style="font-size:.65rem;color:var(--g3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
     </div>
   </div>
   <div class="tabs-scroll">
@@ -1171,12 +1185,86 @@ async function loginWithGoogle() {
   }
 }
 
+// Lista de emails con rol admin automático (se carga desde settings)
+let ADMIN_EMAILS = [];
+
+async function loadAdminEmails() {
+  const saved = await dbGet('settings', 'admin_emails');
+  ADMIN_EMAILS = saved?.value || [];
+}
+
+async function addAdminEmail(useCurrent = false) {
+  const email = useCurrent
+    ? currentUser?.email
+    : document.getElementById('admin-email-input')?.value.trim().toLowerCase();
+  if (!email) { toast('⚠ Ingresa un correo'); return; }
+  if (!email.includes('@')) { toast('⚠ Correo inválido'); return; }
+  if (ADMIN_EMAILS.includes(email)) { toast('Este correo ya es admin'); return; }
+  ADMIN_EMAILS.push(email);
+  await dbPut('settings', { key: 'admin_emails', value: ADMIN_EMAILS });
+  // Si es el usuario actual, actualizar rol inmediatamente
+  if (currentUser?.email === email) {
+    currentUser.role = 'admin';
+    await dbPut('settings', { key: 'user', value: currentUser });
+    updateAdminUI();
+  }
+  renderAdminEmailsList();
+  if (document.getElementById('admin-email-input')) document.getElementById('admin-email-input').value = '';
+  toast('✓ ' + email + ' ahora tiene acceso de administrador');
+}
+
+async function removeAdminEmail(email) {
+  const ok = await confirmDelete('¿Quitar acceso admin?', `"${email}" pasará a ser colaborador la próxima vez que inicie sesión.`);
+  if (!ok) return;
+  ADMIN_EMAILS = ADMIN_EMAILS.filter(e => e !== email);
+  await dbPut('settings', { key: 'admin_emails', value: ADMIN_EMAILS });
+  renderAdminEmailsList();
+  toast('✓ Acceso admin removido de ' + email);
+}
+
+function renderAdminEmailsList() {
+  const el = document.getElementById('admin-emails-list');
+  if (!el) return;
+  if (!ADMIN_EMAILS.length) {
+    el.innerHTML = '<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin cuentas admin configuradas.</p>';
+    return;
+  }
+  el.innerHTML = ADMIN_EMAILS.map(email => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:.3rem .5rem;background:var(--g0);border-radius:var(--rxs);margin-bottom:.25rem">
+      <div style="display:flex;align-items:center;gap:.4rem">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--g6)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span style="font-size:.78rem;color:var(--txt)">${email}</span>
+        ${email === currentUser?.email ? '<span style="font-size:.65rem;color:var(--g6);background:var(--g1);padding:.05rem .3rem;border-radius:var(--rxs)">tú</span>' : ''}
+      </div>
+      <button onclick="removeAdminEmail('${email}')" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem;padding:.1rem .3rem">✕</button>
+    </div>`).join('');
+}
+
 async function finishGoogleLogin(profile) {
   const btn = document.getElementById('google-btn');
   if (btn) btn.disabled = false;
-  currentUser = { uid: profile.uid, name: profile.name, email: profile.email, role: 'colaborador', avatar: profile.avatar };
-  const saved = await dbGet('settings', 'user_' + profile.uid);
-  if (saved?.value?.role) currentUser.role = saved.value.role;
+
+  // Cargar lista de emails admin
+  await loadAdminEmails();
+
+  // Determinar rol: admin si el email está en la lista
+  const email = profile.email?.toLowerCase() || '';
+  const isAdminEmail = ADMIN_EMAILS.includes(email);
+
+  currentUser = {
+    uid: profile.uid,
+    name: profile.name,
+    email: profile.email,
+    role: isAdminEmail ? 'admin' : 'colaborador',
+    avatar: profile.avatar
+  };
+
+  // Si no está en lista admin, revisar si tenía rol guardado previamente
+  if (!isAdminEmail) {
+    const saved = await dbGet('settings', 'user_' + profile.uid);
+    if (saved?.value?.role) currentUser.role = saved.value.role;
+  }
+
   await dbPut('settings', { key: 'user', value: currentUser });
   await dbPut('settings', { key: 'user_' + profile.uid, value: currentUser });
   document.getElementById('login-screen').style.display = 'none';
@@ -1184,7 +1272,8 @@ async function finishGoogleLogin(profile) {
   await loadData();
   updateAdminUI();
   renderSpeciesGrid();
-  toast('✓ Bienvenido, ' + currentUser.name.split(' ')[0]);
+  const roleMsg = currentUser.role === 'admin' ? ' · Administrador' : '';
+  toast('✓ Bienvenido, ' + currentUser.name.split(' ')[0] + roleMsg);
 }
 
 async function manualSync() {
@@ -1697,7 +1786,7 @@ function showScreen(name) {
   const b = document.getElementById('bnav-'+name);
   if (b) b.classList.add('active');
   if (name==='home') document.getElementById('bnav-home').classList.add('active');
-  if (name==='admin') { renderAdminSpeciesList(); }
+  if (name==='admin') { renderAdminSpeciesList(); loadAdminEmails().then(renderAdminEmailsList); }
   if (name==='historias') renderRecordsList();
   if (name==='inventario') renderInventoryList();
   if (name==='vademecum') { syncAndRenderVademecum(); }
@@ -2006,6 +2095,22 @@ function openSpecies(id) {
   window.scrollTo({top:0, behavior:'instant'});
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
+  // Ajustar posición de tabs según altura real del header (importante en móvil)
+  requestAnimationFrame(() => {
+    const header = document.getElementById('detail-header');
+    const tabsScroll = document.querySelector('.tabs-scroll');
+    const spacers = document.querySelectorAll('.tab-content-spacer');
+    if (header && tabsScroll) {
+      const topbarH = 56;
+      const headerH = header.offsetHeight;
+      const tabsTop = topbarH + headerH;
+      tabsScroll.style.top = tabsTop + 'px';
+      // Altura de la barra de tabs
+      const tabsH = tabsScroll.offsetHeight || 40;
+      const spacerH = tabsTop + tabsH;
+      spacers.forEach(s => s.style.height = spacerH + 'px');
+    }
+  });
 }
 function showTab(tab) {
   const tabs = ['general','fisiologia','nutricion','enfermedades','comportamiento','medicamentos','protocolos','fluidoterapia'];
@@ -2873,10 +2978,9 @@ async function removeDentalMeasure(i) {
 // ── Helper: importar Excel con IA para cualquier sección ──
 async function importExcelWithAI(file, prompt) {
   const rawKey = localStorage.getItem('wv_api_key') || '';
-  const apiKey = rawKey.replace(/[\s\u200B\u00A0\uFEFF]/g, '').trim();
-  if (!apiKey || !apiKey.startsWith('sk-')) {
-    throw new Error('API Key inválida. Configurala en Admin → Nueva Especie → campo API Key');
-  }
+  const apiKey = rawKey.replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g, '');
+  if (!apiKey) throw new Error('API Key no configurada. Agrégala en Admin → Nueva Especie');
+  if (!apiKey.startsWith('sk-')) throw new Error('API Key inválida (debe empezar con sk-ant-)');
   const text = await (file.name.match(/\.xlsx?$/i) ? readExcel(file) : file.text());
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -2892,7 +2996,13 @@ async function importExcelWithAI(file, prompt) {
       messages: [{ role: 'user', content: prompt + '\n\nDocumento:\n' + text.substring(0, 12000) }]
     })
   });
-  if (!resp.ok) throw new Error('API error: ' + resp.status);
+  if (!resp.ok) {
+    let errMsg = 'API error ' + resp.status;
+    if (resp.status === 400) errMsg = 'Error 400 — API Key incorrecta o expirada. Genera una nueva en console.anthropic.com';
+    if (resp.status === 401) errMsg = 'Error 401 — API Key inválida o revocada';
+    if (resp.status === 429) errMsg = 'Error 429 — Límite de uso alcanzado, espera un momento';
+    throw new Error(errMsg);
+  }
   const data = await resp.json();
   const raw = data.content.map(c => c.text || '').join('');
   const clean = raw.replace(/```json|```/g, '').trim();
@@ -6228,7 +6338,7 @@ if ('serviceWorker' in navigator) {
 // ═══════════════════════════════════
 async function init() {
   await initDB();
-  // Inicializar Firebase con config incrustada
+  await loadAdminEmails(); // Cargar emails admin antes de cualquier login
   initFirebase(FIREBASE_CONFIG_BUILTIN);
   // Dar tiempo a Firebase para verificar sesión persistente (onAuthStateChanged)
   await new Promise(r => setTimeout(r, 900));
