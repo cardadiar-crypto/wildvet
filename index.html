@@ -1911,157 +1911,125 @@ async function setCoverPhoto(spId, input) {
 }
 
 function downloadSpeciesTemplate() {
-  const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-<head><meta charset='UTF-8'><style>
-body{font-family:Calibri,Arial;font-size:11pt;margin:2cm}
-h1{font-size:16pt;color:#0f3d22;border-bottom:2pt solid #0f3d22;padding-bottom:4pt}
-h2{font-size:13pt;color:#1a6b3f;margin-top:14pt}
-h3{font-size:11pt;color:#228b52;margin-top:10pt}
-table{border-collapse:collapse;width:100%;margin-bottom:10pt}
-th{background:#e8faf0;padding:5pt 8pt;border:1pt solid #c2f0d3;text-align:left;font-size:10pt}
-td{padding:4pt 8pt;border:1pt solid #e0e0e0;font-size:10pt;vertical-align:top}
-.field{color:#888;font-style:italic}
-</style></head><body>
+  // Plantilla limpia optimizada para lectura por IA (sin índice ni decoración)
+  const csv = `WILDVET - PLANTILLA DE FICHA DE ESPECIE
+Instrucciones: Complete SOLO los campos que tenga disponibles. No modifique los encabezados en MAYÚSCULAS.
+=============================================
 
-<h1>FICHA DE ESPECIE — WILDVET</h1>
-<p style="color:#888;font-size:9pt">Complete esta plantilla y súbala en WildVet → Admin → Nueva Especie → Importar archivo. La IA leerá automáticamente todos los campos.</p>
+=== SECCION: IDENTIFICACION ===
+NOMBRE_COMUN: 
+NOMBRE_CIENTIFICO: 
+ORDEN: 
+FAMILIA: 
+DESCRIPCION_GENERAL: 
 
-<h2>GENERALIDADES</h2>
-<table><tr><th width="35%">Campo</th><th>Valor</th></tr>
-<tr><td><b>Nombre común *</b></td><td class="field">Ej: Danta de tierras bajas</td></tr>
-<tr><td><b>Nombre científico</b></td><td class="field">Ej: Tapirus terrestris</td></tr>
-<tr><td><b>Orden</b></td><td class="field">Ej: Perissodactyla</td></tr>
-<tr><td><b>Familia</b></td><td class="field">Ej: Tapiridae</td></tr>
-<tr><td><b>Descripción general</b></td><td class="field">Historia natural, importancia ecológica, características...</td></tr>
-</table>
+=== SECCION: CONSERVACION ===
+UICN_MUNDIAL: (LC/NT/VU/EN/CR/EW/EX/DD)
+UICN_COLOMBIA: (LC/NT/VU/EN/CR/EW/EX/DD)
+CITES: (No listada/Apéndice I/II/III)
+RESOLUCION_0126: 
 
-<h2>ESTADO DE CONSERVACIÓN</h2>
-<table><tr><th>Categoría</th><th>Estado</th></tr>
-<tr><td>UICN Mundial</td><td class="field">LC / NT / VU / EN / CR / EW / EX / DD</td></tr>
-<tr><td>UICN Colombia</td><td class="field">LC / NT / VU / EN / CR / EW / EX / DD</td></tr>
-<tr><td>CITES</td><td class="field">Apéndice I / II / III / No listada</td></tr>
-<tr><td>Resolución 0126 de 2024 (Colombia)</td><td class="field">Categoría</td></tr>
-</table>
+=== SECCION: BIOMETRIA ===
+PESO_PROMEDIO_MACHO_kg: 
+PESO_PROMEDIO_HEMBRA_kg: 
+RANGO_PESO_MACHO_kg: 
+RANGO_PESO_HEMBRA_kg: 
+LONGITUD_CC_MACHO_cm: 
+LONGITUD_CC_HEMBRA_cm: 
+LONGITUD_COLA_MACHO_cm: 
+LONGITUD_COLA_HEMBRA_cm: 
+ALTURA_CRUZ_MACHO_cm: 
+ALTURA_CRUZ_HEMBRA_cm: 
 
-<h2>BIOMETRÍA</h2>
-<table><tr><th>Parámetro</th><th>Macho</th><th>Hembra</th></tr>
-<tr><td>Peso promedio (kg)</td><td class="field"></td><td class="field"></td></tr>
-<tr><td>Rango de peso (kg)</td><td class="field">mín – máx</td><td class="field">mín – máx</td></tr>
-<tr><td>Longitud cabeza-cuerpo (cm)</td><td class="field"></td><td class="field"></td></tr>
-<tr><td>Longitud de cola (cm)</td><td class="field"></td><td class="field"></td></tr>
-<tr><td>Altura a la cruz (cm)</td><td class="field"></td><td class="field"></td></tr>
-</table>
+=== SECCION: LONGEVIDAD ===
+ESPERANZA_VIDA_SILVESTRE: 
+ESPERANZA_VIDA_CAUTIVERIO: 
+MADUREZ_SEXUAL_SILVESTRE: 
+MADUREZ_SEXUAL_CAUTIVERIO: 
+GESTACION_DIAS: 
 
-<h2>LONGEVIDAD Y REPRODUCCIÓN</h2>
-<table><tr><th>Parámetro</th><th>Vida silvestre</th><th>Bajo cuidado profesional</th></tr>
-<tr><td>Esperanza de vida</td><td class="field"></td><td class="field"></td></tr>
-<tr><td>Edad promedio</td><td class="field"></td><td class="field"></td></tr>
-<tr><td>Edad máxima registrada</td><td class="field"></td><td class="field"></td></tr>
-<tr><td>Edad de madurez sexual</td><td class="field"></td><td class="field"></td></tr>
-<tr><td>Período de gestación</td><td class="field"></td><td class="field"></td></tr>
-</table>
+=== SECCION: HABITAT ===
+DISTRIBUCION_GEOGRAFICA: 
+DIETA_SILVESTRE: 
+TEMPERATURA_OPTIMA_MIN_C: 
+TEMPERATURA_OPTIMA_MAX_C: 
+HUMEDAD_MIN_pct: 
+HUMEDAD_MAX_pct: 
 
-<h2>DISTRIBUCIÓN Y HÁBITAT</h2>
-<table><tr><th>Campo</th><th>Valor</th></tr>
-<tr><td>Distribución geográfica</td><td class="field"></td></tr>
-<tr><td>Dieta en vida silvestre</td><td class="field"></td></tr>
-<tr><td>Temperatura óptima (°C)</td><td class="field">mín – máx</td></tr>
-<tr><td>Humedad relativa (%)</td><td class="field">mín – máx</td></tr>
-</table>
+=== SECCION: FISIOLOGIA ===
+TEMPERATURA_CORPORAL_C: 
+FRECUENCIA_CARDIACA_bpm: 
+FRECUENCIA_RESPIRATORIA_rpm: 
+PRESION_ARTERIAL_mmHg: 
+VOLUMEN_SANGUINEO: 
 
-<h2>FISIOLOGÍA — CONSTANTES VITALES</h2>
-<table><tr><th>Parámetro</th><th>Rango de referencia</th></tr>
-<tr><td>Temperatura corporal (°C)</td><td class="field"></td></tr>
-<tr><td>Frecuencia cardíaca (bpm)</td><td class="field"></td></tr>
-<tr><td>Frecuencia respiratoria (rpm)</td><td class="field"></td></tr>
-<tr><td>Presión arterial (mmHg)</td><td class="field"></td></tr>
-<tr><td>Volumen sanguíneo</td><td class="field">% del peso corporal</td></tr>
-</table>
+=== SECCION: HEMATOLOGIA ===
+(Formato: PARAMETRO | RANGO_NORMAL | UNIDADES)
+Eritrocitos | | x10⁶/μL
+Hematocrito | | %
+Hemoglobina | | g/dL
+Leucocitos | | x10³/μL
+Neutrofilos | | %
+Plaquetas | | x10³/μL
 
-<h3>Hematología</h3>
-<table><tr><th>Parámetro</th><th>Valor de referencia</th></tr>
-<tr><td>Eritrocitos</td><td class="field">x10⁶/μL</td></tr>
-<tr><td>Hematocrito</td><td class="field">%</td></tr>
-<tr><td>Hemoglobina</td><td class="field">g/dL</td></tr>
-<tr><td>Leucocitos</td><td class="field">x10³/μL</td></tr>
-<tr><td>Neutrófilos</td><td class="field">%</td></tr>
-<tr><td>Plaquetas</td><td class="field">x10³/μL</td></tr>
-<tr><td class="field">Agregar más filas según necesidad...</td><td></td></tr>
-</table>
+=== SECCION: BIOQUIMICA ===
+(Formato: PARAMETRO | RANGO_NORMAL | UNIDADES)
+ALT | | U/L
+AST | | U/L
+Creatinina | | mg/dL
+BUN | | mg/dL
+Glucosa | | mg/dL
+Proteinas_totales | | g/dL
 
-<h3>Bioquímica sérica</h3>
-<table><tr><th>Parámetro</th><th>Valor de referencia</th></tr>
-<tr><td>ALT</td><td class="field">U/L</td></tr>
-<tr><td>AST</td><td class="field">U/L</td></tr>
-<tr><td>Creatinina</td><td class="field">mg/dL</td></tr>
-<tr><td>BUN</td><td class="field">mg/dL</td></tr>
-<tr><td>Glucosa</td><td class="field">mg/dL</td></tr>
-<tr><td>Proteínas totales</td><td class="field">g/dL</td></tr>
-</table>
+=== SECCION: NUTRICION ===
+DIETA_CAUTIVERIO: 
+FRECUENCIA_ALIMENTACION: 
+REQ_ENERGETICO_ADULTO_kcal_kg_dia: 
+REQ_ENERGETICO_JUVENIL_kcal_kg_dia: 
+REQ_ENERGETICO_GESTANTE_kcal_kg_dia: 
 
-<h2>NUTRICIÓN EN CAUTIVERIO</h2>
-<table><tr><th>Campo</th><th>Valor</th></tr>
-<tr><td>Dieta en cautiverio</td><td class="field">Descripción de la dieta...</td></tr>
-<tr><td>Requerimiento energético (kcal/kg/día)</td><td class="field">Ej: 50–80 kcal/kg/día</td></tr>
-<tr><td>Frecuencia de alimentación</td><td class="field">Ej: 2–3 veces al día</td></tr>
-<tr><td>Suplementos</td><td class="field">Nombre y dosis</td></tr>
-</table>
+=== SECCION: SUPLEMENTOS ===
+(Formato: NOMBRE | DOSIS | UNIDAD)
+Ejemplo: Vitamina D3 | 200-400 | UI/kg
 
-<h3>Requerimiento energético por categoría</h3>
-<table><tr><th>Categoría</th><th>kcal/kg/día</th><th>Notas</th></tr>
-<tr><td class="field">Macho adulto</td><td class="field"></td><td class="field"></td></tr>
-<tr><td class="field">Hembra adulta</td><td class="field"></td><td class="field"></td></tr>
-<tr><td class="field">Cachorro / Juvenil</td><td class="field"></td><td class="field"></td></tr>
-<tr><td class="field">Hembra gestante</td><td class="field"></td><td class="field"></td></tr>
-</table>
+=== SECCION: TOXICOS ===
+(Formato: SUSTANCIA | EFECTO_TOXICO)
+Ejemplo: Aguacate | Toxicidad cardiaca
 
-<h3>Tóxicos y prohibidos</h3>
-<table><tr><th>Alimento / Sustancia</th><th>Efecto tóxico</th></tr>
-<tr><td class="field">Aguacate</td><td class="field">Toxicidad cardíaca</td></tr>
-<tr><td class="field">Agregar más...</td><td class="field"></td></tr>
-</table>
+=== SECCION: FORMULA_DENTARIA ===
+(Formato: TIPO | SUPERIOR | INFERIOR | FUNCION)
+Ejemplo: Incisivo | 3 | 3 | Corte
 
-<h2>COMPORTAMIENTO</h2>
-<table><tr><th>Categoría</th><th>Descripción</th></tr>
-<tr><td>En vida silvestre</td><td class="field"></td></tr>
-<tr><td>Bajo cuidado profesional</td><td class="field"></td></tr>
-<tr><td>Bajo estrés (señales)</td><td class="field"></td></tr>
-<tr><td>Reproductivo</td><td class="field"></td></tr>
-</table>
+=== SECCION: COMPORTAMIENTO ===
+COMPORTAMIENTO_SILVESTRE: 
+COMPORTAMIENTO_CAUTIVERIO: 
+COMPORTAMIENTO_ESTRES: 
+COMPORTAMIENTO_REPRODUCTIVO: 
+COMPORTAMIENTO_SOCIAL: 
 
-<h2>ENFERMEDADES PREVALENTES</h2>
-<table><tr><th>Sistema</th><th>Enfermedad</th><th>Agente / Causa</th><th>Signos clínicos</th><th>Diagnóstico</th><th>Tratamiento</th></tr>
-<tr><td>Gastrointestinal</td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td></tr>
-<tr><td>Respiratorio</td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td></tr>
-<tr><td>Infeccioso/Parasitario</td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td></tr>
-<tr><td class="field">Agregar más...</td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td></tr>
-</table>
+=== SECCION: ENFERMEDADES ===
+(Formato: SISTEMA | ENFERMEDAD | AGENTE | SIGNOS | DIAGNOSTICO | TRATAMIENTO)
+Ejemplo: dental | Fractura dental | Trauma | Dolor inapetencia | Radiografia | Endodoncia
 
-<h2>MEDICAMENTOS Y PROTOCOLOS ANESTÉSICOS</h2>
-<h3>Fármacos</h3>
-<table><tr><th>Nombre</th><th>Categoría</th><th>Conc. (mg/ml)</th><th>Dosis mín (mg/kg)</th><th>Dosis rec (mg/kg)</th><th>Dosis máx (mg/kg)</th><th>Vía</th><th>Frecuencia</th><th>Efectos adversos</th><th>Notas</th></tr>
-<tr><td class="field">Medetomidina</td><td class="field">Sedante α2</td><td class="field">1.0</td><td class="field">0.05</td><td class="field">0.07</td><td class="field">0.1</td><td class="field">IM</td><td class="field">Una dosis</td><td class="field">Bradicardia</td><td class="field">Revertir con Atipamezol</td></tr>
-<tr><td class="field">Agregar más...</td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td></tr>
-</table>
+=== SECCION: FARMACOS ===
+(Formato: NOMBRE | CATEGORIA | CONCENTRACION_mg_ml | DOSIS_MIN | DOSIS_REC | DOSIS_MAX | VIA | FRECUENCIA | EFECTOS_ADVERSOS | NOTAS)
+Ejemplo: Ketamina | Disociativo | 100 | 2 | 5 | 10 | IM | Dosis única | Rigidez muscular | Combinar con xilacina
 
-<h3>Protocolos anestésicos</h3>
-<table><tr><th>Nombre del protocolo</th><th>Fármaco 1</th><th>Dosis 1 (mg/kg)</th><th>Fármaco 2</th><th>Dosis 2 (mg/kg)</th><th>Reversor</th><th>Dosis reversor</th><th>Inducción (min)</th><th>Duración (min)</th><th>Notas</th></tr>
-<tr><td class="field">Inmovilización estándar</td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td><td class="field"></td></tr>
-</table>
+=== SECCION: PROTOCOLOS_ANESTESICOS ===
+(Formato: NOMBRE_PROTOCOLO | FARMACOS_Y_DOSIS | REVERSOR | INDUCCION_min | DURACION_min | NOTAS)
+Ejemplo: Inmovilizacion estandar | Ketamina 5mg/kg + Xilacina 1mg/kg IM | Atipamezol 0.25mg/kg IM | 5 | 30 | Para adultos >20kg
+`;
 
-<p style="color:#888;font-size:9pt;margin-top:20pt">* Campo obligatorio. Todos los demás son opcionales. Complete solo los campos que tenga disponibles.</p>
-</body></html>`;
-
-  const blob = new Blob([html], { type: 'application/msword' });
+  const blob = new Blob(['﻿' + csv], { type: 'text/plain;charset=utf-8' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href = url;
-  a.download = 'WildVet_Plantilla_Especie.doc';
+  a.download = 'WildVet_Plantilla_Especie.txt';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  toast('✓ Plantilla descargada — complétala y súbela para importar');
+  toast('✓ Plantilla descargada — completa los campos y súbela');
 }
 
 function previewFormCover(input) {
@@ -3187,7 +3155,7 @@ async function importExcelWithAI(file, prompt) {
 
   } else if (rawKey.startsWith('AIza')) {
     // Google Gemini
-    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${rawKey}`, {
+    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${rawKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -4000,6 +3968,7 @@ async function removeProtocol(i) {
 
 function renderFluidoterapia(el, sp) {
   const maxW = Math.max(sp.weight_max||500, 5000);
+  const isAdmin = currentUser?.role === 'admin';
   // Build 1-15 options for dehydration
   const dehydOpts = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(n=>
     `<option value="${n}" ${n===6?'selected':''}>${n}%${n===0?' — Normal':n<=5?' — Leve':n<=9?' — Moderada':' — Severa'}</option>`
@@ -4061,7 +4030,178 @@ function renderFluidoterapia(el, sp) {
       </div>
     </div>`;
   calcFluids();
+
+  // ── Sección de líquidos ──
+  const liquidos = sp.liquidos_iv || DEFAULT_LIQUIDOS;
+  const liqEl = document.getElementById('tab-fluidoterapia');
+  if (!liqEl) return;
+  liqEl.insertAdjacentHTML('beforeend', `
+    <div style="margin-top:1rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+        <div class="sec-title" style="margin-bottom:0">💧 Líquidos IV — Referencia</div>
+        ${isAdmin ? `<button onclick="addLiquidoIV()" class="btn btn-admin btn-sm">+ Agregar</button>` : ''}
+      </div>
+      <div id="liquidos-list">
+        ${renderLiquidosIV(liquidos, isAdmin)}
+      </div>
+    </div>`);
 }
+// ═══════════════════════════════════
+// LÍQUIDOS IV — datos y funciones
+// ═══════════════════════════════════
+const DEFAULT_LIQUIDOS = [
+  { nombre:'Solución Salina 0.9% (NaCl)', tipo:'Isotónico cristaloide', osmolaridad:'308 mOsm/L',
+    composicion:'Na⁺ 154 mEq/L · Cl⁻ 154 mEq/L',
+    indicaciones:'Deshidratación isotónica · Pérdidas por vómito/diarrea · Shock hipovolémico · Dilución de medicamentos',
+    contraindicaciones:'Hipernatremia · Acidosis hiperclorémica · Insuficiencia cardíaca severa',
+    dosis:'10–20 ml/kg/h en shock · 5–10 ml/kg/h mantenimiento',
+    notas:'Líquido de primera línea. Puede causar acidosis hiperclorémica si se usa en grandes volúmenes.', color:'#2563eb' },
+  { nombre:'Lactato de Ringer (LR)', tipo:'Isotónico cristaloide', osmolaridad:'273 mOsm/L',
+    composicion:'Na⁺ 130 · K⁺ 4 · Ca²⁺ 3 · Cl⁻ 109 · Lactato 28 mEq/L',
+    indicaciones:'Deshidratación moderada-severa · Quemaduras · Cirugías · Acidosis metabólica leve · Pérdidas GI',
+    contraindicaciones:'Hipercalemia · Insuficiencia hepática severa (no metaboliza lactato) · Alcalosis',
+    dosis:'10–20 ml/kg/h en shock · 5 ml/kg/h mantenimiento',
+    notas:'Más fisiológico que SS 0.9%. Elección preferida en cirugías y trauma. El lactato se convierte en bicarbonato en el hígado.', color:'#0891b2' },
+  { nombre:'Dextrosa 5% en agua (D5W)', tipo:'Hipotónico (en tejidos)', osmolaridad:'252 mOsm/L',
+    composicion:'Glucosa 50 g/L (5%) · Sin electrolitos',
+    indicaciones:'Hipoglucemia · Hiperosmolaridad · Hipernatremia · Aporte calórico suplementario · Deshidratación intracelular',
+    contraindicaciones:'Hiponatremia · Edema cerebral · Hiperglucemia · Como líquido único en deshidratación',
+    dosis:'2–5 ml/kg/h · Nunca como fluido único de reanimación',
+    notas:'Tras metabolizarse la glucosa, actúa como agua libre. No aporta electrolitos. Usar combinado con cristaloides.', color:'#d97706' },
+  { nombre:'Dextrosa 5% en SS 0.9%', tipo:'Isotónico cristaloide + glucosa', osmolaridad:'560 mOsm/L',
+    composicion:'Na⁺ 154 · Cl⁻ 154 mEq/L + Glucosa 50 g/L',
+    indicaciones:'Mantenimiento con aporte calórico · Pacientes en ayuno prolongado · Hipoglucemia con deshidratación',
+    contraindicaciones:'Hiperglucemia · Hipernatremia',
+    dosis:'3–5 ml/kg/h mantenimiento',
+    notas:'Útil en neonatos y pacientes con tendencia a hipoglucemia. Monitorear glucemia.', color:'#7c3aed' },
+  { nombre:'Hidroxietilalmidón (HES 6%)', tipo:'Coloide sintético', osmolaridad:'308 mOsm/L',
+    composicion:'HES 130/0.4 · Na⁺ 154 mEq/L',
+    indicaciones:'Shock hipovolémico severo · Expansión rápida de volumen intravascular · Hipoalbuminemia severa',
+    contraindicaciones:'Insuficiencia renal · Coagulopatía · Sepsis (controversial) · Quemaduras extensas',
+    dosis:'5–10 ml/kg dosis única · Máximo 20 ml/kg/día',
+    notas:'Permanece más tiempo en espacio intravascular. Puede causar coagulopatía y daño renal. Usar con precaución.', color:'#dc2626' },
+  { nombre:'Plasma Fresco Congelado (PFC)', tipo:'Coloide natural', osmolaridad:'~290 mOsm/L',
+    composicion:'Proteínas · Factores de coagulación · Albumina · Inmunoglobulinas',
+    indicaciones:'Coagulopatías · Hipoproteinemia severa · Intoxicación por anticoagulantes · Enfermedades hemorrágicas',
+    contraindicaciones:'Sin compatibilidad de grupo sanguíneo · Sobrecarga de volumen',
+    dosis:'6–10 ml/kg lento (30–60 min)',
+    notas:'Requiere tipificación. Descongelar a 37°C. Usar en máximo 4h tras descongelación. Muy útil en intoxicaciones por rodenticidas.', color:'#059669' },
+  { nombre:'Solución Hartmann / Plasmalyte', tipo:'Isotónico balanceado', osmolaridad:'294–295 mOsm/L',
+    composicion:'Na⁺ 130–140 · K⁺ 4–5 · Mg²⁺ 1.5 · Cl⁻ 98–103 · Acetato/Gluconato 27–47 mEq/L',
+    indicaciones:'Reemplazo de fluidos en cirugía · Mantenimiento · Acidosis metabólica · Elección en felinos y pacientes críticos',
+    contraindicaciones:'Hipercalemia severa (Plasmalyte)',
+    dosis:'5–10 ml/kg/h mantenimiento · 20 ml/kg/h emergencia',
+    notas:'Más fisiológico que SS o LR. El acetato/gluconato se metabolizan a bicarbonato. Mínimo efecto sobre equilibrio ácido-base.', color:'#0d9488' }
+];
+
+function renderLiquidosIV(liquidos, isAdmin) {
+  if (!liquidos?.length) return '<p style="font-size:.82rem;color:var(--txt3)">Sin líquidos configurados.</p>';
+  return liquidos.map((l, i) => `
+    <div class="info-card" style="border-left:4px solid ${l.color||'var(--g5)'};margin-bottom:.6rem">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-weight:700;font-size:.88rem;color:var(--txt)">${l.nombre}</div>
+          <div style="font-size:.72rem;color:var(--txt3);margin-top:.1rem">
+            <span style="background:${l.color||'var(--g5)'};color:white;padding:.05rem .35rem;border-radius:var(--rxs);font-size:.65rem">${l.tipo}</span>
+            <span style="margin-left:.4rem">${l.osmolaridad||''}</span>
+          </div>
+        </div>
+        ${isAdmin ? `
+        <div style="display:flex;gap:.3rem">
+          <button onclick="editLiquidoIV(${i})" style="background:var(--g0);border:1px solid var(--g4);border-radius:var(--rxs);color:var(--g6);cursor:pointer;font-size:.7rem;padding:.15rem .35rem">✏️</button>
+          <button onclick="removeLiquidoIV(${i})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.7rem;padding:.15rem .35rem">✕</button>
+        </div>` : ''}
+      </div>
+      ${l.composicion ? `<div style="font-size:.75rem;color:var(--txt3);margin-top:.35rem;font-family:var(--mono)">${l.composicion}</div>` : ''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-top:.5rem">
+        <div>
+          <div style="font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--g6);margin-bottom:.15rem">✅ Indicaciones</div>
+          <div style="font-size:.78rem;color:var(--txt2);line-height:1.5">${l.indicaciones||'—'}</div>
+        </div>
+        <div>
+          <div style="font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--r5);margin-bottom:.15rem">⚠ Contraindicaciones</div>
+          <div style="font-size:.78rem;color:var(--txt2);line-height:1.5">${l.contraindicaciones||'—'}</div>
+        </div>
+      </div>
+      ${l.dosis ? `<div style="margin-top:.4rem;padding:.3rem .5rem;background:var(--sur2);border-radius:var(--rxs);font-size:.78rem"><strong>Dosis:</strong> ${l.dosis}</div>` : ''}
+      ${l.notas ? `<div style="margin-top:.3rem;font-size:.75rem;color:var(--txt3);font-style:italic">${l.notas}</div>` : ''}
+    </div>`).join('');
+}
+
+function addLiquidoIV() { openLiquidoModal(-1); }
+function editLiquidoIV(i) { openLiquidoModal(i); }
+
+function openLiquidoModal(idx) {
+  const sp = currentSpecies;
+  const liquidos = sp.liquidos_iv || [...DEFAULT_LIQUIDOS];
+  const l = idx >= 0 ? liquidos[idx] : {};
+  const COLORES = ['#2563eb','#0891b2','#d97706','#7c3aed','#dc2626','#059669','#0d9488','#b45309','#475569'];
+  document.getElementById('liquido-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="liquido-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${idx<0?'Agregar':'Editar'} líquido IV</div>
+        <div class="form-group"><label>Nombre del líquido *</label><input id="liq-nombre" class="form-control" value="${l.nombre||''}" placeholder="Ej: Lactato de Ringer"></div>
+        <div class="form-row">
+          <div class="form-group"><label>Tipo</label><input id="liq-tipo" class="form-control" value="${l.tipo||''}" placeholder="Isotónico cristaloide..."></div>
+          <div class="form-group"><label>Osmolaridad</label><input id="liq-osm" class="form-control" value="${l.osmolaridad||''}" placeholder="273 mOsm/L"></div>
+        </div>
+        <div class="form-group"><label>Composición</label><input id="liq-comp" class="form-control" value="${l.composicion||''}" placeholder="Na⁺ 130 · K⁺ 4..."></div>
+        <div class="form-group"><label>Indicaciones</label><textarea id="liq-ind" class="form-control" style="min-height:60px">${l.indicaciones||''}</textarea></div>
+        <div class="form-group"><label>Contraindicaciones</label><textarea id="liq-contra" class="form-control" style="min-height:60px">${l.contraindicaciones||''}</textarea></div>
+        <div class="form-group"><label>Dosis recomendada</label><input id="liq-dosis" class="form-control" value="${l.dosis||''}" placeholder="10–20 ml/kg/h en shock..."></div>
+        <div class="form-group"><label>Notas clínicas</label><textarea id="liq-notas" class="form-control" style="min-height:50px">${l.notas||''}</textarea></div>
+        <div class="form-group"><label>Color identificador</label>
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.25rem">
+            ${COLORES.map(col=>`<div onclick="document.getElementById('liq-color').value='${col}';this.parentElement.querySelectorAll('div').forEach(d=>d.style.outline='none');this.style.outline='3px solid var(--txt)'"
+              style="width:28px;height:28px;border-radius:50%;background:${col};cursor:pointer;outline:${(l.color||COLORES[0])===col?'3px solid var(--txt)':'none'}"></div>`).join('')}
+          </div>
+          <input type="hidden" id="liq-color" value="${l.color||COLORES[0]}">
+        </div>
+        <div style="display:flex;gap:.5rem;margin-top:.5rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('liquido-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveLiquidoIV(${idx})">💾 Guardar</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+async function saveLiquidoIV(idx) {
+  const nombre = document.getElementById('liq-nombre')?.value.trim();
+  if (!nombre) { toast('⚠ El nombre es obligatorio'); return; }
+  if (!currentSpecies.liquidos_iv) currentSpecies.liquidos_iv = [...DEFAULT_LIQUIDOS];
+  const item = {
+    nombre,
+    tipo:              document.getElementById('liq-tipo')?.value||'',
+    osmolaridad:       document.getElementById('liq-osm')?.value||'',
+    composicion:       document.getElementById('liq-comp')?.value||'',
+    indicaciones:      document.getElementById('liq-ind')?.value||'',
+    contraindicaciones:document.getElementById('liq-contra')?.value||'',
+    dosis:             document.getElementById('liq-dosis')?.value||'',
+    notas:             document.getElementById('liq-notas')?.value||'',
+    color:             document.getElementById('liq-color')?.value||'#2563eb'
+  };
+  if (idx >= 0) currentSpecies.liquidos_iv[idx] = item;
+  else currentSpecies.liquidos_iv.push(item);
+  await dbPutSync('species', currentSpecies);
+  document.getElementById('liquido-modal')?.remove();
+  // Refrescar solo la lista de líquidos
+  const listEl = document.getElementById('liquidos-list');
+  if (listEl) listEl.innerHTML = renderLiquidosIV(currentSpecies.liquidos_iv, true);
+  toast('✓ Líquido guardado');
+}
+
+async function removeLiquidoIV(i) {
+  const ok = await confirmDelete('¿Eliminar líquido?', `Se eliminará "${(currentSpecies.liquidos_iv||DEFAULT_LIQUIDOS)[i]?.nombre||''}".`);
+  if (!ok) return;
+  if (!currentSpecies.liquidos_iv) currentSpecies.liquidos_iv = [...DEFAULT_LIQUIDOS];
+  currentSpecies.liquidos_iv.splice(i, 1);
+  await dbPutSync('species', currentSpecies);
+  const listEl = document.getElementById('liquidos-list');
+  if (listEl) listEl.innerHTML = renderLiquidosIV(currentSpecies.liquidos_iv, true);
+  toast('Líquido eliminado');
+}
+
 function calcFluids() {
   const w = parseFloat(document.getElementById('fl-w')?.value)||currentWeight;
   const d = parseFloat(document.getElementById('fl-d')?.value)||0;
@@ -6701,13 +6841,53 @@ function renderBiblioteca() {
   }).join('');
 }
 
+function saveRefAIKey(raw) {
+  const key = (raw||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
+  // Guardar como key activa del proveedor detectado
+  if (key.startsWith('AIza')) {
+    localStorage.setItem('wv_key_gemini', key);
+    selectedAI = 'gemini';
+  } else if (key.startsWith('sk-')) {
+    localStorage.setItem('wv_key_claude', key);
+    selectedAI = 'claude';
+  }
+  localStorage.setItem('wv_ai_provider', selectedAI);
+  const status = document.getElementById('ref-ai-key-status');
+  if (status) {
+    if (!key) { status.textContent = ''; return; }
+    if (key.startsWith('AIza')) { status.textContent = '✓ Gemini configurado'; status.style.color='var(--g6)'; }
+    else if (key.startsWith('sk-')) { status.textContent = '✓ Claude configurado'; status.style.color='var(--g6)'; }
+    else { status.textContent = '⚠ Key no reconocida'; status.style.color='var(--r5)'; }
+  }
+}
+
 function openAddRef(spId) {
   document.getElementById('ref-modal')?.remove();
+  _refPDFData = null;
   const sp = SPECIES_DB.find(s => s.id === spId);
+  // Obtener key activa para pre-rellenar
+  const { provider, key } = getActiveAIKey();
+  const keyPlaceholder = key ? key.substring(0,8)+'...' : 'AIzaSy... (Gemini) o sk-ant-... (Claude)';
   document.body.insertAdjacentHTML('beforeend', `
     <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">📚 Agregar referencia — ${sp?.name||''}</div>
+
+        <!-- Campo API key en el modal -->
+        <div style="background:var(--g0);border-radius:var(--rsm);padding:.5rem;margin-bottom:.75rem">
+          <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.3rem">🤖 IA para extraer metadatos del PDF</div>
+          <div style="display:flex;gap:.3rem">
+            <input type="password" id="ref-ai-key" class="form-control" style="flex:1;font-size:.78rem"
+              placeholder="${keyPlaceholder}"
+              value="${key||''}"
+              oninput="saveRefAIKey(this.value)">
+            <a href="https://aistudio.google.com/apikey" target="_blank" class="btn btn-secondary btn-sm" style="font-size:.68rem;white-space:nowrap">Gemini gratis</a>
+          </div>
+          <div id="ref-ai-key-status" style="font-size:.68rem;margin-top:.2rem;color:${key?'var(--g6)':'var(--txt3)'}">
+            ${key ? '✓ ' + (provider==='gemini'?'Gemini':'Claude') + ' configurado' : 'Sin key — los campos se llenarán manualmente'}
+          </div>
+        </div>
+
         <div class="form-group"><label>Título *</label><input id="ref-titulo" class="form-control" placeholder="Ej: Wild Mammal Husbandry..."></div>
         <div class="form-row">
           <div class="form-group"><label>Autores</label><input id="ref-autores" class="form-control" placeholder="Apellido, N. et al."></div>
@@ -6725,7 +6905,7 @@ function openAddRef(spId) {
         <div class="form-group"><label>Notas</label><textarea id="ref-notas" class="form-control" placeholder="Capítulos relevantes, páginas, observaciones..." style="min-height:50px"></textarea></div>
         <!-- PDF adjunto -->
         <div class="form-group">
-          <label>PDF adjunto (opcional)</label>
+          <label>PDF adjunto (opcional — extrae metadatos automáticamente)</label>
           <div style="display:flex;align-items:center;gap:.5rem">
             <label for="ref-pdf-up" class="btn btn-secondary btn-sm" style="cursor:pointer">📎 Adjuntar PDF</label>
             <input type="file" id="ref-pdf-up" accept=".pdf" style="display:none" onchange="previewRefPDF(this)">
@@ -6761,8 +6941,10 @@ async function previewRefPDF(input) {
   if (nameEl) nameEl.textContent = file.name + ' (' + (file.size/1024).toFixed(0) + ' KB)';
 
   // Intentar extraer metadatos con IA
-  const { provider, key } = getActiveAIKey();
-  const rawKey = key || (localStorage.getItem('wv_api_key')||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
+  // Priorizar key del campo del modal, luego la guardada
+  const modalKey = (document.getElementById('ref-ai-key')?.value||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
+  const { key: savedKey } = getActiveAIKey();
+  const rawKey = modalKey || savedKey || (localStorage.getItem('wv_api_key')||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
   if (!rawKey) return; // Sin key, dejar campos vacíos
 
   if (nameEl) nameEl.textContent += ' · 🤖 Extrayendo metadatos...';
