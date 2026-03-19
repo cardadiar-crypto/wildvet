@@ -2689,55 +2689,59 @@ function renderNutricion(el, sp) {
         Suplementos
         ${isAdmin?`<button onclick="addSuplemento()" class="btn btn-admin btn-sm">+ Suplemento</button>`:''}
       </div>
+      <!-- Peso global para cálculo -->
+      <div class="weight-slider-section" style="margin-bottom:.6rem">
+        <div style="display:flex;align-items:center;gap:.75rem">
+          <input type="number" id="sup-wv-input" value="${currentWeight}" min="0.001" max="5000" step="0.001"
+            style="background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rsm);padding:.35rem .6rem;font-family:var(--mono);font-size:1.2rem;font-weight:700;color:var(--g3);width:130px;outline:none;text-align:center"
+            oninput="updateSupWeight(this.value)">
+          <span style="font-size:1rem;color:var(--g3);font-weight:600">kg</span>
+          <span style="font-size:.75rem;color:var(--g2)" id="sup-wv-grams">(${(currentWeight*1000).toLocaleString()} g)</span>
+        </div>
+      </div>
       ${suplementos.length ? `
-      <div style="overflow-x:auto;margin-bottom:.5rem">
-        <table style="width:100%;border-collapse:collapse;font-size:.82rem">
-          <thead><tr style="background:var(--sur2)">
-            <th style="padding:.35rem .5rem;text-align:left;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Suplemento</th>
-            <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Dosis</th>
-            <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Unidad</th>
-            <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Conc. (mg/ml)</th>
-            <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Peso (kg)</th>
-            <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--g6)">Total</th>
-            ${isAdmin?'<th style="border-bottom:1px solid var(--bor);width:24px"></th>':''}
+      <div class="drug-table-wrap">
+        <table class="drug-table">
+          <thead><tr>
+            <th>Suplemento</th>
+            <th>Categoría</th>
+            <th>Conc.(mg/ml)</th>
+            <th>Unidad</th>
+            <th>Dosis(mg/kg)</th>
+            <th>Rango</th>
+            <th>Total mg</th>
+            <th>Resultado</th>
+            ${isAdmin?'<th></th>':''}
           </tr></thead>
-          <tbody>
-            ${suplementos.map((s,i)=>`<tr>
-              <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-weight:600">${supCell(s,i,'nombre','Nombre...')}</td>
-              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)">${supCell(s,i,'dosis','10-20','center')}</td>
-              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor)">
-                ${isAdmin
-                  ? `<select style="background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-size:.78rem;color:var(--txt)" onchange="editSuplemento(${i},'unit',this.value)">
-                      ${['mg/kg','UI/kg','mg/día','UI/día','g/kg','ml/kg'].map(u=>`<option ${s.unit===u?'selected':''}>${u}</option>`).join('')}
-                    </select>`
-                  : (s.unit||'mg/kg')}
-              </td>
-              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor)">
-                ${isAdmin ? `<input type="text" value="${s.conc||''}" placeholder="mg/ml" style="width:60px;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.78rem;color:var(--txt);text-align:center" onchange="editSuplemento(${i},'conc',this.value)">` : (s.conc||'—')}
-              </td>
-              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor)">
-                <input type="number" min="0.001" max="5000" step="0.1" value="${currentWeight}" placeholder="kg"
-                  style="width:65px;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.2rem .3rem;font-family:var(--mono);font-size:.78rem;color:var(--txt);outline:none;text-align:center"
-                  oninput="calcSupConc(this,'${(s.dosis||'').replace(/'/g,'')}','${s.conc||0}','${s.unit||'mg/kg'}','sup-total-${i}')">
-              </td>
-              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--g6);font-weight:600;font-size:.78rem" id="sup-total-${i}">—</td>
-              ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button onclick="removeSuplemento(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button></td>`:''}
-            </tr>`).join('')}
-          </tbody>
+          <tbody id="sup-tbody">${renderSupRows(suplementos, currentWeight, isAdmin)}</tbody>
         </table>
       </div>
-      <p style="font-size:.7rem;color:var(--txt3);margin-top:.25rem">Ingresa el peso para calcular la dosis total. Si la dosis es un rango (ej: "10-20"), el resultado muestra mínimo–máximo.</p>
+      <div class="sec-title" style="margin-top:.75rem">Detalles</div>
+      ${suplementos.map((s,i)=>`
+        <div class="info-card" style="margin-bottom:.5rem">
+          <div class="info-card-title">${s.nombre} <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--g6)">${s.unit||'mg/kg'}</span></div>
+          ${s.notas?`<p class="text-sm" style="color:var(--txt2);line-height:1.5">${s.notas}</p>`:''}
+        </div>`).join('')}
       ` : `<p style="font-size:.8rem;color:var(--txt3);font-style:italic">Sin suplementos registrados.${isAdmin?' Toca + Suplemento.':''}</p>`}
       ${isAdmin ? `
       <div id="sup-form" style="display:none;background:var(--sur2);border-radius:var(--rsm);padding:.6rem;margin-top:.4rem">
-        <div style="display:grid;grid-template-columns:1fr 80px 80px;gap:.4rem;margin-bottom:.4rem">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:.4rem">
           <div><label style="font-size:.7rem;color:var(--txt3)">Nombre del suplemento</label><input id="sup-nombre" class="form-control" placeholder="Vitamina D3, Calcio..." style="font-size:.82rem"></div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis (ej: 10-20)</label><input id="sup-dosis" class="form-control" placeholder="10-20" style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">Categoría</label><input id="sup-cat" class="form-control" placeholder="Vitamina, Mineral..." style="font-size:.82rem"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:80px 80px 80px 80px;gap:.4rem;margin-bottom:.4rem">
+          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis mín</label><input id="sup-dmin" class="form-control" type="number" step="0.001" placeholder="1" style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis rec.</label><input id="sup-dosis" class="form-control" type="number" step="0.001" placeholder="5" style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis máx</label><input id="sup-dmax" class="form-control" type="number" step="0.001" placeholder="10" style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">Conc.(mg/ml)</label><input id="sup-conc" class="form-control" type="number" step="0.01" placeholder="100" style="font-size:.82rem"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:.4rem">
           <div><label style="font-size:.7rem;color:var(--txt3)">Unidad</label>
             <select id="sup-unit" class="form-control" style="font-size:.82rem">
               <option>mg/kg</option><option>UI/kg</option><option>mg/día</option><option>UI/día</option><option>g/kg</option><option>ml/kg</option>
             </select>
           </div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">Notas clínicas</label><input id="sup-notas" class="form-control" placeholder="Indicaciones, precauciones..." style="font-size:.82rem"></div>
         </div>
         <div style="display:flex;gap:.4rem">
           <button class="btn btn-secondary btn-sm" onclick="document.getElementById('sup-form').style.display='none'">Cancelar</button>
@@ -2746,7 +2750,7 @@ function renderNutricion(el, sp) {
       </div>` : ''}
     </div>
 
-    <!-- TÓXICOS -->
+<!-- TÓXICOS -->
     <div class="info-card" style="border-color:var(--r5)">
       <div class="info-card-title" style="color:var(--r5);display:flex;justify-content:space-between;align-items:center">
         ⚠ Tóxicos y Prohibidos
@@ -2979,7 +2983,7 @@ async function editSuplemento(i, field, value) {
   currentSpecies.suplementos[i][field] = value;
   await dbPutSync('species', currentSpecies);
 }
-function addSuplemento() { document.getElementById('sup-form').style.display = 'block'; document.getElementById('sup-nombre')?.focus(); }
+// addSuplemento ya definida abajo
 async function saveReqEnergetico() {
   const cat = document.getElementById('req-cat')?.value.trim();
   if (!cat) { toast('⚠ Ingresa la categoría'); return; }
@@ -2995,13 +2999,69 @@ async function removeReqEnergetico(i) {
   await dbPutSync('species', currentSpecies); renderTab('nutricion');
 }
 
+function renderSupRows(sups, w, isAdmin) {
+  return sups.map((s,i) => {
+    const conc = parseFloat(s.conc)||0;
+    const dosis = parseFloat(s.dosis)||0;
+    const dmin = parseFloat(s.dose_min)||0;
+    const dmax = parseFloat(s.dose_max)||0;
+    const totalMg = w * dosis;
+    const unidad = s.unit || 'mg/kg';
+    let resultado = '—';
+    if (totalMg > 0) resultado = conc > 0 ? (totalMg/conc).toFixed(2)+' ml' : totalMg.toFixed(2)+' '+unidad.replace('/kg','');
+    return `<tr>
+      <td>${s.nombre}</td>
+      <td style="color:var(--txt3)">${s.cat||''}</td>
+      <td style="text-align:right;font-family:var(--mono)">${conc||'—'}</td>
+      <td style="text-align:center">
+        <select onchange="updateSupUnit(${i},this.value)" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .25rem;font-size:.75rem;color:var(--txt);outline:none">
+          ${['mg/kg','UI/kg','mg/día','UI/día','g/kg','ml/kg'].map(u=>`<option ${unidad===u?'selected':''}>${u}</option>`).join('')}
+        </select>
+      </td>
+      <td style="text-align:center;font-family:var(--mono)">${dosis||'—'}</td>
+      <td style="text-align:center;font-family:var(--mono);font-size:.75rem;color:var(--txt3)">${dmin&&dmax?dmin+'–'+dmax:'—'}</td>
+      <td style="text-align:right;font-family:var(--mono);color:var(--g6);font-weight:600" id="sup-totmg-${i}">${totalMg?totalMg.toFixed(1)+' mg':'—'}</td>
+      <td style="text-align:right;font-family:var(--mono);color:var(--g5);font-weight:700" id="sup-total-${i}">${resultado}</td>
+      ${isAdmin?`<td><button onclick="removeSuplemento(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem;padding:.2rem">✕</button></td>`:''}
+    </tr>`;
+  }).join('');
+}
+function updateSupWeight(w) {
+  const peso = parseFloat(w)||0;
+  const grams = document.getElementById('sup-wv-grams');
+  if (grams) grams.textContent = '(' + (peso*1000).toLocaleString() + ' g)';
+  (currentSpecies?.suplementos||[]).forEach((s,i) => {
+    const conc = parseFloat(s.conc)||0, dosis = parseFloat(s.dosis)||0;
+    const totalMg = peso * dosis;
+    const mg = document.getElementById('sup-totmg-'+i);
+    const tot = document.getElementById('sup-total-'+i);
+    if (mg) mg.textContent = totalMg ? totalMg.toFixed(1)+' mg' : '—';
+    if (tot) tot.textContent = totalMg>0 ? (conc>0?(totalMg/conc).toFixed(2)+' ml':totalMg.toFixed(2)) : '—';
+  });
+}
+async function updateSupUnit(i, val) {
+  if (!currentSpecies.suplementos?.[i]) return;
+  currentSpecies.suplementos[i].unit = val;
+  await dbPutSync('species', currentSpecies);
+}
 function addSuplemento() { document.getElementById('sup-form').style.display = 'block'; document.getElementById('sup-nombre')?.focus(); }
 async function saveSuplemento() {
   const nombre = document.getElementById('sup-nombre')?.value.trim();
   if (!nombre) { toast('⚠ Ingresa el nombre del suplemento'); return; }
   if (!currentSpecies.suplementos) currentSpecies.suplementos = [];
-  currentSpecies.suplementos.push({ nombre, dosis: document.getElementById('sup-dosis')?.value||'', unit: document.getElementById('sup-unit')?.value||'mg/kg' });
-  await dbPutSync('species', currentSpecies); renderTab('nutricion'); toast('✓ Suplemento agregado');
+  currentSpecies.suplementos.push({
+    nombre,
+    cat:      document.getElementById('sup-cat')?.value || '',
+    dosis:    parseFloat(document.getElementById('sup-dosis')?.value)||0,
+    dose_min: parseFloat(document.getElementById('sup-dmin')?.value)||0,
+    dose_max: parseFloat(document.getElementById('sup-dmax')?.value)||0,
+    conc:     parseFloat(document.getElementById('sup-conc')?.value)||0,
+    unit:     document.getElementById('sup-unit')?.value || 'mg/kg',
+    notas:    document.getElementById('sup-notas')?.value || ''
+  });
+  await dbPutSync('species', currentSpecies);
+  renderTab('nutricion');
+  toast('✓ Suplemento agregado');
 }
 async function removeSuplemento(i) {
   const ok = await confirmDelete('¿Eliminar suplemento?',`Se eliminará "${currentSpecies.suplementos?.[i]?.nombre||''}".`);
@@ -3624,11 +3684,18 @@ function openAddEnfermedad(sistId) {
 
         <!-- Importar desde Excel -->
         <div style="background:var(--g0);border-radius:var(--rsm);padding:.6rem;margin-bottom:.75rem">
-          <div style="font-size:.75rem;font-weight:600;color:var(--g6);margin-bottom:.3rem">📊 Importar desde Excel (requiere API Key)</div>
-          <div style="display:flex;gap:.4rem">
-            <input type="password" id="enf-api-key" class="form-control" style="flex:1;font-size:.75rem"
-              placeholder="sk-ant-api03-..." value="${localStorage.getItem('wv_api_key')||''}"
-              onchange="localStorage.setItem('wv_api_key',this.value)">
+          <div style="font-size:.75rem;font-weight:600;color:var(--g6);margin-bottom:.3rem">📊 Importar desde Excel</div>
+          <div style="background:var(--sur2);border-radius:var(--rsm);padding:.4rem .5rem;margin-bottom:.4rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
+          <span style="font-size:.68rem;color:var(--txt3);font-weight:600">IA:</span>
+          <button onclick="setModalAI(this,'gemini')" data-provider="gemini"
+            style="font-size:.68rem;padding:.15rem .4rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--g1);color:var(--g7);cursor:pointer;font-family:var(--sans)">🔵 Gemini</button>
+          <button onclick="setModalAI(this,'claude')" data-provider="claude"
+            style="font-size:.68rem;padding:.15rem .4rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--sur);color:var(--txt3);cursor:pointer;font-family:var(--sans)">🟠 Claude</button>
+          <input type="password" id="modal-ai-key" class="form-control" style="flex:1;min-width:0;font-size:.72rem;height:1.6rem"
+            placeholder="API Key..." oninput="saveModalAIKey(this.value)">
+          <div id="modal-ai-status" style="font-size:.65rem;color:var(--txt3);width:100%"></div>
+        </div>
+          <div style="display:flex;gap:.4rem;margin-top:.3rem">
             <label class="btn btn-secondary btn-sm" for="enf-file-import" style="cursor:pointer;white-space:nowrap">📁 Subir Excel</label>
             <input type="file" id="enf-file-import" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="importEnfermedadesFile(this,'${sistId}')">
           </div>
@@ -3651,20 +3718,15 @@ function openAddEnfermedad(sistId) {
         </div>
       </div>
     </div>`);
-  document.getElementById('enf-nombre')?.focus();
+  document.getElementById('enf-nombre')?.focus(); setTimeout(updateModalAIStatus, 50);
 }
 
 async function importEnfermedadesFile(input, sistId) {
   if (!input.files?.[0]) return;
   const statusEl = document.getElementById('enf-import-status');
   // Limpiar la key de espacios, saltos de línea y caracteres invisibles
-  const rawKey = document.getElementById('enf-api-key')?.value || localStorage.getItem('wv_api_key') || '';
-  const apiKey = rawKey.replace(/[\s\u200B\u00A0\uFEFF]/g, '').trim();
-  if (!apiKey || !apiKey.startsWith('sk-')) {
-    statusEl.textContent = '⚠ API Key inválida — debe empezar con sk-ant-...';
-    statusEl.style.color = 'var(--r5)'; return;
-  }
-  localStorage.setItem('wv_api_key', apiKey);
+  const apiKey = getModalAIKey();
+  if (!apiKey) { statusEl.textContent = '⚠ Sin API Key'; statusEl.style.color='var(--r5)'; return; }
   statusEl.textContent = '⏳ Leyendo archivo...'; statusEl.style.color='var(--g6)';
   try {
     const text = await (input.files[0].name.match(/\.xlsx?$/i)
@@ -5078,11 +5140,18 @@ function openAddSpeciesDrug() {
   f.innerHTML = `
     <!-- Importar desde Excel -->
     <div style="background:var(--g0);border-radius:var(--rsm);padding:.6rem;margin-bottom:.75rem">
-      <div style="font-size:.75rem;font-weight:600;color:var(--g6);margin-bottom:.3rem">📊 Importar fármacos desde Excel (requiere API Key)</div>
-      <div style="display:flex;gap:.4rem">
-        <input type="password" id="drug-api-key" class="form-control" style="flex:1;font-size:.75rem"
-          placeholder="sk-ant-api03-..." value="${localStorage.getItem('wv_api_key')||''}"
-          onchange="localStorage.setItem('wv_api_key',this.value)">
+      <div style="font-size:.75rem;font-weight:600;color:var(--g6);margin-bottom:.3rem">📊 Importar fármacos desde Excel</div>
+      <div style="background:var(--sur2);border-radius:var(--rsm);padding:.4rem .5rem;margin-bottom:.4rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
+          <span style="font-size:.68rem;color:var(--txt3);font-weight:600">IA:</span>
+          <button onclick="setModalAI(this,'gemini')" data-provider="gemini"
+            style="font-size:.68rem;padding:.15rem .4rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--g1);color:var(--g7);cursor:pointer;font-family:var(--sans)">🔵 Gemini</button>
+          <button onclick="setModalAI(this,'claude')" data-provider="claude"
+            style="font-size:.68rem;padding:.15rem .4rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--sur);color:var(--txt3);cursor:pointer;font-family:var(--sans)">🟠 Claude</button>
+          <input type="password" id="modal-ai-key" class="form-control" style="flex:1;min-width:0;font-size:.72rem;height:1.6rem"
+            placeholder="API Key..." oninput="saveModalAIKey(this.value)">
+          <div id="modal-ai-status" style="font-size:.65rem;color:var(--txt3);width:100%"></div>
+        </div>
+      <div style="display:flex;gap:.4rem;margin-top:.3rem">
         <label class="btn btn-secondary btn-sm" for="drug-file-import" style="cursor:pointer;white-space:nowrap">📁 Subir Excel</label>
         <input type="file" id="drug-file-import" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="importFarmacosFile(this)">
       </div>
@@ -5110,19 +5179,14 @@ function openAddSpeciesDrug() {
       <button class="btn btn-secondary" onclick="closeModal('modal-species-drug')">Cancelar</button>
       <button class="btn btn-primary" style="flex:1" onclick="saveSpeciesDrug()">Agregar fármaco</button>
     </div>`;
-  document.getElementById('modal-species-drug').classList.add('open');
+  document.getElementById('modal-species-drug').classList.add('open'); setTimeout(updateModalAIStatus, 50);
 }
 
 async function importFarmacosFile(input) {
   if (!input.files?.[0]) return;
   const statusEl = document.getElementById('drug-import-status');
-  const rawKey = document.getElementById('drug-api-key')?.value || localStorage.getItem('wv_api_key') || '';
-  const apiKey = rawKey.replace(/[\s\u200B\u00A0\uFEFF]/g, '').trim();
-  if (!apiKey || !apiKey.startsWith('sk-')) {
-    statusEl.textContent = '⚠ API Key inválida — debe empezar con sk-ant-...';
-    statusEl.style.color = 'var(--r5)'; return;
-  }
-  localStorage.setItem('wv_api_key', apiKey);
+  const apiKey = getModalAIKey();
+  if (!apiKey) { statusEl.textContent = '⚠ Sin API Key'; statusEl.style.color='var(--r5)'; return; }
   statusEl.textContent = '⏳ Leyendo archivo...'; statusEl.style.color='var(--g6)';
   try {
     const text = await (input.files[0].name.match(/\.xlsx?$/i)
@@ -6841,6 +6905,40 @@ function renderBiblioteca() {
   }).join('');
 }
 
+function setModalAI(btn, provider) {
+  selectedAI = provider;
+  localStorage.setItem('wv_ai_provider', provider);
+  // Actualizar estilos botones
+  btn.closest('div').querySelectorAll('[data-provider]').forEach(b => {
+    const isSel = b.dataset.provider === provider;
+    b.style.background = isSel ? (provider==='gemini'?'var(--g1)':'#fff8e1') : 'var(--sur)';
+    b.style.color = isSel ? (provider==='gemini'?'var(--g7)':'#b45309') : 'var(--txt3)';
+    b.style.borderColor = isSel ? (provider==='gemini'?'var(--g4)':'#f59e0b') : 'var(--bor)';
+  });
+  updateModalAIStatus();
+}
+function saveModalAIKey(raw) {
+  const key = (raw||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
+  if (key.startsWith('AIza')) { localStorage.setItem('wv_key_gemini', key); selectedAI='gemini'; }
+  else if (key.startsWith('sk-')) { localStorage.setItem('wv_key_claude', key); selectedAI='claude'; }
+  localStorage.setItem('wv_ai_provider', selectedAI);
+  updateModalAIStatus();
+}
+function updateModalAIStatus() {
+  const { key } = getActiveAIKey();
+  const inp = document.getElementById('modal-ai-key');
+  const st  = document.getElementById('modal-ai-status');
+  if (inp && !inp.value && key) inp.value = key;
+  if (!st) return;
+  if (!key) st.textContent = '⚠ Sin key — Gemini gratis: aistudio.google.com/apikey';
+  else st.textContent = '✓ ' + (selectedAI==='gemini'?'Gemini':'Claude') + ': ' + key.substring(0,14) + '...';
+  st.style.color = key ? 'var(--g6)' : 'var(--am)';
+}
+function getModalAIKey() {
+  const modalKey = (document.getElementById('modal-ai-key')?.value||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
+  const { key } = getActiveAIKey();
+  return modalKey || key || '';
+}
 function saveRefAIKey(raw) {
   const key = (raw||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
   // Guardar como key activa del proveedor detectado
