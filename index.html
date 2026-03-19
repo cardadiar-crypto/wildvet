@@ -122,7 +122,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .badge-admin{background:var(--am1);color:#854d0e}
 
 /* QUICK GRID */
-.quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:1rem}
+.quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-bottom:1rem}
 .quick-card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--rsm);padding:.8rem .5rem;cursor:pointer;text-align:center;transition:background .15s}
 .quick-card:hover{background:var(--sur2)}
 .quick-card svg{width:22px;height:22px;color:var(--g5);margin-bottom:.3rem}
@@ -432,6 +432,10 @@ textarea.form-control{resize:vertical;min-height:70px}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
         <span>Vademécum</span>
       </div>
+      <div class="quick-card" onclick="showScreen('biblioteca')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <span>Biblioteca</span>
+      </div>
     </div>
     <div class="flex-between mb-1"><div class="sec-title" style="margin-bottom:0">Especies</div><div id="admin-add-sp-btn" style="display:none"><button class="btn btn-admin btn-sm" onclick="openAddSpecies()">+ Nueva especie</button></div></div>
     <div style="height:.75rem"></div>
@@ -440,6 +444,15 @@ textarea.form-control{resize:vertical;min-height:70px}
       <div class="sec-title">Resultados</div>
       <div id="search-list"></div>
     </div>
+  </div>
+
+  <!-- BIBLIOTECA -->
+  <div id="screen-biblioteca" class="screen">
+    <div class="flex-between mb-2">
+      <h2 style="font-size:1.1rem;font-weight:700">📚 Biblioteca de Referencias</h2>
+    </div>
+    <p style="font-size:.82rem;color:var(--txt3);margin-bottom:1rem">Referencias bibliográficas organizadas por especie — libros, artículos, papers y publicaciones usadas como fuente.</p>
+    <div id="biblioteca-list"></div>
   </div>
 
   <!-- HISTORIAS -->
@@ -1269,7 +1282,10 @@ async function finishGoogleLogin(profile) {
   const btn = document.getElementById('google-btn');
   if (btn) btn.disabled = false;
 
-  // Cargar lista de emails admin (Firestore si disponible, sino local)
+  // Ocultar login screen inmediatamente
+  document.getElementById('login-screen').style.display = 'none';
+
+  // Cargar lista de emails admin
   await loadAdminEmails();
 
   const email = (profile.email || '').toLowerCase();
@@ -1283,7 +1299,6 @@ async function finishGoogleLogin(profile) {
     avatar: profile.avatar
   };
 
-  // Si no está en lista admin, revisar si tenía rol guardado previamente
   if (!isAdminEmail) {
     const saved = await dbGet('settings', 'user_' + profile.uid);
     if (saved?.value?.role) currentUser.role = saved.value.role;
@@ -1291,9 +1306,9 @@ async function finishGoogleLogin(profile) {
 
   await dbPut('settings', { key: 'user',                value: currentUser });
   await dbPut('settings', { key: 'user_' + profile.uid, value: currentUser });
-  document.getElementById('login-screen').style.display = 'none';
   updateUserUI();
   await loadData();
+  await loadBiblioteca();
   updateAdminUI();
   renderSpeciesGrid();
   const roleMsg = currentUser.role === 'admin' ? ' · Administrador ✓' : '';
@@ -1801,7 +1816,7 @@ function logout() {
 // ═══════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════
-function showScreen(name) {
+function showScreen(name, trackNav=true) {
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('species-detail').style.display='none';
@@ -1809,8 +1824,10 @@ function showScreen(name) {
   if (s) s.classList.add('active');
   const b = document.getElementById('bnav-'+name);
   if (b) b.classList.add('active');
+  if (trackNav) pushNav({ type: 'screen', name });
   if (name==='home') document.getElementById('bnav-home').classList.add('active');
   if (name==='admin') { renderAdminSpeciesList(); loadAdminEmails().then(renderAdminEmailsList); }
+  if (name==='biblioteca') { renderBiblioteca(); }
   if (name==='historias') renderRecordsList();
   if (name==='inventario') renderInventoryList();
   if (name==='vademecum') { syncAndRenderVademecum(); }
@@ -2103,7 +2120,7 @@ function handleSearch(val) {
 // ═══════════════════════════════════
 // SPECIES DETAIL TABS
 // ═══════════════════════════════════
-function openSpecies(id) {
+function openSpecies(id, trackNav=true) {
   currentSpecies = SPECIES_DB.find(s=>s.id===id);
   if (!currentSpecies) return;
   currentWeight = currentSpecies.weight_avg;
@@ -2116,6 +2133,7 @@ function openSpecies(id) {
   badge.className = 'badge badge-'+currentSpecies.uicn_world.toLowerCase();
   document.getElementById('detail-edit-btn').style.display = currentUser?.role==='admin' ? 'flex' : 'none';
   showTab('general');
+  if (trackNav) pushNav({ type: 'species', id });
   window.scrollTo({top:0, behavior:'instant'});
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
@@ -2706,6 +2724,7 @@ function renderNutricion(el, sp) {
             <th style="padding:.35rem .5rem;text-align:left;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Suplemento</th>
             <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Dosis</th>
             <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Unidad</th>
+            <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Conc. (mg/ml)</th>
             <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Peso (kg)</th>
             <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--g6)">Total</th>
             ${isAdmin?'<th style="border-bottom:1px solid var(--bor);width:24px"></th>':''}
@@ -2722,11 +2741,14 @@ function renderNutricion(el, sp) {
                   : (s.unit||'mg/kg')}
               </td>
               <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor)">
+                ${isAdmin ? `<input type="text" value="${s.conc||''}" placeholder="mg/ml" style="width:60px;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.78rem;color:var(--txt);text-align:center" onchange="editSuplemento(${i},'conc',this.value)">` : (s.conc||'—')}
+              </td>
+              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor)">
                 <input type="number" min="0.001" max="5000" step="0.1" value="${currentWeight}" placeholder="kg"
                   style="width:65px;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.2rem .3rem;font-family:var(--mono);font-size:.78rem;color:var(--txt);outline:none;text-align:center"
-                  oninput="calcSupRango(this,'${(s.dosis||'').replace(/'/g,'')}',0,'sup-total-${i}')">
+                  oninput="calcSupConc(this,'${(s.dosis||'').replace(/'/g,'')}','${s.conc||0}','${s.unit||'mg/kg'}','sup-total-${i}')">
               </td>
-              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--g6);font-weight:600" id="sup-total-${i}">—</td>
+              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--g6);font-weight:600;font-size:.78rem" id="sup-total-${i}">—</td>
               ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button onclick="removeSuplemento(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button></td>`:''}
             </tr>`).join('')}
           </tbody>
@@ -3118,40 +3140,67 @@ async function removeDentalMeasure(i) {
   renderTab('nutricion');
   toast('Medida eliminada');
 }
-// ── Helper: importar Excel con IA para cualquier sección ──
+// ── Helper: importar con IA (Anthropic o Gemini) ──
 async function importExcelWithAI(file, prompt) {
-  const rawKey = localStorage.getItem('wv_api_key') || '';
-  const apiKey = rawKey.replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g, '');
-  if (!apiKey) throw new Error('API Key no configurada. Agrégala en Admin → Nueva Especie');
-  if (!apiKey.startsWith('sk-')) throw new Error('API Key inválida (debe empezar con sk-ant-)');
+  const rawKey = (localStorage.getItem('wv_api_key') || '').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g, '');
+
+  if (!rawKey) throw new Error('Sin API Key. Configúrala en Admin → Nueva Especie → campo API Key');
+
   const text = await (file.name.match(/\.xlsx?$/i) ? readExcel(file) : file.text());
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 3000,
-      messages: [{ role: 'user', content: prompt + '\n\nDocumento:\n' + text.substring(0, 12000) }]
-    })
-  });
-  if (!resp.ok) {
-    let errMsg = 'API error ' + resp.status;
-    if (resp.status === 400) errMsg = 'Error 400 — API Key incorrecta o expirada. Genera una nueva en console.anthropic.com';
-    if (resp.status === 401) errMsg = 'Error 401 — API Key inválida o revocada';
-    if (resp.status === 429) errMsg = 'Error 429 — Límite de uso alcanzado, espera un momento';
-    throw new Error(errMsg);
+  const fullPrompt = prompt + '\n\nDocumento:\n' + text.substring(0, 12000);
+
+  // Detectar tipo de key
+  if (rawKey.startsWith('sk-')) {
+    // Anthropic Claude
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': rawKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 3000,
+        messages: [{ role: 'user', content: fullPrompt }]
+      })
+    });
+    if (!resp.ok) {
+      const status = resp.status;
+      if (status === 400) throw new Error('API Key inválida o expirada (400). Genera una nueva en console.anthropic.com y toca 🗑 Limpiar primero');
+      if (status === 401) throw new Error('API Key rechazada (401). Verifica que sea correcta');
+      if (status === 429) throw new Error('Límite de uso alcanzado (429). Espera un momento');
+      throw new Error('Error API Anthropic: ' + status);
+    }
+    const data = await resp.json();
+    const raw = data.content.map(c => c.text || '').join('');
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const s = clean.indexOf('['), e = clean.lastIndexOf(']');
+    if (s === -1) { const js = clean.indexOf('{'); const je = clean.lastIndexOf('}'); if(js>=0) return JSON.parse(clean.substring(js,je+1)); throw new Error('No se encontró JSON'); }
+    return JSON.parse(clean.substring(s, e + 1));
+
+  } else if (rawKey.startsWith('AIza')) {
+    // Google Gemini
+    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${rawKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: fullPrompt }] }],
+        generationConfig: { temperature: 0.1 }
+      })
+    });
+    if (!resp.ok) throw new Error('Error Gemini API: ' + resp.status);
+    const data = await resp.json();
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const s = clean.indexOf('['), e = clean.lastIndexOf(']');
+    if (s === -1) { const js = clean.indexOf('{'); const je = clean.lastIndexOf('}'); if(js>=0) return JSON.parse(clean.substring(js,je+1)); throw new Error('No se encontró JSON'); }
+    return JSON.parse(clean.substring(s, e + 1));
+
+  } else {
+    throw new Error('API Key no reconocida. Debe empezar con "sk-" (Anthropic) o "AIza" (Google Gemini)');
   }
-  const data = await resp.json();
-  const raw = data.content.map(c => c.text || '').join('');
-  const clean = raw.replace(/```json|```/g, '').trim();
-  const s = clean.indexOf('['), e = clean.lastIndexOf(']');
-  if (s === -1) throw new Error('No se encontró JSON en la respuesta');
-  return JSON.parse(clean.substring(s, e + 1));
 }
 
 // Hematología / Bioquímica desde Excel
@@ -3496,7 +3545,10 @@ function renderEnfermedades(el, sp) {
                     <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">${e.signos||'—'}</td>
                     <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">${e.dx||'—'}</td>
                     <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">${e.tx||'—'}</td>
-                    ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button onclick="removeEnfermedad('${s.id}',${ei})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.7rem;padding:.1rem .3rem;font-weight:700">✕</button></td>`:''}
+                    ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)">
+                      <button onclick="openEditEnfermedad('${s.id}',${ei})" style="background:var(--g0);border:1px solid var(--g5);border-radius:var(--rxs);color:var(--g6);cursor:pointer;font-size:.7rem;padding:.1rem .3rem;margin-right:.2rem">✏️</button>
+                      <button onclick="removeEnfermedad('${s.id}',${ei})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.7rem;padding:.1rem .3rem;font-weight:700">✕</button>
+                    </td>`:''}
                   </tr>`).join('')}
                 </tbody>
               </table>
@@ -4447,7 +4499,7 @@ function buildSpeciesForm(sp) {
 
       <!-- API Key para importación -->
       <div style="margin-bottom:.6rem;text-align:left">
-        <label style="font-size:.7rem;color:var(--txt3)">API Key de Anthropic (necesaria para importar)</label>
+        <label style="font-size:.7rem;color:var(--txt3)">API Key — Anthropic (sk-ant-...) o Google Gemini (AIza...)</label>
         <div style="display:flex;gap:.3rem;margin-top:.2rem">
           <input type="password" id="sp-api-key" class="form-control"
             placeholder="sk-ant-api03-..."
@@ -6514,13 +6566,274 @@ if ('serviceWorker' in navigator) {
 // ═══════════════════════════════════
 // INIT
 // ═══════════════════════════════════
+// ═══════════════════════════════════
+// BIBLIOTECA DE REFERENCIAS
+// ═══════════════════════════════════
+let BIBLIOTECA_DB = {}; // { spId: [{titulo, autores, año, tipo, url, notas}] }
+
+async function loadBiblioteca() {
+  const saved = await dbGet('settings', 'biblioteca');
+  BIBLIOTECA_DB = saved?.value || {};
+  // Asegurar que existe una sección para cada especie
+  for (const sp of SPECIES_DB) {
+    if (!BIBLIOTECA_DB[sp.id]) BIBLIOTECA_DB[sp.id] = [];
+  }
+}
+
+async function saveBiblioteca() {
+  await dbPut('settings', { key: 'biblioteca', value: BIBLIOTECA_DB });
+  if (firestore && fbUid()) {
+    try { await firestore.collection('settings').doc('biblioteca').set({ value: BIBLIOTECA_DB }); } catch(e) {}
+  }
+}
+
+function renderBiblioteca() {
+  const el = document.getElementById('biblioteca-list');
+  if (!el) return;
+  const isAdmin = currentUser?.role === 'admin';
+  if (!SPECIES_DB.length) { el.innerHTML = '<p style="color:var(--txt3)">Sin especies cargadas.</p>'; return; }
+  el.innerHTML = SPECIES_DB.map(sp => {
+    const refs = BIBLIOTECA_DB[sp.id] || [];
+    return `
+    <div class="info-card" style="margin-bottom:.75rem">
+      <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;align-items:center;gap:.5rem">
+          ${sp.cover_photo ? `<img src="${sp.cover_photo}" style="width:32px;height:24px;object-fit:cover;border-radius:var(--rxs)">` : ''}
+          <span>${sp.name}</span>
+          <span style="font-size:.7rem;color:var(--txt3);font-weight:400;font-style:italic">${sp.sci||''}</span>
+        </div>
+        ${isAdmin ? `<button onclick="openAddRef('${sp.id}')" class="btn btn-admin btn-sm">+ Agregar</button>` : ''}
+      </div>
+      ${refs.length ? `
+      <div style="margin-top:.4rem">
+        ${refs.map((r,i) => `
+        <div style="padding:.4rem .5rem;border-left:3px solid var(--g5);margin-bottom:.4rem;background:var(--sur2);border-radius:0 var(--rxs) var(--rxs) 0">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div style="flex:1">
+              <div style="font-size:.82rem;font-weight:600;color:var(--txt)">${r.titulo||'Sin título'}</div>
+              ${r.autores ? `<div style="font-size:.75rem;color:var(--txt3)">${r.autores}${r.año?' · '+r.año:''}</div>` : ''}
+              <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
+                ${r.tipo ? `<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>` : ''}
+                ${r.url ? `<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver fuente</a>` : ''}
+              </div>
+              ${r.notas ? `<div style="font-size:.75rem;color:var(--txt3);margin-top:.2rem;font-style:italic">${r.notas}</div>` : ''}
+            </div>
+            ${isAdmin ? `<button onclick="removeRef('${sp.id}',${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem;padding:.1rem .3rem;flex-shrink:0">✕</button>` : ''}
+          </div>
+        </div>`).join('')}
+      </div>` : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic;margin-top:.3rem">Sin referencias agregadas.${isAdmin?' Toca + Agregar.':''}</p>`}
+    </div>`;
+  }).join('');
+}
+
+function openAddRef(spId) {
+  document.getElementById('ref-modal')?.remove();
+  const sp = SPECIES_DB.find(s => s.id === spId);
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">📚 Agregar referencia — ${sp?.name||''}</div>
+        <div class="form-group"><label>Título *</label><input id="ref-titulo" class="form-control" placeholder="Ej: Wild Mammal Husbandry..."></div>
+        <div class="form-row">
+          <div class="form-group"><label>Autores</label><input id="ref-autores" class="form-control" placeholder="Apellido, N. et al."></div>
+          <div class="form-group"><label>Año</label><input id="ref-año" class="form-control" type="number" placeholder="2023" style="width:80px"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Tipo</label>
+            <select id="ref-tipo" class="form-control">
+              <option>Libro</option><option>Artículo científico</option><option>Paper</option>
+              <option>Guía clínica</option><option>Tesis</option><option>Manual</option><option>Otro</option>
+            </select>
+          </div>
+          <div class="form-group"><label>URL / DOI</label><input id="ref-url" class="form-control" placeholder="https://..."></div>
+        </div>
+        <div class="form-group"><label>Notas</label><textarea id="ref-notas" class="form-control" placeholder="Capítulos relevantes, páginas, observaciones..." style="min-height:50px"></textarea></div>
+        <div style="display:flex;gap:.5rem;margin-top:.5rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveRef('${spId}')">💾 Guardar</button>
+        </div>
+      </div>
+    </div>`);
+  document.getElementById('ref-titulo')?.focus();
+}
+
+async function saveRef(spId) {
+  const titulo = document.getElementById('ref-titulo')?.value.trim();
+  if (!titulo) { toast('⚠ El título es obligatorio'); return; }
+  if (!BIBLIOTECA_DB[spId]) BIBLIOTECA_DB[spId] = [];
+  BIBLIOTECA_DB[spId].push({
+    titulo,
+    autores: document.getElementById('ref-autores')?.value.trim() || '',
+    año:     document.getElementById('ref-año')?.value || '',
+    tipo:    document.getElementById('ref-tipo')?.value || 'Libro',
+    url:     document.getElementById('ref-url')?.value.trim() || '',
+    notas:   document.getElementById('ref-notas')?.value.trim() || ''
+  });
+  await saveBiblioteca();
+  document.getElementById('ref-modal')?.remove();
+  renderBiblioteca();
+  toast('✓ Referencia agregada');
+}
+
+async function removeRef(spId, i) {
+  const ok = await confirmDelete('¿Eliminar referencia?', `Se eliminará "${BIBLIOTECA_DB[spId]?.[i]?.titulo||''}".`);
+  if (!ok) return;
+  BIBLIOTECA_DB[spId].splice(i, 1);
+  await saveBiblioteca();
+  renderBiblioteca();
+}
+
+// ═══════════════════════════════════
+// EDITAR ENFERMEDAD EXISTENTE
+// ═══════════════════════════════════
+function openEditEnfermedad(sistId, enfIdx) {
+  const enf = currentSpecies?.enfermedades_sistemas?.[sistId]?.enfermedades?.[enfIdx];
+  if (!enf) return;
+  document.getElementById('enf-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="enf-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">✏️ Editar enfermedad</div>
+        <div class="form-group"><label>Nombre *</label><input id="enf-nombre" class="form-control" value="${enf.nombre||''}"></div>
+        <div class="form-group"><label>Agente / Causa</label><input id="enf-agente" class="form-control" value="${enf.agente||''}"></div>
+        <div class="form-group"><label>Signos clínicos</label><textarea id="enf-signos" class="form-control" style="min-height:70px">${enf.signos||''}</textarea></div>
+        <div class="form-group"><label>Diagnóstico</label><input id="enf-dx" class="form-control" value="${enf.dx||''}"></div>
+        <div class="form-group"><label>Tratamiento</label><textarea id="enf-tx" class="form-control" style="min-height:70px">${enf.tx||''}</textarea></div>
+        <div style="display:flex;gap:.5rem;margin-top:.5rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('enf-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveEditEnfermedad('${sistId}',${enfIdx})">💾 Guardar cambios</button>
+        </div>
+      </div>
+    </div>`);
+  document.getElementById('enf-nombre')?.focus();
+}
+
+async function saveEditEnfermedad(sistId, enfIdx) {
+  const nombre = document.getElementById('enf-nombre')?.value.trim();
+  if (!nombre) { toast('⚠ El nombre es obligatorio'); return; }
+  currentSpecies.enfermedades_sistemas[sistId].enfermedades[enfIdx] = {
+    nombre,
+    agente: document.getElementById('enf-agente')?.value || '',
+    signos: document.getElementById('enf-signos')?.value || '',
+    dx:     document.getElementById('enf-dx')?.value || '',
+    tx:     document.getElementById('enf-tx')?.value || ''
+  };
+  await dbPutSync('species', currentSpecies);
+  document.getElementById('enf-modal')?.remove();
+  renderTab('enfermedades');
+  toast('✓ Enfermedad actualizada');
+}
+
+// ═══════════════════════════════════
+// NAVEGACIÓN — historial interno
+// ═══════════════════════════════════
+let navHistory = [];
+
+function pushNav(state) {
+  navHistory.push(state);
+}
+
+function handleBackNav() {
+  if (navHistory.length > 1) {
+    navHistory.pop(); // quitar estado actual
+    const prev = navHistory[navHistory.length - 1];
+    if (prev.type === 'screen') {
+      showScreen(prev.name, false);
+    } else if (prev.type === 'species') {
+      openSpecies(prev.id, false);
+    } else if (prev.type === 'tab') {
+      showTab(prev.tab, false);
+    }
+  } else {
+    // Confirmar salida de sesión
+    confirmDelete('¿Cerrar sesión?', 'Si sales perderás la sesión actual. ¿Deseas continuar?', '🚪').then(ok => {
+      if (ok) logout();
+    });
+  }
+}
+
+// Interceptar botón atrás del navegador
+window.addEventListener('popstate', (e) => {
+  e.preventDefault();
+  handleBackNav();
+  // Mantener la URL sin cambios
+  history.pushState(null, '', location.href);
+});
+
+// Inicializar historial
+history.pushState(null, '', location.href);
+
+// ═══════════════════════════════════
+// CALCULADORA SUPLEMENTOS (con concentración)
+// ═══════════════════════════════════
+function calcSupConc(weightInput, dosisStr, concStr, unitStr, resultId) {
+  const w = parseFloat(weightInput.value);
+  const el = document.getElementById(resultId);
+  if (!el || !w) { if(el) el.textContent='—'; return; }
+  const parts = String(dosisStr||'').split('-').map(p=>parseFloat(p.trim())).filter(n=>!isNaN(n));
+  const conc = parseFloat(concStr) || 0;
+  const unit = unitStr || 'mg/kg';
+  const isDayUnit = unit.includes('/día') || unit.includes('/dia');
+
+  if (parts.length === 2) {
+    const totalMin = w * parts[0];
+    const totalMax = w * parts[1];
+    let result = `${totalMin.toFixed(1)}–${totalMax.toFixed(1)} ${unit.replace('/kg','').replace('/día','').replace('/dia','')} total`;
+    if (conc > 0 && !isDayUnit) {
+      result += ` · ${(totalMin/conc).toFixed(2)}–${(totalMax/conc).toFixed(2)} ml`;
+    }
+    el.textContent = result;
+  } else if (parts.length === 1) {
+    const total = w * parts[0];
+    let result = `${total.toFixed(2)} ${unit.replace('/kg','').replace('/día','').replace('/dia','')} total`;
+    if (conc > 0 && !isDayUnit) {
+      result += ` · ${(total/conc).toFixed(2)} ml`;
+    }
+    el.textContent = result;
+  } else { el.textContent='—'; }
+}
+
 async function init() {
   await initDB();
+
+  // Mostrar pantalla de carga mientras Firebase verifica sesión
+  const loginScreen = document.getElementById('login-screen');
+
+  // Inicializar Firebase — onAuthStateChanged manejará el login automático
   initFirebase(FIREBASE_CONFIG_BUILTIN);
-  // Dar tiempo a Firebase para verificar sesión persistente (onAuthStateChanged)
-  await new Promise(r => setTimeout(r, 900));
-  // Si Firebase ya resolvió el login, ya está dentro
+
+  // Esperar a Firebase con timeout progresivo
+  let resolved = false;
+  const authPromise = new Promise(resolve => {
+    const unsub = firebaseAuth?.onAuthStateChanged(async user => {
+      if (resolved) return;
+      resolved = true;
+      unsub?.();
+      resolve(user);
+    });
+  });
+
+  // Esperar máximo 3 segundos a Firebase
+  const user = await Promise.race([
+    authPromise,
+    new Promise(r => setTimeout(() => r(null), 3000))
+  ]);
+
+  if (user) {
+    // Firebase tiene sesión activa — finishGoogleLogin se llamó via onAuthStateChanged
+    // Esperar un poco más para que termine
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  // Si después de todo no hay sesión, mostrar login
+  if (!currentUser) {
+    if (loginScreen) loginScreen.style.display = 'flex';
+  }
+
   if (!navigator.onLine) document.getElementById('offline-badge').classList.add('show');
+
+  // Inicializar historial de navegación
+  pushNav({ type: 'screen', name: 'home' });
 }
 init();
 </script>
