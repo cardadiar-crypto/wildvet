@@ -10,11 +10,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="WildVet">
 <meta name="application-name" content="WildVet">
-<link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
-<link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png">
-<link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <title>WildVet — Fauna Silvestre</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -2501,9 +2501,15 @@ function renderFisiologia(el, sp) {
         </tr></thead>
         <tbody>
           ${hem.map((h,i)=>`<tr>
-            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">${h[0]}</td>
-            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:center;color:var(--txt3);font-size:.78rem">${h[2]||'—'}</td>
-            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:right;font-family:var(--mono)">${h[1]}</td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
+              ${isAdmin?`<input type="text" value="${h[0]||''}" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-size:.82rem;color:var(--txt)" onchange="editHemoRow(${i},'hematology',0,this.value)">`:h[0]}
+            </td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:center;color:var(--txt3);font-size:.78rem">
+              ${isAdmin?`<input type="text" value="${h[2]||''}" placeholder="unidad" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-size:.78rem;color:var(--txt3);text-align:center" onchange="editHemoRow(${i},'hematology',2,this.value)">`:h[2]||'—'}
+            </td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:right;font-family:var(--mono)">
+              ${isAdmin?`<input type="text" value="${h[1]||''}" placeholder="rango" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.82rem;color:var(--txt);text-align:right" onchange="editHemoRow(${i},'hematology',1,this.value)">`:h[1]}
+            </td>
             ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button class="icon-btn danger" style="width:22px;height:22px;font-size:.65rem" onclick="removeHemoRow(${i},'hematology')">✕</button></td>`:''}
           </tr>`).join('')}
           ${!hem.length?`<tr><td colspan="4" style="padding:.5rem;color:var(--txt3);font-size:.8rem;text-align:center">Sin datos registrados</td></tr>`:''}
@@ -2529,9 +2535,15 @@ function renderFisiologia(el, sp) {
         </tr></thead>
         <tbody>
           ${bio.map((b,i)=>`<tr>
-            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">${b[0]}</td>
-            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:center;color:var(--txt3);font-size:.78rem">${b[2]||'—'}</td>
-            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:right;font-family:var(--mono)">${b[1]}</td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
+              ${isAdmin?`<input type="text" value="${b[0]||''}" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-size:.82rem;color:var(--txt)" onchange="editHemoRow(${i},'biochem',0,this.value)">`:b[0]}
+            </td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:center;color:var(--txt3);font-size:.78rem">
+              ${isAdmin?`<input type="text" value="${b[2]||''}" placeholder="unidad" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-size:.78rem;color:var(--txt3);text-align:center" onchange="editHemoRow(${i},'biochem',2,this.value)">`:b[2]||'—'}
+            </td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:right;font-family:var(--mono)">
+              ${isAdmin?`<input type="text" value="${b[1]||''}" placeholder="rango" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.82rem;color:var(--txt);text-align:right" onchange="editHemoRow(${i},'biochem',1,this.value)">`:b[1]}
+            </td>
             ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button class="icon-btn danger" style="width:22px;height:22px;font-size:.65rem" onclick="removeHemoRow(${i},'biochem')">✕</button></td>`:''}
           </tr>`).join('')}
           ${!bio.length?`<tr><td colspan="4" style="padding:.5rem;color:var(--txt3);font-size:.8rem;text-align:center">Sin datos registrados</td></tr>`:''}
@@ -2570,6 +2582,11 @@ async function saveHemoRow(field, idx) {
   renderTab('fisiologia');
   toast('✓ Parámetro agregado');
 }
+async function editHemoRow(i, field, col, value) {
+  if (!currentSpecies[field]?.[i]) return;
+  currentSpecies[field][i][col] = value;
+  await dbPutSync('species', currentSpecies);
+}
 async function removeHemoRow(i, field) {
   if (!currentSpecies[field]) return;
   const label = field === 'hematology' ? 'parámetro hematológico' : 'parámetro bioquímico';
@@ -2588,6 +2605,20 @@ function renderNutricion(el, sp) {
   const denticion = sp.denticion || [];
   const reqEnerg = sp.req_energetico || [];
 
+  // Helper: celda editable inline para req energético
+  const reqCell = (r, i, field, placeholder) => isAdmin
+    ? `<input type="text" value="${r[field]||''}" placeholder="${placeholder}"
+        style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.82rem;color:var(--txt);padding:.1rem .2rem;text-align:center"
+        onchange="editReqEnergetico(${i},'${field}',this.value)">`
+    : (r[field]||'—');
+
+  // Helper: celda editable inline para suplementos
+  const supCell = (s, i, field, placeholder, align='left') => isAdmin
+    ? `<input type="text" value="${s[field]||''}" placeholder="${placeholder}"
+        style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--sans);font-size:.82rem;color:var(--txt);padding:.1rem .2rem;text-align:${align}"
+        onchange="editSuplemento(${i},'${field}',this.value)">`
+    : (s[field]||'—');
+
   el.innerHTML = `
     <!-- DIETA EN CAUTIVERIO -->
     <div class="info-card">
@@ -2596,6 +2627,24 @@ function renderNutricion(el, sp) {
         ${isAdmin?`<button onclick="editField('nutricion','captive','Dieta en cautiverio')" class="btn-inline-edit">✏️</button>`:''}
       </div>
       <p class="text-sm" style="line-height:1.6">${n.captive||'N/D'}</p>
+    </div>
+
+    <!-- FRECUENCIA DE ALIMENTACIÓN -->
+    <div class="info-card">
+      <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
+        Frecuencia de Alimentación
+        ${isAdmin?`<button onclick="editFrecuencia()" class="btn-inline-edit">✏️</button>`:''}
+      </div>
+      <div id="freq-view">
+        <p class="text-sm">${n.freq||'No especificada'}</p>
+      </div>
+      <div id="freq-edit" style="display:none;margin-top:.4rem">
+        <input id="freq-input" class="form-control" value="${n.freq||''}" placeholder="Ej: 2–3 veces/día">
+        <div style="display:flex;gap:.4rem;margin-top:.4rem">
+          <button class="btn btn-secondary btn-sm" onclick="cancelFrecuencia()">Cancelar</button>
+          <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveFrecuencia()">💾 Guardar</button>
+        </div>
+      </div>
     </div>
 
     <!-- REQUERIMIENTO ENERGÉTICO -->
@@ -2610,32 +2659,38 @@ function renderNutricion(el, sp) {
           <thead><tr style="background:var(--sur2)">
             <th style="padding:.35rem .5rem;text-align:left;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Categoría</th>
             <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">kcal/kg/día</th>
-            <th style="padding:.35rem .5rem;text-align:left;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Notas</th>
+            <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Peso (kg)</th>
+            <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--g6)">Total kcal/día</th>
             ${isAdmin?'<th style="border-bottom:1px solid var(--bor);width:24px"></th>':''}
           </tr></thead>
           <tbody>
             ${reqEnerg.map((r,i)=>`<tr>
-              <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">${r.cat}</td>
-              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);font-weight:600;color:var(--g6)">${r.kcal}</td>
-              <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);color:var(--txt3)">${r.notes||''}</td>
+              <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">${reqCell(r,i,'cat','Categoría...')}</td>
+              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);font-weight:600;color:var(--g6)">${reqCell(r,i,'kcal','50-80')}</td>
+              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor)">
+                <input type="number" min="0.001" max="5000" step="0.1" value="${currentWeight}" placeholder="kg"
+                  style="width:65px;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.2rem .3rem;font-family:var(--mono);font-size:.78rem;color:var(--txt);outline:none;text-align:center"
+                  oninput="calcReqTotal(this,'${(r.kcal||'').replace(/'/g,'')}','req-total-${i}')">
+              </td>
+              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--g5);font-weight:700" id="req-total-${i}">—</td>
               ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button onclick="removeReqEnergetico(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button></td>`:''}
             </tr>`).join('')}
           </tbody>
         </table>
-      </div>` : `<p style="font-size:.8rem;color:var(--txt3);font-style:italic">Sin requerimientos energéticos registrados.${isAdmin?' Toca + Categoría para agregar.':''}</p>`}
+      </div>
+      <p style="font-size:.7rem;color:var(--txt3);margin-top:.25rem">Ingresa el peso del animal para calcular el total de kcal/día. Si el rango es "50-80", calcula con el valor medio.</p>
+      ` : `<p style="font-size:.8rem;color:var(--txt3);font-style:italic">Sin requerimientos energéticos registrados.${isAdmin?' Toca + Categoría.':''}</p>`}
       ${isAdmin ? `
       <div id="req-form" style="display:none;background:var(--sur2);border-radius:var(--rsm);padding:.6rem;margin-top:.4rem">
-        <div style="display:grid;grid-template-columns:1fr 80px 1fr;gap:.4rem;margin-bottom:.4rem">
+        <div style="display:grid;grid-template-columns:1fr 120px;gap:.4rem;margin-bottom:.4rem">
           <div><label style="font-size:.7rem;color:var(--txt3)">Categoría</label><input id="req-cat" class="form-control" placeholder="Macho adulto, Cachorro..." style="font-size:.82rem"></div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">Rango kcal/kg/día (ej: 50-80)</label><input id="req-kcal" class="form-control" placeholder="50-80" style="font-size:.82rem"></div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">Notas</label><input id="req-notes" class="form-control" placeholder="Observaciones..." style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">Rango kcal/kg/día</label><input id="req-kcal" class="form-control" placeholder="50-80" style="font-size:.82rem"></div>
         </div>
         <div style="display:flex;gap:.4rem">
           <button class="btn btn-secondary btn-sm" onclick="document.getElementById('req-form').style.display='none'">Cancelar</button>
           <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveReqEnergetico()">Guardar</button>
         </div>
       </div>` : ''}
-      ${row('Frecuencia de alimentación', n.freq||'N/D')}
     </div>
 
     <!-- SUPLEMENTOS -->
@@ -2650,30 +2705,40 @@ function renderNutricion(el, sp) {
           <thead><tr style="background:var(--sur2)">
             <th style="padding:.35rem .5rem;text-align:left;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Suplemento</th>
             <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Dosis</th>
-            <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Peso animal (kg)</th>
-            <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--g6)">Total calculado</th>
+            <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Unidad</th>
+            <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Peso (kg)</th>
+            <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--g6)">Total</th>
             ${isAdmin?'<th style="border-bottom:1px solid var(--bor);width:24px"></th>':''}
           </tr></thead>
           <tbody>
             ${suplementos.map((s,i)=>`<tr>
-              <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-weight:600">${s.nombre}</td>
-              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)">${s.dosis} ${s.unit||'mg/kg'}</td>
+              <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-weight:600">${supCell(s,i,'nombre','Nombre...')}</td>
+              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)">${supCell(s,i,'dosis','10-20','center')}</td>
               <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor)">
-                <input type="number" min="0.001" max="5000" step="0.001" value="${currentWeight}" placeholder="kg"
-                  style="width:70px;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.2rem .3rem;font-family:var(--mono);font-size:.78rem;color:var(--txt);outline:none;text-align:center"
-                  oninput="calcSup(this,${s.dosis},'sup-total-${i}')">
+                ${isAdmin
+                  ? `<select style="background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-size:.78rem;color:var(--txt)" onchange="editSuplemento(${i},'unit',this.value)">
+                      ${['mg/kg','UI/kg','mg/día','UI/día','g/kg','ml/kg'].map(u=>`<option ${s.unit===u?'selected':''}>${u}</option>`).join('')}
+                    </select>`
+                  : (s.unit||'mg/kg')}
+              </td>
+              <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor)">
+                <input type="number" min="0.001" max="5000" step="0.1" value="${currentWeight}" placeholder="kg"
+                  style="width:65px;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.2rem .3rem;font-family:var(--mono);font-size:.78rem;color:var(--txt);outline:none;text-align:center"
+                  oninput="calcSupRango(this,'${(s.dosis||'').replace(/'/g,'')}',0,'sup-total-${i}')">
               </td>
               <td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--g6);font-weight:600" id="sup-total-${i}">—</td>
               ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button onclick="removeSuplemento(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button></td>`:''}
             </tr>`).join('')}
           </tbody>
         </table>
-      </div>` : `<p style="font-size:.8rem;color:var(--txt3);font-style:italic">Sin suplementos registrados.${isAdmin?' Toca + Suplemento para agregar.':''}</p>`}
+      </div>
+      <p style="font-size:.7rem;color:var(--txt3);margin-top:.25rem">Ingresa el peso para calcular la dosis total. Si la dosis es un rango (ej: "10-20"), el resultado muestra mínimo–máximo.</p>
+      ` : `<p style="font-size:.8rem;color:var(--txt3);font-style:italic">Sin suplementos registrados.${isAdmin?' Toca + Suplemento.':''}</p>`}
       ${isAdmin ? `
       <div id="sup-form" style="display:none;background:var(--sur2);border-radius:var(--rsm);padding:.6rem;margin-top:.4rem">
         <div style="display:grid;grid-template-columns:1fr 80px 80px;gap:.4rem;margin-bottom:.4rem">
           <div><label style="font-size:.7rem;color:var(--txt3)">Nombre del suplemento</label><input id="sup-nombre" class="form-control" placeholder="Vitamina D3, Calcio..." style="font-size:.82rem"></div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis (rango, ej: 10-20)</label><input id="sup-dosis" class="form-control" placeholder="10-20" style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis (ej: 10-20)</label><input id="sup-dosis" class="form-control" placeholder="10-20" style="font-size:.82rem"></div>
           <div><label style="font-size:.7rem;color:var(--txt3)">Unidad</label>
             <select id="sup-unit" class="form-control" style="font-size:.82rem">
               <option>mg/kg</option><option>UI/kg</option><option>mg/día</option><option>UI/día</option><option>g/kg</option><option>ml/kg</option>
@@ -2867,6 +2932,60 @@ async function saveEditField(section, field) {
   toast('✓ Guardado');
 }
 function addReqEnergetico() { document.getElementById('req-form').style.display = 'block'; document.getElementById('req-cat')?.focus(); }
+async function saveReqEnergetico() {
+  const cat = document.getElementById('req-cat')?.value.trim();
+  if (!cat) { toast('⚠ Ingresa la categoría'); return; }
+  if (!currentSpecies.req_energetico) currentSpecies.req_energetico = [];
+  currentSpecies.req_energetico.push({ cat, kcal: document.getElementById('req-kcal')?.value||'' });
+  await dbPutSync('species', currentSpecies);
+  renderTab('nutricion'); toast('✓ Requerimiento energético agregado');
+}
+async function editReqEnergetico(i, field, value) {
+  if (!currentSpecies.req_energetico?.[i]) return;
+  currentSpecies.req_energetico[i][field] = value;
+  await dbPutSync('species', currentSpecies);
+}
+async function removeReqEnergetico(i) {
+  currentSpecies.req_energetico.splice(i,1);
+  await dbPutSync('species', currentSpecies); renderTab('nutricion');
+}
+function calcReqTotal(input, kcalStr, resultId) {
+  const w = parseFloat(input.value);
+  const el = document.getElementById(resultId);
+  if (!el || !w || !kcalStr) { if(el) el.textContent='—'; return; }
+  const parts = String(kcalStr).split('-').map(p=>parseFloat(p.trim())).filter(n=>!isNaN(n));
+  if (parts.length === 2) {
+    el.textContent = Math.round(w*parts[0]) + '–' + Math.round(w*parts[1]) + ' kcal';
+  } else if (parts.length === 1) {
+    el.textContent = Math.round(w*parts[0]) + ' kcal';
+  } else { el.textContent='—'; }
+}
+// Frecuencia de alimentación editable
+function editFrecuencia() {
+  document.getElementById('freq-view').style.display='none';
+  document.getElementById('freq-edit').style.display='block';
+  document.getElementById('freq-input')?.focus();
+}
+function cancelFrecuencia() {
+  document.getElementById('freq-view').style.display='block';
+  document.getElementById('freq-edit').style.display='none';
+}
+async function saveFrecuencia() {
+  const val = document.getElementById('freq-input')?.value||'';
+  if (!currentSpecies.nutrition) currentSpecies.nutrition = {};
+  currentSpecies.nutrition.freq = val;
+  await dbPutSync('species', currentSpecies);
+  const view = document.getElementById('freq-view');
+  if (view) view.innerHTML = `<p class="text-sm">${val||'No especificada'}</p>`;
+  cancelFrecuencia(); toast('✓ Frecuencia guardada');
+}
+// Edición inline de suplementos
+async function editSuplemento(i, field, value) {
+  if (!currentSpecies.suplementos?.[i]) return;
+  currentSpecies.suplementos[i][field] = value;
+  await dbPutSync('species', currentSpecies);
+}
+function addSuplemento() { document.getElementById('sup-form').style.display = 'block'; document.getElementById('sup-nombre')?.focus(); }
 async function saveReqEnergetico() {
   const cat = document.getElementById('req-cat')?.value.trim();
   if (!cat) { toast('⚠ Ingresa la categoría'); return; }
@@ -3930,10 +4049,43 @@ function renderAdminSpeciesList() {
     </div>`).join('') || '<p class="text-muted">Sin especies registradas</p>';
 }
 
+function saveApiKey(raw) {
+  const key = (raw||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g, '');
+  localStorage.setItem('wv_api_key', key);
+  setTimeout(showApiKeyStatus, 10);
+}
+function clearApiKey() {
+  localStorage.removeItem('wv_api_key');
+  const inp = document.getElementById('sp-api-key');
+  if (inp) inp.value = '';
+  showApiKeyStatus();
+  toast('🗑 API Key eliminada — pega una nueva');
+}
+function showApiKeyStatus() {
+  const key = (localStorage.getItem('wv_api_key') || '').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
+  const statusEl = document.getElementById('api-key-status');
+  const inp = document.getElementById('sp-api-key');
+  if (!statusEl) return;
+  if (!key) {
+    statusEl.innerHTML = '⚠ Sin API Key — <a href="https://console.anthropic.com" target="_blank" style="color:var(--g6)">Obtener en console.anthropic.com</a>';
+    statusEl.style.color = 'var(--am)';
+    if (inp) inp.value = '';
+  } else if (!key.startsWith('sk-')) {
+    statusEl.textContent = '⚠ Key inválida — toca 🗑 Limpiar y pega una nueva';
+    statusEl.style.color = 'var(--r5)';
+    if (inp) inp.value = key;
+  } else {
+    statusEl.textContent = '✓ API Key: ' + key.substring(0,16) + '...';
+    statusEl.style.color = 'var(--g6)';
+    if (inp) inp.value = key;
+  }
+}
 function openAddSpecies() {
   document.getElementById('modal-species-title').textContent = 'Nueva Especie';
+  window._formCoverPhoto = null;
   buildSpeciesForm(null);
   document.getElementById('modal-species').classList.add('open');
+  setTimeout(showApiKeyStatus, 80);
 }
 function editSpecies(id) {
   const sp = SPECIES_DB.find(s=>s.id===id);
@@ -4299,12 +4451,14 @@ function buildSpeciesForm(sp) {
         <div style="display:flex;gap:.3rem;margin-top:.2rem">
           <input type="password" id="sp-api-key" class="form-control"
             placeholder="sk-ant-api03-..."
-            value="${localStorage.getItem('wv_api_key')||''}"
+            value=""
             style="font-size:.78rem;flex:1"
-            onchange="localStorage.setItem('wv_api_key',this.value)">
+            onchange="saveApiKey(this.value)">
+          <button onclick="clearApiKey()" class="btn btn-secondary btn-sm" style="white-space:nowrap;font-size:.7rem;color:var(--r5)">🗑 Limpiar</button>
           <a href="https://console.anthropic.com" target="_blank" class="btn btn-secondary btn-sm" style="white-space:nowrap;font-size:.7rem">Obtener key</a>
         </div>
-        <div style="font-size:.68rem;color:var(--txt3);margin-top:.2rem">Se guarda solo en tu dispositivo. <a href="#" onclick="downloadSpeciesTemplate();return false;" style="color:var(--g6)">Descargar plantilla Word/Excel</a></div>
+        <div id="api-key-status" style="font-size:.72rem;margin-top:.2rem;color:var(--txt3)">Cargando...</div>
+        <div style="font-size:.68rem;color:var(--txt3);margin-top:.1rem">Se guarda solo en tu dispositivo. <a href="#" onclick="downloadSpeciesTemplate();return false;" style="color:var(--g6)">Descargar plantilla Word/Excel</a></div>
       </div>
 
       <label for="sp-file-import" class="btn btn-primary" style="cursor:pointer;display:inline-flex">
@@ -6344,7 +6498,7 @@ function installApp() {
 window.addEventListener('online', ()=>document.getElementById('offline-badge').classList.remove('show'));
 window.addEventListener('offline', ()=>document.getElementById('offline-badge').classList.add('show'));
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').then(reg => {
+  navigator.serviceWorker.register('sw.js').then(reg => {
     // Detectar actualización disponible
     reg.addEventListener('updatefound', () => {
       const newWorker = reg.installing;
