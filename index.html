@@ -142,7 +142,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .tab-btn{padding:.6rem .85rem;font-family:var(--sans);font-size:.78rem;font-weight:500;background:none;border:none;border-bottom:2px solid transparent;color:var(--txt3);cursor:pointer;white-space:nowrap;transition:all .15s}
 .tab-btn.active{color:var(--g6);border-bottom-color:var(--g5)}
 /* spacer: 56px topbar + 48px detail-header + 40px tabs = 144px */
-.tab-content-spacer{height:144px;flex-shrink:0}
+.tab-content-spacer{height:104px;min-height:104px;flex-shrink:0}
 .tab-content{display:none;padding:1rem;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
 .tab-content.active{display:block}
 
@@ -2137,22 +2137,26 @@ function openSpecies(id, trackNav=true) {
   window.scrollTo({top:0, behavior:'instant'});
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
-  // Ajustar posición de tabs según altura real del header (importante en móvil)
-  requestAnimationFrame(() => {
+  // Ajustar posición de tabs después de que el DOM se haya renderizado
+  function adjustTabsPosition() {
     const header = document.getElementById('detail-header');
     const tabsScroll = document.querySelector('.tabs-scroll');
     const spacers = document.querySelectorAll('.tab-content-spacer');
-    if (header && tabsScroll) {
-      const topbarH = 56;
-      const headerH = header.offsetHeight;
-      const tabsTop = topbarH + headerH;
-      tabsScroll.style.top = tabsTop + 'px';
-      // Altura de la barra de tabs
-      const tabsH = tabsScroll.offsetHeight || 40;
-      const spacerH = tabsTop + tabsH;
-      spacers.forEach(s => s.style.height = spacerH + 'px');
-    }
+    if (!header || !tabsScroll) return;
+    const topbarH = 56;
+    const headerH = header.offsetHeight || header.getBoundingClientRect().height || 48;
+    const tabsTop = topbarH + headerH;
+    tabsScroll.style.top = tabsTop + 'px';
+    const tabsH = tabsScroll.offsetHeight || 40;
+    const spacerH = tabsTop + tabsH + 8; // +8px de margen visual
+    spacers.forEach(s => { s.style.height = spacerH + 'px'; s.style.minHeight = spacerH + 'px'; });
+  }
+  requestAnimationFrame(() => {
+    adjustTabsPosition();
+    requestAnimationFrame(adjustTabsPosition);
   });
+  setTimeout(adjustTabsPosition, 100);
+  setTimeout(adjustTabsPosition, 400);
 }
 function showTab(tab) {
   const tabs = ['general','fisiologia','nutricion','enfermedades','comportamiento','medicamentos','protocolos','fluidoterapia'];
@@ -3142,9 +3146,10 @@ async function removeDentalMeasure(i) {
 }
 // ── Helper: importar con IA (Anthropic o Gemini) ──
 async function importExcelWithAI(file, prompt) {
-  const rawKey = (localStorage.getItem('wv_api_key') || '').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g, '');
+  const { provider, key } = getActiveAIKey();
+  const rawKey = key || (localStorage.getItem('wv_api_key')||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
 
-  if (!rawKey) throw new Error('Sin API Key. Configúrala en Admin → Nueva Especie → campo API Key');
+  if (!rawKey) throw new Error('Sin API Key. Configúrala arriba — Gemini es gratis en aistudio.google.com/apikey');
 
   const text = await (file.name.match(/\.xlsx?$/i) ? readExcel(file) : file.text());
   const fullPrompt = prompt + '\n\nDocumento:\n' + text.substring(0, 12000);
@@ -4101,43 +4106,81 @@ function renderAdminSpeciesList() {
     </div>`).join('') || '<p class="text-muted">Sin especies registradas</p>';
 }
 
-function saveApiKey(raw) {
+// ═══ GESTIÓN DE KEYS DE IA ═══
+let selectedAI = localStorage.getItem('wv_ai_provider') || 'gemini';
+
+function selectAI(provider) {
+  selectedAI = provider;
+  localStorage.setItem('wv_ai_provider', provider);
+  const geminiBlock = document.getElementById('gemini-key-block');
+  const claudeBlock = document.getElementById('claude-key-block');
+  const geminiBtn   = document.getElementById('ai-sel-gemini');
+  const claudeBtn   = document.getElementById('ai-sel-claude');
+  if (geminiBlock) geminiBlock.style.display = provider === 'gemini' ? 'block' : 'none';
+  if (claudeBlock) claudeBlock.style.display = provider === 'claude' ? 'block' : 'none';
+  if (geminiBtn) { geminiBtn.style.borderColor = provider==='gemini'?'var(--g4)':'var(--bor)'; geminiBtn.style.background = provider==='gemini'?'var(--g1)':'var(--sur2)'; geminiBtn.style.color = provider==='gemini'?'var(--g7)':'var(--txt3)'; }
+  if (claudeBtn) { claudeBtn.style.borderColor = provider==='claude'?'var(--am)':'var(--bor)'; claudeBtn.style.background = provider==='claude'?'#fff8e1':'var(--sur2)'; claudeBtn.style.color = provider==='claude'?'#b45309':'var(--txt3)'; }
+  updateAIKeyStatus(provider);
+}
+
+function saveAIKey(provider, raw) {
   const key = (raw||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g, '');
-  localStorage.setItem('wv_api_key', key);
-  setTimeout(showApiKeyStatus, 10);
+  localStorage.setItem('wv_key_' + provider, key);
+  updateAIKeyStatus(provider);
 }
-function clearApiKey() {
-  localStorage.removeItem('wv_api_key');
-  const inp = document.getElementById('sp-api-key');
+
+function clearAIKey(provider) {
+  localStorage.removeItem('wv_key_' + provider);
+  const inp = document.getElementById(provider + '-api-key');
   if (inp) inp.value = '';
-  showApiKeyStatus();
-  toast('🗑 API Key eliminada — pega una nueva');
+  updateAIKeyStatus(provider);
+  toast('🗑 Key de ' + (provider==='gemini'?'Gemini':'Claude') + ' eliminada');
 }
-function showApiKeyStatus() {
-  const key = (localStorage.getItem('wv_api_key') || '').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  const statusEl = document.getElementById('api-key-status');
-  const inp = document.getElementById('sp-api-key');
+
+function updateAIKeyStatus(provider) {
+  const key = (localStorage.getItem('wv_key_' + provider) || '').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
+  const statusEl = document.getElementById(provider + '-key-status');
+  const inp = document.getElementById(provider + '-api-key');
   if (!statusEl) return;
+  if (inp && !inp.value && key) inp.value = key;
   if (!key) {
-    statusEl.innerHTML = '⚠ Sin API Key — <a href="https://console.anthropic.com" target="_blank" style="color:var(--g6)">Obtener en console.anthropic.com</a>';
+    statusEl.textContent = provider==='gemini'
+      ? '⚠ Sin key — aistudio.google.com/apikey (gratis)'
+      : '⚠ Sin key — console.anthropic.com';
     statusEl.style.color = 'var(--am)';
-    if (inp) inp.value = '';
-  } else if (!key.startsWith('sk-')) {
-    statusEl.textContent = '⚠ Key inválida — toca 🗑 Limpiar y pega una nueva';
-    statusEl.style.color = 'var(--r5)';
-    if (inp) inp.value = key;
-  } else {
-    statusEl.textContent = '✓ API Key: ' + key.substring(0,16) + '...';
+  } else if (provider==='gemini' && key.startsWith('AIza')) {
+    statusEl.textContent = '✓ Gemini: ' + key.substring(0,12) + '...';
     statusEl.style.color = 'var(--g6)';
-    if (inp) inp.value = key;
+  } else if (provider==='claude' && key.startsWith('sk-')) {
+    statusEl.textContent = '✓ Claude: ' + key.substring(0,16) + '...';
+    statusEl.style.color = 'var(--g6)';
+  } else {
+    statusEl.textContent = provider==='gemini'
+      ? '⚠ Key inválida — debe empezar con AIza'
+      : '⚠ Key inválida — debe empezar con sk-ant-';
+    statusEl.style.color = 'var(--r5)';
   }
+}
+
+function initAIKeyUI() {
+  selectAI(selectedAI);
+}
+
+// Funciones legacy para compatibilidad
+function saveApiKey(raw) { saveAIKey(selectedAI, raw); }
+function clearApiKey() { clearAIKey(selectedAI); }
+function showApiKeyStatus() { updateAIKeyStatus('gemini'); updateAIKeyStatus('claude'); }
+
+function getActiveAIKey() {
+  const key = (localStorage.getItem('wv_key_' + selectedAI) || '').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
+  return { provider: selectedAI, key };
 }
 function openAddSpecies() {
   document.getElementById('modal-species-title').textContent = 'Nueva Especie';
   window._formCoverPhoto = null;
   buildSpeciesForm(null);
   document.getElementById('modal-species').classList.add('open');
-  setTimeout(showApiKeyStatus, 80);
+  setTimeout(() => { showApiKeyStatus(); initAIKeyUI(); }, 80);
 }
 function editSpecies(id) {
   const sp = SPECIES_DB.find(s=>s.id===id);
@@ -4497,20 +4540,51 @@ function buildSpeciesForm(sp) {
       <div style="font-weight:600;font-size:.9rem;margin-bottom:.15rem">Importar desde archivo</div>
       <div style="font-size:.73rem;color:var(--txt3);margin-bottom:.5rem">PDF, Word (.docx) o Excel (.xlsx) — La IA extrae la información automáticamente</div>
 
-      <!-- API Key para importación -->
-      <div style="margin-bottom:.6rem;text-align:left">
-        <label style="font-size:.7rem;color:var(--txt3)">API Key — Anthropic (sk-ant-...) o Google Gemini (AIza...)</label>
-        <div style="display:flex;gap:.3rem;margin-top:.2rem">
-          <input type="password" id="sp-api-key" class="form-control"
+      <!-- Selector de IA -->
+      <div style="margin-bottom:.5rem;text-align:left">
+        <label style="font-size:.7rem;color:var(--txt3);font-weight:600">IA para importar</label>
+        <div style="display:flex;gap:.4rem;margin-top:.25rem">
+          <button id="ai-sel-gemini" onclick="selectAI('gemini')"
+            style="flex:1;padding:.4rem;border-radius:var(--rsm);border:2px solid var(--g4);background:var(--g1);color:var(--g7);font-family:var(--sans);font-size:.78rem;font-weight:600;cursor:pointer">
+            🔵 Google Gemini <span style="font-size:.65rem;font-weight:400">(gratis)</span>
+          </button>
+          <button id="ai-sel-claude" onclick="selectAI('claude')"
+            style="flex:1;padding:.4rem;border-radius:var(--rsm);border:2px solid var(--bor);background:var(--sur2);color:var(--txt3);font-family:var(--sans);font-size:.78rem;cursor:pointer">
+            🟠 Anthropic Claude
+          </button>
+        </div>
+      </div>
+
+      <!-- Key de Gemini -->
+      <div id="gemini-key-block" style="margin-bottom:.4rem;text-align:left">
+        <div style="display:flex;gap:.3rem;align-items:center">
+          <input type="password" id="gemini-api-key" class="form-control"
+            placeholder="AIzaSy..."
+            value=""
+            style="font-size:.78rem;flex:1"
+            onchange="saveAIKey('gemini',this.value)">
+          <button onclick="clearAIKey('gemini')" class="btn btn-secondary btn-sm" style="color:var(--r5);font-size:.7rem">🗑</button>
+          <a href="https://aistudio.google.com/apikey" target="_blank" class="btn btn-secondary btn-sm" style="font-size:.7rem">Obtener</a>
+        </div>
+        <div id="gemini-key-status" style="font-size:.7rem;margin-top:.2rem;color:var(--txt3)">...</div>
+      </div>
+
+      <!-- Key de Claude -->
+      <div id="claude-key-block" style="display:none;margin-bottom:.4rem;text-align:left">
+        <div style="display:flex;gap:.3rem;align-items:center">
+          <input type="password" id="claude-api-key" class="form-control"
             placeholder="sk-ant-api03-..."
             value=""
             style="font-size:.78rem;flex:1"
-            onchange="saveApiKey(this.value)">
-          <button onclick="clearApiKey()" class="btn btn-secondary btn-sm" style="white-space:nowrap;font-size:.7rem;color:var(--r5)">🗑 Limpiar</button>
-          <a href="https://console.anthropic.com" target="_blank" class="btn btn-secondary btn-sm" style="white-space:nowrap;font-size:.7rem">Obtener key</a>
+            onchange="saveAIKey('claude',this.value)">
+          <button onclick="clearAIKey('claude')" class="btn btn-secondary btn-sm" style="color:var(--r5);font-size:.7rem">🗑</button>
+          <a href="https://console.anthropic.com" target="_blank" class="btn btn-secondary btn-sm" style="font-size:.7rem">Obtener</a>
         </div>
-        <div id="api-key-status" style="font-size:.72rem;margin-top:.2rem;color:var(--txt3)">Cargando...</div>
-        <div style="font-size:.68rem;color:var(--txt3);margin-top:.1rem">Se guarda solo en tu dispositivo. <a href="#" onclick="downloadSpeciesTemplate();return false;" style="color:var(--g6)">Descargar plantilla Word/Excel</a></div>
+        <div id="claude-key-status" style="font-size:.7rem;margin-top:.2rem;color:var(--txt3)">...</div>
+      </div>
+
+      <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.5rem;text-align:left">
+        <a href="#" onclick="downloadSpeciesTemplate();return false;" style="color:var(--g6)">📥 Descargar plantilla Word/Excel</a>
       </div>
 
       <label for="sp-file-import" class="btn btn-primary" style="cursor:pointer;display:inline-flex">
@@ -6615,6 +6689,7 @@ function renderBiblioteca() {
               <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
                 ${r.tipo ? `<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>` : ''}
                 ${r.url ? `<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver fuente</a>` : ''}
+                ${r.pdf ? `<a href="${r.pdf.data}" download="${r.pdf.name}" style="font-size:.65rem;color:var(--bl)">📄 ${r.pdf.name}</a>` : ''}
               </div>
               ${r.notas ? `<div style="font-size:.75rem;color:var(--txt3);margin-top:.2rem;font-style:italic">${r.notas}</div>` : ''}
             </div>
@@ -6648,6 +6723,15 @@ function openAddRef(spId) {
           <div class="form-group"><label>URL / DOI</label><input id="ref-url" class="form-control" placeholder="https://..."></div>
         </div>
         <div class="form-group"><label>Notas</label><textarea id="ref-notas" class="form-control" placeholder="Capítulos relevantes, páginas, observaciones..." style="min-height:50px"></textarea></div>
+        <!-- PDF adjunto -->
+        <div class="form-group">
+          <label>PDF adjunto (opcional)</label>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <label for="ref-pdf-up" class="btn btn-secondary btn-sm" style="cursor:pointer">📎 Adjuntar PDF</label>
+            <input type="file" id="ref-pdf-up" accept=".pdf" style="display:none" onchange="previewRefPDF(this)">
+            <span id="ref-pdf-name" style="font-size:.75rem;color:var(--txt3)">Sin PDF adjunto</span>
+          </div>
+        </div>
         <div style="display:flex;gap:.5rem;margin-top:.5rem">
           <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
           <button class="btn btn-primary" style="flex:2" onclick="saveRef('${spId}')">💾 Guardar</button>
@@ -6655,6 +6739,108 @@ function openAddRef(spId) {
       </div>
     </div>`);
   document.getElementById('ref-titulo')?.focus();
+}
+
+let _refPDFData = null;
+
+async function previewRefPDF(input) {
+  if (!input.files?.[0]) return;
+  const file = input.files[0];
+  const nameEl = document.getElementById('ref-pdf-name');
+  if (nameEl) nameEl.textContent = '⏳ Leyendo PDF...';
+
+  // Guardar base64
+  const base64 = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+  _refPDFData = { name: file.name, data: base64 };
+
+  if (nameEl) nameEl.textContent = file.name + ' (' + (file.size/1024).toFixed(0) + ' KB)';
+
+  // Intentar extraer metadatos con IA
+  const { provider, key } = getActiveAIKey();
+  const rawKey = key || (localStorage.getItem('wv_api_key')||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
+  if (!rawKey) return; // Sin key, dejar campos vacíos
+
+  if (nameEl) nameEl.textContent += ' · 🤖 Extrayendo metadatos...';
+
+  try {
+    const prompt = `Analiza este documento científico/académico y extrae sus metadatos bibliográficos. Devuelve SOLO un JSON válido:
+{"titulo":"título completo del documento","autores":"Apellido1, N.; Apellido2, N. (todos los autores)","año":"año de publicación","tipo":"Libro|Artículo científico|Paper|Guía clínica|Tesis|Manual|Otro"}
+Si no encuentras algún dato deja el campo vacío "".`;
+
+    let metadata = null;
+
+    if (rawKey.startsWith('sk-')) {
+      // Anthropic — enviar como documento PDF base64
+      const b64 = base64.split(',')[1];
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json','x-api-key':rawKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
+        body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:500,
+          messages:[{ role:'user', content:[
+            { type:'document', source:{ type:'base64', media_type:'application/pdf', data:b64 } },
+            { type:'text', text:prompt }
+          ]}]
+        })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const raw = data.content.map(c=>c.text||'').join('');
+        const clean = raw.replace(/```json|```/g,'').trim();
+        const js = clean.indexOf('{'), je = clean.lastIndexOf('}');
+        if (js>=0) metadata = JSON.parse(clean.substring(js, je+1));
+      }
+    } else if (rawKey.startsWith('AIza')) {
+      // Gemini — enviar como inlineData
+      const b64 = base64.split(',')[1];
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${rawKey}`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ contents:[{ parts:[
+          { inline_data:{ mime_type:'application/pdf', data:b64 } },
+          { text: prompt }
+        ]}]})
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const clean = raw.replace(/```json|```/g,'').trim();
+        const js = clean.indexOf('{'), je = clean.lastIndexOf('}');
+        if (js>=0) metadata = JSON.parse(clean.substring(js, je+1));
+      }
+    }
+
+    if (metadata) {
+      // Rellenar campos automáticamente
+      const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+      set('ref-titulo',  metadata.titulo);
+      set('ref-autores', metadata.autores);
+      set('ref-año',     metadata.año);
+      // Tipo: buscar opción más cercana
+      if (metadata.tipo) {
+        const sel = document.getElementById('ref-tipo');
+        if (sel) {
+          for (const opt of sel.options) {
+            if (opt.value.toLowerCase().includes(metadata.tipo.toLowerCase()) ||
+                metadata.tipo.toLowerCase().includes(opt.value.toLowerCase())) {
+              opt.selected = true; break;
+            }
+          }
+        }
+      }
+      if (nameEl) nameEl.textContent = file.name + ' ✅ Metadatos extraídos';
+      toast('✓ Metadatos del PDF extraídos automáticamente');
+    } else {
+      if (nameEl) nameEl.textContent = file.name + ' (completa los campos manualmente)';
+    }
+  } catch(e) {
+    console.warn('No se pudieron extraer metadatos:', e.message);
+    if (nameEl) nameEl.textContent = file.name + ' (completa los campos manualmente)';
+  }
 }
 
 async function saveRef(spId) {
@@ -6667,8 +6853,10 @@ async function saveRef(spId) {
     año:     document.getElementById('ref-año')?.value || '',
     tipo:    document.getElementById('ref-tipo')?.value || 'Libro',
     url:     document.getElementById('ref-url')?.value.trim() || '',
-    notas:   document.getElementById('ref-notas')?.value.trim() || ''
+    notas:   document.getElementById('ref-notas')?.value.trim() || '',
+    pdf:     _refPDFData || null
   });
+  _refPDFData = null;
   await saveBiblioteca();
   document.getElementById('ref-modal')?.remove();
   renderBiblioteca();
