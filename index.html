@@ -123,7 +123,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .badge-admin{background:var(--am1);color:#854d0e}
 
 /* QUICK GRID */
-.quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-bottom:1rem}
+.quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:1rem}@media(max-width:500px){.quick-grid{grid-template-columns:repeat(3,1fr)}}
 .quick-card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--rsm);padding:.8rem .5rem;cursor:pointer;text-align:center;transition:background .15s}
 .quick-card:hover{background:var(--sur2)}
 .quick-card svg{width:22px;height:22px;color:var(--g5);margin-bottom:.3rem}
@@ -327,6 +327,19 @@ textarea.form-control{resize:vertical;min-height:70px}
 .drug-selector-item select{flex:1;background:var(--sur);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.4rem .5rem;font-family:var(--sans);font-size:.8rem;color:var(--txt);outline:none}
 .drug-selector-item input{width:80px;background:var(--sur);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.4rem .5rem;font-family:var(--mono);font-size:.8rem;color:var(--txt);outline:none}
 .drug-selector-item label{font-size:.7rem;color:var(--txt3);white-space:nowrap}
+
+.tab-filter-btn{background:var(--sur);border:1px solid var(--bor);border-radius:20px;padding:.3rem .75rem;font-size:.78rem;cursor:pointer;font-family:var(--sans);color:var(--txt2);white-space:nowrap;margin-right:.3rem;transition:all .15s}
+.tab-filter-btn.active,.tab-filter-btn:hover{background:var(--g5);color:white;border-color:var(--g5)}
+.enriq-card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);overflow:hidden;margin-bottom:.75rem}
+.enriq-card-header{display:flex;align-items:center;gap:.6rem;padding:.75rem 1rem;cursor:pointer}
+.enriq-card-body{display:none;padding:.75rem 1rem;border-top:1px solid var(--bor)}
+.enriq-card-body.open{display:block}
+.recinto-card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.75rem;overflow:hidden}
+.calc-option{background:var(--sur);border:1px solid var(--bor);border-radius:var(--rsm);padding:.65rem;cursor:pointer;transition:all .15s;font-size:.8rem;text-align:center}
+.calc-option:hover,.calc-option.selected{background:var(--g1);border-color:var(--g5);color:var(--g7)}
+.calc-result-table{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:.5rem}
+.calc-result-table th{background:var(--g1);color:var(--g7);padding:.4rem .6rem;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em}
+.calc-result-table td{padding:.4rem .6rem;border-bottom:1px solid var(--bor);vertical-align:top}
 </style>
 </head>
 <body>
@@ -437,6 +450,18 @@ textarea.form-control{resize:vertical;min-height:70px}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
         <span>Biblioteca</span>
       </div>
+      <div class="quick-card" onclick="showScreen('enriquecimiento')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+        <span>Enriquecimiento</span>
+      </div>
+      <div class="quick-card" onclick="showScreen('recintos')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        <span>Recintos</span>
+      </div>
+      <div class="quick-card" onclick="showScreen('nutricion-calc')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M8 12h8M12 8v8"/></svg>
+        <span>Calculadoras</span>
+      </div>
     </div>
     <div class="flex-between mb-1"><div class="sec-title" style="margin-bottom:0">Especies</div><div id="admin-add-sp-btn" style="display:none"><button class="btn btn-admin btn-sm" onclick="openAddSpecies()">+ Nueva especie</button></div></div>
     <div style="height:.75rem"></div>
@@ -452,11 +477,57 @@ textarea.form-control{resize:vertical;min-height:70px}
     <div class="flex-between mb-2">
       <h2 style="font-size:1.1rem;font-weight:700">📚 Biblioteca de Referencias</h2>
     </div>
-    <p style="font-size:.82rem;color:var(--txt3);margin-bottom:1rem">Referencias bibliográficas organizadas por especie — libros, artículos, papers y publicaciones usadas como fuente.</p>
+    <p style="font-size:.82rem;color:var(--txt3);margin-bottom:1rem">Referencias generales y por especie — libros, artículos, papers y publicaciones usadas como fuente de información.</p>
     <div id="biblioteca-list"></div>
   </div>
 
-  <!-- HISTORIAS -->
+  <!-- ENRIQUECIMIENTO AMBIENTAL -->
+  <div id="screen-enriquecimiento" class="screen">
+    <div class="flex-between mb-2">
+      <h2 style="font-size:1.1rem;font-weight:700">🌿 Enriquecimiento Ambiental</h2>
+      <div id="enriq-admin-btns" style="display:none">
+        <button class="btn btn-admin btn-sm" onclick="openAddEnriquecimiento()">+ Agregar</button>
+      </div>
+    </div>
+    <div id="enriq-tabs" style="overflow-x:auto;white-space:nowrap;margin-bottom:1rem;padding-bottom:.3rem">
+      <button class="tab-filter-btn active" onclick="filterEnriq('todos',this)">Todos</button>
+      <button class="tab-filter-btn" onclick="filterEnriq('alimenticio',this)">🍎 Alimenticios</button>
+      <button class="tab-filter-btn" onclick="filterEnriq('sensorial',this)">👁 Sensoriales</button>
+      <button class="tab-filter-btn" onclick="filterEnriq('fisico',this)">🏃 Físicos</button>
+      <button class="tab-filter-btn" onclick="filterEnriq('cognitivo',this)">🧠 Cognitivos</button>
+      <button class="tab-filter-btn" onclick="filterEnriq('social',this)">👥 Sociales</button>
+    </div>
+    <div id="enriq-list"></div>
+  </div>
+
+  <!-- RECINTOS -->
+  <div id="screen-recintos" class="screen">
+    <div class="flex-between mb-2">
+      <h2 style="font-size:1.1rem;font-weight:700">🏠 Recintos</h2>
+      <div id="recinto-admin-btns" style="display:none">
+        <button class="btn btn-admin btn-sm" onclick="openAddRecinto()">+ Agregar recinto</button>
+      </div>
+    </div>
+    <p style="font-size:.82rem;color:var(--txt3);margin-bottom:1rem">Registro de recintos por especie e institución — lineamientos, componentes y galería fotográfica.</p>
+    <div id="recintos-list"></div>
+  </div>
+
+  <!-- CALCULADORAS NUTRICIONALES -->
+  <div id="screen-nutricion-calc" class="screen">
+    <div class="flex-between mb-2">
+      <h2 style="font-size:1.1rem;font-weight:700">🥗 Calculadoras Nutricionales</h2>
+    </div>
+    <p style="font-size:.82rem;color:var(--txt3);margin-bottom:1rem">Calcula raciones diarias según la especie y etapa de vida.</p>
+    <div id="nutr-calc-container">
+      <div id="nutr-calc-selector" style="margin-bottom:1rem">
+        <label style="font-size:.82rem;font-weight:600;color:var(--txt)">Seleccionar calculadora</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.4rem" id="calc-grid"></div>
+      </div>
+      <div id="nutr-calc-active"></div>
+    </div>
+  </div>
+
+  <!-- HISTORIAS -->  <!-- HISTORIAS -->
   <div id="screen-historias" class="screen">
     <div class="flex-between mb-2">
       <h2 style="font-size:1.1rem;font-weight:700">Historias Clínicas</h2>
@@ -579,6 +650,7 @@ textarea.form-control{resize:vertical;min-height:70px}
   <div id="tab-medicamentos" class="tab-content"><div class="tab-content-spacer"></div></div>
   <div id="tab-protocolos" class="tab-content"><div class="tab-content-spacer"></div></div>
   <div id="tab-fluidoterapia" class="tab-content"><div class="tab-content-spacer"></div></div>
+  <div id="tab-enriquecimiento" class="tab-content"><div class="tab-content-spacer"></div></div>
 </div>
 
 <!-- BOTTOM NAV -->
@@ -1310,6 +1382,9 @@ async function finishGoogleLogin(profile) {
   updateUserUI();
   await loadData();
   await loadBiblioteca();
+  await loadBibliotecaGeneral();
+  await loadEnriquecimientos();
+  await loadRecintos();
   updateAdminUI();
   renderSpeciesGrid();
   const roleMsg = currentUser.role === 'admin' ? ' · Administrador ✓' : '';
@@ -1958,6 +2033,9 @@ function showScreen(name, trackNav=true) {
   if (name==='home') document.getElementById('bnav-home').classList.add('active');
   if (name==='admin') { renderAdminSpeciesList(); loadAdminEmails().then(renderAdminEmailsList); }
   if (name==='biblioteca') { renderBiblioteca(); }
+  if (name==='enriquecimiento') { renderEnriquecimientoScreen(); }
+  if (name==='recintos') { renderRecintosScreen(); }
+  if (name==='nutricion-calc') { renderNutricionCalcScreen(); }
   if (name==='historias') renderRecordsList();
   if (name==='inventario') renderInventoryList();
   if (name==='vademecum') { syncAndRenderVademecum(); }
@@ -2016,7 +2094,7 @@ async function setCoverPhoto(spId, input) {
     canvas.width  = Math.round(img.width  * scale);
     canvas.height = Math.round(img.height * scale);
     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
     URL.revokeObjectURL(url);
     const sp = SPECIES_DB.find(s => s.id === spId);
     if (!sp) return;
@@ -2181,7 +2259,7 @@ function previewFormCover(input) {
       canvas.width  = Math.round(img.width  * scale);
       canvas.height = Math.round(img.height * scale);
       canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
       window._formCoverPhoto = dataUrl;
       const prev = document.getElementById('form-cover-preview');
       const ph   = document.getElementById('form-cover-placeholder');
@@ -2262,7 +2340,7 @@ function openSpecies(id, trackNav=true) {
   setTimeout(adjustTabsPosition, 400);
 }
 function showTab(tab) {
-  const tabs = ['general','fisiologia','nutricion','enfermedades','comportamiento','medicamentos','protocolos','fluidoterapia'];
+  const tabs = ['general','fisiologia','nutricion','enfermedades','comportamiento','medicamentos','protocolos','fluidoterapia','enriquecimiento'];
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',tabs[i]===tab));
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-'+tab).classList.add('active');
@@ -2273,7 +2351,7 @@ function renderTab(tab) {
   const sp = currentSpecies;
   const el = document.getElementById('tab-'+tab);
   if (!sp||!el) return;
-  const m = {general:renderGeneral,fisiologia:renderFisiologia,nutricion:renderNutricion,enfermedades:renderEnfermedades,comportamiento:renderComportamiento,medicamentos:renderMedicamentos,protocolos:renderProtocolos,fluidoterapia:renderFluidoterapia};
+  const m = {general:renderGeneral,fisiologia:renderFisiologia,nutricion:renderNutricion,enfermedades:renderEnfermedades,comportamiento:renderComportamiento,medicamentos:renderMedicamentos,protocolos:renderProtocolos,fluidoterapia:renderFluidoterapia,enriquecimiento:renderEnriquecimientoTab};
   if (m[tab]) m[tab](el, sp);
 }
 function renderGeneral(el, sp) {
@@ -2489,8 +2567,19 @@ function renderGeneral(el, sp) {
     <div class="info-card">
       <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
         Distribución Geográfica
-        ${isAdmin?`<button onclick="editTextField('distribution','Distribución geográfica')" class="btn-inline-edit">✏️</button>`:''}
+        ${isAdmin?`<div style="display:flex;gap:.35rem;align-items:center">
+          <label for="dist-map-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem">🗺 Imagen</label>
+          <input type="file" id="dist-map-up" accept="image/*" style="display:none" onchange="addDistMap(this)">
+          <button onclick="editTextField('distribution','Distribución geográfica')" class="btn-inline-edit">✏️</button>
+        </div>`:''}
       </div>
+      <!-- Imágenes de mapa -->
+      ${(sp.dist_maps||[]).length?`<div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.5rem">
+        ${sp.dist_maps.map((m,i)=>`<div style="position:relative">
+          <img src="${m.data}" alt="mapa" style="max-height:150px;border-radius:var(--rsm);border:1px solid var(--bor);cursor:pointer" onclick="openImageFull('${m.data}')">
+          ${isAdmin?`<button onclick="removeDistMap(${i})" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);border:none;color:white;border-radius:50%;width:20px;height:20px;font-size:.65rem;cursor:pointer">✕</button>`:''}
+        </div>`).join('')}
+      </div>`:''}
       <div id="field-view-distribution">
         <p style="font-size:.875rem;line-height:1.6;color:var(--txt2)">${sp.distribution||'<span style="color:var(--txt3);font-style:italic">Sin información.</span>'}</p>
       </div>
@@ -4368,7 +4457,7 @@ function renderDrugsByCategory(drugs, weight, isAdmin) {
       </div>
     </div>`).join('');
 }
-function renderDrugRows(drugs, weight, isAdmin=false) {
+function renderDrugRows(drugs, weight, isAdmin=false, isGrouped=false) {
   return drugs.map((d,i)=>{
     const unit  = d.unit || 'ml';
     const total = (d.dose * weight);
@@ -7388,6 +7477,24 @@ function toast(msg) {
   t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), 2500);
 }
+function compressImage(file, maxW=600, quality=0.75) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = img.width > maxW ? maxW/img.width : 1;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width*scale);
+      canvas.height = Math.round(img.height*scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      res(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = rej;
+    img.src = url;
+  });
+}
+
 function addPhotos(input, gridId) {
   if (!input.files||!input.files.length) return;
   const grid = document.getElementById(gridId) || document.querySelector('.photo-grid');
@@ -7395,40 +7502,27 @@ function addPhotos(input, gridId) {
   const addBtn = grid.querySelector('label.photo-add');
   let loaded = 0;
   const total = input.files.length;
-  Array.from(input.files).forEach(file => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      // Comprimir a máx 800px
-      const maxW = 800;
-      const scale = img.width > maxW ? maxW/img.width : 1;
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width*scale);
-      canvas.height = Math.round(img.height*scale);
-      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.80);
-      URL.revokeObjectURL(url);
-      // Agregar al DOM
+  Array.from(input.files).forEach(async file => {
+    try {
+      // Comprimir fuertemente para caber en Firestore (< 900KB por doc total)
+      const dataUrl = await compressImage(file, 500, 0.65);
       const div = document.createElement('div');
       div.className = 'photo-thumb';
       div.style.position = 'relative';
+      const photoId = Date.now() + '_' + Math.random().toString(36).slice(2,6);
       div.innerHTML = `
         <img src="${dataUrl}" alt="foto" style="width:100%;height:100%;object-fit:cover">
-        <button onclick="removePhotoFromSpecies(this,${Date.now()})" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);border:none;color:white;border-radius:50%;width:20px;height:20px;font-size:.65rem;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>`;
+        <button onclick="removePhotoFromSpecies(this,'${photoId}')" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);border:none;color:white;border-radius:50%;width:20px;height:20px;font-size:.65rem;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>`;
       if (addBtn) grid.insertBefore(div, addBtn);
       else grid.appendChild(div);
-      // Guardar en especie → Firestore
       if (currentSpecies) {
         if (!currentSpecies.cover_photos) currentSpecies.cover_photos = [];
-        const photoId = Date.now() + '_' + Math.random().toString(36).slice(2,6);
         currentSpecies.cover_photos.push({ id: photoId, data: dataUrl });
-        div.querySelector('button').setAttribute('onclick', `removePhotoFromSpecies(this,'${photoId}')`);
-        dbPutSync('species', currentSpecies);
+        await dbPutSync('species', currentSpecies);
       }
       loaded++;
       if (loaded === total) toast('✓ '+loaded+' foto'+(loaded>1?'s':'')+' guardada'+(loaded>1?'s':'')+' en la nube');
-    };
-    img.src = url;
+    } catch(e) { toast('⚠ Error al procesar imagen: '+e.message); loaded++; }
   });
 }
 
@@ -7437,12 +7531,969 @@ async function removePhotoFromSpecies(btn, photoId) {
   if (currentSpecies?.cover_photos) {
     currentSpecies.cover_photos = currentSpecies.cover_photos.filter(p => p.id !== String(photoId));
     await dbPutSync('species', currentSpecies);
+    toast('Foto eliminada');
   }
 }
 
 // ═══════════════════════════════════
 // PWA
 // ═══════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════
+// IMÁGENES EN DISTRIBUCIÓN (9)
+// ═══════════════════════════════════════════════════════════
+function renderEnriquecimientoTab(el, sp) {
+  const isAdmin = currentUser?.role === 'admin';
+  // Filtrar enriquecimientos de esta especie
+  const spEnriq = ENRIQUECIMIENTOS_DB.filter(e => !e.especie || e.especie.toLowerCase().includes(sp.name.toLowerCase()));
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+      <div class="sec-title" style="margin-bottom:0">Enriquecimiento Ambiental</div>
+      <div style="display:flex;gap:.35rem">
+        <button onclick="showScreen('enriquecimiento')" class="btn btn-secondary btn-sm" style="font-size:.7rem">Ver todos</button>
+        ${isAdmin?`<button onclick="openAddEnriquecimiento()" class="btn btn-admin btn-sm">+ Agregar</button>`:''}
+      </div>
+    </div>
+    ${ENRIQ_CATS.map(cat => {
+      const items = spEnriq.filter(e => e.categoria === cat.id);
+      if (!items.length) return `<div style="padding:.4rem;border-radius:var(--rsm);background:var(--sur2);margin-bottom:.4rem">
+        <div style="font-size:.75rem;color:var(--txt3)">${cat.icon} ${cat.label} — Sin enriquecimientos</div>
+      </div>`;
+      return `<div style="margin-bottom:.75rem">
+        <div style="font-size:.7rem;font-weight:700;color:${cat.color};text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">${cat.icon} ${cat.label}</div>
+        ${items.map((enr,i)=>{
+          const realIdx = ENRIQUECIMIENTOS_DB.indexOf(enr);
+          const foto = enr.fotos?.[0]?.data;
+          return `<div style="display:flex;gap:.5rem;padding:.5rem;border:1px solid var(--bor);border-radius:var(--rsm);margin-bottom:.3rem;background:var(--sur)">
+            ${foto?`<img src="${foto}" style="width:56px;height:44px;object-fit:cover;border-radius:var(--rxs);flex-shrink:0;cursor:pointer" onclick="openImageFull('${foto}')">`:
+              `<div style="width:56px;height:44px;background:${cat.color}20;border-radius:var(--rxs);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">${cat.icon}</div>`}
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;font-size:.85rem">${enr.nombre}</div>
+              ${enr.descripcion?`<div style="font-size:.75rem;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${enr.descripcion}</div>`:''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('')}`;
+}
+async function addDistMap(input) {
+  if (!input.files?.[0] || !currentSpecies) return;
+  const dataUrl = await compressImage(input.files[0], 900, 0.75);
+  if (!currentSpecies.dist_maps) currentSpecies.dist_maps = [];
+  currentSpecies.dist_maps.push({ id: Date.now()+'', data: dataUrl });
+  await dbPutSync('species', currentSpecies);
+  renderTab('general');
+  toast('✓ Imagen de distribución agregada');
+}
+async function removeDistMap(i) {
+  if (!currentSpecies?.dist_maps) return;
+  currentSpecies.dist_maps.splice(i, 1);
+  await dbPutSync('species', currentSpecies);
+  renderTab('general');
+}
+function openImageFull(src) {
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;cursor:zoom-out';
+  ov.onclick = () => ov.remove();
+  ov.innerHTML = `<img src="${src}" style="max-width:95vw;max-height:95vh;border-radius:var(--rsm)">`;
+  document.body.appendChild(ov);
+}
+
+// ═══════════════════════════════════════════════════════════
+// BIBLIOTECA GENERAL (13)
+// ═══════════════════════════════════════════════════════════
+let BIBLIOTECA_GENERAL = []; // referencias sin especie específica
+
+async function loadBibliotecaGeneral() {
+  const saved = await dbGet('settings', 'biblioteca_general');
+  BIBLIOTECA_GENERAL = saved?.value || [];
+  if (firestore && fbUid()) {
+    try {
+      const snap = await firestore.collection('settings').doc('biblioteca_general').get();
+      if (snap.exists) BIBLIOTECA_GENERAL = snap.data().value || [];
+    } catch(e) {}
+  }
+}
+
+async function saveBibliotecaGeneral() {
+  await dbPut('settings', { key: 'biblioteca_general', value: BIBLIOTECA_GENERAL });
+  if (firestore && fbUid()) {
+    try { await firestore.collection('settings').doc('biblioteca_general').set({ value: BIBLIOTECA_GENERAL }); } catch(e) {}
+  }
+}
+
+function renderBiblioteca() {
+  const el = document.getElementById('biblioteca-list');
+  if (!el) return;
+  const isAdmin = currentUser?.role === 'admin';
+  let html = '';
+
+  // Sección general
+  html += `<div class="info-card" style="margin-bottom:1rem;border-left:3px solid var(--g5)">
+    <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📖 Referencias Generales</span>
+      ${isAdmin?`<button onclick="openAddRefGeneral()" class="btn btn-admin btn-sm">+ Agregar</button>`:''}
+    </div>
+    <p style="font-size:.75rem;color:var(--txt3);margin-bottom:.5rem">Libros, guías y documentos que aplican a múltiples especies</p>
+    ${BIBLIOTECA_GENERAL.length ? BIBLIOTECA_GENERAL.map((r,i)=>`
+    <div style="padding:.4rem .5rem;border-left:3px solid var(--g4);margin-bottom:.4rem;background:var(--sur2);border-radius:0 var(--rxs) var(--rxs) 0">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="flex:1">
+          <div style="font-size:.82rem;font-weight:600">${r.titulo||'Sin título'}</div>
+          ${r.autores?`<div style="font-size:.75rem;color:var(--txt3)">${r.autores}${r.año?' · '+r.año:''}</div>`:''}
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
+            ${r.tipo?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>`:''}
+            ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
+            ${r.pdf?`<a href="${r.pdf.data}" download="${r.pdf.name}" style="font-size:.65rem;color:var(--bl)">📄 ${r.pdf.name}</a>`:''}
+          </div>
+        </div>
+        ${isAdmin?`<button onclick="removeRefGeneral(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>`:''}
+      </div>
+    </div>`).join('') : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin referencias generales.</p>`}
+  </div>`;
+
+  // Secciones por especie
+  if (!SPECIES_DB.length) { el.innerHTML = html; return; }
+  html += SPECIES_DB.map(sp => {
+    const refs = BIBLIOTECA_DB[sp.id] || [];
+    return `
+    <div class="info-card" style="margin-bottom:.75rem">
+      <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;align-items:center;gap:.5rem">
+          ${sp.cover_photo?`<img src="${sp.cover_photo}" style="width:32px;height:24px;object-fit:cover;border-radius:var(--rxs)">`:''}
+          <span>${sp.name}</span>
+          <span style="font-size:.7rem;color:var(--txt3);font-style:italic">${sp.sci||''}</span>
+        </div>
+        ${isAdmin?`<button onclick="openAddRef('${sp.id}')" class="btn btn-admin btn-sm">+ Agregar</button>`:''}
+      </div>
+      ${refs.length ? refs.map((r,i)=>`
+      <div style="padding:.4rem .5rem;border-left:3px solid var(--g5);margin-bottom:.4rem;background:var(--sur2);border-radius:0 var(--rxs) var(--rxs) 0">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="flex:1">
+            <div style="font-size:.82rem;font-weight:600">${r.titulo||'Sin título'}</div>
+            ${r.autores?`<div style="font-size:.75rem;color:var(--txt3)">${r.autores}${r.año?' · '+r.año:''}</div>`:''}
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
+              ${r.tipo?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>`:''}
+              ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
+              ${r.pdf?`<a href="${r.pdf.data}" download="${r.pdf.name}" style="font-size:.65rem;color:var(--bl)">📄 ${r.pdf.name}</a>`:''}
+            </div>
+          </div>
+          ${isAdmin?`<button onclick="removeRef('${sp.id}',${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>`:''}
+        </div>
+      </div>`).join('') : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin referencias.</p>`}
+    </div>`;
+  }).join('');
+  el.innerHTML = html;
+}
+
+function openAddRefGeneral() {
+  _refPDFData = null;
+  document.getElementById('ref-modal')?.remove();
+  const { provider, key } = getActiveAIKey();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">📖 Agregar referencia general</div>
+        ${buildRefFormHTML(key, provider)}
+        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveRefGeneral()">💾 Guardar</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+function buildRefFormHTML(key, provider) {
+  return `
+    <div style="background:var(--g0);border:2px dashed var(--g4);border-radius:var(--r);padding:.75rem;margin-bottom:.75rem;text-align:center">
+      <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.35rem">📄 Importar desde archivo — la IA extrae los metadatos</div>
+      <div style="display:flex;gap:.3rem;justify-content:center;margin-bottom:.35rem">
+        <button onclick="setRefAI(this,'gemini')" data-ai="gemini" style="font-size:.7rem;padding:.2rem .5rem;border-radius:var(--rxs);border:${provider==='gemini'?'2px solid var(--g4)':'1px solid var(--bor)'};background:${provider==='gemini'?'var(--g1)':'var(--sur)'};color:${provider==='gemini'?'var(--g7)':'var(--txt3)'};cursor:pointer">🔵 Gemini</button>
+        <button onclick="setRefAI(this,'claude')" data-ai="claude" style="font-size:.7rem;padding:.2rem .5rem;border-radius:var(--rxs);border:${provider==='claude'?'2px solid #f59e0b':'1px solid var(--bor)'};background:${provider==='claude'?'#fff8e1':'var(--sur)'};color:${provider==='claude'?'#b45309':'var(--txt3)'};cursor:pointer">🟠 Claude</button>
+        <input type="password" id="ref-ai-key" class="form-control" style="flex:1;min-width:80px;font-size:.72rem;height:1.6rem" placeholder="API Key..." value="${key||''}" oninput="saveRefAIKey(this.value)">
+      </div>
+      <label for="ref-file-up" class="btn btn-primary btn-sm" style="cursor:pointer">📂 Seleccionar archivo</label>
+      <input type="file" id="ref-file-up" accept=".pdf,.docx,.doc,.txt" style="display:none" onchange="importRefFile(this)">
+      <div id="ref-import-status" style="font-size:.75rem;color:var(--g6);margin-top:.3rem;min-height:1rem"></div>
+    </div>
+    <div class="form-group"><label>Título *</label><input id="ref-titulo" class="form-control" placeholder="Ej: Wild Mammal Husbandry..."></div>
+    <div class="form-row">
+      <div class="form-group"><label>Autores</label><input id="ref-autores" class="form-control" placeholder="Apellido, N. et al."></div>
+      <div class="form-group"><label>Año</label><input id="ref-año" class="form-control" type="number" placeholder="2023" style="width:80px"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Tipo</label>
+        <select id="ref-tipo" class="form-control">
+          <option>Libro</option><option>Artículo científico</option><option>Paper</option><option>Guía clínica</option><option>Tesis</option><option>Manual</option><option>Otro</option>
+        </select>
+      </div>
+      <div class="form-group"><label>URL / DOI</label><input id="ref-url" class="form-control" placeholder="https://..."></div>
+    </div>
+    <div class="form-group"><label>Notas</label><textarea id="ref-notas" class="form-control" style="min-height:50px"></textarea></div>
+    <div class="form-group">
+      <label>PDF adjunto (opcional)</label>
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <label for="ref-pdf-extra" class="btn btn-secondary btn-sm" style="cursor:pointer">📎 Adjuntar PDF</label>
+        <input type="file" id="ref-pdf-extra" accept=".pdf" style="display:none" onchange="previewRefPDF(this)">
+        <span id="ref-pdf-name" style="font-size:.75rem;color:var(--txt3)">Sin PDF</span>
+      </div>
+    </div>`;
+}
+
+async function saveRefGeneral() {
+  const titulo = document.getElementById('ref-titulo')?.value.trim();
+  if (!titulo) { toast('⚠ El título es obligatorio'); return; }
+  BIBLIOTECA_GENERAL.push({
+    titulo,
+    autores: document.getElementById('ref-autores')?.value.trim()||'',
+    año:     document.getElementById('ref-año')?.value||'',
+    tipo:    document.getElementById('ref-tipo')?.value||'Libro',
+    url:     document.getElementById('ref-url')?.value.trim()||'',
+    notas:   document.getElementById('ref-notas')?.value.trim()||'',
+    pdf:     _refPDFData || null
+  });
+  _refPDFData = null;
+  await saveBibliotecaGeneral();
+  document.getElementById('ref-modal')?.remove();
+  renderBiblioteca();
+  toast('✓ Referencia general agregada');
+}
+
+async function removeRefGeneral(i) {
+  const ok = await confirmDelete('¿Eliminar referencia?', `Se eliminará "${BIBLIOTECA_GENERAL[i]?.titulo||''}".`);
+  if (!ok) return;
+  BIBLIOTECA_GENERAL.splice(i, 1);
+  await saveBibliotecaGeneral();
+  renderBiblioteca();
+}
+
+// ═══════════════════════════════════════════════════════════
+// ENRIQUECIMIENTO AMBIENTAL (23)
+// ═══════════════════════════════════════════════════════════
+let ENRIQUECIMIENTOS_DB = [];
+const ENRIQ_CATS = [
+  { id:'alimenticio', label:'Alimenticio', icon:'🍎', color:'#16a34a' },
+  { id:'sensorial',   label:'Sensorial',   icon:'👁',  color:'#2563eb' },
+  { id:'fisico',      label:'Físico',       icon:'🏃',  color:'#d97706' },
+  { id:'cognitivo',   label:'Cognitivo',   icon:'🧠',  color:'#7c3aed' },
+  { id:'social',      label:'Social',      icon:'👥',  color:'#db2777' }
+];
+
+async function loadEnriquecimientos() {
+  const saved = await dbGet('settings', 'enriquecimientos');
+  ENRIQUECIMIENTOS_DB = saved?.value || [];
+  if (firestore && fbUid()) {
+    try {
+      const snap = await firestore.collection('settings').doc('enriquecimientos').get();
+      if (snap.exists) ENRIQUECIMIENTOS_DB = snap.data().value || [];
+    } catch(e) {}
+  }
+}
+
+async function saveEnriquecimientos() {
+  await dbPut('settings', { key: 'enriquecimientos', value: ENRIQUECIMIENTOS_DB });
+  if (firestore && fbUid()) {
+    try { await firestore.collection('settings').doc('enriquecimientos').set({ value: ENRIQUECIMIENTOS_DB }); } catch(e) {}
+  }
+}
+
+function renderEnriquecimientoScreen(filter='todos') {
+  const el = document.getElementById('enriq-list');
+  const adminBtns = document.getElementById('enriq-admin-btns');
+  if (adminBtns) adminBtns.style.display = currentUser?.role==='admin' ? 'block' : 'none';
+  if (!el) return;
+  const isAdmin = currentUser?.role === 'admin';
+  const items = filter === 'todos' ? ENRIQUECIMIENTOS_DB : ENRIQUECIMIENTOS_DB.filter(e => e.categoria === filter);
+  if (!items.length) {
+    el.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--txt3)">
+      <p style="font-size:.9rem">Sin enriquecimientos registrados.</p>
+      ${isAdmin ? '<p style="font-size:.8rem">Toca + Agregar para crear el primero.</p>' : ''}
+    </div>`;
+    return;
+  }
+  el.innerHTML = items.map((enr, gi) => {
+    const realIdx = ENRIQUECIMIENTOS_DB.indexOf(enr);
+    const cat = ENRIQ_CATS.find(c => c.id === enr.categoria) || ENRIQ_CATS[0];
+    const foto = enr.fotos?.[0]?.data || '';
+    return `
+    <div class="enriq-card">
+      <div class="enriq-card-header" onclick="toggleEnriqCard(${realIdx})">
+        ${foto ? `<img src="${foto}" style="width:72px;height:56px;object-fit:cover;border-radius:var(--rxs);flex-shrink:0">` :
+          `<div style="width:72px;height:56px;background:${cat.color}20;border-radius:var(--rxs);display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">${cat.icon}</div>`}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.9rem;color:var(--txt)">${enr.nombre||'Sin nombre'}</div>
+          <div style="display:flex;gap:.35rem;align-items:center;margin-top:.15rem">
+            <span style="font-size:.65rem;background:${cat.color}20;color:${cat.color};border-radius:20px;padding:.1rem .4rem;font-weight:600">${cat.icon} ${cat.label}</span>
+            ${enr.especie?`<span style="font-size:.65rem;color:var(--txt3)">🐾 ${enr.especie}</span>`:''}
+          </div>
+        </div>
+        ${isAdmin ? `<div style="display:flex;gap:.3rem">
+          <button onclick="event.stopPropagation();openEditEnriquecimiento(${realIdx})" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);cursor:pointer;font-size:.75rem;padding:.2rem .4rem">✏️</button>
+          <button onclick="event.stopPropagation();removeEnriquecimiento(${realIdx})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.75rem;padding:.2rem .4rem">✕</button>
+        </div>` : ''}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="enriq-chev-${realIdx}"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="enriq-card-body" id="enriq-body-${realIdx}">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.5rem">
+          ${enr.descripcion?`<div><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Descripción</div><p style="font-size:.82rem;color:var(--txt2);line-height:1.5">${enr.descripcion}</p></div>`:''}
+          ${enr.objetivo?`<div><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Objetivo</div><p style="font-size:.82rem;color:var(--txt2);line-height:1.5">${enr.objetivo}</p></div>`:''}
+        </div>
+        ${enr.materiales?.length?`<div style="margin-bottom:.5rem">
+          <div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.25rem">Materiales</div>
+          <div style="display:flex;flex-wrap:wrap;gap:.25rem">
+            ${enr.materiales.map(m=>`<span style="background:var(--sur2);border:1px solid var(--bor);border-radius:20px;padding:.15rem .5rem;font-size:.75rem">${m}</span>`).join('')}
+          </div>
+        </div>`:''}
+        ${enr.fotos?.length?`<div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.4rem">
+          ${enr.fotos.map(f=>`<img src="${f.data}" style="height:100px;width:auto;border-radius:var(--rxs);border:1px solid var(--bor);cursor:pointer;object-fit:cover" onclick="openImageFull('${f.data}')">`).join('')}
+        </div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleEnriqCard(i) {
+  const body = document.getElementById('enriq-body-'+i);
+  const chev = document.getElementById('enriq-chev-'+i);
+  if (!body) return;
+  body.classList.toggle('open');
+  if (chev) chev.style.transform = body.classList.contains('open') ? 'rotate(180deg)' : '';
+}
+
+function filterEnriq(cat, btn) {
+  document.querySelectorAll('.tab-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderEnriquecimientoScreen(cat);
+}
+
+function openAddEnriquecimiento(editIdx=-1) {
+  const existing = editIdx >= 0 ? ENRIQUECIMIENTOS_DB[editIdx] : null;
+  document.getElementById('enriq-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="enriq-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${editIdx>=0?'✏️ Editar':'+'} Enriquecimiento</div>
+        <div class="form-group"><label>Nombre *</label><input id="enriq-nombre" class="form-control" value="${existing?.nombre||''}" placeholder="Ej: Caja de búsqueda alimentaria"></div>
+        <div class="form-row">
+          <div class="form-group"><label>Categoría</label>
+            <select id="enriq-cat" class="form-control">
+              ${ENRIQ_CATS.map(c=>`<option value="${c.id}" ${(existing?.categoria||'alimenticio')===c.id?'selected':''}>${c.icon} ${c.label}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>Especie (opcional)</label><input id="enriq-especie" class="form-control" value="${existing?.especie||''}" placeholder="Ej: Jaguar, general..."></div>
+        </div>
+        <div class="form-group"><label>Descripción</label><textarea id="enriq-desc" class="form-control" style="min-height:70px" placeholder="Describe el enriquecimiento...">${existing?.descripcion||''}</textarea></div>
+        <div class="form-group"><label>Objetivo</label><textarea id="enriq-obj" class="form-control" style="min-height:50px" placeholder="Qué se busca estimular...">${existing?.objetivo||''}</textarea></div>
+        <div class="form-group">
+          <label>Materiales (uno por línea)</label>
+          <textarea id="enriq-mat" class="form-control" style="min-height:70px" placeholder="Tronco hueco&#10;Semillas&#10;Paja...">${(existing?.materiales||[]).join('\n')}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Fotos</label>
+          <label for="enriq-fotos-up" class="btn btn-secondary btn-sm" style="cursor:pointer">📷 Agregar fotos</label>
+          <input type="file" id="enriq-fotos-up" accept="image/*" multiple style="display:none" onchange="previewEnriqFotos(this)">
+          <div id="enriq-fotos-preview" style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.3rem">
+            ${(existing?.fotos||[]).map((f,fi)=>`<img src="${f.data}" style="height:60px;width:auto;border-radius:var(--rxs);border:1px solid var(--bor);object-fit:cover">`).join('')}
+          </div>
+        </div>
+        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('enriq-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveEnriquecimiento(${editIdx})">💾 Guardar</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+let _enriqFotosNew = [];
+async function previewEnriqFotos(input) {
+  if (!input.files?.length) return;
+  const preview = document.getElementById('enriq-fotos-preview');
+  _enriqFotosNew = [];
+  for (const file of Array.from(input.files)) {
+    const data = await compressImage(file, 600, 0.72);
+    _enriqFotosNew.push({ id: Date.now()+'_'+Math.random().toString(36).slice(2,5), data });
+    if (preview) preview.insertAdjacentHTML('beforeend', `<img src="${data}" style="height:60px;width:auto;border-radius:var(--rxs);border:1px solid var(--g5);object-fit:cover">`);
+  }
+}
+
+function openEditEnriquecimiento(idx) { openAddEnriquecimiento(idx); }
+
+async function saveEnriquecimiento(editIdx=-1) {
+  const nombre = document.getElementById('enriq-nombre')?.value.trim();
+  if (!nombre) { toast('⚠ El nombre es obligatorio'); return; }
+  const materiales = (document.getElementById('enriq-mat')?.value||'').split('\n').map(m=>m.trim()).filter(Boolean);
+  const existing = editIdx >= 0 ? ENRIQUECIMIENTOS_DB[editIdx] : null;
+  const fotos = [...(existing?.fotos||[]), ..._enriqFotosNew];
+  _enriqFotosNew = [];
+  const enr = {
+    nombre,
+    categoria:   document.getElementById('enriq-cat')?.value||'alimenticio',
+    especie:     document.getElementById('enriq-especie')?.value.trim()||'',
+    descripcion: document.getElementById('enriq-desc')?.value||'',
+    objetivo:    document.getElementById('enriq-obj')?.value||'',
+    materiales,
+    fotos
+  };
+  if (editIdx >= 0) ENRIQUECIMIENTOS_DB[editIdx] = enr;
+  else ENRIQUECIMIENTOS_DB.push(enr);
+  await saveEnriquecimientos();
+  document.getElementById('enriq-modal')?.remove();
+  renderEnriquecimientoScreen();
+  toast('✓ Enriquecimiento guardado');
+}
+
+async function removeEnriquecimiento(i) {
+  const ok = await confirmDelete('¿Eliminar enriquecimiento?', `Se eliminará "${ENRIQUECIMIENTOS_DB[i]?.nombre||''}".`);
+  if (!ok) return;
+  ENRIQUECIMIENTOS_DB.splice(i, 1);
+  await saveEnriquecimientos();
+  renderEnriquecimientoScreen();
+}
+
+// También mostrar en ficha de especie (pestaña nueva)
+// se agrega en renderTab via "enriquecimiento" tab
+
+// ═══════════════════════════════════════════════════════════
+// RECINTOS (26)
+// ═══════════════════════════════════════════════════════════
+let RECINTOS_DB = [];
+
+async function loadRecintos() {
+  const saved = await dbGet('settings', 'recintos');
+  RECINTOS_DB = saved?.value || [];
+  if (firestore && fbUid()) {
+    try {
+      const snap = await firestore.collection('settings').doc('recintos').get();
+      if (snap.exists) RECINTOS_DB = snap.data().value || [];
+    } catch(e) {}
+  }
+}
+
+async function saveRecintos() {
+  await dbPut('settings', { key: 'recintos', value: RECINTOS_DB });
+  if (firestore && fbUid()) {
+    try { await firestore.collection('settings').doc('recintos').set({ value: RECINTOS_DB }); } catch(e) {}
+  }
+}
+
+function renderRecintosScreen() {
+  const el = document.getElementById('recintos-list');
+  const adminBtns = document.getElementById('recinto-admin-btns');
+  if (adminBtns) adminBtns.style.display = currentUser?.role==='admin' ? 'block' : 'none';
+  if (!el) return;
+  const isAdmin = currentUser?.role === 'admin';
+  if (!RECINTOS_DB.length) {
+    el.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--txt3)"><p>Sin recintos registrados.</p>${isAdmin?'<p style="font-size:.8rem">Toca + Agregar recinto.</p>':''}</div>`;
+    return;
+  }
+  el.innerHTML = RECINTOS_DB.map((r,i) => `
+    <div class="recinto-card">
+      <div style="padding:.75rem 1rem;display:flex;align-items:center;gap:.6rem;cursor:pointer" onclick="toggleRecinto(${i})">
+        ${r.fotos?.[0]?`<img src="${r.fotos[0].data}" style="width:72px;height:56px;object-fit:cover;border-radius:var(--rxs);flex-shrink:0">`:
+          `<div style="width:72px;height:56px;background:var(--sur2);border-radius:var(--rxs);display:flex;align-items:center;justify-content:center;font-size:1.5rem">🏠</div>`}
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:.9rem">${r.nombre||'Sin nombre'}</div>
+          <div style="font-size:.75rem;color:var(--txt3)">${r.institucion||''} ${r.especie?'· 🐾 '+r.especie:''}</div>
+        </div>
+        ${isAdmin?`<div style="display:flex;gap:.3rem">
+          <button onclick="event.stopPropagation();openEditRecinto(${i})" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);cursor:pointer;font-size:.75rem;padding:.2rem .4rem">✏️</button>
+          <button onclick="event.stopPropagation();removeRecinto(${i})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.75rem;padding:.2rem .4rem">✕</button>
+        </div>`:''}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="recinto-chev-${i}"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div id="recinto-body-${i}" style="display:none;border-top:1px solid var(--bor);padding:.75rem 1rem">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.5rem">
+          ${r.area?`<div><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase">Área</div><p style="font-size:.82rem">${r.area}</p></div>`:''}
+          ${r.altura?`<div><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase">Altura</div><p style="font-size:.82rem">${r.altura}</p></div>`:''}
+          ${r.tipo?`<div><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase">Tipo</div><p style="font-size:.82rem">${r.tipo}</p></div>`:''}
+          ${r.capacidad?`<div><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase">Capacidad</div><p style="font-size:.82rem">${r.capacidad}</p></div>`:''}
+        </div>
+        ${r.lineamientos?`<div style="margin-bottom:.5rem"><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Lineamientos</div><p style="font-size:.82rem;line-height:1.5;color:var(--txt2)">${r.lineamientos}</p></div>`:''}
+        ${r.componentes?.length?`<div style="margin-bottom:.5rem"><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Componentes</div>
+          <div style="display:flex;flex-wrap:wrap;gap:.25rem">${r.componentes.map(c=>`<span style="background:var(--sur2);border:1px solid var(--bor);border-radius:20px;padding:.15rem .5rem;font-size:.75rem">${c}</span>`).join('')}</div>
+        </div>`:''}
+        ${r.notas?`<div style="margin-bottom:.5rem"><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Notas</div><p style="font-size:.82rem;color:var(--txt2)">${r.notas}</p></div>`:''}
+        ${r.fotos?.length?`<div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.4rem">
+          ${r.fotos.map(f=>`<img src="${f.data}" style="height:110px;width:auto;border-radius:var(--rxs);border:1px solid var(--bor);cursor:pointer;object-fit:cover" onclick="openImageFull('${f.data}')">`).join('')}
+        </div>`:''}
+      </div>
+    </div>`).join('');
+}
+
+function toggleRecinto(i) {
+  const body = document.getElementById('recinto-body-'+i);
+  const chev = document.getElementById('recinto-chev-'+i);
+  if (!body) return;
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
+}
+
+function openAddRecinto(editIdx=-1) {
+  const existing = editIdx >= 0 ? RECINTOS_DB[editIdx] : null;
+  document.getElementById('recinto-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="recinto-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${editIdx>=0?'✏️ Editar':'+'} Recinto</div>
+        <div class="form-group"><label>Nombre / Referencia *</label><input id="rec-nombre" class="form-control" value="${existing?.nombre||''}" placeholder="Ej: Recinto jaguar Colombia Zoo 2023"></div>
+        <div class="form-row">
+          <div class="form-group"><label>Institución</label><input id="rec-inst" class="form-control" value="${existing?.institucion||''}" placeholder="Zoológico, santuario..."></div>
+          <div class="form-group"><label>Especie</label><input id="rec-especie" class="form-control" value="${existing?.especie||''}" placeholder="Jaguar..."></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Área (m²)</label><input id="rec-area" class="form-control" type="text" value="${existing?.area||''}" placeholder="500 m²"></div>
+          <div class="form-group"><label>Altura (m)</label><input id="rec-altura" class="form-control" type="text" value="${existing?.altura||''}" placeholder="4 m"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Tipo</label><input id="rec-tipo" class="form-control" value="${existing?.tipo||''}" placeholder="Interior, exterior, mixto..."></div>
+          <div class="form-group"><label>Capacidad</label><input id="rec-cap" class="form-control" value="${existing?.capacidad||''}" placeholder="2 individuos"></div>
+        </div>
+        <div class="form-group"><label>Lineamientos</label><textarea id="rec-lin" class="form-control" style="min-height:70px" placeholder="Área mínima, requisitos...">${existing?.lineamientos||''}</textarea></div>
+        <div class="form-group"><label>Componentes (uno por línea)</label>
+          <textarea id="rec-comp" class="form-control" style="min-height:70px" placeholder="Piscina&#10;Perchas anchas&#10;Vegetación nativa...">${(existing?.componentes||[]).join('\n')}</textarea>
+        </div>
+        <div class="form-group"><label>Notas</label><textarea id="rec-notas" class="form-control" style="min-height:50px">${existing?.notas||''}</textarea></div>
+        <div class="form-group">
+          <label>Galería de fotos</label>
+          <label for="rec-fotos-up" class="btn btn-secondary btn-sm" style="cursor:pointer">📷 Agregar fotos</label>
+          <input type="file" id="rec-fotos-up" accept="image/*" multiple style="display:none" onchange="previewRecintoFotos(this)">
+          <div id="rec-fotos-preview" style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.3rem">
+            ${(existing?.fotos||[]).map(f=>`<img src="${f.data}" style="height:60px;width:auto;border-radius:var(--rxs);border:1px solid var(--bor);object-fit:cover">`).join('')}
+          </div>
+        </div>
+        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('recinto-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveRecinto(${editIdx})">💾 Guardar</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+let _recintoFotosNew = [];
+async function previewRecintoFotos(input) {
+  if (!input.files?.length) return;
+  const preview = document.getElementById('rec-fotos-preview');
+  _recintoFotosNew = [];
+  for (const file of Array.from(input.files)) {
+    const data = await compressImage(file, 700, 0.72);
+    _recintoFotosNew.push({ id: Date.now()+'_'+Math.random().toString(36).slice(2,5), data });
+    if (preview) preview.insertAdjacentHTML('beforeend', `<img src="${data}" style="height:60px;width:auto;border-radius:var(--rxs);border:1px solid var(--g5);object-fit:cover">`);
+  }
+}
+
+function openEditRecinto(idx) { openAddRecinto(idx); }
+
+async function saveRecinto(editIdx=-1) {
+  const nombre = document.getElementById('rec-nombre')?.value.trim();
+  if (!nombre) { toast('⚠ El nombre es obligatorio'); return; }
+  const componentes = (document.getElementById('rec-comp')?.value||'').split('\n').map(c=>c.trim()).filter(Boolean);
+  const existing = editIdx >= 0 ? RECINTOS_DB[editIdx] : null;
+  const fotos = [...(existing?.fotos||[]), ..._recintoFotosNew];
+  _recintoFotosNew = [];
+  const recinto = {
+    nombre,
+    institucion: document.getElementById('rec-inst')?.value.trim()||'',
+    especie:     document.getElementById('rec-especie')?.value.trim()||'',
+    area:        document.getElementById('rec-area')?.value||'',
+    altura:      document.getElementById('rec-altura')?.value||'',
+    tipo:        document.getElementById('rec-tipo')?.value||'',
+    capacidad:   document.getElementById('rec-cap')?.value||'',
+    lineamientos:document.getElementById('rec-lin')?.value||'',
+    componentes,
+    notas:       document.getElementById('rec-notas')?.value||'',
+    fotos
+  };
+  if (editIdx >= 0) RECINTOS_DB[editIdx] = recinto;
+  else RECINTOS_DB.push(recinto);
+  await saveRecintos();
+  document.getElementById('recinto-modal')?.remove();
+  renderRecintosScreen();
+  toast('✓ Recinto guardado');
+}
+
+async function removeRecinto(i) {
+  const ok = await confirmDelete('¿Eliminar recinto?', `Se eliminará "${RECINTOS_DB[i]?.nombre||''}".`);
+  if (!ok) return;
+  RECINTOS_DB.splice(i, 1);
+  await saveRecintos();
+  renderRecintosScreen();
+}
+
+// ═══════════════════════════════════════════════════════════
+// CALCULADORAS NUTRICIONALES (31/calculadoras)
+// ═══════════════════════════════════════════════════════════
+const CALC_FORMULAS = {
+  // ADULTOS
+  'mam_carnivoro': {
+    label:'Mamífero carnívoro', icon:'🦁', tipo:'adulto',
+    pct_default:4, pct_min:3, pct_max:5,
+    componentes:[
+      {id:'proteina',  label:'Proteína animal', pct:97},
+      {id:'minerales', label:'Minerales',        pct:3}
+    ]
+  },
+  'mam_omnivoro_lt35': {
+    label:'Mamífero omnívoro < 3.5 kg', icon:'🐒', tipo:'adulto',
+    pct_default:17, pct_min:15, pct_max:20,
+    componentes:[
+      {id:'frutas',    label:'Frutas',    pct:45},
+      {id:'vegetales', label:'Vegetales', pct:25},
+      {id:'proteina',  label:'Proteína',  pct:28},
+      {id:'minerales', label:'Minerales', pct:2}
+    ]
+  },
+  'mam_omnivoro_gt35': {
+    label:'Mamífero omnívoro > 3.5 kg', icon:'🐻', tipo:'adulto',
+    pct_default:17, pct_min:15, pct_max:20,
+    componentes:[
+      {id:'frutas',    label:'Frutas',    pct:20},
+      {id:'vegetales', label:'Vegetales', pct:30},
+      {id:'proteina',  label:'Proteína',  pct:48},
+      {id:'minerales', label:'Minerales', pct:2}
+    ]
+  },
+  'mam_herbivoro': {
+    label:'Mamífero herbívoro', icon:'🦌', tipo:'adulto',
+    pct_default:17, pct_min:15, pct_max:20,
+    componentes:[
+      {id:'frutas',    label:'Frutas',    pct:35},
+      {id:'vegetales', label:'Vegetales', pct:45},
+      {id:'cereales',  label:'Cereales',  pct:20},
+      {id:'minerales', label:'Minerales', pct:1}
+    ]
+  },
+  'perezoso': {
+    label:'Perezoso', icon:'🦥', tipo:'adulto',
+    pct_default:17, pct_min:15, pct_max:20,
+    componentes:[
+      {id:'frutas',    label:'Frutas',              pct:25},
+      {id:'vegetales', label:'Vegetales',            pct:60},
+      {id:'follaje',   label:'Follaje árboles nativos', pct:14},
+      {id:'minerales', label:'Minerales',            pct:1}
+    ]
+  },
+  'artiodactilo': {
+    label:'Artiodáctilo', icon:'🦒', tipo:'adulto',
+    pct_default:11, pct_min:10, pct_max:12,
+    componentes:[
+      {id:'frutas',      label:'Frutas',      pct:20},
+      {id:'vegetales',   label:'Vegetales',   pct:40},
+      {id:'cereales',    label:'Cereales',    pct:10},
+      {id:'concentrado', label:'Concentrado', pct:28},
+      {id:'minerales',   label:'Minerales',   pct:2}
+    ]
+  },
+  'mam_insectivoro': {
+    label:'Mamífero insectívoro', icon:'🦔', tipo:'adulto', unidad:'ml',
+    pct_default:10, pct_min:10, pct_max:10,
+    componentes:[
+      {id:'proteina_s', label:'Proteína (sólida 60% proteína)', pct:98.5, sub:[
+        {id:'solida',   label:'Parte sólida', pct:60},
+        {id:'liquida',  label:'Parte líquida',pct:40}
+      ]},
+      {id:'minerales',  label:'Minerales', pct:1.5}
+    ]
+  },
+  'ave_carnivora': {
+    label:'Ave carnívora', icon:'🦅', tipo:'adulto',
+    pct_default:22, pct_min:20, pct_max:25,
+    componentes:[
+      {id:'proteina',  label:'Proteína animal', pct:98.5},
+      {id:'minerales', label:'Minerales',        pct:1.5}
+    ]
+  },
+  'ave_piscivora': {
+    label:'Ave piscívora', icon:'🐦', tipo:'adulto',
+    pct_default:22, pct_min:20, pct_max:25,
+    componentes:[
+      {id:'proteina',  label:'Proteína animal', pct:98.5},
+      {id:'minerales', label:'Minerales',        pct:1.5}
+    ]
+  },
+  'ave_insectivora': {
+    label:'Ave insectívora', icon:'🐛', tipo:'adulto',
+    pct_default:25, pct_min:25, pct_max:25,
+    componentes:[
+      {id:'proteina',  label:'Proteína animal', pct:98.5},
+      {id:'minerales', label:'Minerales',        pct:1.5}
+    ]
+  },
+  'ave_granivora': {
+    label:'Ave granívora / herbívora', icon:'🦜', tipo:'adulto',
+    pct_default:30, pct_min:25, pct_max:35,
+    componentes:[
+      {id:'frutas',      label:'Frutas',      pct:25},
+      {id:'vegetales',   label:'Vegetales',   pct:25},
+      {id:'concentrado', label:'Concentrado', pct:48},
+      {id:'minerales',   label:'Minerales',   pct:2}
+    ]
+  },
+  'ave_omnivora': {
+    label:'Ave omnívora', icon:'🐧', tipo:'adulto',
+    pct_default:25, pct_min:20, pct_max:30,
+    componentes:[
+      {id:'frutas',      label:'Frutas',              pct:45},
+      {id:'vegetales',   label:'Vegetales',            pct:40},
+      {id:'proteina',    label:'Proteína animal',      pct:10},
+      {id:'concentrado', label:'Semillas/Concentrado', pct:3},
+      {id:'minerales',   label:'Minerales',            pct:2}
+    ]
+  },
+  'ave_filtradora': {
+    label:'Ave filtradora', icon:'🦢', tipo:'adulto',
+    pct_default:12, pct_min:10, pct_max:15,
+    componentes:[
+      {id:'camarones',  label:'Camarones', pct:45},
+      {id:'vegetales',  label:'Vegetales', pct:50},
+      {id:'minerales',  label:'Minerales', pct:2}
+    ]
+  },
+  'reptil_carnivoro': {
+    label:'Reptil carnívoro', icon:'🐊', tipo:'adulto',
+    pct_default:2.5, pct_min:2, pct_max:3,
+    componentes:[
+      {id:'proteina',  label:'Proteína animal', pct:98.5},
+      {id:'minerales', label:'Minerales',        pct:1.5}
+    ]
+  },
+  'reptil_omnivoro': {
+    label:'Reptil omnívoro', icon:'🦎', tipo:'adulto',
+    pct_default:7, pct_min:5, pct_max:10,
+    componentes:[
+      {id:'frutas',    label:'Frutas',    pct:40},
+      {id:'vegetales', label:'Vegetales', pct:20},
+      {id:'proteina',  label:'Proteína animal', pct:40}
+    ]
+  },
+  'reptil_herbivoro': {
+    label:'Reptil herbívoro', icon:'🐢', tipo:'adulto',
+    pct_default:9, pct_min:8, pct_max:10,
+    componentes:[
+      {id:'frutas',      label:'Frutas',     pct:10},
+      {id:'vegetales',   label:'Vegetales',  pct:70},
+      {id:'hortalizas',  label:'Hortalizas', pct:20}
+    ]
+  },
+  // CRÍAS
+  'cria_ave_omnivora_neonato': {
+    label:'Cría ave omnívora — Neonato', icon:'🐣', tipo:'cria', unidad:'ml',
+    pct_default:5, pct_min:5, pct_max:5,
+    esRacion: true,
+    componentes:[
+      {id:'papilla', label:'Papilla', pct:48, sub:[
+        {id:'cereales', label:'Cereales para bebé', pct:30},
+        {id:'huevo',    label:'Huevo cocinado sin cáscara', pct:28},
+        {id:'frutas_d', label:'Frutas dulces', pct:40}
+      ]},
+      {id:'minerales', label:'Minerales', pct:2},
+      {id:'suero',     label:'Suero oral', pct:50}
+    ]
+  },
+  'cria_ave_omnivora_2da': {
+    label:'Cría ave omnívora — 2ª etapa', icon:'🐥', tipo:'cria',
+    pct_default:5, pct_min:5, pct_max:5,
+    esRacion: true,
+    componentes:[
+      {id:'frutas_d',  label:'Frutas dulces', pct:55},
+      {id:'huevo',     label:'Huevo cocinado sin cáscara', pct:43},
+      {id:'minerales', label:'Minerales', pct:2}
+    ]
+  },
+  'cria_mam_omnivoro_neonato': {
+    label:'Cría mamífero omnívoro — Neonato', icon:'🍼', tipo:'cria', unidad:'ml',
+    pct_default:12, pct_min:10, pct_max:15,
+    esRacion: true,
+    componentes:[
+      {id:'lactea',    label:'Parte láctea (25-50-75%)', pct:37.5},
+      {id:'minerales', label:'Minerales', pct:2},
+      {id:'suero',     label:'Suero oral', pct:36}
+    ]
+  },
+  'cria_mam_carnivoro_neonato': {
+    label:'Cría mamífero carnívoro — Neonato', icon:'🍼', tipo:'cria', unidad:'ml',
+    pct_default:7, pct_min:5, pct_max:10,
+    esRacion: true,
+    componentes:[
+      {id:'lactea',    label:'Parte láctea (25-50-75%)', pct:50},
+      {id:'minerales', label:'Minerales', pct:5},
+      {id:'suero',     label:'Suero oral', pct:45}
+    ]
+  },
+  'cria_reptil': {
+    label:'Cría reptil', icon:'🐍', tipo:'cria',
+    pct_default:7, pct_min:6, pct_max:8,
+    esRacion: true,
+    componentes:[
+      {id:'proteina',  label:'Proteína', pct:98},
+      {id:'minerales', label:'Minerales', pct:2}
+    ]
+  }
+};
+
+function renderNutricionCalcScreen() {
+  const grid = document.getElementById('calc-grid');
+  if (!grid) return;
+  // Separar adultos y crías
+  const adultos = Object.entries(CALC_FORMULAS).filter(([,f])=>f.tipo==='adulto');
+  const crias   = Object.entries(CALC_FORMULAS).filter(([,f])=>f.tipo==='cria');
+  grid.innerHTML = `
+    <div style="grid-column:1/-1;font-size:.7rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">Adultos</div>
+    ${adultos.map(([id,f])=>`
+    <div class="calc-option" onclick="openCalcFormula('${id}')">
+      <div style="font-size:1.2rem;margin-bottom:.2rem">${f.icon}</div>
+      <div style="font-size:.75rem;font-weight:600;line-height:1.3">${f.label}</div>
+    </div>`).join('')}
+    <div style="grid-column:1/-1;font-size:.7rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin:.5rem 0 .2rem">Crías</div>
+    ${crias.map(([id,f])=>`
+    <div class="calc-option" onclick="openCalcFormula('${id}')">
+      <div style="font-size:1.2rem;margin-bottom:.2rem">${f.icon}</div>
+      <div style="font-size:.75rem;font-weight:600;line-height:1.3">${f.label}</div>
+    </div>`).join('')}`;
+}
+
+function openCalcFormula(fid) {
+  const formula = CALC_FORMULAS[fid];
+  if (!formula) return;
+  const container = document.getElementById('nutr-calc-active');
+  if (!container) return;
+  container.innerHTML = `
+    <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:1rem;margin-top:.5rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+        <div>
+          <span style="font-size:1.4rem">${formula.icon}</span>
+          <span style="font-size:.95rem;font-weight:700;margin-left:.35rem">${formula.label}</span>
+          <span style="font-size:.7rem;color:var(--txt3);margin-left:.35rem">${formula.tipo==='cria'?'· Cría (por ración)':'· Adulto (por día)'}</span>
+        </div>
+        <button onclick="document.getElementById('nutr-calc-active').innerHTML=''" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:1rem">✕</button>
+      </div>
+
+      <!-- Peso y % ración -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.75rem">
+        <div>
+          <label style="font-size:.72rem;color:var(--txt3);display:block;margin-bottom:.15rem">Peso del animal (kg)</label>
+          <input type="number" id="calc-peso" value="10" min="0.001" step="0.1"
+            style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rsm);padding:.35rem .5rem;font-family:var(--mono);font-size:1rem;font-weight:700;color:var(--g3);outline:none;text-align:center"
+            oninput="runCalc('${fid}')">
+          <div style="font-size:.68rem;color:var(--txt3);text-align:center;margin-top:.1rem" id="calc-gramos">= 10,000 g</div>
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:var(--txt3);display:block;margin-bottom:.15rem">% ración (${formula.pct_min}–${formula.pct_max}%)</label>
+          <input type="number" id="calc-pct" value="${formula.pct_default}" min="${formula.pct_min}" max="${formula.pct_max}" step="0.5"
+            style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rsm);padding:.35rem .5rem;font-family:var(--mono);font-size:1rem;font-weight:700;color:var(--g6);outline:none;text-align:center"
+            oninput="runCalc('${fid}')">
+        </div>
+      </div>
+
+      <!-- Resultado total -->
+      <div style="background:var(--g0);border-radius:var(--rsm);padding:.6rem;margin-bottom:.75rem;text-align:center">
+        <div style="font-size:.7rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em">${formula.esRacion?'Ración por toma':'Ración diaria total'}</div>
+        <div id="calc-total" style="font-size:1.8rem;font-weight:700;color:var(--g5);font-family:var(--mono)">—</div>
+        <div style="font-size:.72rem;color:var(--txt3)">${formula.unidad==='ml'?'ml':'gramos'}</div>
+      </div>
+
+      <!-- Multiplicador de raciones -->
+      ${formula.esRacion ? `
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;padding:.4rem .6rem;background:var(--sur2);border-radius:var(--rsm)">
+        <label style="font-size:.75rem;color:var(--txt2);flex:1">Nº de raciones para preparar:</label>
+        <input type="number" id="calc-raciones" value="1" min="1" max="24" step="1"
+          style="width:60px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.25rem;font-family:var(--mono);font-size:.88rem;text-align:center"
+          oninput="runCalc('${fid}')">
+        <span id="calc-total-raciones" style="font-size:.88rem;font-weight:700;color:var(--g6);font-family:var(--mono);min-width:80px;text-align:right">—</span>
+      </div>` : `
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;padding:.4rem .6rem;background:var(--sur2);border-radius:var(--rsm)">
+        <label style="font-size:.75rem;color:var(--txt2);flex:1">Multiplicador (caquexia / mayor demanda):</label>
+        <input type="number" id="calc-mult" value="1" min="0.5" max="3" step="0.1"
+          style="width:60px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.25rem;font-family:var(--mono);font-size:.88rem;text-align:center"
+          oninput="runCalc('${fid}')">
+        <span id="calc-total-mult" style="font-size:.88rem;font-weight:700;color:var(--g6);font-family:var(--mono);min-width:80px;text-align:right">—</span>
+      </div>`}
+
+      <!-- Tabla de componentes -->
+      <table class="calc-result-table">
+        <thead><tr><th>%</th><th>Componente</th><th>Cantidad</th><th>Ingredientes</th></tr></thead>
+        <tbody id="calc-tbody">
+          ${formula.componentes.map(comp=>`
+          <tr id="calc-row-${comp.id}">
+            <td style="text-align:center;font-weight:700;color:var(--g6);font-family:var(--mono)">
+              <input type="number" id="calc-pct-${comp.id}" value="${comp.pct}" min="0" max="100" step="0.5"
+                style="width:50px;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.82rem;font-weight:700;color:var(--g6);text-align:center"
+                oninput="runCalc('${fid}')">%
+            </td>
+            <td style="font-weight:600">${comp.label}</td>
+            <td id="calc-val-${comp.id}" style="font-family:var(--mono);font-weight:700;color:var(--g5)">—</td>
+            <td>
+              <div id="ing-list-${comp.id}" style="font-size:.75rem;color:var(--txt3)">
+                <div style="font-style:italic">— Agrega ingredientes →</div>
+              </div>
+              <button onclick="addIngrediente('${comp.id}')" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.72rem;padding:.1rem 0">+ ingrediente</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <div style="margin-top:.5rem;padding:.4rem;background:var(--g0);border-radius:var(--rxs)">
+        <div class="form-group" style="margin-bottom:.3rem"><label style="font-size:.72rem;color:var(--txt3)">Notas / Instrucciones de preparación</label>
+          <textarea id="calc-notas" class="form-control" style="min-height:50px;font-size:.8rem" placeholder="Ej: Licuar todo junto, servir a temperatura ambiente..."></textarea>
+        </div>
+      </div>
+    </div>`;
+  runCalc(fid);
+  document.querySelectorAll('.calc-option').forEach(el => el.classList.remove('selected'));
+  event?.target?.closest('.calc-option')?.classList.add('selected');
+}
+
+function runCalc(fid) {
+  const formula = CALC_FORMULAS[fid];
+  if (!formula) return;
+  const pesoKg = parseFloat(document.getElementById('calc-peso')?.value)||0;
+  const pesoG  = pesoKg * 1000;
+  const pct    = parseFloat(document.getElementById('calc-pct')?.value)||formula.pct_default;
+  const unidad = formula.unidad || 'g';
+  // Actualizar display de gramos
+  const gEl = document.getElementById('calc-gramos');
+  if (gEl) gEl.textContent = '= ' + pesoG.toLocaleString('es-CO') + ' g';
+  // Ración total
+  const racion = pesoG * pct / 100;
+  const totalEl = document.getElementById('calc-total');
+  if (totalEl) totalEl.textContent = racion.toFixed(1) + ' ' + unidad;
+  // Raciones / multiplicador
+  if (formula.esRacion) {
+    const nRac = parseInt(document.getElementById('calc-raciones')?.value)||1;
+    const multEl = document.getElementById('calc-total-raciones');
+    if (multEl) multEl.textContent = (racion * nRac).toFixed(1) + ' ' + unidad + ' total';
+  } else {
+    const mult = parseFloat(document.getElementById('calc-mult')?.value)||1;
+    const multEl = document.getElementById('calc-total-mult');
+    if (multEl) multEl.textContent = (racion * mult).toFixed(1) + ' ' + unidad;
+  }
+  // Componentes
+  formula.componentes.forEach(comp => {
+    const pctComp = parseFloat(document.getElementById('calc-pct-'+comp.id)?.value) ?? comp.pct;
+    const val = racion * pctComp / 100;
+    const valEl = document.getElementById('calc-val-'+comp.id);
+    if (valEl) valEl.textContent = val.toFixed(2) + ' ' + unidad;
+  });
+}
+
+let _ingredientes = {}; // { compId: [{nombre,gramos,tamano}] }
+function addIngrediente(compId) {
+  const listEl = document.getElementById('ing-list-'+compId);
+  if (!listEl) return;
+  if (!_ingredientes[compId]) _ingredientes[compId] = [];
+  const idx = _ingredientes[compId].length;
+  _ingredientes[compId].push({nombre:'',gramos:0,tamano:''});
+  listEl.innerHTML = _ingredientes[compId].map((ing,i)=>`
+    <div style="display:flex;gap:.25rem;margin-bottom:.25rem;align-items:center">
+      <input type="text" value="${ing.nombre}" placeholder="Ingrediente" style="flex:2;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .3rem;font-size:.73rem;color:var(--txt);outline:none"
+        onchange="_ingredientes['${compId}'][${i}].nombre=this.value">
+      <input type="number" value="${ing.gramos}" placeholder="g" style="width:45px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .25rem;font-size:.73rem;text-align:center;font-family:var(--mono);outline:none"
+        onchange="_ingredientes['${compId}'][${i}].gramos=parseFloat(this.value)||0">
+      <input type="text" value="${ing.tamano}" placeholder="Tamaño" style="flex:1;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .3rem;font-size:.73rem;color:var(--txt);outline:none"
+        onchange="_ingredientes['${compId}'][${i}].tamano=this.value">
+      <button onclick="_ingredientes['${compId}'].splice(${i},1);addIngrediente('${compId}')" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.7rem">✕</button>
+    </div>`).join('');
+}
+
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault(); deferredPrompt=e;
   document.getElementById('install-banner').classList.add('show');
