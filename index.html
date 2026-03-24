@@ -37,6 +37,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 
 /* LOGIN */
 #login-screen{position:fixed;inset:0;z-index:999;background:var(--g9);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem}
+@keyframes spin{to{transform:rotate(360deg)}}
 .login-logo{font-size:4rem;margin-bottom:.5rem}
 .login-title{font-size:1.8rem;font-weight:700;color:var(--g3);margin-bottom:.25rem}
 .login-sub{font-size:.9rem;color:var(--g4);margin-bottom:2rem;text-align:center}
@@ -2294,9 +2295,7 @@ function renderGeneral(el, sp) {
           <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveNewBiometriaRow()">Guardar</button>
         </div>
       </div>`:''}
-      <div style="margin-top:.4rem;padding:.3rem .4rem;background:var(--sur2);border-radius:var(--rxs);font-size:.72rem;color:var(--txt3)">
-        Datos de referencia: promedio ${sp.weight_avg||'?'} kg · rango ${sp.weight_min||'?'}–${sp.weight_max||'?'} kg
-      </div>
+
     </div>
 
     <!-- LONGEVIDAD / VIDA -->
@@ -2325,20 +2324,100 @@ function renderGeneral(el, sp) {
     </div>
 
     <!-- CONDICIONES ÓPTIMAS -->
-    <div class="info-card"><div class="info-card-title">Condiciones Óptimas de Mantenimiento</div>
-      ${row('Temperatura',(sp.temp_range||[0,0]).join('–')+' °C')}
-      ${row('Humedad relativa',(sp.humidity||[0,0]).join('–')+'%')}
+    <div class="info-card">
+      <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
+        Condiciones Óptimas de Mantenimiento
+        ${isAdmin?`<span style="font-size:.68rem;color:var(--g6)">Toca los valores para editar</span>`:''}
+      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <tbody>
+          <tr><td style="padding:.35rem .5rem;font-size:.8rem;color:var(--txt3);border-bottom:1px solid var(--bor);width:40%">Temperatura mínima °C</td>
+            <td style="padding:.35rem .5rem;border-bottom:1px solid var(--bor)">
+              ${isAdmin?`<input type="number" value="${(sp.temp_range||[20,28])[0]}" step="0.5" style="background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.85rem;width:80px" onchange="saveRangeField('temp_range',0,this.value)">` : `${(sp.temp_range||[20,28])[0]} °C`}
+            </td></tr>
+          <tr><td style="padding:.35rem .5rem;font-size:.8rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Temperatura máxima °C</td>
+            <td style="padding:.35rem .5rem;border-bottom:1px solid var(--bor)">
+              ${isAdmin?`<input type="number" value="${(sp.temp_range||[20,28])[1]}" step="0.5" style="background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.85rem;width:80px" onchange="saveRangeField('temp_range',1,this.value)">` : `${(sp.temp_range||[20,28])[1]} °C`}
+            </td></tr>
+          <tr><td style="padding:.35rem .5rem;font-size:.8rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Humedad mínima %</td>
+            <td style="padding:.35rem .5rem;border-bottom:1px solid var(--bor)">
+              ${isAdmin?`<input type="number" value="${(sp.humidity||[60,90])[0]}" step="1" style="background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.85rem;width:80px" onchange="saveRangeField('humidity',0,this.value)">` : `${(sp.humidity||[60,90])[0]}%`}
+            </td></tr>
+          <tr><td style="padding:.35rem .5rem;font-size:.8rem;color:var(--txt3)">Humedad máxima %</td>
+            <td style="padding:.35rem .5rem">
+              ${isAdmin?`<input type="number" value="${(sp.humidity||[60,90])[1]}" step="1" style="background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.85rem;width:80px" onchange="saveRangeField('humidity',1,this.value)">` : `${(sp.humidity||[60,90])[1]}%`}
+            </td></tr>
+        </tbody>
+      </table>
     </div>
 
-    <!-- DISTRIBUCIÓN Y DIETA -->
-    <div class="info-card"><div class="info-card-title">Distribución y Dieta</div>
-      ${row('Distribución',sp.distribution||'N/D')}
-      ${row('Dieta silvestre',sp.diet_wild||'N/D')}
+    <!-- DISTRIBUCIÓN -->
+    <div class="info-card">
+      <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
+        Distribución Geográfica
+        ${isAdmin?`<button onclick="editTextField('distribution','Distribución geográfica')" class="btn-inline-edit">✏️</button>`:''}
+      </div>
+      <div id="field-view-distribution">
+        <p style="font-size:.875rem;line-height:1.6;color:var(--txt2)">${sp.distribution||'<span style="color:var(--txt3);font-style:italic">Sin información.</span>'}</p>
+      </div>
+      <div id="field-edit-distribution" style="display:none;margin-top:.4rem">
+        <textarea id="field-input-distribution" class="form-control" style="min-height:80px">${sp.distribution||''}</textarea>
+        <div style="display:flex;gap:.4rem;margin-top:.4rem">
+          <button class="btn btn-secondary btn-sm" onclick="cancelTextField('distribution')">Cancelar</button>
+          <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveTextField('distribution')">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DIETA SILVESTRE -->
+    <div class="info-card">
+      <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
+        Dieta en Vida Silvestre
+        ${isAdmin?`<div style="display:flex;gap:.4rem">
+          <button onclick="addDietaItem()" class="btn btn-admin btn-sm" style="font-size:.7rem">+ Agregar</button>
+          <button onclick="editTextField('diet_wild','Dieta silvestre (descripción)')" class="btn-inline-edit">✏️</button>
+        </div>`:''}
+      </div>
+      <div id="field-view-diet_wild">
+        <p style="font-size:.875rem;line-height:1.6;color:var(--txt2)">${sp.diet_wild||'<span style="color:var(--txt3);font-style:italic">Sin información.</span>'}</p>
+      </div>
+      <div id="field-edit-diet_wild" style="display:none;margin-top:.4rem">
+        <textarea id="field-input-diet_wild" class="form-control" style="min-height:60px">${sp.diet_wild||''}</textarea>
+        <div style="display:flex;gap:.4rem;margin-top:.4rem">
+          <button class="btn btn-secondary btn-sm" onclick="cancelTextField('diet_wild')">Cancelar</button>
+          <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveTextField('diet_wild')">💾 Guardar</button>
+        </div>
+      </div>
+      <!-- Lista de alimentos -->
+      ${(sp.dieta_silvestre_lista||[]).length ? `
+      <div style="margin-top:.5rem">
+        <div style="font-size:.7rem;color:var(--txt3);font-weight:600;margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.06em">Lista de alimentos</div>
+        <div style="display:flex;flex-wrap:wrap;gap:.3rem">
+          ${(sp.dieta_silvestre_lista||[]).map((item,i)=>`
+          <span style="display:inline-flex;align-items:center;gap:.25rem;background:var(--g0);border:1px solid var(--g3);border-radius:20px;padding:.2rem .6rem;font-size:.78rem;color:var(--g7)">
+            ${item}
+            ${isAdmin?`<button onclick="removeDietaItem(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.7rem;padding:0;margin-left:.1rem;line-height:1">✕</button>`:''}
+          </span>`).join('')}
+        </div>
+      </div>` : ''}
+      ${isAdmin?`
+      <div id="dieta-item-form" style="display:none;margin-top:.4rem">
+        <div style="display:flex;gap:.3rem">
+          <input id="dieta-item-input" class="form-control" placeholder="Ej: Mamíferos pequeños, frutas..." style="flex:1;font-size:.82rem">
+          <button class="btn btn-primary btn-sm" onclick="saveDietaItem()">Agregar</button>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('dieta-item-form').style.display='none'">✕</button>
+        </div>
+      </div>`:''}
     </div>
 
     <!-- GALERÍA -->
     <div class="sec-title" style="margin-top:1rem">Galería de fotos</div>
     <div class="photo-grid" id="photo-grid-${sp.id}">
+      ${(sp.cover_photos||[]).map(p=>`
+        <div class="photo-thumb" style="position:relative">
+          <img src="${p.data}" alt="foto" style="width:100%;height:100%;object-fit:cover">
+          ${isAdmin?`<button onclick="removePhotoFromSpecies(this,'${p.id}')" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);border:none;color:white;border-radius:50%;width:20px;height:20px;font-size:.65rem;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>`:''}
+        </div>`).join('')}
       <label class="photo-add" for="photo-up-${sp.id}" style="cursor:pointer">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Añadir fotos
@@ -2419,6 +2498,50 @@ async function saveGeneralidades() {
   cancelGeneralidades();
   toast('✓ Generalidades guardadas');
 }
+
+async function saveRangeField(field, idx, value) {
+  if (!currentSpecies[field]) currentSpecies[field] = [0,0];
+  currentSpecies[field][idx] = parseFloat(value)||0;
+  await dbPutSync('species', currentSpecies);
+}
+function editTextField(field, label) {
+  document.getElementById('field-view-'+field).style.display='none';
+  document.getElementById('field-edit-'+field).style.display='block';
+  document.getElementById('field-input-'+field)?.focus();
+}
+function cancelTextField(field) {
+  document.getElementById('field-view-'+field).style.display='block';
+  document.getElementById('field-edit-'+field).style.display='none';
+}
+async function saveTextField(field) {
+  const val = document.getElementById('field-input-'+field)?.value||'';
+  currentSpecies[field] = val;
+  await dbPutSync('species', currentSpecies);
+  const view = document.getElementById('field-view-'+field);
+  if (view) view.innerHTML = val ? `<p style="font-size:.875rem;line-height:1.6;color:var(--txt2)">${val}</p>` : '<p style="font-size:.875rem;color:var(--txt3);font-style:italic">Sin información.</p>';
+  cancelTextField(field);
+  toast('✓ Guardado');
+}
+function addDietaItem() {
+  document.getElementById('dieta-item-form').style.display='block';
+  document.getElementById('dieta-item-input')?.focus();
+}
+async function saveDietaItem() {
+  const val = document.getElementById('dieta-item-input')?.value.trim();
+  if (!val) return;
+  if (!currentSpecies.dieta_silvestre_lista) currentSpecies.dieta_silvestre_lista = [];
+  currentSpecies.dieta_silvestre_lista.push(val);
+  await dbPutSync('species', currentSpecies);
+  document.getElementById('dieta-item-form').style.display='none';
+  document.getElementById('dieta-item-input').value='';
+  renderTab('general');
+  toast('✓ Alimento agregado');
+}
+async function removeDietaItem(i) {
+  currentSpecies.dieta_silvestre_lista.splice(i,1);
+  await dbPutSync('species', currentSpecies);
+  renderTab('general');
+}
 function renderFisiologia(el, sp) {
   const hem = sp.hematology||[];
   const bio = sp.biochem||[];
@@ -2487,6 +2610,7 @@ function renderFisiologia(el, sp) {
           <th style="text-align:left;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Parámetro</th>
           <th style="text-align:center;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Unidades</th>
           <th style="text-align:right;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Rango normal</th>
+          <th style="text-align:left;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Definición</th>
           ${isAdmin?'<th style="width:28px;border-bottom:1px solid var(--bor)"></th>':''}
         </tr></thead>
         <tbody>
@@ -2500,6 +2624,7 @@ function renderFisiologia(el, sp) {
             <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:right;font-family:var(--mono)">
               ${isAdmin?`<input type="text" value="${h[1]||''}" placeholder="rango" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.82rem;color:var(--txt);text-align:right" onchange="editHemoRow(${i},'hematology',1,this.value)">`:h[1]}
             </td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-size:.75rem;color:var(--txt3)">${isAdmin?`<input type="text" value="${h[3]||''}" placeholder="Para qué se mide..." style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-size:.75rem;color:var(--txt3)" onchange="editHemoRow(${i},'hematology',3,this.value)">`:h[3]||''}</td>
             ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button class="icon-btn danger" style="width:22px;height:22px;font-size:.65rem" onclick="removeHemoRow(${i},'hematology')">✕</button></td>`:''}
           </tr>`).join('')}
           ${!hem.length?`<tr><td colspan="4" style="padding:.5rem;color:var(--txt3);font-size:.8rem;text-align:center">Sin datos registrados</td></tr>`:''}
@@ -2521,6 +2646,7 @@ function renderFisiologia(el, sp) {
           <th style="text-align:left;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Parámetro</th>
           <th style="text-align:center;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Unidades</th>
           <th style="text-align:right;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Rango normal</th>
+          <th style="text-align:left;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Definición</th>
           ${isAdmin?'<th style="width:28px;border-bottom:1px solid var(--bor)"></th>':''}
         </tr></thead>
         <tbody>
@@ -2534,6 +2660,7 @@ function renderFisiologia(el, sp) {
             <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:right;font-family:var(--mono)">
               ${isAdmin?`<input type="text" value="${b[1]||''}" placeholder="rango" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.82rem;color:var(--txt);text-align:right" onchange="editHemoRow(${i},'biochem',1,this.value)">`:b[1]}
             </td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-size:.75rem;color:var(--txt3)">${isAdmin?`<input type="text" value="${b[3]||''}" placeholder="Para qué se mide..." style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-size:.75rem;color:var(--txt3)" onchange="editHemoRow(${i},'biochem',3,this.value)">`:b[3]||''}</td>
             ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button class="icon-btn danger" style="width:22px;height:22px;font-size:.65rem" onclick="removeHemoRow(${i},'biochem')">✕</button></td>`:''}
           </tr>`).join('')}
           ${!bio.length?`<tr><td colspan="4" style="padding:.5rem;color:var(--txt3);font-size:.8rem;text-align:center">Sin datos registrados</td></tr>`:''}
@@ -2555,6 +2682,9 @@ function addHemoRow(tableId, field) {
       </td>
       <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
         <input style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--g4);outline:none;font-family:var(--mono);font-size:.82rem;color:var(--txt);text-align:right" placeholder="Rango normal" id="hv_${field}_${idx}">
+      </td>
+      <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
+        <input style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--g4);outline:none;font-size:.75rem;color:var(--txt3)" placeholder="Definición" id="hd_${field}_${idx}">
       </td>
       <td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)">
         <button class="btn btn-primary btn-sm" style="padding:.2rem .4rem;font-size:.7rem" onclick="saveHemoRow('${field}',${idx})">✓</button>
@@ -2691,7 +2821,7 @@ function renderNutricion(el, sp) {
       </div>
       ${suplementos.length ? `
         ${suplementos.map((s,i)=>`
-        <div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.65rem .75rem;margin-bottom:.6rem;background:var(--sur)">
+        <div id="sup-card-${i}" style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.65rem .75rem;margin-bottom:.6rem;background:var(--sur)">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
             <div style="font-weight:700;font-size:.88rem;color:var(--txt)">${s.nombre} <span style="font-weight:400;font-size:.75rem;color:var(--txt3)">${s.cat||''}</span></div>
             ${isAdmin?`<button onclick="removeSuplemento(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.8rem;padding:.1rem .3rem">✕</button>`:''}
@@ -2699,37 +2829,37 @@ function renderNutricion(el, sp) {
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.35rem;margin-bottom:.35rem">
             <div>
               <label style="font-size:.62rem;color:var(--txt3);display:block">Peso (kg)</label>
-              <input type="number" class="sup-peso-${i}" value="${'${currentWeight}'}" min="0.001" max="9999" step="0.1"
+              <input type="number" id="sup-peso-${i}" value="${currentWeight}" min="0.001" max="9999" step="0.1"
                 style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .3rem;font-family:var(--mono);font-size:.88rem;font-weight:700;color:var(--g3);outline:none;text-align:center"
-                oninput="calcSupI(${i},this.closest('.sup-card-${i}'))">
+                oninput="calcSupI(${i})">
             </div>
             <div>
               <label style="font-size:.62rem;color:var(--txt3);display:block">Dosis</label>
-              <input type="number" class="sup-dosis-${i}" value="${s.dosis||0}" min="0" step="0.001"
+              <input type="number" id="sup-dosis-${i}" value="${s.dosis||0}" min="0" step="0.001"
                 style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .3rem;font-family:var(--mono);font-size:.88rem;color:var(--txt);outline:none;text-align:center"
-                oninput="calcSupI(${i},this.closest('.sup-card-${i}'))">
+                oninput="calcSupI(${i})">
             </div>
             <div>
               <label style="font-size:.62rem;color:var(--txt3);display:block">Unidad dosis</label>
-              <select class="sup-unit-${i}"
+              <select id="sup-unit-${i}"
                 style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .2rem;font-size:.75rem;color:var(--txt);outline:none"
-                onchange="calcSupI(${i},this.closest('.sup-card-${i}'))">
-                ${['mg/kg','UI/kg','g/kg','mcg/kg','mg/día','UI/día','g/día'].map(u=>`<option ${(s.unit||'mg/kg')===u?'selected':''}>${u}</option>`).join('')}
+                onchange="calcSupI(${i})">
+                ${['mg/kg','UI/kg','g/kg','mcg/kg','mg/día','UI/día','g/día','por kg alimento'].map(u=>`<option ${(s.unit||'mg/kg')===u?'selected':''}>${u}</option>`).join('')}
               </select>
             </div>
             <div>
-              <label style="font-size:.62rem;color:var(--txt3);display:block">Concentración</label>
-              <input type="number" class="sup-conc-${i}" value="${s.conc||0}" min="0" step="0.01"
+              <label style="font-size:.62rem;color:var(--txt3);display:block" id="sup-conc-label-${i}">Concentración</label>
+              <input type="number" id="sup-conc-${i}" value="${s.conc||0}" min="0" step="0.01"
                 style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .3rem;font-family:var(--mono);font-size:.88rem;color:var(--txt);outline:none;text-align:center"
-                oninput="calcSupI(${i},this.closest('.sup-card-${i}'))">
+                oninput="calcSupI(${i})">
             </div>
           </div>
           <div style="display:flex;gap:.35rem;align-items:flex-end">
             <div style="flex:1">
               <label style="font-size:.62rem;color:var(--txt3);display:block">Unidad conc.</label>
-              <select class="sup-cunit-${i}"
+              <select id="sup-cunit-${i}"
                 style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .2rem;font-size:.75rem;color:var(--txt);outline:none"
-                onchange="calcSupI(${i},this.closest('.sup-card-${i}'))">
+                onchange="calcSupI(${i})">
                 ${['mg/ml','UI/ml','g/L','mg/tab','mg/cáp','mg/g'].map(u=>`<option ${(s.conc_unit||'mg/ml')===u?'selected':''}>${u}</option>`).join('')}
               </select>
             </div>
@@ -3078,42 +3208,37 @@ async function updateSupUnit(i, val) {
   currentSpecies.suplementos[i].unit = val;
   await dbPutSync('species', currentSpecies);
 }
-function calcSupI(i, card) {
-  const peso   = parseFloat(card?.querySelector(`[class*="sup-peso-"]`)?.value) || 0;
-  const dosis  = parseFloat(card?.querySelector(`[class*="sup-dosis-"]`)?.value) || 0;
-  const unit   = card?.querySelector(`[class*="sup-unit-"]`)?.value || 'mg/kg';
-  const conc   = parseFloat(card?.querySelector(`[class*="sup-conc-"]`)?.value) || 0;
-  const cunit  = card?.querySelector(`[class*="sup-cunit-"]`)?.value || 'mg/ml';
-  const el     = document.getElementById('sup-res-' + i);
-  if (!el) return;
+function calcSupI(i) {
+  const g = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+  const peso  = parseFloat(g('sup-peso-'  + i)) || 0;
+  const dosis = parseFloat(g('sup-dosis-' + i)) || 0;
+  const unit  = g('sup-unit-'  + i) || 'mg/kg';
+  const conc  = parseFloat(g('sup-conc-'  + i)) || 0;
+  const cunit = g('sup-cunit-' + i) || 'mg/ml';
+  const el    = document.getElementById('sup-res-' + i);
+  if (!el || peso <= 0 || dosis <= 0) { if(el) el.textContent = '—'; return; }
 
-  // Calcular dosis total (en la unidad base)
-  const esDia = unit.includes('/día') || unit.includes('/dia');
-  const totalBase = esDia ? dosis : peso * dosis; // si es /día no multiplica por peso
+  // Calcular total según unidad
+  const esDia   = unit.includes('/día') || unit.includes('/dia');
+  const esAlim  = unit.includes('alimento');
+  const totalBase = (esDia || esAlim) ? dosis : peso * dosis;
+  const unitBase  = unit.replace('/kg','').replace('/día','').replace('/dia','').replace(' por kg alimento','').trim();
 
-  if (totalBase <= 0) { el.textContent = '—'; return; }
-
-  // Determinar resultado según unidades
   if (conc <= 0) {
-    // Sin concentración → resultado directo
-    const unitOut = unit.replace('/kg','').replace('/día','').replace('/dia','');
-    el.textContent = totalBase.toFixed(3) + ' ' + unitOut;
+    el.textContent = totalBase.toFixed(3) + ' ' + unitBase;
     return;
   }
 
-  // Con concentración → convertir
-  if (cunit === 'mg/tab' || cunit === 'mg/cáp') {
-    const tipo = cunit.includes('tab') ? 'tab' : 'cáp';
-    const tabs = totalBase / conc;
-    el.textContent = tabs.toFixed(2) + ' ' + tipo;
-  } else if (cunit === 'mg/g' || cunit === 'g/L') {
-    const concMgMl = cunit === 'g/L' ? conc : conc; // g/L = mg/ml
-    const vol = totalBase / concMgMl;
-    el.textContent = vol.toFixed(2) + ' ml';
+  if (cunit === 'mg/tab') {
+    el.textContent = (totalBase / conc).toFixed(2) + ' tab';
+  } else if (cunit === 'mg/cáp') {
+    el.textContent = (totalBase / conc).toFixed(2) + ' cáp';
+  } else if (cunit === 'mg/g') {
+    el.textContent = (totalBase / conc).toFixed(3) + ' g';
   } else {
-    // mg/ml o UI/ml → resultado en ml
-    const vol = totalBase / conc;
-    el.textContent = vol.toFixed(2) + ' ml';
+    // mg/ml, UI/ml, g/L → ml
+    const factor = cunit === 'g/L' ? 1000 : 1; // g/L = 1000mg/L = 1mg/ml
+    el.textContent = (totalBase / (conc * (cunit==='g/L'?1:1))).toFixed(2) + ' ml';
   }
 }
 
@@ -3605,6 +3730,16 @@ function renderEnfermedades(el, sp) {
   const todosLosSistemas = [...SISTEMAS_ENFERMEDAD, ...categoriasExtra];
 
   el.innerHTML = `
+    <!-- Buscador de síntomas (22) -->
+    <div style="background:var(--sur2);border-radius:var(--rsm);padding:.6rem;margin-bottom:.75rem">
+      <div style="font-size:.7rem;font-weight:600;color:var(--txt3);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.06em">🔍 Buscar por signos clínicos</div>
+      <div style="display:flex;gap:.3rem">
+        <input id="signos-search" class="form-control" style="flex:1;font-size:.82rem" placeholder="Ej: vómito, fiebre, letargo...">
+        <button class="btn btn-primary btn-sm" onclick="buscarPorSignos()">Buscar</button>
+      </div>
+      <div id="signos-results" style="margin-top:.4rem;font-size:.8rem"></div>
+    </div>
+
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
       <div class="sec-title" style="margin-bottom:0">Enfermedades por sistema</div>
       ${isAdmin?`<button onclick="openAddCategoria()" class="btn btn-admin btn-sm">+ Nueva categoría</button>`:''}
@@ -3623,7 +3758,10 @@ function renderEnfermedades(el, sp) {
           <span style="font-size:1.1rem">${s.icon}</span>
           <span style="flex:1;font-weight:600;font-size:.9rem">${s.label}</span>
           ${count?`<span style="background:var(--g5);color:white;font-size:.65rem;border-radius:20px;padding:.1rem .45rem;font-weight:600">${count}</span>`:''}
-          ${isAdmin && isCustom ? `<button onclick="event.stopPropagation();removeCategoria('${s.id}')" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.65rem;padding:.1rem .35rem" title="Eliminar categoría">✕</button>` : ''}
+          ${isAdmin ? `
+            <button onclick="event.stopPropagation();editCategoria('${s.id}')" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);color:var(--txt3);cursor:pointer;font-size:.65rem;padding:.1rem .35rem" title="Editar nombre/icono">✏️</button>
+            ${isCustom?`<button onclick="event.stopPropagation();removeCategoria('${s.id}')" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.65rem;padding:.1rem .35rem" title="Eliminar categoría">✕</button>`:''}
+          `:''}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="chev-sist-${s.id}"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
         <!-- Panel expandible -->
@@ -3670,7 +3808,7 @@ function renderEnfermedades(el, sp) {
                     <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">${e.dx||'—'}</td>
                     <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">${e.tx||'—'}</td>
                     ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)">
-                      <button onclick="openEditEnfermedad('${s.id}',${ei})" style="background:var(--g0);border:1px solid var(--g5);border-radius:var(--rxs);color:var(--g6);cursor:pointer;font-size:.7rem;padding:.1rem .3rem;margin-right:.2rem">✏️</button>
+                      <button onclick="openAddEnfermedad('${s.id}',${ei})" style="background:var(--g0);border:1px solid var(--g5);border-radius:var(--rxs);color:var(--g6);cursor:pointer;font-size:.7rem;padding:.1rem .3rem;margin-right:.2rem">✏️</button>
                       <button onclick="removeEnfermedad('${s.id}',${ei})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.7rem;padding:.1rem .3rem;font-weight:700">✕</button>
                     </td>`:''}
                   </tr>`).join('')}
@@ -3764,52 +3902,159 @@ async function removeCategoria(id) {
   toast('Categoría eliminada');
 }
 
-function openAddEnfermedad(sistId) {
-  const s = SISTEMAS_ENFERMEDAD.find(x=>x.id===sistId) ||
-            (currentSpecies.enfermedades_categorias||[]).find(x=>x.id===sistId);
+function openAddEnfermedad(sistId, editIdx=-1) {
   document.getElementById('enf-modal')?.remove();
+  const sist = currentSpecies?.enfermedades_sistemas?.[sistId];
+  const editEnf = editIdx >= 0 ? sist?.enfermedades?.[editIdx] : null;
+  const sName = [...SISTEMAS_ENFERMEDAD, ...(currentSpecies?.enfermedades_categorias||[])].find(s=>s.id===sistId)?.label || sistId;
   document.body.insertAdjacentHTML('beforeend', `
     <div id="enf-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
-      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
-        <div style="font-weight:700;font-size:.95rem;margin-bottom:.5rem">Agregar enfermedad — ${s?.icon||''} ${s?.label||sistId}</div>
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${editEnf?'✏️ Editar':'+'} enfermedad — ${sName}</div>
 
-        <!-- Importar desde Excel -->
-        <div style="background:var(--g0);border-radius:var(--rsm);padding:.6rem;margin-bottom:.75rem">
-          <div style="font-size:.75rem;font-weight:600;color:var(--g6);margin-bottom:.3rem">📊 Importar desde Excel</div>
-          <div style="background:var(--sur2);border-radius:var(--rsm);padding:.4rem .5rem;margin-bottom:.4rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
-          <span style="font-size:.68rem;color:var(--txt3);font-weight:600">IA:</span>
-          <button onclick="setModalAI(this,'gemini')" data-provider="gemini"
-            style="font-size:.68rem;padding:.15rem .4rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--g1);color:var(--g7);cursor:pointer;font-family:var(--sans)">🔵 Gemini</button>
-          <button onclick="setModalAI(this,'claude')" data-provider="claude"
-            style="font-size:.68rem;padding:.15rem .4rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--sur);color:var(--txt3);cursor:pointer;font-family:var(--sans)">🟠 Claude</button>
-          <input type="password" id="modal-ai-key" class="form-control" style="flex:1;min-width:0;font-size:.72rem;height:1.6rem"
-            placeholder="API Key..." oninput="saveModalAIKey(this.value)">
-          <div id="modal-ai-status" style="font-size:.65rem;color:var(--txt3);width:100%"></div>
-        </div>
-          <div style="display:flex;gap:.4rem;margin-top:.3rem">
-            <label class="btn btn-secondary btn-sm" for="enf-file-import" style="cursor:pointer;white-space:nowrap">📁 Subir Excel</label>
-            <input type="file" id="enf-file-import" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="importEnfermedadesFile(this,'${sistId}')">
+        <!-- Importar desde Excel con selector IA -->
+        ${editIdx<0?`<div style="background:var(--sur2);border-radius:var(--rsm);padding:.5rem;margin-bottom:.75rem">
+          <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.25rem">📊 Importar desde Excel/CSV</div>
+          <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
+            <button onclick="setModalAI(this,'gemini')" data-provider="gemini" style="font-size:.65rem;padding:.15rem .35rem;border-radius:var(--rxs);border:2px solid var(--g4);background:var(--g1);color:var(--g7);cursor:pointer;font-family:var(--sans);font-weight:600">🔵 Gemini</button>
+            <button onclick="setModalAI(this,'claude')" data-provider="claude" style="font-size:.65rem;padding:.15rem .35rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--sur);color:var(--txt3);cursor:pointer;font-family:var(--sans)">🟠 Claude</button>
+            <input type="password" id="modal-ai-key" class="form-control" style="flex:1;font-size:.72rem;height:1.6rem" placeholder="API Key..." oninput="saveModalAIKey(this.value)">
           </div>
-          <div id="enf-import-status" style="font-size:.72rem;color:var(--g6);margin-top:.25rem;min-height:1rem"></div>
+          <label class="btn btn-secondary btn-sm" for="enf-file-import" style="cursor:pointer;font-size:.7rem">📁 Subir archivo</label>
+          <input type="file" id="enf-file-import" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="importEnfermedadesFile(this,'${sistId}')">
+          <span id="enf-import-status" style="font-size:.7rem;color:var(--g6);margin-left:.4rem"></span>
+        </div>`:''}
+
+        <div class="form-group"><label>Nombre de la enfermedad *</label>
+          <input id="enf-nombre" class="form-control" value="${editEnf?.nombre||''}" placeholder="Ej: Panleucopenia felina">
+        </div>
+        <div class="form-group"><label>Agente / Causa</label>
+          <input id="enf-agente" class="form-control" value="${editEnf?.agente||''}" placeholder="Parvovirus felino, Bacteriana...">
         </div>
 
-        <div class="form-group"><label>Nombre de la enfermedad <span style="color:var(--r5)">*</span></label>
-          <input id="enf-nombre" class="form-control" placeholder="Ej: Panleucopenia felina"></div>
-        <div class="form-group"><label>Agente / Causa</label>
-          <input id="enf-agente" class="form-control" placeholder="Parvovirus felino, Bacteriana, Traumática..."></div>
+        <!-- Vías de transmisión (19) -->
+        <div class="form-group">
+          <label>Vías de transmisión</label>
+          <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.3rem">
+            ${['Contacto directo','Fecal-oral','Aerosol/Gotas','Vector','Vertical','Fomites','Agua/Alimento','N/A'].map(v=>`
+            <label style="display:inline-flex;align-items:center;gap:.25rem;font-size:.75rem;cursor:pointer">
+              <input type="checkbox" value="${v}" ${(editEnf?.vias||[]).includes(v)?'checked':''} style="accent-color:var(--g5)"> ${v}
+            </label>`).join('')}
+          </div>
+          <input id="enf-vias-extra" class="form-control" value="${editEnf?.vias_extra||''}" placeholder="Otras vías...">
+        </div>
+
+        <!-- Signos como lista (22) -->
         <div class="form-group"><label>Signos clínicos</label>
-          <textarea id="enf-signos" class="form-control" placeholder="Vómito, diarrea, fiebre, letargo..." style="min-height:60px"></textarea></div>
+          <div id="signos-list">
+            ${(editEnf?.signos_lista||[editEnf?.signos||'']).filter(Boolean).map((s,i)=>`
+            <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
+              <input class="form-control signo-item" value="${s}" placeholder="Signo clínico..." style="flex:1;font-size:.82rem">
+              <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+            </div>`).join('')}
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="addListItem('signos-list','Signo clínico...')">+ Agregar signo</button>
+        </div>
+
+        <!-- Diagnósticos como lista (21) -->
         <div class="form-group"><label>Diagnóstico</label>
-          <input id="enf-dx" class="form-control" placeholder="Hemograma, PCR, radiografía..."></div>
+          <div id="dx-list">
+            ${(editEnf?.dx_lista||[editEnf?.dx||'']).filter(Boolean).map((d,i)=>`
+            <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
+              <input class="form-control dx-item" value="${d}" placeholder="Método diagnóstico..." style="flex:1;font-size:.82rem">
+              <input class="form-control dx-expect-item" value="${typeof d==='object'?d.esperado||'':''}" placeholder="Hallazgo esperado..." style="flex:1;font-size:.82rem">
+              <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+            </div>`).join('')}
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="addDxItem()">+ Agregar diagnóstico</button>
+        </div>
+
+        <!-- Tratamiento como lista (22) -->
         <div class="form-group"><label>Tratamiento</label>
-          <textarea id="enf-tx" class="form-control" placeholder="Protocolo, dosis, duración..." style="min-height:60px"></textarea></div>
+          <div id="tx-list">
+            ${(editEnf?.tx_lista||[editEnf?.tx||'']).filter(Boolean).map((t,i)=>`
+            <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
+              <input class="form-control tx-item" value="${t}" placeholder="Tratamiento..." style="flex:1;font-size:.82rem">
+              <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+            </div>`).join('')}
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="addListItem('tx-list','Tratamiento...')">+ Agregar tratamiento</button>
+        </div>
+
+        <!-- Notas (20) -->
+        <div class="form-group"><label>Notas clínicas relevantes</label>
+          <textarea id="enf-notas" class="form-control" style="min-height:60px" placeholder="Tipo de bacteria/virus, predisposición, observaciones...">${editEnf?.notas||''}</textarea>
+        </div>
+
         <div style="display:flex;gap:.5rem;margin-top:.5rem">
-          <button class="btn btn-secondary" style="flex:1;justify-content:center" onclick="document.getElementById('enf-modal').remove()">Cancelar</button>
-          <button class="btn btn-primary" style="flex:2;justify-content:center" onclick="saveEnfermedad('${sistId}')">💾 Guardar</button>
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('enf-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveEnfermedadModal('${sistId}',${editIdx})">💾 ${editIdx>=0?'Guardar cambios':'Agregar'}</button>
         </div>
       </div>
     </div>`);
-  document.getElementById('enf-nombre')?.focus(); setTimeout(updateModalAIStatus, 50);
+  setTimeout(updateModalAIStatus, 50);
+}
+
+function addListItem(containerId, placeholder) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.insertAdjacentHTML('beforeend', `
+    <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
+      <input class="form-control" value="" placeholder="${placeholder}" style="flex:1;font-size:.82rem">
+      <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+    </div>`);
+}
+
+function addDxItem() {
+  const container = document.getElementById('dx-list');
+  if (!container) return;
+  container.insertAdjacentHTML('beforeend', `
+    <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
+      <input class="form-control dx-item" value="" placeholder="Método diagnóstico..." style="flex:1;font-size:.82rem">
+      <input class="form-control dx-expect-item" value="" placeholder="Hallazgo esperado..." style="flex:1;font-size:.82rem">
+      <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+    </div>`);
+}
+
+async function saveEnfermedadModal(sistId, editIdx=-1) {
+  const nombre = document.getElementById('enf-nombre')?.value.trim();
+  if (!nombre) { toast('⚠ El nombre es obligatorio'); return; }
+  // Recopilar signos como lista
+  const signosEls = document.querySelectorAll('#signos-list .signo-item');
+  const signosList = Array.from(signosEls).map(el=>el.value.trim()).filter(Boolean);
+  // Recopilar dx como lista de objetos {metodo, esperado}
+  const dxEls = document.querySelectorAll('#dx-list .dx-item');
+  const dxExpEls = document.querySelectorAll('#dx-list .dx-expect-item');
+  const dxLista = Array.from(dxEls).map((el,i)=>({metodo:el.value.trim(), esperado:dxExpEls[i]?.value.trim()||''})).filter(d=>d.metodo);
+  // Recopilar tx como lista
+  const txEls = document.querySelectorAll('#tx-list .tx-item');
+  const txLista = Array.from(txEls).map(el=>el.value.trim()).filter(Boolean);
+  // Vías de transmisión
+  const vias = Array.from(document.querySelectorAll('#enf-modal input[type=checkbox]:checked')).map(el=>el.value);
+  const viasExtra = document.getElementById('enf-vias-extra')?.value.trim()||'';
+
+  const enf = {
+    nombre,
+    agente:      document.getElementById('enf-agente')?.value||'',
+    signos:      signosList.join(', '),
+    signos_lista:signosList,
+    dx:          dxLista.map(d=>d.metodo).join(', '),
+    dx_lista:    dxLista,
+    tx:          txLista.join(', '),
+    tx_lista:    txLista,
+    vias,
+    vias_extra:  viasExtra,
+    notas:       document.getElementById('enf-notas')?.value||''
+  };
+
+  if (!currentSpecies.enfermedades_sistemas) currentSpecies.enfermedades_sistemas = {};
+  if (!currentSpecies.enfermedades_sistemas[sistId]) currentSpecies.enfermedades_sistemas[sistId] = { notas:'', enfermedades:[] };
+  if (editIdx >= 0) currentSpecies.enfermedades_sistemas[sistId].enfermedades[editIdx] = enf;
+  else currentSpecies.enfermedades_sistemas[sistId].enfermedades.push(enf);
+  await dbPutSync('species', currentSpecies);
+  document.getElementById('enf-modal')?.remove();
+  renderTab('enfermedades');
+  toast('✓ Enfermedad ' + (editIdx>=0?'actualizada':'agregada'));
 }
 
 async function importEnfermedadesFile(input, sistId) {
@@ -3950,11 +4195,8 @@ function renderMedicamentos(el, sp) {
       <div class="sec-title" style="margin-bottom:0">Medicamentos</div>
       ${isAdmin ? `<button class="btn btn-admin btn-sm" onclick="openAddSpeciesDrug()">+ Agregar fármaco</button>` : ''}
     </div>
-    <div class="drug-table-wrap">
-      <table class="drug-table">
-        <thead><tr><th>Fármaco</th><th>Categoría</th><th>Conc.</th><th>Unidad</th><th>Dosis(mg/kg)</th><th>Total(mg)</th><th>Resultado</th><th>Vía</th>${isAdmin?'<th></th>':''}</tr></thead>
-        <tbody id="drug-tbody">${renderDrugRows(sp.drugs||[],currentWeight,isAdmin)}</tbody>
-      </table>
+    <div id="drug-grouped-view">
+      ${renderDrugsByCategory(sp.drugs||[], currentWeight, isAdmin)}
     </div>
     <div class="sec-title">Detalles</div>
     ${(sp.drugs||[]).map(d=>`
@@ -3962,6 +4204,35 @@ function renderMedicamentos(el, sp) {
         <div class="info-card-title">${d.name} <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--g6)">${d.cat}</span></div>
         ${row('Vía',d.route)}${row('Frecuencia',d.freq)}${row('Dosis mín/máx',d.dose_min+'–'+d.dose_max+' mg/kg')}${row('Efectos adversos',d.effects||'N/D')}${row('Sitios venopunción',d.sites||'N/D')}${d.notes?row('Notas',d.notes):''}
       </div>`).join('')}`;
+}
+function renderDrugsByCategory(drugs, weight, isAdmin) {
+  if (!drugs.length) return `<p style="font-size:.8rem;color:var(--txt3);font-style:italic;padding:.5rem 0">Sin medicamentos registrados.${isAdmin?' Toca + Agregar fármaco.':''}</p>`;
+  
+  // Agrupar por categoría
+  const CATS = ['Antibiótico','Antiinflamatorio','Analgésico','Antieméticos','Emético','Sedante','Disociativo','Anestésico','Antiparasitario','Vitaminas/Suplementos','Reversor','Otro'];
+  const groups = {};
+  drugs.forEach((d,i) => {
+    const cat = d.cat || 'Otro';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push({...d, _idx: i});
+  });
+  
+  return Object.entries(groups).map(([cat, items]) => `
+    <div style="margin-bottom:.75rem">
+      <div style="font-size:.7rem;font-weight:700;color:var(--g6);text-transform:uppercase;letter-spacing:.08em;padding:.3rem 0;border-bottom:2px solid var(--g3);margin-bottom:.4rem">
+        ${cat} <span style="font-weight:400;color:var(--txt3)">(${items.length})</span>
+      </div>
+      <div class="drug-table-wrap">
+        <table class="drug-table">
+          <thead><tr>
+            <th>Nombre comercial</th><th>Principio activo</th><th>Conc.(mg/ml)</th>
+            <th>Dosis(mg/kg)</th><th>Rango</th><th>Total mg</th><th>Vol(ml)</th><th>Vía</th>
+            ${isAdmin?'<th></th>':''}
+          </tr></thead>
+          <tbody>${renderDrugRows(items, weight, isAdmin, true)}</tbody>
+        </table>
+      </div>
+    </div>`).join('');
 }
 function renderDrugRows(drugs, weight, isAdmin=false) {
   return drugs.map((d,i)=>{
@@ -5263,9 +5534,20 @@ function openAddSpeciesDrug() {
       <div id="drug-import-status" style="font-size:.72rem;color:var(--g6);margin-top:.25rem;min-height:1rem"></div>
     </div>
 
-    <div class="form-group"><label>Nombre del fármaco</label><input id="sdrug-name" class="form-control" placeholder="Ej: Ketamina"></div>
     <div class="form-row">
-      <div class="form-group"><label>Categoría</label><input id="sdrug-cat" class="form-control" placeholder="Disociativo, AINE..."></div>
+      <div class="form-group"><label>Nombre comercial *</label><input id="sdrug-name" class="form-control" placeholder="Ej: Ketavet, Meloxidyl..."></div>
+      <div class="form-group"><label>Principio activo</label><input id="sdrug-active" class="form-control" placeholder="Ej: Ketamina, Meloxicam..."></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Categoría</label>
+        <select id="sdrug-cat" class="form-control">
+          <option value="">— Seleccionar —</option>
+          <option>Antibiótico</option><option>Antiinflamatorio</option><option>Analgésico</option>
+          <option>Antieméticos</option><option>Emético</option><option>Sedante</option>
+          <option>Disociativo</option><option>Anestésico</option><option>Antiparasitario</option>
+          <option>Vitaminas/Suplementos</option><option>Reversor</option><option>Otro</option>
+        </select>
+      </div>
       <div class="form-group"><label>Vía de administración</label><input id="sdrug-route" class="form-control" placeholder="IM, IV, VO..."></div>
     </div>
     <div class="form-row">
@@ -5276,9 +5558,10 @@ function openAddSpeciesDrug() {
       <div class="form-group"><label>Dosis mínima (mg/kg)</label><input id="sdrug-dmin" class="form-control" type="number" step="0.001" placeholder="1.0"></div>
       <div class="form-group"><label>Dosis máxima (mg/kg)</label><input id="sdrug-dmax" class="form-control" type="number" step="0.001" placeholder="4.0"></div>
     </div>
-    <div class="form-group"><label>Frecuencia</label><input id="sdrug-freq" class="form-control" placeholder="Una dosis, SID x 7 días..."></div>
+    <div class="form-group"><label>Frecuencia</label><input id="sdrug-freq" class="form-control" placeholder="SID x 7 días, Una dosis..."></div>
+    <div class="form-group"><label>Indicaciones</label><textarea id="sdrug-indic" class="form-control" style="min-height:50px" placeholder="Para qué se usa, cuándo indicar..."></textarea></div>
+    <div class="form-group"><label>Contraindicaciones</label><textarea id="sdrug-contra" class="form-control" style="min-height:50px" placeholder="Cuándo NO usar, precauciones..."></textarea></div>
     <div class="form-group"><label>Efectos adversos</label><input id="sdrug-effects" class="form-control" placeholder="Bradicardia, hipotensión..."></div>
-    <div class="form-group"><label>Sitios de venopunción / aplicación</label><input id="sdrug-sites" class="form-control" placeholder="Glúteo, pectoral..."></div>
     <div class="form-group"><label>Notas clínicas</label><textarea id="sdrug-notes" class="form-control" placeholder="Revertir con Atipamezol, combinar con..."></textarea></div>
     <div style="display:flex;gap:.5rem;margin-top:1rem">
       <button class="btn btn-secondary" onclick="closeModal('modal-species-drug')">Cancelar</button>
@@ -5416,16 +5699,18 @@ async function saveSpeciesDrug() {
   if (!name) { toast('⚠ Ingresa el nombre del fármaco'); return; }
   const drug = {
     name,
-    cat: document.getElementById('sdrug-cat').value,
-    conc: parseFloat(document.getElementById('sdrug-conc').value)||100,
-    dose: parseFloat(document.getElementById('sdrug-dose').value)||2.0,
+    active:   document.getElementById('sdrug-active')?.value||'',
+    cat:      document.getElementById('sdrug-cat').value,
+    conc:     parseFloat(document.getElementById('sdrug-conc').value)||100,
+    dose:     parseFloat(document.getElementById('sdrug-dose').value)||2.0,
     dose_min: parseFloat(document.getElementById('sdrug-dmin').value)||1.0,
     dose_max: parseFloat(document.getElementById('sdrug-dmax').value)||4.0,
-    route: document.getElementById('sdrug-route').value,
-    freq: document.getElementById('sdrug-freq').value,
-    effects: document.getElementById('sdrug-effects').value,
-    sites: document.getElementById('sdrug-sites').value,
-    notes: document.getElementById('sdrug-notes').value
+    route:    document.getElementById('sdrug-route').value,
+    freq:     document.getElementById('sdrug-freq').value,
+    indic:    document.getElementById('sdrug-indic')?.value||'',
+    contra:   document.getElementById('sdrug-contra')?.value||'',
+    effects:  document.getElementById('sdrug-effects').value,
+    notes:    document.getElementById('sdrug-notes').value
   };
   if (!currentSpecies.drugs) currentSpecies.drugs = [];
   currentSpecies.drugs.push(drug);
@@ -5454,7 +5739,15 @@ function openAddProtocol() {
   const f = document.getElementById('modal-protocol-form');
   const drugs = currentSpecies.drugs || [];
   f.innerHTML = `
-    <div class="form-group"><label>Nombre del protocolo</label><input id="prot-name" class="form-control" placeholder="Ej: Inmovilización estándar adulto"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Nombre del protocolo *</label><input id="prot-name" class="form-control" placeholder="Ej: Inmovilización estándar adulto"></div>
+      <div class="form-group"><label>Visibilidad</label>
+        <select id="prot-visibility" class="form-control">
+          <option value="public">🌐 General — visible para todos</option>
+          <option value="private">🔒 Privado — solo mi cuenta</option>
+        </select>
+      </div>
+    </div>
     <div class="form-row">
       <div class="form-group"><label>Tiempo de inducción (min)</label><input id="prot-ind" class="form-control" type="number" value="10"></div>
       <div class="form-group"><label>Duración estimada (min)</label><input id="prot-dur" class="form-control" type="number" value="30"></div>
@@ -5467,9 +5760,14 @@ function openAddProtocol() {
         <div style="display:flex;align-items:center;gap:.5rem;padding:.5rem;background:var(--sur2);border-radius:var(--rsm);margin-bottom:.35rem">
           <input type="checkbox" id="pchk-${i}" value="${i}" style="width:16px;height:16px;accent-color:var(--g5)" onchange="toggleProtDrugInput(${i})">
           <label for="pchk-${i}" style="flex:1;font-size:.85rem;font-weight:500;cursor:pointer">${d.name} <span style="font-size:.7rem;color:var(--txt3)">(${d.cat})</span></label>
-          <div id="prot-dose-inp-${i}" style="display:none;align-items:center;gap:.3rem">
+          <div id="prot-dose-inp-${i}" style="display:none;align-items:center;gap:.3rem;flex-wrap:wrap">
             <span style="font-size:.7rem;color:var(--txt3)">mg/kg:</span>
-            <input type="number" id="pdose-${i}" class="editable-input" value="${d.dose}" step="0.01" style="width:70px">
+            <input type="number" id="pdose-${i}" class="editable-input" value="${d.dose}" step="0.01" style="width:65px">
+            <span style="font-size:.7rem;color:var(--txt3)">conc.:</span>
+            <input type="number" id="pconc-${i}" class="editable-input" value="${d.conc||100}" step="0.1" style="width:60px">
+            <select id="proute-${i}" style="background:var(--sur);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.2rem;font-size:.72rem;color:var(--txt)">
+              ${['IM','IV','SC','VO','IN'].map(r=>`<option ${(d.route||'IM')===r?'selected':''}>${r}</option>`).join('')}
+            </select>
           </div>
         </div>`).join('') : '<p class="text-muted">Esta especie no tiene medicamentos. Agrégalos primero en la sección Medicamentos.</p>'}
     </div>
@@ -5536,8 +5834,12 @@ async function saveProtocol() {
   drugs.forEach((d,i)=>{
     const chk = document.getElementById('pchk-'+i);
     if (chk?.checked) {
-      const doseVal = parseFloat(document.getElementById('pdose-'+i)?.value) || d.dose;
-      protDrugs.push({name:d.name, dose:doseVal, conc:d.conc});
+      protDrugs.push({
+        name:  d.name,
+        dose:  parseFloat(document.getElementById('pdose-'+i)?.value) || d.dose,
+        conc:  parseFloat(document.getElementById('pconc-'+i)?.value) || d.conc || 100,
+        route: document.getElementById('proute-'+i)?.value || d.route || 'IM'
+      });
     }
   });
   // Extra drugs
@@ -5832,95 +6134,97 @@ function openEditDrug(id) {
 function renderVademecum(filter='') {
   const list = document.getElementById('vademecum-list');
   if (!list) return;
-  const items = filter
+  const isAdmin = currentUser?.role==='admin';
+  const q = filter.toLowerCase().trim();
+
+  const items = q
     ? VADEMECUM_DB.filter(d=>
-        d.drug.toLowerCase().includes(filter) ||
-        d.category.toLowerCase().includes(filter) ||
-        (d.info||'').toLowerCase().includes(filter) ||
-        (d.species_doses||[]).some(s=>s.species.toLowerCase().includes(filter))
+        d.drug.toLowerCase().includes(q) ||
+        (d.active||'').toLowerCase().includes(q) ||
+        (d.category||'').toLowerCase().includes(q) ||
+        (d.info||'').toLowerCase().includes(q) ||
+        (d.species_doses||[]).some(s=>s.species.toLowerCase().includes(q))
       )
     : VADEMECUM_DB;
-  const isAdmin = currentUser?.role==='admin';
 
   if (!items.length) {
-    list.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><p>Sin resultados${filter?' para "'+filter+'"':''}</p></div>`;
+    list.innerHTML = `<div class="empty-state"><p>Sin resultados${q?' para "'+q+'"':''}</p></div>`;
     return;
   }
 
-  list.innerHTML = items.map(d => {
-    const doses = d.species_doses || [];
-    const doseCount = doses.length;
-    return `
-    <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.55rem;overflow:hidden" id="vd-card-${d.id}">
+  // Agrupar por categoría
+  const groups = {};
+  items.forEach(d => {
+    const cat = d.category || 'Otro';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(d);
+  });
 
-      <!-- FILA PRINCIPAL — siempre visible -->
-      <div style="display:flex;align-items:center;gap:.6rem;padding:.7rem .85rem">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:.95rem;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.drug}</div>
-          <div style="display:flex;align-items:center;gap:.4rem;margin-top:.15rem;flex-wrap:wrap">
-            <span style="background:var(--g0);color:var(--g7);font-size:.65rem;font-weight:600;border-radius:20px;padding:.1rem .45rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">${d.category}</span>
-            ${d.info ? `<span style="font-size:.75rem;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px" title="${d.info}">${d.info.substring(0,60)}${d.info.length>60?'…':''}</span>` : ''}
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:.3rem;flex-shrink:0">
-          <!-- Botón ESPECIES -->
-          <button onclick="toggleVdSpecies('${d.id}')" id="vd-sp-btn-${d.id}"
-            style="display:flex;align-items:center;gap:.3rem;background:var(--g5);color:white;border:none;border-radius:var(--rsm);padding:.35rem .65rem;font-family:var(--sans);font-size:.75rem;font-weight:600;cursor:pointer;transition:background .15s"
-            onmouseover="this.style.background='var(--g4)'" onmouseout="this.style.background='var(--g5)'">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Especies${doseCount ? ` <span style="background:rgba(255,255,255,.3);border-radius:20px;padding:.05rem .35rem;font-size:.65rem">${doseCount}</span>` : ''}
-          </button>
-          ${isAdmin ? `
-          <button onclick="openEditDrug('${d.id}')" title="Editar" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);width:28px;height:28px;cursor:pointer;font-size:.8rem;display:flex;align-items:center;justify-content:center">✏️</button>
-          <button onclick="deleteDrug('${d.id}')" title="Eliminar" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);width:28px;height:28px;cursor:pointer;font-size:.75rem;color:var(--r5);display:flex;align-items:center;justify-content:center">✕</button>
-          ` : ''}
-        </div>
+  // Ordenar categorías predefinidas primero
+  const CAT_ORDER = ['Antibiótico','Antiinflamatorio','Analgésico','Sedante','Disociativo','Anestésico','Antiparasitario','Reversor','Vitaminas/Suplementos','Otro'];
+  const sortedCats = Object.keys(groups).sort((a,b) => {
+    const ia = CAT_ORDER.indexOf(a), ib = CAT_ORDER.indexOf(b);
+    if (ia >= 0 && ib >= 0) return ia - ib;
+    if (ia >= 0) return -1;
+    if (ib >= 0) return 1;
+    return a.localeCompare(b);
+  });
+
+  list.innerHTML = sortedCats.map(cat => `
+    <div style="margin-bottom:1rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--g6);text-transform:uppercase;letter-spacing:.08em;padding:.3rem 0;border-bottom:2px solid var(--g3);margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:center">
+        <span>${cat} <span style="font-weight:400;color:var(--txt3)">(${groups[cat].length})</span></span>
       </div>
-
-      ${d.contraindications ? `
-      <div style="padding:.2rem .85rem .4rem;display:flex;gap:.3rem;align-items:flex-start">
-        <span style="color:var(--r5);font-size:.8rem;flex-shrink:0">⚠</span>
-        <span style="font-size:.75rem;color:var(--r5)">${d.contraindications}</span>
-      </div>` : ''}
-
-      <!-- PANEL ESPECIES — oculto por defecto -->
-      <div id="vd-sp-panel-${d.id}" style="display:none;border-top:1px solid var(--bor)">
-
-        <!-- Lista de especies como botones -->
-        <div style="padding:.5rem .85rem;background:var(--sur2)">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
-            <span style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Dosis por especie</span>
-            <button onclick="openAddSpeciesDoseModal('${d.id}')"
-              style="display:inline-flex;align-items:center;gap:.25rem;background:var(--g5);color:white;border:none;border-radius:var(--rxs);padding:.25rem .55rem;font-size:.7rem;font-weight:600;cursor:pointer">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Agregar especie
-            </button>
+      ${groups[cat].map(d => {
+        const doses = d.species_doses || [];
+        return `
+        <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.4rem;overflow:hidden" id="vd-card-${d.id}">
+          <div style="display:flex;align-items:center;gap:.6rem;padding:.65rem .85rem;cursor:pointer" onclick="toggleVdCard('${d.id}')">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:.92rem;font-weight:700;color:var(--txt)">${d.drug}</div>
+              ${d.active?`<div style="font-size:.72rem;color:var(--txt3);font-style:italic">${d.active}</div>`:''}
+              ${d.info?`<div style="font-size:.75rem;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${d.info.substring(0,80)}${d.info.length>80?'…':''}</div>`:''}
+            </div>
+            <div style="display:flex;align-items:center;gap:.3rem;flex-shrink:0">
+              <span style="font-size:.65rem;background:var(--g1);color:var(--g7);border-radius:20px;padding:.1rem .4rem;font-weight:600">${doses.length} esp.</span>
+              ${isAdmin?`
+              <button onclick="event.stopPropagation();openEditDrug('${d.id}')" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);width:26px;height:26px;cursor:pointer;font-size:.75rem">✏️</button>
+              <button onclick="event.stopPropagation();deleteDrug('${d.id}')" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);width:26px;height:26px;cursor:pointer;font-size:.7rem;color:var(--r5)">✕</button>`:''}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="vd-chev-${d.id}"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
           </div>
-
-          ${doseCount === 0 ? `
-          <div style="text-align:center;padding:.65rem;color:var(--txt3);font-size:.78rem;font-style:italic;border:1px dashed var(--bor);border-radius:var(--rsm)">
-            Sin dosis registradas — agrega la primera especie
-          </div>` : `
-          <div style="display:flex;flex-wrap:wrap;gap:.3rem">
-            ${doses.map((s,i) => `
-            <button onclick="toggleVdCalc('${d.id}',${i})" id="vd-sp-chip-${d.id}-${i}"
-              style="display:inline-flex;align-items:center;gap:.3rem;background:var(--sur);border:1px solid var(--bor);border-radius:20px;padding:.3rem .7rem;font-size:.78rem;font-weight:500;color:var(--txt);cursor:pointer;transition:all .15s"
-              onmouseover="this.style.background='var(--g0)';this.style.borderColor='var(--g4)'" 
-              onmouseout="if(!this.classList.contains('active')){this.style.background='var(--sur)';this.style.borderColor='var(--bor)'}">
-              <span style="font-size:.7rem">🐾</span>
-              ${s.species.split('(')[0].trim()}
-              <span style="font-size:.65rem;color:var(--txt3);font-family:var(--mono)">${s.dose||0} mg/kg</span>
-            </button>`).join('')}
-          </div>`}
-        </div>
-
-        <!-- Calculadora expandible por especie -->
-        <div id="vd-calc-container-${d.id}"></div>
-
-      </div>
-    </div>`;
-  }).join('');
+          <div id="vd-panel-${d.id}" style="display:none;border-top:1px solid var(--bor)">
+            ${d.contraindications?`<div style="padding:.3rem .85rem;background:var(--r1);display:flex;gap:.3rem"><span style="color:var(--r5)">⚠</span><span style="font-size:.75rem;color:var(--r5)">${d.contraindications}</span></div>`:''}
+            ${d.indic?`<div style="padding:.3rem .85rem .1rem;font-size:.78rem;color:var(--txt2)"><strong>Indicaciones:</strong> ${d.indic}</div>`:''}
+            <div style="padding:.5rem .85rem;background:var(--sur2)">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+                <span style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Dosis por especie</span>
+                <button onclick="openAddSpeciesDoseModal('${d.id}')" style="background:var(--g5);color:white;border:none;border-radius:var(--rxs);padding:.2rem .5rem;font-size:.7rem;cursor:pointer">+ Especie</button>
+              </div>
+              ${doses.length ? `<div style="display:flex;flex-wrap:wrap;gap:.3rem">
+                ${doses.map((s,i)=>`
+                <button onclick="toggleVdCalc('${d.id}',${i})" id="vd-sp-chip-${d.id}-${i}"
+                  style="background:var(--sur);border:1px solid var(--bor);border-radius:20px;padding:.25rem .6rem;font-size:.75rem;cursor:pointer">
+                  🐾 ${s.species.split('(')[0].trim()} <span style="font-size:.65rem;color:var(--txt3)">${s.dose||0} mg/kg</span>
+                </button>`).join('')}
+              </div>` : '<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin dosis registradas</p>'}
+            </div>
+            <div id="vd-calc-container-${d.id}"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
 }
+
+function toggleVdCard(id) {
+  const panel = document.getElementById('vd-panel-'+id);
+  const chev  = document.getElementById('vd-chev-'+id);
+  if (!panel) return;
+  const open = panel.style.display === 'none';
+  panel.style.display = open ? 'block' : 'none';
+  if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
+}
+
 
 // Toggle panel de especies
 function toggleVdSpecies(drugId) {
@@ -6898,25 +7202,51 @@ function addPhotos(input, gridId) {
   if (!grid) return;
   const addBtn = grid.querySelector('label.photo-add');
   let loaded = 0;
+  const total = input.files.length;
   Array.from(input.files).forEach(file => {
-    const reader = new FileReader();
-    reader.onload = e => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      // Comprimir a máx 800px
+      const maxW = 800;
+      const scale = img.width > maxW ? maxW/img.width : 1;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width*scale);
+      canvas.height = Math.round(img.height*scale);
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.80);
+      URL.revokeObjectURL(url);
+      // Agregar al DOM
       const div = document.createElement('div');
       div.className = 'photo-thumb';
       div.style.position = 'relative';
       div.innerHTML = `
-        <img src="${e.target.result}" alt="foto" style="width:100%;height:100%;object-fit:cover">
-        <button onclick="this.parentElement.remove()" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);border:none;color:white;border-radius:50%;width:20px;height:20px;font-size:.65rem;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>`;
+        <img src="${dataUrl}" alt="foto" style="width:100%;height:100%;object-fit:cover">
+        <button onclick="removePhotoFromSpecies(this,${Date.now()})" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);border:none;color:white;border-radius:50%;width:20px;height:20px;font-size:.65rem;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>`;
       if (addBtn) grid.insertBefore(div, addBtn);
       else grid.appendChild(div);
+      // Guardar en especie → Firestore
+      if (currentSpecies) {
+        if (!currentSpecies.cover_photos) currentSpecies.cover_photos = [];
+        const photoId = Date.now() + '_' + Math.random().toString(36).slice(2,6);
+        currentSpecies.cover_photos.push({ id: photoId, data: dataUrl });
+        div.querySelector('button').setAttribute('onclick', `removePhotoFromSpecies(this,'${photoId}')`);
+        dbPutSync('species', currentSpecies);
+      }
       loaded++;
-      if (loaded === input.files.length) toast('✓ '+loaded+' foto'+(loaded>1?'s':'')+' agregada'+(loaded>1?'s':''));
+      if (loaded === total) toast('✓ '+loaded+' foto'+(loaded>1?'s':'')+' guardada'+(loaded>1?'s':'')+' en la nube');
     };
-    reader.readAsDataURL(file);
+    img.src = url;
   });
 }
-// Legacy compat
-function addPhoto(input) { addPhotos(input, null); }
+
+async function removePhotoFromSpecies(btn, photoId) {
+  btn.closest('.photo-thumb')?.remove();
+  if (currentSpecies?.cover_photos) {
+    currentSpecies.cover_photos = currentSpecies.cover_photos.filter(p => p.id !== String(photoId));
+    await dbPutSync('species', currentSpecies);
+  }
+}
 
 // ═══════════════════════════════════
 // PWA
@@ -7492,6 +7822,57 @@ async function removeRef(spId, i) {
 // ═══════════════════════════════════
 // EDITAR ENFERMEDAD EXISTENTE
 // ═══════════════════════════════════
+
+function buscarPorSignos() {
+  const query = document.getElementById('signos-search')?.value.toLowerCase().trim();
+  const resultsEl = document.getElementById('signos-results');
+  if (!query || !resultsEl) return;
+  const terminos = query.split(/[,;]+/).map(t=>t.trim()).filter(Boolean);
+  const sp = currentSpecies;
+  if (!sp) return;
+  const matches = [];
+  const sistemas = sp.enfermedades_sistemas || {};
+  const todos = [...SISTEMAS_ENFERMEDAD, ...(sp.enfermedades_categorias||[])];
+  todos.forEach(sist => {
+    const enfs = sistemas[sist.id]?.enfermedades || [];
+    enfs.forEach(enf => {
+      const signos = (enf.signos_lista||[enf.signos||'']).join(' ').toLowerCase();
+      const coincide = terminos.some(t => signos.includes(t));
+      if (coincide) matches.push({ sist: sist.label, icon: sist.icon, enf });
+    });
+  });
+  if (!matches.length) {
+    resultsEl.innerHTML = '<span style="color:var(--txt3)">Sin enfermedades compatibles con esos signos.</span>';
+    return;
+  }
+  resultsEl.innerHTML = `<div style="font-weight:600;color:var(--g6);margin-bottom:.3rem">${matches.length} enfermedad(es) compatible(s):</div>` +
+    matches.map(m=>`
+    <div style="padding:.3rem .5rem;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);margin-bottom:.25rem">
+      <div style="font-size:.72rem;color:var(--txt3)">${m.icon} ${m.sist}</div>
+      <div style="font-weight:600;font-size:.82rem">${m.enf.nombre}</div>
+      ${m.enf.agente?`<div style="font-size:.75rem;color:var(--txt3)">Agente: ${m.enf.agente}</div>`:''}
+    </div>`).join('');
+}
+
+function editCategoria(sistId) {
+  const sist = [...SISTEMAS_ENFERMEDAD, ...(currentSpecies?.enfermedades_categorias||[])].find(s=>s.id===sistId);
+  if (!sist) return;
+  const nombre = prompt('Nombre de la categoría:', sist.label);
+  if (!nombre) return;
+  const icono = prompt('Emoji/Icono:', sist.icon);
+  if (SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)) {
+    // Guardar override en species
+    if (!currentSpecies._cat_overrides) currentSpecies._cat_overrides = {};
+    currentSpecies._cat_overrides[sistId] = { label: nombre, icon: icono||sist.icon };
+  } else {
+    // Categoría custom
+    const idx = currentSpecies.enfermedades_categorias.findIndex(s=>s.id===sistId);
+    if (idx>=0) { currentSpecies.enfermedades_categorias[idx].label = nombre; currentSpecies.enfermedades_categorias[idx].icon = icono||sist.icon; }
+  }
+  dbPutSync('species', currentSpecies);
+  renderTab('enfermedades');
+  toast('✓ Categoría actualizada');
+}
 function openEditEnfermedad(sistId, enfIdx) {
   const enf = currentSpecies?.enfermedades_sistemas?.[sistId]?.enfermedades?.[enfIdx];
   if (!enf) return;
@@ -7602,43 +7983,62 @@ function calcSupConc(weightInput, dosisStr, concStr, unitStr, resultId) {
 async function init() {
   await initDB();
 
-  // Mostrar pantalla de carga mientras Firebase verifica sesión
   const loginScreen = document.getElementById('login-screen');
 
-  // Inicializar Firebase — onAuthStateChanged manejará el login automático
+  // Mostrar spinner de carga (NO login) mientras Firebase verifica
+  if (loginScreen) {
+    loginScreen.innerHTML = `
+      <div style="text-align:center">
+        <div style="width:48px;height:48px;border:3px solid var(--g4);border-top-color:var(--g6);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 1rem"></div>
+        <p style="color:var(--g4);font-size:.85rem">Verificando sesión...</p>
+      </div>`;
+    loginScreen.style.display = 'flex';
+  }
+
+  // Inicializar Firebase
   initFirebase(FIREBASE_CONFIG_BUILTIN);
 
-  // Esperar a Firebase con timeout progresivo
-  let resolved = false;
-  const authPromise = new Promise(resolve => {
-    const unsub = firebaseAuth?.onAuthStateChanged(async user => {
-      if (resolved) return;
-      resolved = true;
-      unsub?.();
-      resolve(user);
-    });
+  // Esperar a que onAuthStateChanged resuelva (máx 5s)
+  await new Promise(resolve => {
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    // onAuthStateChanged ya está configurado en initFirebase y llama a finishGoogleLogin
+    // Solo esperamos que currentUser se establezca o que expire el timeout
+    const check = setInterval(() => { if (currentUser) { clearInterval(check); finish(); } }, 100);
+    setTimeout(() => { clearInterval(check); finish(); }, 5000);
   });
 
-  // Esperar máximo 3 segundos a Firebase
-  const user = await Promise.race([
-    authPromise,
-    new Promise(r => setTimeout(() => r(null), 3000))
-  ]);
-
-  if (user) {
-    // Firebase tiene sesión activa — finishGoogleLogin se llamó via onAuthStateChanged
-    // Esperar un poco más para que termine
-    await new Promise(r => setTimeout(r, 300));
-  }
-
-  // Si después de todo no hay sesión, mostrar login
+  // Si no hay sesión → mostrar login real
   if (!currentUser) {
-    if (loginScreen) loginScreen.style.display = 'flex';
+    if (loginScreen) {
+      // Restaurar el HTML del login original
+      loginScreen.innerHTML = `
+        <div style="text-align:center;max-width:340px;width:100%;padding:0 1.5rem">
+          <div style="margin-bottom:1.5rem">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--g5)" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <h1 style="font-size:1.5rem;font-weight:700;color:var(--g6);margin-top:.5rem">WildVet</h1>
+            <p style="font-size:.8rem;color:var(--txt3)">Plataforma clínica para fauna silvestre</p>
+          </div>
+          <button id="google-btn" onclick="loginWithGoogle()"
+            style="width:100%;display:flex;align-items:center;justify-content:center;gap:.6rem;background:white;border:1px solid #dadce0;border-radius:var(--rsm);padding:.7rem 1rem;font-size:.9rem;font-weight:500;color:#3c4043;cursor:pointer;margin-bottom:.75rem;font-family:var(--sans)">
+            <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Continuar con Google
+          </button>
+          <div style="margin-bottom:.5rem;position:relative">
+            <hr style="border:none;border-top:1px solid var(--bor)">
+            <span style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:var(--g9);padding:0 .5rem;font-size:.72rem;color:var(--txt3)">o</span>
+          </div>
+          <button onclick="loginWithPin()"
+            style="width:100%;background:none;border:1px solid var(--bor);border-radius:var(--rsm);padding:.6rem;font-size:.82rem;color:var(--txt3);cursor:pointer;font-family:var(--sans)">
+            🔐 Entrar como Administrador (PIN)
+          </button>
+          <p id="login-status" style="font-size:.75rem;color:var(--r5);margin-top:.6rem;min-height:1rem"></p>
+        </div>`;
+      loginScreen.style.display = 'flex';
+    }
   }
 
-  if (!navigator.onLine) document.getElementById('offline-badge').classList.add('show');
-
-  // Inicializar historial de navegación
+  if (!navigator.onLine) document.getElementById('offline-badge')?.classList.add('show');
   pushNav({ type: 'screen', name: 'home' });
 }
 init();
