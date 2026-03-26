@@ -493,7 +493,8 @@ textarea.form-control{resize:vertical;min-height:70px}
   <div id="screen-enriquecimiento" class="screen">
     <div class="flex-between mb-2">
       <h2 style="font-size:1.1rem;font-weight:700">🌿 Enriquecimiento Ambiental</h2>
-      <div id="enriq-admin-btns" style="display:none">
+      <div id="enriq-admin-btns" style="display:none;display:flex;gap:.35rem">
+        <button class="btn btn-secondary btn-sm" onclick="openSpeciesHistoryManager()">📋 Historial</button>
         <button class="btn btn-admin btn-sm" onclick="openAddEnriquecimiento()">+ Agregar</button>
       </div>
     </div>
@@ -517,7 +518,8 @@ textarea.form-control{resize:vertical;min-height:70px}
   <div id="screen-recintos" class="screen">
     <div class="flex-between mb-2">
       <h2 style="font-size:1.1rem;font-weight:700">🏠 Recintos</h2>
-      <div id="recinto-admin-btns" style="display:none">
+      <div id="recinto-admin-btns" style="display:none;display:flex;gap:.35rem">
+        <button class="btn btn-secondary btn-sm" onclick="shareRecintosWithEmail()">🔗 Compartir</button>
         <button class="btn btn-admin btn-sm" onclick="openAddRecinto()">+ Agregar recinto</button>
       </div>
     </div>
@@ -1931,13 +1933,20 @@ async function loadData() {
       }
 
       // ── Inventario ──
-      const fsInv = await fsGetAll('inventory');
-      if (fsInv?.length) {
-        inventoryItems = fsInv;
-        for (const i of fsInv) await dbPut('inventory', i);
+      const fsInvAll = await fsGetAll('inventory');
+      const myUid = fbUid();
+      if (fsInvAll?.length) {
+        // Mostrar solo los propios + los compartidos conmigo
+        inventoryItems = fsInvAll.filter(i =>
+          !i.owner ||                           // legados sin owner
+          i.owner === myUid ||                  // mis items
+          (i.sharedWith||[]).includes(myUid) || // compartidos conmigo
+          (i.sharedWith||[]).includes(currentUser?.email) // compartidos por email
+        );
+        for (const i of inventoryItems) await dbPut('inventory', i);
       } else {
         inventoryItems = await dbGetAll('inventory');
-        for (const i of inventoryItems) await fsPut('inventory', i);
+        for (const i of inventoryItems) await fsPut('inventory', { ...i, owner: myUid, sharedWith: [] });
       }
 
     } catch(e) {
@@ -2210,7 +2219,7 @@ async function setCoverPhoto(spId, input) {
     canvas.width  = Math.round(img.width  * scale);
     canvas.height = Math.round(img.height * scale);
     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
     URL.revokeObjectURL(url);
     const sp = SPECIES_DB.find(s => s.id === spId);
     if (!sp) return;
@@ -2375,7 +2384,7 @@ function previewFormCover(input) {
       canvas.width  = Math.round(img.width  * scale);
       canvas.height = Math.round(img.height * scale);
       canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
       window._formCoverPhoto = dataUrl;
       const prev = document.getElementById('form-cover-preview');
       const ph   = document.getElementById('form-cover-placeholder');
@@ -2818,7 +2827,7 @@ async function addDimorfismoFotos(input) {
   if (!input.files?.length || !currentSpecies) return;
   if (!currentSpecies.dimorfismo_fotos) currentSpecies.dimorfismo_fotos = [];
   for (const file of Array.from(input.files)) {
-    const data = await compressImage(file, 700, 0.75);
+    const data = await compressImage(file, 1600, 0.95);
     const label = prompt('Etiqueta para esta foto (ej: Macho adulto, Hembra joven...):', '') || '';
     currentSpecies.dimorfismo_fotos.push({ id: Date.now()+'', data, label });
   }
@@ -3102,12 +3111,13 @@ async function saveHemoRow(field, idx) {
   const p = document.getElementById('hp_'+field+'_'+idx)?.value.trim();
   const u = document.getElementById('hu_'+field+'_'+idx)?.value.trim();
   const v = document.getElementById('hv_'+field+'_'+idx)?.value.trim();
+  const d = document.getElementById('hd_'+field+'_'+idx)?.value.trim()||'';
   if (!p) { toast('⚠ Ingresa el nombre del parámetro'); return; }
   if (!currentSpecies[field]) currentSpecies[field] = [];
-  currentSpecies[field].push([p, v||'N/D', u||'']);
+  currentSpecies[field].push([p, v||'N/D', u||'', d]);
   await dbPutSync('species', currentSpecies);
   renderTab('fisiologia');
-  toast('✓ Parámetro agregado');
+  toast('✓ Parámetro guardado en la nube');
 }
 async function editHemoRow(i, field, col, value) {
   if (!currentSpecies[field]?.[i]) return;
@@ -3230,82 +3240,145 @@ function renderNutricion(el, sp) {
         ${suplementos.map((s,i)=>`
         <div id="sup-card-${i}" style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.65rem .75rem;margin-bottom:.6rem;background:var(--sur)">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
-            <div style="font-weight:700;font-size:.88rem;color:var(--txt)">${s.nombre} <span style="font-weight:400;font-size:.75rem;color:var(--txt3)">${s.cat||''}</span></div>
+            <div>
+              <span style="font-weight:700;font-size:.88rem;color:var(--txt)">${s.nombre}</span>
+              <span style="font-weight:400;font-size:.75rem;color:var(--txt3);margin-left:.35rem">${s.cat||''}</span>
+              ${s.cat2?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);border-radius:20px;padding:.05rem .35rem;margin-left:.3rem">${s.cat2}</span>`:''}
+            </div>
             ${isAdmin?`<button onclick="removeSuplemento(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.8rem;padding:.1rem .3rem">✕</button>`:''}
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.35rem;margin-bottom:.35rem">
+
+          <!-- RANGO DE DOSIS (visual) -->
+          ${(s.dose_min||s.dose_max)?`
+          <div style="background:var(--g0);border-radius:var(--rxs);padding:.3rem .5rem;margin-bottom:.4rem;font-size:.75rem;color:var(--g7)">
+            <strong>Rango:</strong> ${s.dose_min||'—'} – ${s.dose_max||'—'} ${s.unitB||s.unit?.split('/')[0]||''} / ${s.unitA||s.unit?.split('/')[1]||'kg'}
+          </div>`:''}
+
+          <!-- FILA A: unidad del denominador de dosis -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.3rem">
             <div>
-              <label style="font-size:.62rem;color:var(--txt3);display:block">Peso (kg)</label>
+              <label style="font-size:.62rem;color:var(--txt3);display:block">Tipo de A (denominador dosis)</label>
+              <select id="sup-unitA-${i}"
+                style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .2rem;font-size:.75rem;color:var(--txt);outline:none"
+                onchange="onSupUnitAChange(${i})">
+                ${[['kg(pv)','kg pv (peso animal)'],['kg(al)','kg al (peso alimento)'],['día','/día (sin peso)'],['otra','Otra (sin peso)']].map(([v,l])=>`<option value="${v}" ${(s.unitA||'kg(pv)')===v?'selected':''}>${l}</option>`).join('')}
+              </select>
+            </div>
+            <div id="sup-peso-wrap-${i}" style="${(s.unitA||'kg(pv)')!=='día' && (s.unitA||'kg(pv)')!=='otra'?'':'display:none'}">
+              <label style="font-size:.62rem;color:var(--txt3);display:block" id="sup-peso-lbl-${i}">${(s.unitA||'kg(pv)')!=='kg(al)'?'Peso animal (kg)':'Peso alimento (kg)'}</label>
               <input type="number" id="sup-peso-${i}" value="${currentWeight}" min="0.001" max="9999" step="0.1"
                 style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .3rem;font-family:var(--mono);font-size:.88rem;font-weight:700;color:var(--g3);outline:none;text-align:center"
                 oninput="calcSupI(${i})">
             </div>
-            <div>
-              <label style="font-size:.62rem;color:var(--txt3);display:block">Dosis</label>
-              <input type="number" id="sup-dosis-${i}" value="${s.dosis||0}" min="0" step="0.001"
-                style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .3rem;font-family:var(--mono);font-size:.88rem;color:var(--txt);outline:none;text-align:center"
+            <div id="sup-palim-wrap-${i}" style="display:none">
+              <label style="font-size:.62rem;color:var(--txt3);display:block">Peso alimento (kg)</label>
+              <input type="number" id="sup-palim-${i}" value="1" min="0.001" max="9999" step="0.1"
+                style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .3rem;font-family:var(--mono);font-size:.88rem;font-weight:700;color:var(--bl);outline:none;text-align:center"
                 oninput="calcSupI(${i})">
             </div>
+          </div>
+
+          <!-- FILA B (numerador dosis) y dosis -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;margin-bottom:.3rem">
             <div>
-              <label style="font-size:.62rem;color:var(--txt3);display:block">Unidad dosis</label>
-              <select id="sup-unit-${i}"
+              <label style="font-size:.62rem;color:var(--txt3);display:block">Unidad B (num. dosis)</label>
+              <select id="sup-unitB-${i}"
                 style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .2rem;font-size:.75rem;color:var(--txt);outline:none"
-                onchange="calcSupI(${i})">
-                ${['mg/kg','UI/kg','g/kg','mcg/kg','mg/día','UI/día','g/día','por kg alimento'].map(u=>`<option ${(s.unit||'mg/kg')===u?'selected':''}>${u}</option>`).join('')}
+                onchange="updateSupConcUnits(${i});calcSupI(${i})">
+                ${['mg','UI','g','mcg','mmol','mEq'].map(u=>`<option ${(s.unitB||s.unit?.split('/')[0]||'mg')===u?'selected':''}>${u}</option>`).join('')}
               </select>
             </div>
             <div>
-              <label style="font-size:.62rem;color:var(--txt3);display:block" id="sup-conc-label-${i}">Concentración</label>
+              <label style="font-size:.62rem;color:var(--txt3);display:block">Dosis mín → rec → máx</label>
+              <div style="display:flex;gap:.2rem;align-items:center">
+                <input type="number" id="sup-dmin-${i}" value="${s.dose_min||''}" min="0" step="0.001" placeholder="mín"
+                  style="width:33%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .15rem;font-family:var(--mono);font-size:.78rem;text-align:center;outline:none"
+                  oninput="calcSupI(${i})">
+                <input type="number" id="sup-dosis-${i}" value="${s.dosis||s.dose_min||0}" min="0" step="0.001" placeholder="rec"
+                  style="width:34%;background:var(--g0);border:2px solid var(--g4);border-radius:var(--rxs);padding:.22rem .15rem;font-family:var(--mono);font-size:.88rem;font-weight:700;color:var(--g6);text-align:center;outline:none"
+                  oninput="calcSupI(${i})">
+                <input type="number" id="sup-dmax-${i}" value="${s.dose_max||''}" min="0" step="0.001" placeholder="máx"
+                  style="width:33%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .15rem;font-family:var(--mono);font-size:.78rem;text-align:center;outline:none"
+                  oninput="calcSupI(${i})">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:.62rem;color:var(--txt3);display:block">Conc. (B/C)</label>
               <input type="number" id="sup-conc-${i}" value="${s.conc||0}" min="0" step="0.01"
                 style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .3rem;font-family:var(--mono);font-size:.88rem;color:var(--txt);outline:none;text-align:center"
                 oninput="calcSupI(${i})">
             </div>
           </div>
-          <div style="display:flex;gap:.35rem;align-items:flex-end">
-            <div style="flex:1">
-              <label style="font-size:.62rem;color:var(--txt3);display:block">Unidad conc.</label>
-              <select id="sup-cunit-${i}"
+
+          <!-- FILA C: unidad de concentración (resultado) -->
+          <div style="display:grid;grid-template-columns:1fr 2fr;gap:.35rem;align-items:center">
+            <div>
+              <label style="font-size:.62rem;color:var(--txt3);display:block">Unidad C (resultado)</label>
+              <select id="sup-unitC-${i}"
                 style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .2rem;font-size:.75rem;color:var(--txt);outline:none"
                 onchange="calcSupI(${i})">
-                ${['mg/ml','UI/ml','g/L','mg/tab','mg/cáp','mg/g'].map(u=>`<option ${(s.conc_unit||'mg/ml')===u?'selected':''}>${u}</option>`).join('')}
+                <option value="ml" ${(s.unitC||'ml')==='ml'?'selected':''}>ml</option>
+                <option value="tab" ${(s.unitC)==='tab'?'selected':''}>tab</option>
+                <option value="cáp" ${(s.unitC)==='cáp'?'selected':''}>cáp</option>
+                <option value="g" ${(s.unitC)==='g'?'selected':''}>g</option>
+                <option value="mg" ${(s.unitC)==='mg'?'selected':''}>mg</option>
               </select>
             </div>
-            <div style="flex:2;text-align:right">
-              <label style="font-size:.62rem;color:var(--txt3);display:block">Resultado</label>
-              <div id="sup-res-${i}" style="font-family:var(--mono);font-size:1.05rem;font-weight:700;color:var(--g5)">—</div>
+            <div style="text-align:right">
+              <div style="font-size:.62rem;color:var(--txt3);margin-bottom:.15rem">Resultado</div>
+              <div id="sup-res-${i}" style="font-family:var(--mono);font-size:1.15rem;font-weight:700;color:var(--g5)">—</div>
+              ${(s.dose_min||s.dose_max)?`
+              <div style="font-size:.72rem;color:var(--txt3);margin-top:.1rem">
+                Rango: <span id="sup-res-min-${i}" style="color:var(--g4)">—</span>
+                <span style="margin:0 .3rem">–</span>
+                <span id="sup-res-max-${i}" style="color:var(--r5)">—</span>
+              </div>`:
+              `<div id="sup-res-min-${i}" style="display:none"></div><div id="sup-res-max-${i}" style="display:none"></div>`}
             </div>
           </div>
-          ${s.notas?`<div style="font-size:.73rem;color:var(--txt3);margin-top:.3rem;font-style:italic">${s.notas}</div>`:''}
+          ${s.notas?`<div style="font-size:.73rem;color:var(--txt3);margin-top:.35rem;font-style:italic">📋 ${s.notas}</div>`:''}
         </div>`).join('')}
       ` : `<p style="font-size:.8rem;color:var(--txt3);font-style:italic">Sin suplementos registrados.${isAdmin?' Toca + Suplemento.':''}</p>`}
       ${isAdmin ? `
       <div id="sup-form" style="display:none;background:var(--sur2);border-radius:var(--rsm);padding:.6rem;margin-top:.4rem">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:.4rem">
-          <div><label style="font-size:.7rem;color:var(--txt3)">Nombre *</label><input id="sup-nombre" class="form-control" placeholder="Vitamina D3..." style="font-size:.82rem"></div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">Categoría</label><input id="sup-cat" class="form-control" placeholder="Vitamina, Mineral..." style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">Nombre *</label><input id="sup-nombre" class="form-control" placeholder="Vit. D3, Carbonato Ca..." style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">Categoría general</label>
+            <input id="sup-cat" class="form-control" placeholder="Vitamina, Mineral, Aminoácido..." style="font-size:.82rem">
+          </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:.4rem;margin-bottom:.4rem">
-          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis mín</label><input id="sup-dmin" class="form-control" type="number" step="0.001" placeholder="1" style="font-size:.82rem"></div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis rec.</label><input id="sup-dosis" class="form-control" type="number" step="0.001" placeholder="5" style="font-size:.82rem"></div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis máx</label><input id="sup-dmax" class="form-control" type="number" step="0.001" placeholder="10" style="font-size:.82rem"></div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">Unidad dosis</label>
-            <select id="sup-unit" class="form-control" style="font-size:.82rem">
-              <option>mg/kg</option><option>UI/kg</option><option>g/kg</option><option>mcg/kg</option><option>mg/día</option><option>UI/día</option><option>g/día</option>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:.4rem">
+          <div><label style="font-size:.7rem;color:var(--txt3)">A: tipo denominador dosis</label>
+            <select id="sup-unitA" class="form-control" style="font-size:.82rem">
+              <option value="kg(pv)">kg pv (peso animal)</option>
+              <option value="kg(al)">kg al (peso alimento)</option>
+              <option value="día">/día (total sin peso)</option>
+              <option value="otra">Otra</option>
             </select>
           </div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">Conc.</label><input id="sup-conc" class="form-control" type="number" step="0.01" placeholder="100" style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">B: numerador dosis</label>
+            <select id="sup-unitB" class="form-control" style="font-size:.82rem">
+              <option>mg</option><option>UI</option><option>g</option><option>mcg</option><option>mmol</option><option>mEq</option>
+            </select>
+          </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 2fr;gap:.4rem;margin-bottom:.4rem">
-          <div><label style="font-size:.7rem;color:var(--txt3)">Unidad conc.</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.4rem">
+          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis mínima</label><input id="sup-dmin" class="form-control" type="number" step="0.001" placeholder="1" style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis recomendada *</label><input id="sup-dosis" class="form-control" type="number" step="0.001" placeholder="5" style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis máxima</label><input id="sup-dmax" class="form-control" type="number" step="0.001" placeholder="10" style="font-size:.82rem"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.4rem">
+          <div><label style="font-size:.7rem;color:var(--txt3)">Concentración (B/C)</label><input id="sup-conc" class="form-control" type="number" step="0.01" placeholder="100" style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">C: unidad resultado</label>
             <select id="sup-conc-unit" class="form-control" style="font-size:.82rem">
-              <option>mg/ml</option><option>UI/ml</option><option>g/L</option><option>mg/tab</option><option>mg/cáp</option><option>mg/g</option>
+              <option value="ml">ml</option><option value="tab">tab</option><option value="cáp">cáp</option><option value="g">g</option>
             </select>
           </div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">Notas</label><input id="sup-notas" class="form-control" placeholder="Indicaciones, precauciones..." style="font-size:.82rem"></div>
+          <div><label style="font-size:.7rem;color:var(--txt3)">Notas</label><input id="sup-notas" class="form-control" placeholder="Indicaciones..." style="font-size:.82rem"></div>
         </div>
         <div style="display:flex;gap:.4rem">
           <button class="btn btn-secondary btn-sm" onclick="document.getElementById('sup-form').style.display='none'">Cancelar</button>
-          <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveSuplemento()">Guardar</button>
+          <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveSuplemento()">Guardar suplemento</button>
         </div>
       </div>` : ''}
     </div>
@@ -3621,39 +3694,98 @@ async function updateSupUnit(i, val) {
   await dbPutSync('species', currentSpecies);
 }
 function calcSupI(i) {
-  const g = id => { const el = document.getElementById(id); return el ? el.value : ''; };
-  const peso  = parseFloat(g('sup-peso-'  + i)) || 0;
-  const dosis = parseFloat(g('sup-dosis-' + i)) || 0;
-  const unit  = g('sup-unit-'  + i) || 'mg/kg';
-  const conc  = parseFloat(g('sup-conc-'  + i)) || 0;
-  const cunit = g('sup-cunit-' + i) || 'mg/ml';
-  const el    = document.getElementById('sup-res-' + i);
-  if (!el || peso <= 0 || dosis <= 0) { if(el) el.textContent = '—'; return; }
+  const g  = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+  const gn = id => { const el = document.getElementById(id); return el ? parseFloat(el.value)||0 : 0; };
 
-  // Calcular total según unidad
-  const esDia   = unit.includes('/día') || unit.includes('/dia');
-  const esAlim  = unit.includes('alimento');
-  const totalBase = (esDia || esAlim) ? dosis : peso * dosis;
-  const unitBase  = unit.replace('/kg','').replace('/día','').replace('/dia','').replace(' por kg alimento','').trim();
+  const unitA    = g('sup-unitA-' + i);         // A: kg(pv), kg(al), día, etc.
+  const unitB    = g('sup-unitB-' + i);         // B: mg, UI, g, mcg
+  const unitC    = g('sup-unitC-' + i);         // C: ml, tab, cáp, g
+  const dosisMin = gn('sup-dmin-'  + i);
+  const dosisMax = gn('sup-dmax-'  + i);
+  const dosisRec = gn('sup-dosis-' + i);
+  const dosisUsar= dosisRec || dosisMin || 0;
+  const conc     = gn('sup-conc-'  + i);
+  const pesoAnim = gn('sup-peso-'  + i);
+  const pesoAlim = gn('sup-palim-' + i);
+  const el       = document.getElementById('sup-res-' + i);
+  const elMin    = document.getElementById('sup-res-min-' + i);
+  const elMax    = document.getElementById('sup-res-max-' + i);
+  if (!el) return;
 
-  if (conc <= 0) {
-    el.textContent = totalBase.toFixed(3) + ' ' + unitBase;
+  // Determinar valor de A según tipo
+  let valorA = 1;
+  if (unitA === 'kg(pv)') valorA = pesoAnim;
+  else if (unitA === 'kg(al)') valorA = pesoAlim;
+  // si es /día u otro, A=1 (la dosis ya viene en esa unidad total)
+
+  if (valorA <= 0 && (unitA === 'kg(pv)' || unitA === 'kg(al)')) {
+    el.textContent = '—';
+    if (elMin) elMin.textContent = '—';
+    if (elMax) elMax.textContent = '—';
     return;
   }
 
-  if (cunit === 'mg/tab') {
-    el.textContent = (totalBase / conc).toFixed(2) + ' tab';
-  } else if (cunit === 'mg/cáp') {
-    el.textContent = (totalBase / conc).toFixed(2) + ' cáp';
-  } else if (cunit === 'mg/g') {
-    el.textContent = (totalBase / conc).toFixed(3) + ' g';
+  // Fórmula: (valorA × dosis) / conc = resultado en C
+  const calcVal = (dosis) => {
+    if (dosis <= 0) return null;
+    const totalB = valorA * dosis;   // B total
+    if (!conc || conc <= 0) return { val: totalB, unit: unitB };
+    return { val: totalB / conc, unit: unitC };
+  };
+
+  const fmt = (v, u) => v == null ? '—' : v.toFixed(3).replace(/\.?0+$/, '') + ' ' + u;
+
+  // Resultado principal (dosis recomendada o única)
+  const res = calcVal(dosisUsar);
+  el.textContent = fmt(res?.val, res?.unit||'');
+
+  // Rango min–max
+  if (dosisMin > 0 && dosisMax > 0) {
+    const rMin = calcVal(dosisMin);
+    const rMax = calcVal(dosisMax);
+    if (elMin) elMin.textContent = fmt(rMin?.val, rMin?.unit||'');
+    if (elMax) elMax.textContent = fmt(rMax?.val, rMax?.unit||'');
   } else {
-    // mg/ml, UI/ml, g/L → ml
-    const factor = cunit === 'g/L' ? 1000 : 1; // g/L = 1000mg/L = 1mg/ml
-    el.textContent = (totalBase / (conc * (cunit==='g/L'?1:1))).toFixed(2) + ' ml';
+    if (elMin) elMin.textContent = '';
+    if (elMax) elMax.textContent = '';
   }
 }
 
+
+function onSupUnitAChange(i) {
+  const val = document.getElementById('sup-unitA-'+i)?.value||'kg(pv)';
+  const pesoWrap  = document.getElementById('sup-peso-wrap-'+i);
+  const palimWrap = document.getElementById('sup-palim-wrap-'+i);
+  const pesoLbl   = document.getElementById('sup-peso-lbl-'+i);
+  if (val === 'kg(pv)') {
+    if(pesoWrap)  pesoWrap.style.display  = 'block';
+    if(palimWrap) palimWrap.style.display = 'none';
+    if(pesoLbl)   pesoLbl.textContent     = 'Peso animal (kg)';
+  } else if (val === 'kg(al)') {
+    if(pesoWrap)  pesoWrap.style.display  = 'none';
+    if(palimWrap) palimWrap.style.display = 'block';
+  } else {
+    if(pesoWrap)  pesoWrap.style.display  = 'none';
+    if(palimWrap) palimWrap.style.display = 'none';
+  }
+  calcSupI(i);
+}
+
+function updateSupConcUnits(i) {
+  const unitB = document.getElementById('sup-unitB-'+i)?.value || 'mg';
+  const sel = document.getElementById('sup-unitC-'+i);
+  if (!sel) return;
+  // Opciones de C compatibles con B
+  const opts = [
+    { val: 'ml',  label: 'ml' },
+    { val: 'tab', label: 'tab' },
+    { val: 'cáp', label: 'cáp' },
+    { val: 'g',   label: 'g' },
+    { val: unitB, label: unitB + ' (sin div.)' }
+  ];
+  const current = sel.value;
+  sel.innerHTML = opts.map(o => `<option value="${o.val}" ${current===o.val?'selected':''}>${o.label}</option>`).join('');
+}
 function addSuplemento() { document.getElementById('sup-form').style.display = 'block'; document.getElementById('sup-nombre')?.focus(); }
 async function saveSuplemento() {
   const nombre = document.getElementById('sup-nombre')?.value.trim();
@@ -3666,8 +3798,10 @@ async function saveSuplemento() {
     dose_min:  parseFloat(document.getElementById('sup-dmin')?.value)||0,
     dose_max:  parseFloat(document.getElementById('sup-dmax')?.value)||0,
     conc:      parseFloat(document.getElementById('sup-conc')?.value)||0,
-    unit:      document.getElementById('sup-unit')?.value || 'mg/kg',
-    conc_unit: document.getElementById('sup-conc-unit')?.value || 'mg/ml',
+    unitA:     document.getElementById('sup-unitA')?.value || 'kg(pv)',
+    unitB:     document.getElementById('sup-unitB')?.value || 'mg',
+    unitC:     document.getElementById('sup-conc-unit')?.value || 'ml',
+    unit:      (document.getElementById('sup-unitB')?.value||'mg') + '/' + (document.getElementById('sup-unitA')?.value||'kg(pv)'),
     notas:     document.getElementById('sup-notas')?.value || ''
   });
   await dbPutSync('species', currentSpecies);
@@ -3769,7 +3903,7 @@ async function addDentalFotos(input) {
   if (!currentSpecies.dental_fotos) currentSpecies.dental_fotos = [];
   let count = 0;
   for (const file of Array.from(input.files)) {
-    const data = await compressImage(file, 700, 0.72);
+    const data = await compressImage(file, 1400, 0.94);
     currentSpecies.dental_fotos.push({ id: Date.now()+'_'+Math.random().toString(36).slice(2,5), data });
     count++;
   }
@@ -4401,26 +4535,46 @@ function openAddEnfermedad(sistId, editIdx=-1) {
           <input id="enf-vias-extra" class="form-control" value="${editEnf?.vias_extra||''}" placeholder="Otras vías...">
         </div>
 
-        <!-- Signos como lista (22) -->
-        <div class="form-group"><label>Signos clínicos</label>
-          <div id="signos-list">
+        <!-- Signos clínicos: entrada masiva + historial -->
+        <div class="form-group">
+          <label>Signos clínicos <span style="font-size:.7rem;color:var(--txt3)">(uno por línea, o separados por coma)</span></label>
+          <!-- Signos ya agregados -->
+          <div id="signos-list" style="margin-bottom:.35rem">
             ${(editEnf?.signos_lista||[editEnf?.signos||'']).filter(Boolean).map((s,i)=>`
-            <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
-              <input class="form-control signo-item" value="${s}" placeholder="Signo clínico..." style="flex:1;font-size:.82rem">
+            <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
+              <input class="form-control signo-item" value="${s}" placeholder="Signo clínico..." style="flex:1;font-size:.82rem" list="signos-hist-dl">
               <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
             </div>`).join('')}
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="addListItem('signos-list','Signo clínico...')">+ Agregar signo</button>
+          <!-- Entrada masiva -->
+          <div style="background:var(--sur2);border-radius:var(--rsm);padding:.45rem;margin-bottom:.3rem">
+            <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.2rem">💡 Pegar lista completa:</div>
+            <textarea id="signos-bulk-input" class="form-control" style="min-height:60px;font-size:.8rem"
+              placeholder="Ej: Letargia, Anorexia, Vómito bilioso&#10;Fiebre > 39.5°C&#10;Mucosas pálidas"></textarea>
+            <button class="btn btn-primary btn-sm" style="margin-top:.3rem;width:100%" onclick="addSignosBulk()">+ Agregar todos</button>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="addSignoFromHistory()">+ Desde historial</button>
         </div>
 
-        <!-- Diagnósticos como lista (21) -->
+        <!-- Diagnósticos como lista con imágenes en hallazgo (21) -->
         <div class="form-group"><label>Diagnóstico</label>
           <div id="dx-list">
             ${(editEnf?.dx_lista||[editEnf?.dx||'']).filter(Boolean).map((d,i)=>`
-            <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
-              <input class="form-control dx-item" value="${d}" placeholder="Método diagnóstico..." style="flex:1;font-size:.82rem">
-              <input class="form-control dx-expect-item" value="${typeof d==='object'?d.esperado||'':''}" placeholder="Hallazgo esperado..." style="flex:1;font-size:.82rem">
-              <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+            <div class="dx-row" style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem;margin-bottom:.4rem;background:var(--sur2)">
+              <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
+                <input class="form-control dx-item" value="${typeof d==='object'?d.metodo||'':d}" placeholder="Método (Rx, ecografía, PCR...)" style="flex:1;font-size:.82rem">
+                <input class="form-control dx-expect-item" value="${typeof d==='object'?d.esperado||'':''}" placeholder="Hallazgo esperado..." style="flex:1;font-size:.82rem">
+                <button onclick="this.closest('.dx-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.2rem" class="dx-img-preview">
+                ${(typeof d==='object'&&d.imagenes||[]).map(img=>`
+                <div style="position:relative"><img src="${img.data}" style="height:55px;width:auto;border-radius:var(--rxs);cursor:pointer" onclick="openImageFull('${img.data}')">
+                </div>`).join('')}
+              </div>
+              <label class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.68rem;margin-top:.1rem">
+                📷 Imagen hallazgo
+                <input type="file" accept="image/*" style="display:none" onchange="addDxImage(this)">
+              </label>
             </div>`).join('')}
           </div>
           <button class="btn btn-secondary btn-sm" onclick="addDxItem()">+ Agregar diagnóstico</button>
@@ -4449,7 +4603,7 @@ function openAddEnfermedad(sistId, editIdx=-1) {
         </div>
       </div>
     </div>`);
-  setTimeout(updateModalAIStatus, 50);
+  setTimeout(() => { updateModalAIStatus(); buildSignosHistory(); }, 50);
 }
 
 function addListItem(containerId, placeholder) {
@@ -4462,15 +4616,82 @@ function addListItem(containerId, placeholder) {
     </div>`);
 }
 
+
+let _signosHistorial = new Set();
+
+function buildSignosHistory() {
+  // Recopilar signos de todas las enfermedades
+  if (!currentSpecies) return;
+  const sistemas = currentSpecies.enfermedades_sistemas || {};
+  Object.values(sistemas).forEach(sist => {
+    (sist.enfermedades||[]).forEach(enf => {
+      (enf.signos_lista||[enf.signos||'']).filter(Boolean).forEach(s => _signosHistorial.add(s.trim()));
+    });
+  });
+  // Actualizar datalist
+  let dl = document.getElementById('signos-hist-dl');
+  if (!dl) { dl = document.createElement('datalist'); dl.id = 'signos-hist-dl'; document.body.appendChild(dl); }
+  dl.innerHTML = [..._signosHistorial].sort().map(s => `<option value="${s}">`).join('');
+}
+
+function addSignosBulk() {
+  const raw = document.getElementById('signos-bulk-input')?.value || '';
+  if (!raw.trim()) return;
+  const items = raw.split(/[,\n]+/).map(s=>s.trim()).filter(Boolean);
+  const container = document.getElementById('signos-list');
+  if (!container) return;
+  items.forEach(s => {
+    container.insertAdjacentHTML('beforeend', `
+      <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
+        <input class="form-control signo-item" value="${s.replace(/"/g,'&quot;')}" placeholder="Signo clínico..." style="flex:1;font-size:.82rem" list="signos-hist-dl">
+        <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+      </div>`);
+    _signosHistorial.add(s);
+  });
+  const input = document.getElementById('signos-bulk-input');
+  if (input) input.value = '';
+  toast('✓ ' + items.length + ' signo'+(items.length>1?'s':'')+' agregado'+(items.length>1?'s':''));
+}
+
+function addSignoFromHistory() {
+  const container = document.getElementById('signos-list');
+  if (!container) return;
+  container.insertAdjacentHTML('beforeend', `
+    <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
+      <input class="form-control signo-item" value="" placeholder="Escribir o seleccionar del historial..." style="flex:1;font-size:.82rem" list="signos-hist-dl" autofocus>
+      <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+    </div>`);
+  container.lastElementChild?.querySelector('input')?.focus();
+}
 function addDxItem() {
   const container = document.getElementById('dx-list');
   if (!container) return;
   container.insertAdjacentHTML('beforeend', `
-    <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
-      <input class="form-control dx-item" value="" placeholder="Método diagnóstico..." style="flex:1;font-size:.82rem">
-      <input class="form-control dx-expect-item" value="" placeholder="Hallazgo esperado..." style="flex:1;font-size:.82rem">
-      <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+    <div class="dx-row" style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem;margin-bottom:.4rem;background:var(--sur2)">
+      <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
+        <input class="form-control dx-item" value="" placeholder="Método (Rx, ecografía, PCR...)" style="flex:1;font-size:.82rem">
+        <input class="form-control dx-expect-item" value="" placeholder="Hallazgo esperado..." style="flex:1;font-size:.82rem">
+        <button onclick="this.closest('.dx-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.2rem" class="dx-img-preview"></div>
+      <label class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.68rem">
+        📷 Imagen hallazgo
+        <input type="file" accept="image/*" style="display:none" onchange="addDxImage(this)">
+      </label>
     </div>`);
+}
+
+async function addDxImage(input) {
+  if (!input.files?.[0]) return;
+  const data = await compressImage(input.files[0], 1400, 0.94);
+  const preview = input.closest('.dx-row')?.querySelector('.dx-img-preview');
+  if (preview) {
+    const div = document.createElement('div');
+    div.style.position = 'relative';
+    div.innerHTML = `<img src="${data}" style="height:55px;width:auto;border-radius:var(--rxs);cursor:pointer" onclick="openImageFull('${data}')">
+      <button onclick="this.closest('div').remove()" style="position:absolute;top:1px;right:1px;background:rgba(0,0,0,.6);border:none;color:white;border-radius:50%;width:16px;height:16px;font-size:.55rem;cursor:pointer">✕</button>`;
+    preview.appendChild(div);
+  }
 }
 
 async function saveEnfermedadModal(sistId, editIdx=-1) {
@@ -4480,9 +4701,14 @@ async function saveEnfermedadModal(sistId, editIdx=-1) {
   const signosEls = document.querySelectorAll('#signos-list .signo-item');
   const signosList = Array.from(signosEls).map(el=>el.value.trim()).filter(Boolean);
   // Recopilar dx como lista de objetos {metodo, esperado}
-  const dxEls = document.querySelectorAll('#dx-list .dx-item');
-  const dxExpEls = document.querySelectorAll('#dx-list .dx-expect-item');
-  const dxLista = Array.from(dxEls).map((el,i)=>({metodo:el.value.trim(), esperado:dxExpEls[i]?.value.trim()||''})).filter(d=>d.metodo);
+  const dxRows = document.querySelectorAll('#dx-list .dx-row');
+  const dxLista = Array.from(dxRows).map(row => {
+    const metodo   = row.querySelector('.dx-item')?.value.trim()||'';
+    const esperado = row.querySelector('.dx-expect-item')?.value.trim()||'';
+    const imgEls   = row.querySelectorAll('.dx-img-preview img');
+    const imagenes = Array.from(imgEls).map(img => ({ data: img.src }));
+    return { metodo, esperado, imagenes };
+  }).filter(d => d.metodo);
   // Recopilar tx como lista
   const txEls = document.querySelectorAll('#tx-list .tx-item');
   const txLista = Array.from(txEls).map(el=>el.value.trim()).filter(Boolean);
@@ -4688,6 +4914,11 @@ function renderMedicamentos(el, sp) {
       <div class="sec-title" style="margin-bottom:0">Medicamentos</div>
       ${isAdmin ? `<button class="btn btn-admin btn-sm" onclick="openAddSpeciesDrug()">+ Agregar fármaco</button>` : ''}
     </div>
+    <!-- Buscador de medicamentos -->
+    <div style="display:flex;gap:.3rem;margin-bottom:.5rem">
+      <input id="drug-search-inp" class="form-control" placeholder="Buscar por nombre, principio activo o categoría..." oninput="filterDrugs(this.value)" style="flex:1;font-size:.82rem">
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('drug-search-inp').value='';filterDrugs('')">✕</button>
+    </div>
     <div id="drug-grouped-view">
       ${renderDrugsByCategory(sp.drugs||[], currentWeight, isAdmin)}
     </div>
@@ -4698,16 +4929,78 @@ function renderMedicamentos(el, sp) {
         ${row('Vía',d.route)}${row('Frecuencia',d.freq)}${row('Dosis mín/máx',d.dose_min+'–'+d.dose_max+' mg/kg')}${row('Efectos adversos',d.effects||'N/D')}${row('Sitios venopunción',d.sites||'N/D')}${d.notes?row('Notas',d.notes):''}
       </div>`).join('')}`;
 }
+
+
+function renderDrugRowsNew(drugs, weight, isAdmin) {
+  return drugs.map((d, _i) => {
+    const peso = parseFloat(weight)||0;
+    const dmin  = d.dose_min||0;
+    const drec  = d.dose||0;
+    const dmax  = d.dose_max||0;
+    const conc  = d.conc||1;
+    const hasRange = dmin > 0 && dmax > 0;
+    // Calcular volumen recomendado
+    const vol = (peso > 0 && drec > 0 && conc > 0) ? (peso*drec/conc).toFixed(2) : '—';
+    const volMin = (peso > 0 && dmin > 0 && conc > 0) ? (peso*dmin/conc).toFixed(2) : '—';
+    const volMax = (peso > 0 && dmax > 0 && conc > 0) ? (peso*dmax/conc).toFixed(2) : '—';
+    return `<tr>
+      <td style="padding:.35rem .5rem;border-bottom:1px solid var(--bor)">
+        <div style="font-weight:700;font-size:.82rem">${d.name}</div>
+        ${d.active?`<div style="font-size:.7rem;color:var(--txt3);font-style:italic">${d.active}</div>`:''}
+        ${d.cat_esp?`<div style="font-size:.65rem;background:var(--g1);color:var(--g7);display:inline-block;border-radius:20px;padding:.05rem .3rem;margin-top:.1rem">${d.cat_esp}</div>`:''}
+      </td>
+      <td style="padding:.35rem .5rem;border-bottom:1px solid var(--bor);text-align:center;font-family:var(--mono);font-size:.78rem">
+        ${conc}
+        <div style="font-size:.65rem;color:var(--txt3)">${d.route||''}</div>
+      </td>
+      <td style="padding:.35rem .5rem;border-bottom:1px solid var(--bor)">
+        ${hasRange ? `
+        <div style="font-size:.7rem;color:var(--txt3)">mín: ${dmin}</div>
+        <div style="font-weight:700;color:var(--g6)">${drec} mg/kg</div>
+        <div style="font-size:.7rem;color:var(--txt3)">máx: ${dmax}</div>` :
+        `<div style="font-weight:700;color:var(--g6)">${drec} mg/kg</div>`}
+      </td>
+      <td style="padding:.35rem .5rem;border-bottom:1px solid var(--bor);text-align:right">
+        ${peso > 0 ? `
+        <div style="font-family:var(--mono);font-weight:700;font-size:.92rem;color:var(--g5)">${vol} ml</div>
+        ${hasRange?`<div style="font-size:.7rem;color:var(--txt3)">(${volMin}–${volMax} ml)</div>`:''}`
+        : '<span style="font-size:.75rem;color:var(--txt3)">Ingresa peso ↑</span>'}
+      </td>
+      <td style="padding:.35rem .5rem;border-bottom:1px solid var(--bor);font-size:.75rem;color:var(--txt3)">${d.freq||''}</td>
+      ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)">
+        <button onclick="openEditSpeciesDrug(${d._idx||0})" style="background:var(--g0);border:1px solid var(--g5);border-radius:var(--rxs);color:var(--g6);cursor:pointer;font-size:.65rem;padding:.1rem .3rem;margin-bottom:.15rem;display:block">✏️</button>
+        <button onclick="removeSpeciesDrug(${d._idx||0})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.65rem;padding:.1rem .3rem">✕</button>
+      </td>`:''}
+    </tr>`;
+  }).join('');
+}
+function filterDrugs(q) {
+  const sp = currentSpecies;
+  if (!sp) return;
+  const isAdmin = currentUser?.role === 'admin';
+  const term = q.toLowerCase().trim();
+  const drugs = term ? (sp.drugs||[]).filter(d =>
+    (d.name||'').toLowerCase().includes(term) ||
+    (d.active||'').toLowerCase().includes(term) ||
+    (d.cat||'').toLowerCase().includes(term) ||
+    (d.cat_esp||'').toLowerCase().includes(term) ||
+    (d.cats||[]).some(c=>c.toLowerCase().includes(term))
+  ) : (sp.drugs||[]);
+  const el = document.getElementById('drug-grouped-view');
+  if (el) el.innerHTML = renderDrugsByCategory(drugs, currentWeight, isAdmin);
+}
 function renderDrugsByCategory(drugs, weight, isAdmin) {
   if (!drugs.length) return `<p style="font-size:.8rem;color:var(--txt3);font-style:italic;padding:.5rem 0">Sin medicamentos registrados.${isAdmin?' Toca + Agregar fármaco.':''}</p>`;
   
-  // Agrupar por categoría
-  const CATS = ['Antibiótico','Antiinflamatorio','Analgésico','Antieméticos','Emético','Sedante','Disociativo','Anestésico','Antiparasitario','Vitaminas/Suplementos','Reversor','Otro'];
+  // Agrupar por categorías (puede haber varias por fármaco)
+  const CATS = ['Antibiótico','Antiinflamatorio','Analgésico','Sedante','Disociativo','Anestésico','Antiparasitario','Reversor','Vitaminas','Antieméticos','Emético','Otro'];
   const groups = {};
   drugs.forEach((d,i) => {
-    const cat = d.cat || 'Otro';
-    if (!groups[cat]) groups[cat] = [];
-    groups[cat].push({...d, _idx: i});
+    const catList = d.cats?.length ? d.cats : [d.cat||'Otro'];
+    catList.forEach(cat => {
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push({...d, _idx: i});
+    });
   });
   
   return Object.entries(groups).map(([cat, items]) => `
@@ -4722,7 +5015,7 @@ function renderDrugsByCategory(drugs, weight, isAdmin) {
             <th>Dosis(mg/kg)</th><th>Rango</th><th>Total mg</th><th>Vol(ml)</th><th>Vía</th>
             ${isAdmin?'<th></th>':''}
           </tr></thead>
-          <tbody>${renderDrugRows(items, weight, isAdmin, true)}</tbody>
+          <tbody>${renderDrugRowsNew(items, weight, isAdmin)}</tbody>
         </table>
       </div>
     </div>`).join('');
@@ -6098,14 +6391,18 @@ function openAddSpeciesDrug() {
       <div class="form-group"><label>Principio activo</label><input id="sdrug-active" class="form-control" placeholder="Ej: Ketamina, Meloxicam..."></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Categoría</label>
-        <select id="sdrug-cat" class="form-control">
-          <option value="">— Seleccionar —</option>
-          <option>Antibiótico</option><option>Antiinflamatorio</option><option>Analgésico</option>
-          <option>Antieméticos</option><option>Emético</option><option>Sedante</option>
-          <option>Disociativo</option><option>Anestésico</option><option>Antiparasitario</option>
-          <option>Vitaminas/Suplementos</option><option>Reversor</option><option>Otro</option>
-        </select>
+      <div class="form-group">
+        <label>Categoría(s) general(es) <span style="font-size:.7rem;color:var(--txt3)">(puede ser más de una)</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.25rem">
+          ${['Antibiótico','Antiinflamatorio','Analgésico','Sedante','Disociativo','Anestésico','Antiparasitario','Reversor','Vitaminas','Otro'].map(cat=>`
+          <label style="display:inline-flex;align-items:center;gap:.2rem;cursor:pointer;font-size:.75rem;padding:.2rem .5rem;border-radius:20px;border:1px solid var(--bor)">
+            <input type="checkbox" class="sdrug-cat-chk" value="${cat}" style="accent-color:var(--g5)"> ${cat}
+          </label>`).join('')}
+        </div>
+        <div class="form-group" style="margin-top:.35rem;margin-bottom:0">
+          <label>Categoría específica <span style="font-size:.7rem;color:var(--txt3)">(opcional, ej: AINE, α2-adrenérgico)</span></label>
+          <input id="sdrug-cat-esp" class="form-control" placeholder="Ej: AINE, Aminoglucósido, α2-adrenérgico..." style="font-size:.82rem">
+        </div>
       </div>
       <div class="form-group"><label>Concentración (mg/ml)</label><input id="sdrug-conc" class="form-control" type="number" step="0.01" value="100" placeholder="100"></div>
     </div>
@@ -6259,7 +6556,9 @@ async function saveSpeciesDrug() {
   const drug = {
     name,
     active:   document.getElementById('sdrug-active')?.value||'',
-    cat:      document.getElementById('sdrug-cat').value,
+    cats:     Array.from(document.querySelectorAll('.sdrug-cat-chk:checked')).map(el=>el.value),
+    cat:      Array.from(document.querySelectorAll('.sdrug-cat-chk:checked')).map(el=>el.value).join(', ') || 'Otro',
+    cat_esp:  document.getElementById('sdrug-cat-esp')?.value||'',
     conc:     parseFloat(document.getElementById('sdrug-conc').value)||100,
     dose:     parseFloat(document.getElementById('sdrug-dose').value)||2.0,
     dose_min: parseFloat(document.getElementById('sdrug-dmin').value)||1.0,
@@ -7912,7 +8211,9 @@ async function saveInventoryItem() {
       const item = {
         id: 'inv_'+Date.now(), institution:inst, speciesId, speciesName:nombreComun,
         nombreComun, nombreCientifico:nombreCient, machos, hembras, indet,
-        count: total, notes, date: new Date().toISOString()
+        count: total, notes, date: new Date().toISOString(),
+        owner: fbUid() || 'local',
+        sharedWith: []
       };
       inventoryItems.push(item);
       await dbPutSync('inventory', item);
@@ -7937,6 +8238,41 @@ async function renameInstitution(oldName) {
   document.getElementById('institution-tabs').dataset.active = newName;
   renderInventoryList();
   toast('✓ Institución renombrada — ' + changed + ' registro(s) actualizados');
+}
+
+async function shareInventoryWith() {
+  const email = prompt('Correo electrónico con quien compartir el inventario:');
+  if (!email || !email.includes('@')) { toast('⚠ Correo inválido'); return; }
+  const myUid = fbUid();
+  let count = 0;
+  for (const item of inventoryItems) {
+    if (item.owner === myUid) {
+      if (!item.sharedWith) item.sharedWith = [];
+      if (!item.sharedWith.includes(email)) {
+        item.sharedWith.push(email);
+        await dbPutSync('inventory', item);
+        count++;
+      }
+    }
+  }
+  toast('✓ Inventario compartido con ' + email + ' (' + count + ' registros)');
+}
+
+async function shareRecintosWithEmail() {
+  const email = prompt('Correo electrónico con quien compartir los recintos:');
+  if (!email || !email.includes('@')) { toast('⚠ Correo inválido'); return; }
+  const myUid = fbUid();
+  const all = JSON.parse(JSON.stringify(RECINTOS_DB));
+  let count = 0;
+  all.forEach(r => {
+    if (!r.owner || r.owner === myUid) {
+      if (!r.sharedWith) r.sharedWith = [];
+      if (!r.sharedWith.includes(email)) { r.sharedWith.push(email); count++; }
+    }
+  });
+  RECINTOS_DB = all;
+  await saveRecintos();
+  toast('✓ Recintos compartidos con ' + email + ' (' + count + ' registros)');
 }
 async function removeInventory(id) {
   const item = inventoryItems.find(x=>x.id===id);
@@ -8039,8 +8375,8 @@ function addPhotos(input, gridId) {
   const total = input.files.length;
   Array.from(input.files).forEach(async file => {
     try {
-      // Comprimir fuertemente para caber en Firestore (< 900KB por doc total)
-      const dataUrl = await compressImage(file, 500, 0.65);
+      // Alta calidad en IndexedDB; dbPutSync comprime para Firestore automáticamente
+      const dataUrl = await compressImage(file, 1600, 0.95);
       const div = document.createElement('div');
       div.className = 'photo-thumb';
       div.style.position = 'relative';
@@ -8123,7 +8459,7 @@ function renderEnriquecimientoTab(el, sp) {
 }
 async function addDistMap(input) {
   if (!input.files?.[0] || !currentSpecies) return;
-  const dataUrl = await compressImage(input.files[0], 900, 0.75);
+  const dataUrl = await compressImage(input.files[0], 1800, 0.95);
   if (!currentSpecies.dist_maps) currentSpecies.dist_maps = [];
   currentSpecies.dist_maps.push({ id: Date.now()+'', data: dataUrl });
   await dbPutSync('species', currentSpecies);
@@ -8191,7 +8527,7 @@ function renderBiblioteca() {
           <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
             ${r.tipo?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>`:''}
             ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
-            ${r.pdf?`<a href="${r.pdf.data||'#'}" download="${r.pdf.name}" style="font-size:.65rem;color:var(--bl)">📄 ${r.pdf.name||'PDF'}</a>`:''}
+            ${r.pdf?`<span style="display:inline-flex;gap:.25rem">${r.pdf.data?`<a href="${r.pdf.data}" target="_blank" style="font-size:.65rem;color:var(--g6)">👁 Ver</a><a href="${r.pdf.data}" download="${r.pdf.name||'ref.pdf'}" style="font-size:.65rem;color:var(--bl)">⬇ ${r.pdf.name||'PDF'}</a>`:`<span style='font-size:.65rem;color:var(--txt3)'>📄 ${r.pdf.name} (local)</span>`}</span>`:''}
           </div>
         </div>
         ${isAdmin?`<div style="display:flex;gap:.3rem">
@@ -8230,7 +8566,7 @@ function renderBiblioteca() {
                 <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
                   ${r.tipo?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>`:''}
                   ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
-                  ${r.pdf?`<a href="${r.pdf.data||'#'}" download="${r.pdf.name}" style="font-size:.65rem;color:var(--bl)">📄 ${r.pdf.name||'PDF'}</a>`:''}
+                  ${r.pdf?`<span style="display:inline-flex;gap:.25rem">${r.pdf.data?`<a href="${r.pdf.data}" target="_blank" style="font-size:.65rem;color:var(--g6)">👁 Ver</a><a href="${r.pdf.data}" download="${r.pdf.name||'ref.pdf'}" style="font-size:.65rem;color:var(--bl)">⬇ ${r.pdf.name||'PDF'}</a>`:`<span style='font-size:.65rem;color:var(--txt3)'>📄 ${r.pdf.name} (local)</span>`}</span>`:''}
                 </div>
               </div>
               ${isAdmin?`<div style="display:flex;gap:.3rem">
@@ -8367,17 +8703,17 @@ function openAddRefGeneral() {
 function buildRefFormHTML(key, provider) {
   return `
     <div style="background:var(--g0);border:2px dashed var(--g4);border-radius:var(--r);padding:.75rem;margin-bottom:.75rem;text-align:center">
-      <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.35rem">📄 Importar desde archivo — la IA extrae los metadatos</div>
+      <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.35rem">📄 Importar desde archivo — la IA extrae los metadatos automáticamente</div>
       <div style="display:flex;gap:.3rem;justify-content:center;margin-bottom:.35rem">
         <button onclick="setRefAI(this,'gemini')" data-ai="gemini" style="font-size:.7rem;padding:.2rem .5rem;border-radius:var(--rxs);border:${provider==='gemini'?'2px solid var(--g4)':'1px solid var(--bor)'};background:${provider==='gemini'?'var(--g1)':'var(--sur)'};color:${provider==='gemini'?'var(--g7)':'var(--txt3)'};cursor:pointer">🔵 Gemini</button>
         <button onclick="setRefAI(this,'claude')" data-ai="claude" style="font-size:.7rem;padding:.2rem .5rem;border-radius:var(--rxs);border:${provider==='claude'?'2px solid #f59e0b':'1px solid var(--bor)'};background:${provider==='claude'?'#fff8e1':'var(--sur)'};color:${provider==='claude'?'#b45309':'var(--txt3)'};cursor:pointer">🟠 Claude</button>
         <input type="password" id="ref-ai-key" class="form-control" style="flex:1;min-width:80px;font-size:.72rem;height:1.6rem" placeholder="API Key..." value="${key||''}" oninput="saveRefAIKey(this.value)">
       </div>
-      <label for="ref-file-up" class="btn btn-primary btn-sm" style="cursor:pointer">📂 Seleccionar archivo</label>
+      <label for="ref-file-up" class="btn btn-primary btn-sm" style="cursor:pointer">📂 Seleccionar archivo (PDF, Word, TXT)</label>
       <input type="file" id="ref-file-up" accept=".pdf,.docx,.doc,.txt" style="display:none" onchange="importRefFile(this)">
       <div id="ref-import-status" style="font-size:.75rem;color:var(--g6);margin-top:.3rem;min-height:1rem"></div>
     </div>
-    <div class="form-group"><label>Título *</label><input id="ref-titulo" class="form-control" placeholder="Ej: Wild Mammal Husbandry..."></div>
+    <div class="form-group"><label>Título *</label><input id="ref-titulo" class="form-control" placeholder="Ej: Wild Mammal Husbandry, Formulario AAZV..."></div>
     <div class="form-row">
       <div class="form-group"><label>Autores</label><input id="ref-autores" class="form-control" placeholder="Apellido, N. et al."></div>
       <div class="form-group"><label>Año</label><input id="ref-año" class="form-control" type="number" placeholder="2023" style="width:80px"></div>
@@ -8385,20 +8721,42 @@ function buildRefFormHTML(key, provider) {
     <div class="form-row">
       <div class="form-group"><label>Tipo</label>
         <select id="ref-tipo" class="form-control">
-          <option>Libro</option><option>Artículo científico</option><option>Paper</option><option>Guía clínica</option><option>Tesis</option><option>Manual</option><option>Otro</option>
+          <option>Libro</option><option>Artículo científico</option><option>Paper</option><option>Guía clínica</option><option>Tesis</option><option>Manual</option><option>Formulario</option><option>Radiología</option><option>Farmacopea</option><option>Otro</option>
         </select>
       </div>
       <div class="form-group"><label>URL / DOI</label><input id="ref-url" class="form-control" placeholder="https://..."></div>
     </div>
     <div class="form-group"><label>Notas</label><textarea id="ref-notas" class="form-control" style="min-height:50px"></textarea></div>
     <div class="form-group">
-      <label>PDF adjunto (opcional)</label>
-      <div style="display:flex;align-items:center;gap:.5rem">
+      <label>PDF adjunto <span style="font-size:.7rem;color:var(--txt3)">(se guarda localmente; se puede ver o descargar)</span></label>
+      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
         <label for="ref-pdf-extra" class="btn btn-secondary btn-sm" style="cursor:pointer">📎 Adjuntar PDF</label>
         <input type="file" id="ref-pdf-extra" accept=".pdf" style="display:none" onchange="previewRefPDF(this)">
-        <span id="ref-pdf-name" style="font-size:.75rem;color:var(--txt3)">Sin PDF</span>
+        <span id="ref-pdf-name" style="font-size:.75rem;color:var(--txt3)">Sin PDF adjunto</span>
+        <span id="ref-pdf-actions" style="display:none;gap:.4rem">
+          <button onclick="viewRefPDF()" class="btn btn-secondary btn-sm">👁 Ver</button>
+          <button onclick="downloadRefPDF()" class="btn btn-secondary btn-sm">⬇ Descargar</button>
+        </span>
       </div>
     </div>`;
+}
+
+function viewRefPDF() {
+  if (!_refPDFData?.data) return;
+  const win = window.open('', '_blank');
+  if (!win) { toast('⚠ Activa ventanas emergentes'); return; }
+  win.document.write(`<!DOCTYPE html><html><head><title>${_refPDFData.name||'PDF'}</title></head><body style="margin:0;height:100vh">
+    <embed src="${_refPDFData.data}" type="application/pdf" width="100%" height="100%">
+  </body></html>`);
+  win.document.close();
+}
+
+function downloadRefPDF() {
+  if (!_refPDFData?.data) return;
+  const a = document.createElement('a');
+  a.href = _refPDFData.data;
+  a.download = _refPDFData.name || 'referencia.pdf';
+  a.click();
 }
 
 async function saveRefGeneral() {
@@ -8421,11 +8779,7 @@ async function saveRefGeneral() {
 }
 
 
-function openEditRef(spId, idx) {
-  const ref = BIBLIOTECA_DB[spId]?.[idx];
-  if (!ref) return;
-  openAddRef(spId, idx); // Reusar modal con datos pre-llenados
-}
+
 
 function openEditRefGeneral(idx) {
   // Abrir modal con datos existentes para editar referencia general
@@ -8684,7 +9038,7 @@ async function previewEnriqFotos(input) {
   const preview = document.getElementById('enriq-fotos-preview');
   _enriqFotosNew = [];
   for (const file of Array.from(input.files)) {
-    const data = await compressImage(file, 600, 0.72);
+    const data = await compressImage(file, 1400, 0.94);
     _enriqFotosNew.push({ id: Date.now()+'_'+Math.random().toString(36).slice(2,5), data });
     if (preview) preview.insertAdjacentHTML('beforeend', `<img src="${data}" style="height:60px;width:auto;border-radius:var(--rxs);border:1px solid var(--g5);object-fit:cover">`);
   }
@@ -8748,6 +9102,80 @@ function addEnriqSpRow() {
     </div>`);
 }
 
+
+function openSpeciesHistoryManager() {
+  document.getElementById('sp-hist-modal')?.remove();
+  const history = getSpeciesHistory();
+  // Obtener solo las que vienen de enriquecimientos y recintos (editables)
+  const allItems = [];
+  ENRIQUECIMIENTOS_DB.forEach((enr, enrIdx) => {
+    const lista = enr.especies?.length ? enr.especies : (enr.especie ? [{sp:enr.especie, sci:enr.sci||''}] : []);
+    lista.forEach((e, spIdx) => {
+      if (e.sp||e.sci) allItems.push({ source: 'enriq', enrIdx, spIdx, sp: e.sp||'', sci: e.sci||'', enrName: enr.nombre });
+    });
+  });
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="sp-hist-modal" style="position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:85vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">📋 Historial de especies (${allItems.length})</div>
+        <p style="font-size:.78rem;color:var(--txt3);margin-bottom:.75rem">Edita o elimina entradas del historial. Los cambios se aplican al enriquecimiento correspondiente.</p>
+        <div id="sp-hist-list">
+          ${allItems.length ? allItems.map((item, i) => `
+          <div style="display:flex;gap:.4rem;align-items:center;padding:.4rem;border:1px solid var(--bor);border-radius:var(--rsm);margin-bottom:.3rem;background:var(--sur2)" id="sphi-${i}">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:.8rem;font-weight:600">${item.sp||'—'}</div>
+              <div style="font-size:.72rem;color:var(--txt3);font-style:italic">${item.sci||'—'}</div>
+              <div style="font-size:.65rem;color:var(--g6)">En: ${item.enrName}</div>
+            </div>
+            <button onclick="editHistItem(${i},${JSON.stringify(item).replace(/"/g,'&quot;')})"
+              style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);cursor:pointer;font-size:.75rem;padding:.2rem .4rem">✏️</button>
+            <button onclick="removeHistItem(${i},${JSON.stringify(item).replace(/"/g,'&quot;')})"
+              style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.75rem;padding:.2rem .4rem">✕</button>
+          </div>`).join('') : '<p style="font-size:.8rem;color:var(--txt3);text-align:center">Sin especies registradas en enriquecimientos</p>'}
+        </div>
+        <button class="btn btn-secondary btn-block" style="margin-top:.75rem" onclick="document.getElementById('sp-hist-modal').remove()">Cerrar</button>
+      </div>
+    </div>`);
+}
+
+async function editHistItem(displayIdx, item) {
+  const nuevoNombre = prompt('Nombre común:', item.sp);
+  if (nuevoNombre === null) return;
+  const nuevoCientifico = prompt('Nombre científico:', item.sci);
+  if (nuevoCientifico === null) return;
+  if (item.source === 'enriq') {
+    const enr = ENRIQUECIMIENTOS_DB[item.enrIdx];
+    if (!enr) return;
+    if (enr.especies?.[item.spIdx]) {
+      enr.especies[item.spIdx] = { sp: nuevoNombre.trim(), sci: nuevoCientifico.trim() };
+    } else {
+      enr.especie = nuevoNombre.trim();
+      enr.sci = nuevoCientifico.trim();
+    }
+    await saveEnriquecimientos();
+  }
+  document.getElementById('sp-hist-modal')?.remove();
+  openSpeciesHistoryManager();
+  toast('✓ Especie actualizada');
+}
+
+async function removeHistItem(displayIdx, item) {
+  const ok = await confirmDelete('¿Eliminar especie?', `Se eliminará "${item.sp}" del enriquecimiento "${item.enrName}".`);
+  if (!ok) return;
+  if (item.source === 'enriq') {
+    const enr = ENRIQUECIMIENTOS_DB[item.enrIdx];
+    if (!enr) return;
+    if (enr.especies?.length) {
+      enr.especies.splice(item.spIdx, 1);
+    } else {
+      enr.especie = ''; enr.sci = '';
+    }
+    await saveEnriquecimientos();
+  }
+  document.getElementById('sp-hist-modal')?.remove();
+  openSpeciesHistoryManager();
+  toast('✓ Especie eliminada del historial');
+}
 function autofillSciInRow(input) {
   const val = input.value.trim().toLowerCase();
   const history = getSpeciesHistory();
@@ -8832,7 +9260,16 @@ async function loadRecintos() {
   if (firestore && fbUid()) {
     try {
       const snap = await firestore.collection('settings').doc('recintos').get();
-      if (snap.exists) RECINTOS_DB = snap.data().value || [];
+      if (snap.exists) {
+        const myUid = fbUid();
+        const all = snap.data().value || [];
+        RECINTOS_DB = all.filter(r =>
+          !r.owner || r.owner === myUid ||
+          (r.sharedWith||[]).includes(myUid) ||
+          (r.sharedWith||[]).includes(currentUser?.email)
+        );
+        await dbPut('settings', { key: 'recintos', value: RECINTOS_DB });
+      }
     } catch(e) {}
   }
 }
@@ -9010,7 +9447,9 @@ async function saveRecinto(editIdx=-1) {
     lineamientos:document.getElementById('rec-lin')?.value||'',
     componentes,
     notas:       document.getElementById('rec-notas')?.value||'',
-    fotos
+    fotos,
+    owner: fbUid() || 'local',
+    sharedWith: editIdx>=0 ? (RECINTOS_DB[editIdx]?.sharedWith||[]) : []
   };
   if (editIdx >= 0) RECINTOS_DB[editIdx] = recinto;
   else RECINTOS_DB.push(recinto);
@@ -9873,6 +10312,8 @@ async function previewRefPDF(input) {
   _refPDFData = { name: file.name, data: base64 };
 
   if (nameEl) nameEl.textContent = file.name + ' (' + (file.size/1024).toFixed(0) + ' KB)';
+  const actionsEl = document.getElementById('ref-pdf-actions');
+  if (actionsEl) actionsEl.style.display = 'flex';
 
   // Intentar extraer metadatos con IA
   // Priorizar key del campo del modal, luego la guardada
