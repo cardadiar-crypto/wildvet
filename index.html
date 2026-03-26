@@ -689,13 +689,46 @@ textarea.form-control{resize:vertical;min-height:70px}
 
 <!-- MODAL INVENTORY -->
 <div class="modal-overlay" id="modal-inventory">
-  <div class="modal">
+  <div class="modal" style="max-height:90vh;overflow-y:auto">
     <div class="modal-handle"></div>
-    <div class="modal-title">Agregar al Inventario</div>
-    <div class="form-group"><label>Institución</label><input type="text" id="inv-institution" class="form-control" placeholder="Ej: CRRFS Cali, Zoo Cali..."></div>
-    <div class="form-group"><label>Especie</label><select id="inv-species" class="form-control"><option value="">Seleccionar...</option></select></div>
-    <div class="form-group"><label>Cantidad</label><input type="number" id="inv-count" class="form-control" value="1" min="0"></div>
-    <div class="form-group"><label>Notas</label><textarea id="inv-notes" class="form-control" placeholder="Procedencia, condición..."></textarea></div>
+    <div class="modal-title" id="inv-modal-title">Agregar al Inventario</div>
+    <input type="hidden" id="inv-edit-id" value="">
+    <div class="form-group">
+      <label>Institución *</label>
+      <input type="text" id="inv-institution" class="form-control" placeholder="Ej: CRRFS Cali, Zoológico de Cali..." list="inv-inst-list">
+      <datalist id="inv-inst-list"></datalist>
+    </div>
+    <div class="form-group">
+      <label>Especie registrada</label>
+      <select id="inv-species" class="form-control" onchange="syncInvSpeciesFields()">
+        <option value="">— No registrada / Ingresar manualmente —</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Nombre común *</label>
+        <input type="text" id="inv-nombre-comun" class="form-control" placeholder="Ej: Jaguar">
+      </div>
+      <div class="form-group">
+        <label>Nombre científico</label>
+        <input type="text" id="inv-nombre-cientifico" class="form-control" placeholder="Panthera onca">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Machos</label>
+        <input type="number" id="inv-machos" class="form-control" value="0" min="0" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label>Hembras</label>
+        <input type="number" id="inv-hembras" class="form-control" value="0" min="0" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label>Indeterminados</label>
+        <input type="number" id="inv-indet" class="form-control" value="0" min="0" placeholder="0">
+      </div>
+    </div>
+    <div class="form-group"><label>Notas</label><textarea id="inv-notes" class="form-control" placeholder="Procedencia, condición, fecha ingreso..."></textarea></div>
     <div style="display:flex;gap:.5rem;margin-top:1rem">
       <button class="btn btn-secondary" onclick="closeModal('modal-inventory')">Cancelar</button>
       <button class="btn btn-primary" style="flex:1" onclick="saveInventoryItem()">Guardar</button>
@@ -1755,7 +1788,15 @@ function buildSpeciesExportHTML(sp) {
   // ══ 10. FLUIDOTERAPIA ══
   if (sp.fluid_nota) html += sec('10. Fluidoterapia', `<div class="note">${esc(sp.fluid_nota).replace(/\n/g,'<br>')}</div>`);
 
-  // ══ 11. GALERÍA ══
+  // ══ 11. FOTOS DENTALES ══
+  if ((sp.dental_fotos||[]).length) {
+    let dentalGallery = `<div style="display:flex;flex-wrap:wrap;gap:6pt">`;
+    sp.dental_fotos.forEach(f => { dentalGallery += `<img src="${f.data}" style="height:80px;width:auto;border-radius:3pt;border:1pt solid #ddd">`; });
+    dentalGallery += `</div>`;
+    html += sec('11. Fotos Dentales', dentalGallery);
+  }
+
+  // ══ 12. GALERÍA ══
   if ((sp.cover_photos||[]).length) {
     let galleryContent = `<div style="display:flex;flex-wrap:wrap;gap:8pt;margin-top:6pt">`;
     sp.cover_photos.forEach(p => {
@@ -3294,11 +3335,16 @@ function renderNutricion(el, sp) {
       <div style="margin-top:.75rem">
         <div style="font-size:.72rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">Fotos dentales</div>
         <div class="photo-grid" id="dental-photo-grid">
+          ${(sp.dental_fotos||[]).map((f,i)=>`
+          <div class="photo-thumb" style="position:relative">
+            <img src="${f.data}" alt="dental" style="width:100%;height:100%;object-fit:cover;cursor:pointer" onclick="openImageFull('${f.data}')">
+            ${isAdmin?`<button onclick="removeDentalFoto(${i})" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);border:none;color:white;border-radius:50%;width:20px;height:20px;font-size:.6rem;cursor:pointer">✕</button>`:''}
+          </div>`).join('')}
           <label class="photo-add" for="dental-photo-up" style="cursor:pointer">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Foto
           </label>
-          <input type="file" id="dental-photo-up" accept="image/*" multiple style="display:none" onchange="addPhotos(this,'dental-photo-grid')">
+          <input type="file" id="dental-photo-up" accept="image/*" multiple style="display:none" onchange="addDentalFotos(this)">
         </div>
       </div>
     </div>
@@ -3641,6 +3687,27 @@ async function removeDiente(i) {
   if (!ok) return;
   currentSpecies.denticion.splice(i,1);
   await dbPutSync('species', currentSpecies); renderTab('nutricion');
+}
+
+async function addDentalFotos(input) {
+  if (!input.files?.length || !currentSpecies) return;
+  if (!currentSpecies.dental_fotos) currentSpecies.dental_fotos = [];
+  let count = 0;
+  for (const file of Array.from(input.files)) {
+    const data = await compressImage(file, 700, 0.72);
+    currentSpecies.dental_fotos.push({ id: Date.now()+'_'+Math.random().toString(36).slice(2,5), data });
+    count++;
+  }
+  await dbPutSync('species', currentSpecies);
+  renderTab('nutricion');
+  toast('✓ ' + count + ' foto' + (count > 1 ? 's' : '') + ' dental' + (count > 1 ? 'es' : '') + ' guardada' + (count > 1 ? 's' : '') + ' en la nube');
+}
+
+async function removeDentalFoto(i) {
+  if (!currentSpecies?.dental_fotos) return;
+  currentSpecies.dental_fotos.splice(i, 1);
+  await dbPutSync('species', currentSpecies);
+  renderTab('nutricion');
 }
 async function addDentalMeasure() {
   const num   = document.getElementById('dm-num')?.value.trim();
@@ -4222,6 +4289,30 @@ function openAddEnfermedad(sistId, editIdx=-1) {
         <div class="form-group"><label>Agente / Causa</label>
           <input id="enf-agente" class="form-control" value="${editEnf?.agente||''}" placeholder="Parvovirus felino, Bacteriana...">
         </div>
+        <!-- Sistemas afectados (multi-selección) -->
+        <div class="form-group">
+          <label>Sistemas afectados <span style="font-size:.7rem;color:var(--txt3)">(puede seleccionar varios)</span></label>
+          <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.25rem">
+            ${[...SISTEMAS_ENFERMEDAD, ...(currentSpecies?.enfermedades_categorias||[])].map(sist=>`
+            <label style="display:inline-flex;align-items:center;gap:.2rem;cursor:pointer;font-size:.75rem;padding:.15rem .4rem;border-radius:20px;border:1px solid var(--bor);background:${(editEnf?.sistemas_afectados||[sistId]).includes(sist.id)?'var(--g1)':'var(--sur)'}">
+              <input type="checkbox" value="${sist.id}" class="enf-sistema-chk"
+                ${(editEnf?.sistemas_afectados||[sistId]).includes(sist.id)?'checked':''} style="accent-color:var(--g5)">
+              ${sist.icon} ${sist.label}
+            </label>`).join('')}
+          </div>
+        </div>
+
+        <!-- Sistemas afectados (3) -->
+        <div class="form-group">
+          <label>Sistemas afectados <span style="font-weight:400;color:var(--txt3);font-size:.72rem">(puede afectar varios)</span></label>
+          <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.25rem">
+            ${SISTEMAS_ENFERMEDAD.map(s=>`
+            <label style="display:inline-flex;align-items:center;gap:.25rem;padding:.2rem .45rem;border:1px solid var(--bor);border-radius:20px;cursor:pointer;font-size:.72rem;background:var(--sur)">
+              <input type="checkbox" value="${s.id}" ${(editEnf?.sistemas_afectados||[sistId]).includes(s.id)?'checked':''} style="accent-color:var(--g5)">
+              ${s.icon} ${s.label}
+            </label>`).join('')}
+          </div>
+        </div>
 
         <!-- Vías de transmisión (19) -->
         <div class="form-group">
@@ -4229,7 +4320,7 @@ function openAddEnfermedad(sistId, editIdx=-1) {
           <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.3rem">
             ${['Contacto directo','Fecal-oral','Aerosol/Gotas','Vector','Vertical','Fomites','Agua/Alimento','N/A'].map(v=>`
             <label style="display:inline-flex;align-items:center;gap:.25rem;font-size:.75rem;cursor:pointer">
-              <input type="checkbox" value="${v}" ${(editEnf?.vias||[]).includes(v)?'checked':''} style="accent-color:var(--g5)"> ${v}
+              <input type="checkbox" class="vias-chk" value="${v}" ${(editEnf?.vias||[]).includes(v)?'checked':''} style="accent-color:var(--g5)"> ${v}
             </label>`).join('')}
           </div>
           <input id="enf-vias-extra" class="form-control" value="${editEnf?.vias_extra||''}" placeholder="Otras vías...">
@@ -4321,7 +4412,8 @@ async function saveEnfermedadModal(sistId, editIdx=-1) {
   const txEls = document.querySelectorAll('#tx-list .tx-item');
   const txLista = Array.from(txEls).map(el=>el.value.trim()).filter(Boolean);
   // Vías de transmisión
-  const vias = Array.from(document.querySelectorAll('#enf-modal input[type=checkbox]:checked')).map(el=>el.value);
+  const vias = Array.from(document.querySelectorAll('#enf-modal .vias-chk:checked')).map(el=>el.value);
+  const sistemasAfectados = Array.from(document.querySelectorAll('#enf-modal .enf-sistema-chk:checked')).map(el=>el.value);
   const viasExtra = document.getElementById('enf-vias-extra')?.value.trim()||'';
 
   const enf = {
@@ -4335,17 +4427,52 @@ async function saveEnfermedadModal(sistId, editIdx=-1) {
     tx_lista:    txLista,
     vias,
     vias_extra:  viasExtra,
+    sistemas_afectados: sistemasAfectados.length ? sistemasAfectados : [sistId],
     notas:       document.getElementById('enf-notas')?.value||''
   };
 
   if (!currentSpecies.enfermedades_sistemas) currentSpecies.enfermedades_sistemas = {};
-  if (!currentSpecies.enfermedades_sistemas[sistId]) currentSpecies.enfermedades_sistemas[sistId] = { notas:'', enfermedades:[] };
-  if (editIdx >= 0) currentSpecies.enfermedades_sistemas[sistId].enfermedades[editIdx] = enf;
-  else currentSpecies.enfermedades_sistemas[sistId].enfermedades.push(enf);
+  const targetSistemas = enf.sistemas_afectados?.length ? enf.sistemas_afectados : [sistId];
+  targetSistemas.forEach(sid => {
+    if (!currentSpecies.enfermedades_sistemas[sid]) currentSpecies.enfermedades_sistemas[sid] = { notas:'', enfermedades:[] };
+    const existing = currentSpecies.enfermedades_sistemas[sid].enfermedades;
+    if (sid === sistId && editIdx >= 0) {
+      existing[editIdx] = enf;
+    } else {
+      // Verificar si ya existe (por si se edita y se agregan más sistemas)
+      const dupIdx = existing.findIndex(e => e.nombre === enf.nombre);
+      if (dupIdx >= 0) existing[dupIdx] = enf;
+      else existing.push(enf);
+    }
+  });
+  // Guardar en todos los sistemas seleccionados
+  const sistChecks = Array.from(document.querySelectorAll('#enf-modal input[type=checkbox]')).filter(el=>el.value&&!el.value.includes('|')).filter(el=>el.checked).map(el=>el.value);
+  const sistAfect = sistChecks.length ? sistChecks : [sistId];
+  enf.sistemas_afectados = sistAfect;
+
+  if (!currentSpecies.enfermedades_sistemas) currentSpecies.enfermedades_sistemas = {};
+  if (editIdx >= 0) {
+    // Si edita, actualizar en el sistema original
+    currentSpecies.enfermedades_sistemas[sistId].enfermedades[editIdx] = enf;
+    // Sincronizar con otros sistemas si cambió
+    sistAfect.filter(s=>s!==sistId).forEach(s => {
+      if (!currentSpecies.enfermedades_sistemas[s]) currentSpecies.enfermedades_sistemas[s] = { notas:'', enfermedades:[] };
+      const existIdx = currentSpecies.enfermedades_sistemas[s].enfermedades.findIndex(e=>e.nombre===enf.nombre);
+      if (existIdx>=0) currentSpecies.enfermedades_sistemas[s].enfermedades[existIdx] = enf;
+      else currentSpecies.enfermedades_sistemas[s].enfermedades.push(enf);
+    });
+  } else {
+    // Agregar a todos los sistemas seleccionados
+    sistAfect.forEach(s => {
+      if (!currentSpecies.enfermedades_sistemas[s]) currentSpecies.enfermedades_sistemas[s] = { notas:'', enfermedades:[] };
+      currentSpecies.enfermedades_sistemas[s].enfermedades.push(enf);
+    });
+  }
+
   await dbPutSync('species', currentSpecies);
   document.getElementById('enf-modal')?.remove();
   renderTab('enfermedades');
-  toast('✓ Enfermedad ' + (editIdx>=0?'actualizada':'agregada'));
+  toast('✓ Enfermedad ' + (editIdx>=0?'actualizada':'agregada') + (sistAfect.length>1?' en '+sistAfect.length+' sistemas':''));
 }
 
 async function importEnfermedadesFile(input, sistId) {
@@ -7569,44 +7696,158 @@ function renderInventoryList() {
   tabDiv.innerHTML = institutions.map(inst=>`<button class="tab-btn ${inst===active?'active':''}" onclick="filterInventory('${inst}')">${inst}</button>`).join('');
   tabDiv.dataset.active = active;
   const filtered = inventoryItems.filter(i=>(i.institution||'General')===active);
-  list.innerHTML = filtered.map(item=>{
+  // Header de institución con botón renombrar
+  const isAdmin = currentUser?.role==='admin';
+  list.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+      <span style="font-size:.72rem;color:var(--txt3);font-weight:600;text-transform:uppercase">${active} · ${filtered.length} especie(s)</span>
+      ${isAdmin?`<button onclick="renameInstitution('${active}')" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem">✏️ Renombrar</button>`:''}
+    </div>` +
+  (filtered.map(item=>{
     const sp = SPECIES_DB.find(s=>s.id===item.speciesId);
-    return `<div class="inventory-item">
-      <div class="inv-icon" style="overflow:hidden;padding:0;background:var(--sur2);display:flex;align-items:center;justify-content:center">${sp?.cover_photo?`<img src="${sp.cover_photo}" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-size:1.3rem">${sp?.emoji||'🐾'}</span>`}</div>
-      <div style="flex:1"><div class="inv-name">${sp?.name||item.speciesName||'Especie'}</div><div class="inv-meta">${sp?.sci||''} ${item.notes?'· '+item.notes:''}</div></div>
-      <div class="inv-count">${item.count}</div>
-      <button onclick="removeInventory('${item.id}')" style="background:none;border:none;color:var(--txt3);cursor:pointer;padding:.2rem">✕</button>
+    const machos  = item.machos  != null ? item.machos  : Math.round((item.count||0)/2);
+    const hembras = item.hembras != null ? item.hembras : (item.count||0) - machos;
+    const indet   = item.indet   || 0;
+    const nombre  = item.nombreComun || sp?.name || item.speciesName || 'Especie';
+    const sci     = item.nombreCientifico || sp?.sci || '';
+    return `<div class="inventory-item" style="align-items:flex-start">
+      <div class="inv-icon" style="overflow:hidden;padding:0;background:var(--sur2);display:flex;align-items:center;justify-content:center;flex-shrink:0">${sp?.cover_photo?`<img src="${sp.cover_photo}" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-size:1.3rem">🐾</span>`}</div>
+      <div style="flex:1;min-width:0">
+        <div class="inv-name">${nombre}</div>
+        <div class="inv-meta" style="font-style:italic">${sci}</div>
+        <div style="display:flex;gap:.5rem;margin-top:.2rem;flex-wrap:wrap">
+          <span style="font-size:.72rem;background:var(--g1);color:var(--g7);border-radius:20px;padding:.1rem .45rem">♂ ${machos}</span>
+          <span style="font-size:.72rem;background:var(--r1);color:var(--r5);border-radius:20px;padding:.1rem .45rem">♀ ${hembras}</span>
+          ${indet?`<span style="font-size:.72rem;background:var(--sur2);border-radius:20px;padding:.1rem .45rem">? ${indet}</span>`:''}
+          <span style="font-size:.72rem;color:var(--txt3)">Total: ${(item.count||machos+hembras+indet)}</span>
+        </div>
+        ${item.notes?`<div class="inv-meta" style="margin-top:.15rem">${item.notes}</div>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.2rem;flex-shrink:0">
+        ${isAdmin?`<button onclick="openAddInventory('${item.id}')" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);cursor:pointer;font-size:.7rem;padding:.2rem .35rem">✏️</button>`:''}
+        <button onclick="removeInventory('${item.id}')" style="background:none;border:none;color:var(--txt3);cursor:pointer;padding:.2rem;font-size:.85rem">✕</button>
+      </div>
     </div>`;
-  }).join('')||`<div class="empty-state"><p>Sin animales en ${active}</p></div>`;
+  }).join('')||`<div class="empty-state"><p>Sin animales en ${active}</p></div>`);
 }
 function filterInventory(inst) {
   document.getElementById('institution-tabs').dataset.active = inst;
   renderInventoryList();
 }
-function openAddInventory() {
-  const sp = document.getElementById('inv-species');
-  sp.innerHTML = '<option value="">Seleccionar...</option>'+SPECIES_DB.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+function openAddInventory(editId=null) {
+  // Poblar select de especies
+  const sel = document.getElementById('inv-species');
+  sel.innerHTML = '<option value="">— No registrada / Ingresar manualmente —</option>' +
+    SPECIES_DB.map(s=>`<option value="${s.id}">${s.name} (${s.sci||''})</option>`).join('');
+  // Poblar datalist de instituciones
+  const dl = document.getElementById('inv-inst-list');
+  if (dl) {
+    const insts = [...new Set(inventoryItems.map(i=>i.institution||'').filter(Boolean))];
+    dl.innerHTML = insts.map(i=>`<option value="${i}">`).join('');
+  }
+  // Limpiar / rellenar si es edición
+  const editIdEl = document.getElementById('inv-edit-id');
+  const titleEl  = document.getElementById('inv-modal-title');
+  if (editId) {
+    const item = inventoryItems.find(x=>x.id===editId);
+    if (!item) return;
+    if (editIdEl) editIdEl.value = editId;
+    if (titleEl) titleEl.textContent = 'Editar registro';
+    const set = (id,v) => { const el=document.getElementById(id); if(el) el.value=v||''; };
+    set('inv-institution',   item.institution);
+    set('inv-nombre-comun',  item.speciesName||item.nombreComun||'');
+    set('inv-nombre-cientifico', item.nombreCientifico||'');
+    set('inv-machos',  item.machos||0);
+    set('inv-hembras', item.hembras||0);
+    set('inv-indet',   item.indet||0);
+    set('inv-notes',   item.notes||'');
+    // Seleccionar la especie si está registrada
+    if (item.speciesId) {
+      for (const opt of sel.options) { if (opt.value===item.speciesId){opt.selected=true;break;} }
+    }
+  } else {
+    if (editIdEl) editIdEl.value = '';
+    if (titleEl) titleEl.textContent = 'Agregar al Inventario';
+    ['inv-institution','inv-nombre-comun','inv-nombre-cientifico','inv-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    ['inv-machos','inv-hembras','inv-indet'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0';});
+    sel.value='';
+  }
   document.getElementById('modal-inventory').classList.add('open');
 }
+
+function syncInvSpeciesFields() {
+  const sel = document.getElementById('inv-species');
+  if (!sel.value) return;
+  const sp = SPECIES_DB.find(s=>s.id===sel.value);
+  if (!sp) return;
+  const nc = document.getElementById('inv-nombre-comun');
+  const sci = document.getElementById('inv-nombre-cientifico');
+  if (nc && !nc.value) nc.value = sp.name;
+  if (sci && !sci.value) sci.value = sp.sci||'';
+}
 async function saveInventoryItem() {
-  const inst = document.getElementById('inv-institution').value.trim()||'General';
-  const speciesId = document.getElementById('inv-species').value;
-  const count = parseInt(document.getElementById('inv-count').value)||1;
-  const notes = document.getElementById('inv-notes').value;
-  if (!speciesId) { toast('⚠ Selecciona una especie'); return; }
-  const sp = SPECIES_DB.find(s=>s.id===speciesId);
-  const existing = inventoryItems.find(i=>i.speciesId===speciesId&&i.institution===inst);
-  if (existing) {
-    existing.count += count; existing.notes = notes||existing.notes;
-    await dbPutSync('inventory', existing);
+  const inst         = document.getElementById('inv-institution')?.value.trim() || 'General';
+  const speciesId    = document.getElementById('inv-species')?.value || '';
+  const nombreComun  = document.getElementById('inv-nombre-comun')?.value.trim();
+  const nombreCient  = document.getElementById('inv-nombre-cientifico')?.value.trim()||'';
+  const machos       = parseInt(document.getElementById('inv-machos')?.value)||0;
+  const hembras      = parseInt(document.getElementById('inv-hembras')?.value)||0;
+  const indet        = parseInt(document.getElementById('inv-indet')?.value)||0;
+  const notes        = document.getElementById('inv-notes')?.value||'';
+  const editId       = document.getElementById('inv-edit-id')?.value||'';
+
+  if (!nombreComun) { toast('⚠ Ingresa el nombre común'); return; }
+
+  const sp = speciesId ? SPECIES_DB.find(s=>s.id===speciesId) : null;
+  const total = machos + hembras + indet;
+
+  if (editId) {
+    // Editar registro existente
+    const existing = inventoryItems.find(x=>x.id===editId);
+    if (existing) {
+      Object.assign(existing, { institution:inst, speciesId, speciesName:nombreComun,
+        nombreComun, nombreCientifico:nombreCient, machos, hembras, indet, count:total, notes });
+      await dbPutSync('inventory', existing);
+    }
   } else {
-    const item = {id:'inv_'+Date.now(),speciesId,speciesName:sp?.name||'',institution:inst,count,notes,date:new Date().toISOString()};
-    inventoryItems.push(item);
-    await dbPutSync('inventory', item);
+    // Verificar si ya existe mismo inst+especie para sumar
+    const dup = inventoryItems.find(i=>i.institution===inst && (i.speciesId===speciesId||i.nombreComun===nombreComun));
+    if (dup) {
+      dup.machos  = (dup.machos||0)  + machos;
+      dup.hembras = (dup.hembras||0) + hembras;
+      dup.indet   = (dup.indet||0)   + indet;
+      dup.count   = (dup.machos||0)  + (dup.hembras||0) + (dup.indet||0);
+      if (notes) dup.notes = (dup.notes ? dup.notes+'; ' : '') + notes;
+      await dbPutSync('inventory', dup);
+    } else {
+      const item = {
+        id: 'inv_'+Date.now(), institution:inst, speciesId, speciesName:nombreComun,
+        nombreComun, nombreCientifico:nombreCient, machos, hembras, indet,
+        count: total, notes, date: new Date().toISOString()
+      };
+      inventoryItems.push(item);
+      await dbPutSync('inventory', item);
+    }
   }
   closeModal('modal-inventory');
   renderInventoryList();
-  toast('✓ Inventario actualizado');
+  toast('✓ Inventario ' + (editId?'actualizado':'guardado'));
+}
+
+async function renameInstitution(oldName) {
+  const newName = prompt('Nuevo nombre para la institución:', oldName);
+  if (!newName || newName === oldName) return;
+  let changed = 0;
+  for (const item of inventoryItems) {
+    if (item.institution === oldName) {
+      item.institution = newName;
+      await dbPutSync('inventory', item);
+      changed++;
+    }
+  }
+  document.getElementById('institution-tabs').dataset.active = newName;
+  renderInventoryList();
+  toast('✓ Institución renombrada — ' + changed + ' registro(s) actualizados');
 }
 async function removeInventory(id) {
   const item = inventoryItems.find(x=>x.id===id);
@@ -7730,7 +7971,17 @@ async function removePhotoFromSpecies(btn, photoId) {
 function renderEnriquecimientoTab(el, sp) {
   const isAdmin = currentUser?.role === 'admin';
   // Filtrar enriquecimientos de esta especie
-  const spEnriq = ENRIQUECIMIENTOS_DB.filter(e => !e.especie || e.especie.toLowerCase().includes(sp.name.toLowerCase()));
+  const spLower = sp.name.toLowerCase();
+  const sciLower = (sp.sci||'').toLowerCase();
+  const spEnriq = ENRIQUECIMIENTOS_DB.filter(e => {
+    if (!e.especie && !(e.especies?.length)) return true; // genérico
+    const lista = e.especies?.length ? e.especies : [{especie:e.especie,sci:e.sci}];
+    return lista.some(ep =>
+      (ep?.especie||'').toLowerCase().includes(spLower) ||
+      (ep?.sci||'').toLowerCase().includes(sciLower) ||
+      spLower.includes((ep?.especie||'').toLowerCase())
+    );
+  });
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
       <div class="sec-title" style="margin-bottom:0">Enriquecimiento Ambiental</div>
@@ -7803,7 +8054,10 @@ async function loadBibliotecaGeneral() {
 async function saveBibliotecaGeneral() {
   await dbPut('settings', { key: 'biblioteca_general', value: BIBLIOTECA_GENERAL });
   if (firestore && fbUid()) {
-    try { await firestore.collection('settings').doc('biblioteca_general').set({ value: BIBLIOTECA_GENERAL }); } catch(e) {}
+    try {
+      const noPDF = BIBLIOTECA_GENERAL.map(r => ({ ...r, pdf: r.pdf ? { name: r.pdf.name } : null }));
+      await firestore.collection('settings').doc('biblioteca_general').set({ value: noPDF });
+    } catch(e) { console.warn('Firestore biblioteca_general:', e.message); }
   }
 }
 
@@ -7832,7 +8086,7 @@ function renderBiblioteca() {
             ${r.pdf?`<a href="${r.pdf.data}" download="${r.pdf.name}" style="font-size:.65rem;color:var(--bl)">📄 ${r.pdf.name}</a>`:''}
           </div>
         </div>
-        ${isAdmin?`<button onclick="removeRefGeneral(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>`:''}
+        ${isAdmin?`<div style='display:flex;gap:.3rem'><button onclick="openEditRefGeneral(${i})" style="background:var(--g0);border:1px solid var(--g4);border-radius:var(--rxs);color:var(--g6);cursor:pointer;font-size:.7rem;padding:.1rem .3rem">✏️</button><button onclick="removeRefGeneral(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button></div>`:''}
       </div>
     </div>`).join('') : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin referencias generales.</p>`}
   </div>`;
@@ -7863,7 +8117,7 @@ function renderBiblioteca() {
               ${r.pdf?`<a href="${r.pdf.data}" download="${r.pdf.name}" style="font-size:.65rem;color:var(--bl)">📄 ${r.pdf.name}</a>`:''}
             </div>
           </div>
-          ${isAdmin?`<button onclick="removeRef('${sp.id}',${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>`:''}
+          ${isAdmin?`<div style='display:flex;gap:.3rem'><button onclick="openEditRef('${sp.id}',${i})" style="background:var(--g0);border:1px solid var(--g4);border-radius:var(--rxs);color:var(--g6);cursor:pointer;font-size:.7rem;padding:.1rem .3rem">✏️</button><button onclick="removeRef('${sp.id}',${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button></div>`:''}
         </div>
       </div>`).join('') : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin referencias.</p>`}
     </div>`;
@@ -7871,6 +8125,98 @@ function renderBiblioteca() {
   el.innerHTML = html;
 }
 
+
+function openEditRef(spId, idx) {
+  const r = BIBLIOTECA_DB[spId]?.[idx];
+  if (!r) return;
+  _refPDFData = r.pdf || null;
+  document.getElementById('ref-modal')?.remove();
+  const { provider, key } = getActiveAIKey();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">✏️ Editar referencia</div>
+        ${buildRefFormHTML(key, provider)}
+        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="updateRef('${spId}',${idx})">💾 Guardar cambios</button>
+        </div>
+      </div>
+    </div>`);
+  // Rellenar campos
+  setTimeout(()=>{
+    const s=(id,v)=>{const el=document.getElementById(id);if(el&&v!==undefined)el.value=v;};
+    s('ref-titulo',r.titulo);s('ref-autores',r.autores);s('ref-año',r.año);s('ref-url',r.url);s('ref-notas',r.notas);
+    if(r.tipo){const sel=document.getElementById('ref-tipo');if(sel)for(const o of sel.options)if(o.value===r.tipo){o.selected=true;break;}}
+    if(r.pdf){const n=document.getElementById('ref-pdf-name');if(n)n.textContent='📎 '+r.pdf.name;}
+  },50);
+}
+
+async function updateRef(spId, idx) {
+  const titulo = document.getElementById('ref-titulo')?.value.trim();
+  if (!titulo) { toast('⚠ El título es obligatorio'); return; }
+  if (!BIBLIOTECA_DB[spId]?.[idx]) return;
+  BIBLIOTECA_DB[spId][idx] = {
+    ...BIBLIOTECA_DB[spId][idx],
+    titulo,
+    autores: document.getElementById('ref-autores')?.value.trim()||'',
+    año:     document.getElementById('ref-año')?.value||'',
+    tipo:    document.getElementById('ref-tipo')?.value||'Libro',
+    url:     document.getElementById('ref-url')?.value.trim()||'',
+    notas:   document.getElementById('ref-notas')?.value.trim()||'',
+    pdf:     _refPDFData || BIBLIOTECA_DB[spId][idx].pdf || null
+  };
+  _refPDFData = null;
+  await saveBiblioteca();
+  document.getElementById('ref-modal')?.remove();
+  renderBiblioteca();
+  toast('✓ Referencia actualizada');
+}
+
+function openEditRefGeneral(idx) {
+  const r = BIBLIOTECA_GENERAL[idx];
+  if (!r) return;
+  _refPDFData = r.pdf || null;
+  document.getElementById('ref-modal')?.remove();
+  const { provider, key } = getActiveAIKey();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">✏️ Editar referencia general</div>
+        ${buildRefFormHTML(key, provider)}
+        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="updateRefGeneral(${idx})">💾 Guardar cambios</button>
+        </div>
+      </div>
+    </div>`);
+  setTimeout(()=>{
+    const s=(id,v)=>{const el=document.getElementById(id);if(el&&v!==undefined)el.value=v;};
+    s('ref-titulo',r.titulo);s('ref-autores',r.autores);s('ref-año',r.año);s('ref-url',r.url);s('ref-notas',r.notas);
+    if(r.tipo){const sel=document.getElementById('ref-tipo');if(sel)for(const o of sel.options)if(o.value===r.tipo){o.selected=true;break;}}
+    if(r.pdf){const n=document.getElementById('ref-pdf-name');if(n)n.textContent='📎 '+r.pdf.name;}
+  },50);
+}
+
+async function updateRefGeneral(idx) {
+  const titulo = document.getElementById('ref-titulo')?.value.trim();
+  if (!titulo || !BIBLIOTECA_GENERAL[idx]) return;
+  BIBLIOTECA_GENERAL[idx] = {
+    ...BIBLIOTECA_GENERAL[idx],
+    titulo,
+    autores: document.getElementById('ref-autores')?.value.trim()||'',
+    año:     document.getElementById('ref-año')?.value||'',
+    tipo:    document.getElementById('ref-tipo')?.value||'Libro',
+    url:     document.getElementById('ref-url')?.value.trim()||'',
+    notas:   document.getElementById('ref-notas')?.value.trim()||'',
+    pdf:     _refPDFData || BIBLIOTECA_GENERAL[idx].pdf || null
+  };
+  _refPDFData = null;
+  await saveBibliotecaGeneral();
+  document.getElementById('ref-modal')?.remove();
+  renderBiblioteca();
+  toast('✓ Referencia actualizada');
+}
 function openAddRefGeneral() {
   _refPDFData = null;
   document.getElementById('ref-modal')?.remove();
@@ -7944,6 +8290,68 @@ async function saveRefGeneral() {
   toast('✓ Referencia general agregada');
 }
 
+
+function openEditRef(spId, idx) {
+  const ref = BIBLIOTECA_DB[spId]?.[idx];
+  if (!ref) return;
+  openAddRef(spId, idx); // Reusar modal con datos pre-llenados
+}
+
+function openEditRefGeneral(idx) {
+  // Abrir modal con datos existentes para editar referencia general
+  const ref = BIBLIOTECA_GENERAL[idx];
+  if (!ref) return;
+  _refPDFData = ref.pdf || null;
+  document.getElementById('ref-modal')?.remove();
+  const { provider, key } = getActiveAIKey();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">✏️ Editar referencia general</div>
+        ${buildRefFormHTML(key, provider)}
+        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="updateRefGeneral(${idx})">💾 Guardar cambios</button>
+        </div>
+      </div>
+    </div>`);
+  // Pre-llenar campos
+  setTimeout(() => {
+    const set = (id, v) => { const el=document.getElementById(id); if(el&&v) el.value=v; };
+    set('ref-titulo', ref.titulo);
+    set('ref-autores', ref.autores);
+    set('ref-año', ref.año);
+    set('ref-url', ref.url);
+    set('ref-notas', ref.notas);
+    if (ref.tipo) {
+      const sel = document.getElementById('ref-tipo');
+      if (sel) for (const o of sel.options) if (o.value===ref.tipo) { o.selected=true; break; }
+    }
+    if (ref.pdf?.name) {
+      const nameEl = document.getElementById('ref-pdf-name');
+      if (nameEl) nameEl.textContent = '📎 ' + ref.pdf.name + ' (guardado)';
+    }
+  }, 50);
+}
+
+async function updateRefGeneral(idx) {
+  const titulo = document.getElementById('ref-titulo')?.value.trim();
+  if (!titulo) { toast('⚠ El título es obligatorio'); return; }
+  BIBLIOTECA_GENERAL[idx] = {
+    ...BIBLIOTECA_GENERAL[idx],
+    titulo,
+    autores: document.getElementById('ref-autores')?.value.trim()||'',
+    año:     document.getElementById('ref-año')?.value||'',
+    tipo:    document.getElementById('ref-tipo')?.value||'Libro',
+    url:     document.getElementById('ref-url')?.value.trim()||'',
+    notas:   document.getElementById('ref-notas')?.value.trim()||'',
+    pdf:     _refPDFData || BIBLIOTECA_GENERAL[idx].pdf || null
+  };
+  await saveBibliotecaGeneral();
+  document.getElementById('ref-modal')?.remove();
+  renderBiblioteca();
+  toast('✓ Referencia actualizada');
+}
 async function removeRefGeneral(i) {
   const ok = await confirmDelete('¿Eliminar referencia?', `Se eliminará "${BIBLIOTECA_GENERAL[i]?.titulo||''}".`);
   if (!ok) return;
@@ -8008,8 +8416,8 @@ function renderEnriquecimientoScreen(filter='todos') {
         <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:.9rem;color:var(--txt)">${enr.nombre||'Sin nombre'}</div>
           <div style="display:flex;gap:.35rem;align-items:center;margin-top:.15rem">
-            <span style="font-size:.65rem;background:${cat.color}20;color:${cat.color};border-radius:20px;padding:.1rem .4rem;font-weight:600">${cat.icon} ${cat.label}</span>
-            ${enr.especie?`<span style="font-size:.65rem;color:var(--txt3)">🐾 ${enr.especie}</span>`:''}
+            ${(enr.categorias||[enr.categoria]).map(cid=>{const ct=ENRIQ_CATS.find(cc=>cc.id===cid)||ENRIQ_CATS[0];return `<span style="font-size:.65rem;background:${ct.color}20;color:${ct.color};border-radius:20px;padding:.1rem .4rem;font-weight:600;margin-right:.2rem">${ct.icon} ${ct.label}</span>`;}).join('')}
+            ${(enr.especies||[{especie:enr.especie,sci:enr.sci}]).filter(e=>e?.especie).map(e=>`<span style="font-size:.65rem;color:var(--txt3);margin-right:.2rem">🐾 ${e.especie}${e.sci?' ('+e.sci+')':''}</span>`).join('')}
           </div>
         </div>
         ${isAdmin ? `<div style="display:flex;gap:.3rem">
@@ -8048,10 +8456,14 @@ function toggleEnriqCard(i) {
 function filterEnriqBySpecies(q) {
   if (!q.trim()) { renderEnriquecimientoScreen(); return; }
   const term = q.toLowerCase();
-  const filtered = ENRIQUECIMIENTOS_DB.filter(e =>
-    (e.especie||'').toLowerCase().includes(term) ||
-    (e.sci||'').toLowerCase().includes(term)
-  );
+  const filtered = ENRIQUECIMIENTOS_DB.filter(e => {
+    // Buscar en lista nueva de especies
+    const enEspecies = (e.especies||[{especie:e.especie,sci:e.sci}]).some(sp=>
+      (sp?.especie||'').toLowerCase().includes(term) ||
+      (sp?.sci||'').toLowerCase().includes(term)
+    );
+    return enEspecies;
+  });
   const el = document.getElementById('enriq-list');
   if (!el) return;
   const isAdmin = currentUser?.role === 'admin';
@@ -8079,14 +8491,29 @@ function openAddEnriquecimiento(editIdx=-1) {
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${editIdx>=0?'✏️ Editar':'+'} Enriquecimiento</div>
         <div class="form-group"><label>Nombre *</label><input id="enriq-nombre" class="form-control" value="${existing?.nombre||''}" placeholder="Ej: Caja de búsqueda alimentaria"></div>
-        <div class="form-row">
-          <div class="form-group"><label>Categoría</label>
-            <select id="enriq-cat" class="form-control">
-              ${ENRIQ_CATS.map(c=>`<option value="${c.id}" ${(existing?.categoria||'alimenticio')===c.id?'selected':''}>${c.icon} ${c.label}</option>`).join('')}
-            </select>
+        <!-- Categorías múltiples -->
+        <div class="form-group">
+          <label>Categorías <span style="font-weight:400;color:var(--txt3);font-size:.72rem">(selecciona las que apliquen)</span></label>
+          <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.25rem">
+            ${ENRIQ_CATS.map(cat=>`
+            <label style="display:inline-flex;align-items:center;gap:.3rem;padding:.25rem .55rem;border:1px solid var(--bor);border-radius:20px;cursor:pointer;font-size:.78rem;background:var(--sur)">
+              <input type="checkbox" value="${cat.id}" ${(existing?.categorias||[existing?.categoria||'alimenticio']).includes(cat.id)?'checked':''} style="accent-color:var(--g5)">
+              ${cat.icon} ${cat.label}
+            </label>`).join('')}
           </div>
-          <div class="form-group"><label>Nombre común</label><input id="enriq-especie" class="form-control" value="${existing?.especie||''}" placeholder="Ej: Jaguar"></div>
-          <div class="form-group"><label>Nombre científico</label><input id="enriq-sci" class="form-control" value="${existing?.sci||''}" placeholder="Panthera onca"></div>
+        </div>
+        <!-- Múltiples especies -->
+        <div class="form-group">
+          <label>Especies <span style="font-weight:400;color:var(--txt3);font-size:.72rem">(puede aplicar a varias o ninguna)</span></label>
+          <div id="enriq-sp-list" style="margin-top:.25rem">
+            ${(existing?.especies||((existing?.especie)?[{sp:existing.especie,sci:existing.sci||''}]:[])).map((e,i)=>`
+            <div style="display:flex;gap:.3rem;margin-bottom:.25rem" class="enriq-sp-row">
+              <input class="form-control enriq-sp-inp" value="${e.sp||''}" placeholder="Nombre común" style="flex:1;font-size:.8rem">
+              <input class="form-control enriq-sci-inp" value="${e.sci||''}" placeholder="Nombre científico" style="flex:1;font-size:.8rem">
+              <button onclick="this.closest('.enriq-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem;flex-shrink:0">✕</button>
+            </div>`).join('')}
+          </div>
+          <button onclick="addEnriqSpRow()" class="btn btn-secondary btn-sm" style="margin-top:.2rem">+ Agregar especie</button>
         </div>
         <div class="form-group"><label>Descripción</label><textarea id="enriq-desc" class="form-control" style="min-height:70px" placeholder="Describe el enriquecimiento...">${existing?.descripcion||''}</textarea></div>
         <div class="form-group"><label>Objetivo</label><textarea id="enriq-obj" class="form-control" style="min-height:50px" placeholder="Qué se busca estimular...">${existing?.objetivo||''}</textarea></div>
@@ -8122,6 +8549,28 @@ async function previewEnriqFotos(input) {
   }
 }
 
+function addEnriqSpRow() {
+  const list = document.getElementById('enriq-sp-list');
+  if (!list) return;
+  list.insertAdjacentHTML('beforeend', `
+    <div style="display:flex;gap:.3rem;margin-bottom:.25rem" class="enriq-sp-row">
+      <input class="form-control enriq-sp-inp" value="" placeholder="Nombre común" style="flex:1;font-size:.8rem">
+      <input class="form-control enriq-sci-inp" value="" placeholder="Nombre científico" style="flex:1;font-size:.8rem">
+      <button onclick="this.closest('.enriq-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem;flex-shrink:0">✕</button>
+    </div>`);
+}
+
+function addEnriqEspecieRow() {
+  const list = document.getElementById('enriq-especies-list');
+  if (!list) return;
+  const idx = list.children.length;
+  list.insertAdjacentHTML('beforeend', `
+    <div style="display:flex;gap:.3rem;margin-bottom:.3rem" id="ee-row-${idx}">
+      <input class="form-control enriq-sp" value="" placeholder="Nombre común" style="flex:1;font-size:.82rem">
+      <input class="form-control enriq-sci-inp" value="" placeholder="Nombre científico" style="flex:1;font-size:.82rem">
+      <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+    </div>`);
+}
 function openEditEnriquecimiento(idx) { openAddEnriquecimiento(idx); }
 
 async function saveEnriquecimiento(editIdx=-1) {
@@ -8131,11 +8580,22 @@ async function saveEnriquecimiento(editIdx=-1) {
   const existing = editIdx >= 0 ? ENRIQUECIMIENTOS_DB[editIdx] : null;
   const fotos = [...(existing?.fotos||[]), ..._enriqFotosNew];
   _enriqFotosNew = [];
+  const categoriasChecks = Array.from(document.querySelectorAll('#enriq-modal input[type=checkbox]:checked')).map(el=>el.value);
+  const categorias = categoriasChecks.length ? categoriasChecks : ['alimenticio'];
+  // Buscar filas de especies en cualquiera de los contenedores
+  const _spContainer = document.getElementById('enriq-especies-list') || document.getElementById('enriq-sp-list');
+  const especiesRows = _spContainer ? _spContainer.querySelectorAll(':scope > div') : [];
+  const especies = Array.from(especiesRows).map(row=>({
+    sp:  (row.querySelector('.enriq-sp-inp')||row.querySelector('.enriq-sp'))?.value.trim()||'',
+    sci: row.querySelector('.enriq-sci-inp')?.value.trim()||''
+  })).filter(e=>e.sp||e.sci);
   const enr = {
     nombre,
-    categoria:   document.getElementById('enriq-cat')?.value||'alimenticio',
-    especie:     document.getElementById('enriq-especie')?.value.trim()||'',
-    sci:         document.getElementById('enriq-sci')?.value.trim()||'',
+    categorias,
+    categoria:   categorias[0]||'alimenticio', // compat
+    especie:     especies[0]?.sp||'',           // compat
+    sci:         especies[0]?.sci||'',          // compat
+    especies,
     descripcion: document.getElementById('enriq-desc')?.value||'',
     objetivo:    document.getElementById('enriq-obj')?.value||'',
     materiales,
@@ -8753,9 +9213,17 @@ async function loadBiblioteca() {
 }
 
 async function saveBiblioteca() {
+  // Guardar completo (con PDFs) en IndexedDB local
   await dbPut('settings', { key: 'biblioteca', value: BIBLIOTECA_DB });
+  // En Firestore guardar sin PDFs (evitar límite de 1MB)
   if (firestore && fbUid()) {
-    try { await firestore.collection('settings').doc('biblioteca').set({ value: BIBLIOTECA_DB }); } catch(e) {}
+    try {
+      const noPDF = {};
+      Object.entries(BIBLIOTECA_DB).forEach(([spId, refs]) => {
+        noPDF[spId] = refs.map(r => ({ ...r, pdf: r.pdf ? { name: r.pdf.name } : null }));
+      });
+      await firestore.collection('settings').doc('biblioteca').set({ value: noPDF });
+    } catch(e) { console.warn('Firestore biblioteca:', e.message); }
   }
 }
 
