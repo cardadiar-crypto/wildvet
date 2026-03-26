@@ -463,6 +463,14 @@ textarea.form-control{resize:vertical;min-height:70px}
         <span>Calculadoras</span>
       </div>
     </div>
+    <!-- Filtro rápido por clase -->
+    <div id="class-filter-pills" style="overflow-x:auto;white-space:nowrap;margin-bottom:.5rem;padding-bottom:.2rem">
+      <button class="tab-filter-btn active" onclick="filterByClass('',this)" style="font-size:.72rem">Todas</button>
+      <button class="tab-filter-btn" onclick="filterByClass('Mammalia',this)" style="font-size:.72rem">🦁 Mamíferos</button>
+      <button class="tab-filter-btn" onclick="filterByClass('Aves',this)" style="font-size:.72rem">🦜 Aves</button>
+      <button class="tab-filter-btn" onclick="filterByClass('Reptilia',this)" style="font-size:.72rem">🐊 Reptiles</button>
+      <button class="tab-filter-btn" onclick="filterByClass('Amphibia',this)" style="font-size:.72rem">🐸 Anfibios</button>
+    </div>
     <div class="flex-between mb-1"><div class="sec-title" style="margin-bottom:0">Especies</div><div id="admin-add-sp-btn" style="display:none"><button class="btn btn-admin btn-sm" onclick="openAddSpecies()">+ Nueva especie</button></div></div>
     <div style="height:.75rem"></div>
     <div class="species-grid" id="species-grid"></div>
@@ -514,6 +522,11 @@ textarea.form-control{resize:vertical;min-height:70px}
       </div>
     </div>
     <p style="font-size:.82rem;color:var(--txt3);margin-bottom:1rem">Registro de recintos por especie e institución — lineamientos, componentes y galería fotográfica.</p>
+    <!-- Buscador por especie -->
+    <div style="display:flex;gap:.4rem;margin-bottom:.75rem">
+      <input id="recinto-search" class="form-control" placeholder="Buscar por nombre común o científico..." oninput="filterRecintosBySpecies(this.value)">
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('recinto-search').value='';renderRecintosScreen()">✕</button>
+    </div>
     <div id="recintos-list"></div>
   </div>
 
@@ -839,7 +852,7 @@ const DEFAULT_SPECIES = [
     protocols:[{name:'Inmovilización estándar adulto',induction:12,duration:45,drugs:[{name:'Medetomidina',dose:0.06,conc:1.0},{name:'Tiletamina/Zolazepam',dose:1.5,conc:100}],reversals:[{name:'Atipamezol',dose:0.3,route:'IM',conc:5.0}],notes:'Monitorear SpO₂ y temperatura cada 5 min.'}]
   },
   {
-    id:'puma',name:'Puma',sci:'Puma concolor',order:'Carnivora',family:'Felidae',emoji:'🐆',
+    id:'puma',name:'Puma',sci:'Puma concolor',clase:'Mammalia', order:'Carnivora',family:'Felidae',emoji:'🐆',
     uicn_world:'LC',uicn_colombia:'NT',weight_avg:50,weight_min:35,weight_max:80,
     temp_range:[18,30],humidity:[50,80],lifespan:'12–18 años',dimorphism:'Machos 30–50% más pesados',
     distribution:'Desde Canadá hasta Patagonia. En Colombia: todos los biomas.',
@@ -858,7 +871,7 @@ const DEFAULT_SPECIES = [
     protocols:[{name:'Inmovilización estándar felino grande',induction:10,duration:30,drugs:[{name:'Medetomidina',dose:0.07,conc:1.0},{name:'Tiletamina/Zolazepam',dose:4.0,conc:100}],reversals:[{name:'Atipamezol',dose:0.35,route:'IM',conc:5.0}],notes:'Tener oxígeno y soporte de vía aérea listo.'}]
   },
   {
-    id:'caiman',name:'Caimán del Orinoco',sci:'Crocodylus intermedius',order:'Crocodilia',family:'Crocodylidae',emoji:'🐊',
+    id:'caiman',name:'Caimán del Orinoco',sci:'Crocodylus intermedius',clase:'Reptilia', order:'Crocodilia',family:'Crocodylidae',emoji:'🐊',
     uicn_world:'CR',uicn_colombia:'CR',weight_avg:200,weight_min:100,weight_max:380,
     temp_range:[28,35],humidity:[75,95],lifespan:'60–80 años',dimorphism:'Machos mucho más grandes',
     distribution:'Colombia (ríos Meta, Orinoco) y Venezuela.',
@@ -1263,14 +1276,38 @@ async function fsGetRecords() {
 
 // Wrapper: guardar en IndexedDB LOCAL + Firestore
 async function dbPutSync(store, obj) {
+  // Siempre guardar completo (alta calidad) en IndexedDB local
   await dbPut(store, obj);
-  if (store === 'records') {
-    // Historias: agregar uid del usuario para filtrar por cuenta
-    const withUid = { ...obj, uid: fbUid() };
-    await fsPut(store, withUid);
-  } else {
-    await fsPut(store, obj);
-  }
+  if (!firestore || !fbUid()) return;
+  try {
+    let fsObj = obj;
+    // Si el doc tiene imágenes grandes, comprimir solo la copia de Firestore
+    const json = JSON.stringify(obj);
+    const sizeKB = new Blob([json]).size / 1024;
+    if (sizeKB > 600) {
+      fsObj = JSON.parse(json); // copia profunda
+      const imgFields = ['cover_photo'];
+      const arrFields = ['cover_photos','dental_fotos','dimorfismo_fotos','dist_maps','fotos'];
+      for (const f of imgFields) {
+        if (fsObj[f] && typeof fsObj[f]==='string' && fsObj[f].length > 5000)
+          fsObj[f] = await compressForFirestore(fsObj[f]);
+      }
+      for (const f of arrFields) {
+        if (Array.isArray(fsObj[f])) {
+          fsObj[f] = await Promise.all(fsObj[f].map(async item =>
+            item?.data && item.data.length > 5000
+              ? {...item, data: await compressForFirestore(item.data)}
+              : item
+          ));
+        }
+      }
+    }
+    if (store === 'records') {
+      await fsPut(store, { ...fsObj, uid: fbUid() });
+    } else {
+      await fsPut(store, fsObj);
+    }
+  } catch(e) { console.warn('Firestore sync error:', e.message); }
 }
 
 // Wrapper: eliminar en IndexedDB LOCAL + Firestore
@@ -1589,7 +1626,7 @@ function buildSpeciesExportHTML(sp) {
 
   // ══ 2. TAXONOMÍA Y DATOS GENERALES ══
   html += sec('2. Información General', `<table><tbody>
-    ${row2('Orden', sp.order||NA)}
+    ${sp.clase?row2('Clase',sp.clase):''}${row2('Orden', sp.order||NA)}
     ${row2('Familia', sp.family||NA)}
     ${row2('Distribución', sp.distribution||NA)}
     ${row2('Temperatura óptima', ((sp.temp_range||[0,0]).join('–'))+' °C')}
@@ -2095,6 +2132,39 @@ function closeDetail() {
 // ═══════════════════════════════════
 // SPECIES GRID
 // ═══════════════════════════════════
+
+function filterByClass(clase, btn) {
+  document.querySelectorAll('#class-filter-pills .tab-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const grid = document.getElementById('species-grid');
+  if (!grid) return;
+  if (!clase) { renderSpeciesGrid(); return; }
+  const isAdmin = currentUser?.role==='admin';
+  const filtered = SPECIES_DB.filter(sp => sp.clase === clase);
+  grid.innerHTML = filtered.length ? filtered.map(sp => {
+    const imgSrc = sp.cover_photo || '';
+    const imgHtml = imgSrc
+      ? `<img src="${imgSrc}" alt="${sp.name}" loading="lazy">`
+      : `<div class="scard-placeholder"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span>Sin foto</span></div>`;
+    return `<div class="species-card" onclick="openSpecies('${sp.id}')">
+      <div class="scard-img" id="scimg-${sp.id}">${imgHtml}
+        ${isAdmin ? `<button class="scard-edit-btn" onclick="event.stopPropagation();editSpecies('${sp.id}')">✏️ Editar</button>` : ''}
+        <label class="scard-cam-btn" for="scard-photo-${sp.id}" onclick="event.stopPropagation()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <input type="file" id="scard-photo-${sp.id}" accept="image/*" style="display:none" onchange="setCoverPhoto('${sp.id}',this)">
+        </label>
+      </div>
+      <div class="scard-body">
+        <div class="scard-name">${sp.name}</div>
+        <div class="scard-sci">${sp.sci}</div>
+        <div class="scard-badges">
+          <span class="badge badge-${sp.uicn_world.toLowerCase()}">${sp.uicn_world}</span>
+          <span class="badge badge-order">${sp.order}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('') : `<div class="empty-state"><p>Sin especies de clase ${clase}</p></div>`;
+}
 function renderSpeciesGrid() {
   const grid = document.getElementById('species-grid');
   const isAdmin = currentUser?.role==='admin';
@@ -2121,7 +2191,7 @@ function renderSpeciesGrid() {
         <div class="scard-sci">${sp.sci}</div>
         <div class="scard-badges">
           <span class="badge badge-${sp.uicn_world.toLowerCase()}">${sp.uicn_world}</span>
-          <span class="badge badge-order">${sp.order}</span>
+          ${sp.clase?`<span class="badge" style="background:var(--g1);color:var(--g7)">${sp.clase}</span>`:''}          <span class="badge badge-order">${sp.order}</span>
         </div>
       </div>
     </div>`;
@@ -2140,7 +2210,7 @@ async function setCoverPhoto(spId, input) {
     canvas.width  = Math.round(img.width  * scale);
     canvas.height = Math.round(img.height * scale);
     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
     URL.revokeObjectURL(url);
     const sp = SPECIES_DB.find(s => s.id === spId);
     if (!sp) return;
@@ -2323,7 +2393,12 @@ function handleSearch(val) {
   document.getElementById('species-grid').style.display = q ? 'none' : 'grid';
   srDiv.style.display = q ? 'block' : 'none';
   if (!q) return;
-  const sMatches = SPECIES_DB.filter(sp => sp.name.toLowerCase().includes(q)||sp.sci.toLowerCase().includes(q)||sp.order.toLowerCase().includes(q));
+  const sMatches = SPECIES_DB.filter(sp => {
+    const fields = [sp.name, sp.sci, sp.order, sp.family, sp.clase,
+      sp.sci?.split(' ')[0]  // género
+    ];
+    return fields.some(f => (f||'').toLowerCase().includes(q));
+  });
   const dMatches = VADEMECUM_DB.filter(d => d.drug.toLowerCase().includes(q)||d.category.toLowerCase().includes(q));
   document.getElementById('search-list').innerHTML = `
     ${sMatches.length ? `<div class="sec-title">Especies</div>`+sMatches.map(sp=>`
@@ -2332,7 +2407,7 @@ function handleSearch(val) {
           <div class="record-avatar" style="overflow:hidden;background:var(--sur2)">
               ${sp.cover_photo ? `<img src="${sp.cover_photo}" style="width:100%;height:100%;object-fit:cover">` : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`}
             </div>
-          <div><div class="record-name">${sp.name}</div><div class="record-meta">${sp.sci} · ${sp.order}</div></div>
+          <div><div class="record-name">${sp.name}</div><div class="record-meta">${sp.sci}${sp.clase?' · '+sp.clase:''} · ${sp.order}</div></div>
           <span class="badge badge-${sp.uicn_world.toLowerCase()}" style="margin-left:auto">${sp.uicn_world}</span>
         </div>
       </div>`).join('') : ''}
@@ -2484,7 +2559,7 @@ function renderGeneral(el, sp) {
     <!-- TAXONOMÍA -->
     <div class="info-card">
       <div class="info-card-title">Taxonomía</div>
-      ${row('Orden',sp.order)} ${row('Familia',sp.family)}
+      ${sp.clase?row('Clase',sp.clase):''} ${row('Orden',sp.order)} ${row('Familia',sp.family)}
     </div>
 
     <!-- ESTADO DE CONSERVACIÓN -->
@@ -5629,6 +5704,19 @@ function buildSpeciesForm(sp) {
       <div class="form-group"><label>Nombre científico</label><input id="sp-sci" class="form-control" value="${v('sci')}" placeholder="Tapirus terrestris"></div>
     </div>
     <div class="form-row">
+      <div class="form-group"><label>Clase</label>
+        <select id="sp-class" class="form-control">
+          <option value="">— Seleccionar —</option>
+          <option value="Mammalia">Mammalia (Mamíferos)</option>
+          <option value="Aves">Aves</option>
+          <option value="Reptilia">Reptilia (Reptiles)</option>
+          <option value="Amphibia">Amphibia (Anfibios)</option>
+          <option value="Actinopterygii">Actinopterygii (Peces óseos)</option>
+          <option value="Chondrichthyes">Chondrichthyes (Tiburones/Rayas)</option>
+          <option value="Insecta">Insecta</option>
+          <option value="Otra">Otra</option>
+        </select>
+      </div>
       <div class="form-group"><label>Orden</label><input id="sp-order" class="form-control" value="${v('order')}" placeholder="Perissodactyla"></div>
       <div class="form-group"><label>Familia</label><input id="sp-family" class="form-control" value="${v('family')}" placeholder="Tapiridae"></div>
     </div>
@@ -5803,6 +5891,7 @@ async function saveSpecies() {
   const sp = {
     id, name,
     sci:         document.getElementById('sp-sci')?.value.trim()   || existing?.sci   || '',
+    clase:       document.getElementById('sp-class')?.value||'',
     order:       document.getElementById('sp-order')?.value.trim() || existing?.order || '',
     family:      document.getElementById('sp-family')?.value.trim()|| existing?.family|| '',
     emoji:       existing?.emoji || '🐾',
@@ -7903,7 +7992,9 @@ function toast(msg) {
   t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), 2500);
 }
-function compressImage(file, maxW=600, quality=0.75) {
+function compressImage(file, maxW=1200, quality=0.92) {
+  // Por defecto: alta calidad (1200px, 92%)
+  // Para Firestore se reduce en dbPutSync automáticamente si el doc supera 800KB
   return new Promise((res, rej) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -7918,6 +8009,24 @@ function compressImage(file, maxW=600, quality=0.75) {
     };
     img.onerror = rej;
     img.src = url;
+  });
+}
+
+// Versión reducida solo para Firestore (mantiene IndexedDB en alta calidad)
+function compressForFirestore(dataUrl) {
+  return new Promise((res) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 600;
+      const scale = img.width > MAX ? MAX/img.width : 1;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width*scale);
+      canvas.height = Math.round(img.height*scale);
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      res(canvas.toDataURL('image/jpeg', 0.65));
+    };
+    img.onerror = () => res(dataUrl);
+    img.src = dataUrl;
   });
 }
 
@@ -8065,15 +8174,14 @@ function renderBiblioteca() {
   const el = document.getElementById('biblioteca-list');
   if (!el) return;
   const isAdmin = currentUser?.role === 'admin';
-  let html = '';
 
-  // Sección general
-  html += `<div class="info-card" style="margin-bottom:1rem;border-left:3px solid var(--g5)">
+  // ── Sección general (siempre abierta) ──
+  let html = `<div class="info-card" style="margin-bottom:1rem;border-left:3px solid var(--g5)">
     <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>📖 Referencias Generales</span>
       ${isAdmin?`<button onclick="openAddRefGeneral()" class="btn btn-admin btn-sm">+ Agregar</button>`:''}
     </div>
-    <p style="font-size:.75rem;color:var(--txt3);margin-bottom:.5rem">Libros, guías y documentos que aplican a múltiples especies</p>
+    <p style="font-size:.75rem;color:var(--txt3);margin-bottom:.5rem">Libros de fármacos, guías, radiología y documentos para múltiples especies</p>
     ${BIBLIOTECA_GENERAL.length ? BIBLIOTECA_GENERAL.map((r,i)=>`
     <div style="padding:.4rem .5rem;border-left:3px solid var(--g4);margin-bottom:.4rem;background:var(--sur2);border-radius:0 var(--rxs) var(--rxs) 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -8083,46 +8191,68 @@ function renderBiblioteca() {
           <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
             ${r.tipo?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>`:''}
             ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
-            ${r.pdf?`<a href="${r.pdf.data}" download="${r.pdf.name}" style="font-size:.65rem;color:var(--bl)">📄 ${r.pdf.name}</a>`:''}
+            ${r.pdf?`<a href="${r.pdf.data||'#'}" download="${r.pdf.name}" style="font-size:.65rem;color:var(--bl)">📄 ${r.pdf.name||'PDF'}</a>`:''}
           </div>
         </div>
-        ${isAdmin?`<div style='display:flex;gap:.3rem'><button onclick="openEditRefGeneral(${i})" style="background:var(--g0);border:1px solid var(--g4);border-radius:var(--rxs);color:var(--g6);cursor:pointer;font-size:.7rem;padding:.1rem .3rem">✏️</button><button onclick="removeRefGeneral(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button></div>`:''}
+        ${isAdmin?`<div style="display:flex;gap:.3rem">
+          <button onclick="openEditRefGeneral(${i})" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem">✏️</button>
+          <button onclick="removeRefGeneral(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>
+        </div>`:''}
       </div>
     </div>`).join('') : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin referencias generales.</p>`}
   </div>`;
 
-  // Secciones por especie
-  if (!SPECIES_DB.length) { el.innerHTML = html; return; }
-  html += SPECIES_DB.map(sp => {
-    const refs = BIBLIOTECA_DB[sp.id] || [];
-    return `
-    <div class="info-card" style="margin-bottom:.75rem">
-      <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
-        <div style="display:flex;align-items:center;gap:.5rem">
-          ${sp.cover_photo?`<img src="${sp.cover_photo}" style="width:32px;height:24px;object-fit:cover;border-radius:var(--rxs)">`:''}
-          <span>${sp.name}</span>
-          <span style="font-size:.7rem;color:var(--txt3);font-style:italic">${sp.sci||''}</span>
-        </div>
-        ${isAdmin?`<button onclick="openAddRef('${sp.id}')" class="btn btn-admin btn-sm">+ Agregar</button>`:''}
-      </div>
-      ${refs.length ? refs.map((r,i)=>`
-      <div style="padding:.4rem .5rem;border-left:3px solid var(--g5);margin-bottom:.4rem;background:var(--sur2);border-radius:0 var(--rxs) var(--rxs) 0">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div style="flex:1">
-            <div style="font-size:.82rem;font-weight:600">${r.titulo||'Sin título'}</div>
-            ${r.autores?`<div style="font-size:.75rem;color:var(--txt3)">${r.autores}${r.año?' · '+r.año:''}</div>`:''}
-            <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
-              ${r.tipo?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>`:''}
-              ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
-              ${r.pdf?`<a href="${r.pdf.data}" download="${r.pdf.name}" style="font-size:.65rem;color:var(--bl)">📄 ${r.pdf.name}</a>`:''}
-            </div>
+  // ── Secciones por especie (colapsables) ──
+  if (SPECIES_DB.length) {
+    html += SPECIES_DB.map(sp => {
+      const refs = BIBLIOTECA_DB[sp.id] || [];
+      const isOpen = refs.length > 0; // abrir si tiene refs
+      return `
+      <div class="info-card" style="margin-bottom:.6rem" id="bib-card-${sp.id}">
+        <div style="display:flex;align-items:center;gap:.5rem;cursor:pointer;padding:.1rem 0"
+             onclick="toggleBibCard('${sp.id}')">
+          ${sp.cover_photo?`<img src="${sp.cover_photo}" style="width:36px;height:28px;object-fit:cover;border-radius:var(--rxs);flex-shrink:0">`:''}
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:.88rem">${sp.name}</div>
+            <div style="font-size:.72rem;color:var(--txt3);font-style:italic">${sp.sci||''}</div>
           </div>
-          ${isAdmin?`<div style='display:flex;gap:.3rem'><button onclick="openEditRef('${sp.id}',${i})" style="background:var(--g0);border:1px solid var(--g4);border-radius:var(--rxs);color:var(--g6);cursor:pointer;font-size:.7rem;padding:.1rem .3rem">✏️</button><button onclick="removeRef('${sp.id}',${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button></div>`:''}
+          <span style="font-size:.7rem;background:${refs.length?'var(--g5)':'var(--sur2)'};color:${refs.length?'white':'var(--txt3)'};border-radius:20px;padding:.1rem .45rem;margin-right:.3rem">${refs.length}</span>
+          ${isAdmin?`<button onclick="event.stopPropagation();openAddRef('${sp.id}')" class="btn btn-admin btn-sm" style="font-size:.68rem;padding:.15rem .4rem">+ Agregar</button>`:''}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="bib-chev-${sp.id}" style="flex-shrink:0;transition:transform .2s;transform:${isOpen?'rotate(180deg)':'rotate(0deg)'}"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
-      </div>`).join('') : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin referencias.</p>`}
-    </div>`;
-  }).join('');
+        <div id="bib-body-${sp.id}" style="display:${isOpen?'block':'none'};margin-top:.4rem">
+          ${refs.length ? refs.map((r,i)=>`
+          <div style="padding:.4rem .5rem;border-left:3px solid var(--g5);margin-bottom:.4rem;background:var(--sur2);border-radius:0 var(--rxs) var(--rxs) 0">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div style="flex:1">
+                <div style="font-size:.82rem;font-weight:600">${r.titulo||'Sin título'}</div>
+                ${r.autores?`<div style="font-size:.75rem;color:var(--txt3)">${r.autores}${r.año?' · '+r.año:''}</div>`:''}
+                <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
+                  ${r.tipo?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>`:''}
+                  ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
+                  ${r.pdf?`<a href="${r.pdf.data||'#'}" download="${r.pdf.name}" style="font-size:.65rem;color:var(--bl)">📄 ${r.pdf.name||'PDF'}</a>`:''}
+                </div>
+              </div>
+              ${isAdmin?`<div style="display:flex;gap:.3rem">
+                <button onclick="openEditRef('${sp.id}',${i})" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem">✏️</button>
+                <button onclick="removeRef('${sp.id}',${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>
+              </div>`:''}
+            </div>
+          </div>`).join('') : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic;padding:.2rem 0">Sin referencias — ${isAdmin?'toca + Agregar':''}</p>`}
+        </div>
+      </div>`;
+    }).join('');
+  }
   el.innerHTML = html;
+}
+
+function toggleBibCard(spId) {
+  const body = document.getElementById('bib-body-'+spId);
+  const chev = document.getElementById('bib-chev-'+spId);
+  if (!body) return;
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  if (chev) chev.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
 }
 
 
@@ -8396,7 +8526,7 @@ function renderEnriquecimientoScreen(filter='todos') {
   if (adminBtns) adminBtns.style.display = currentUser?.role==='admin' ? 'block' : 'none';
   if (!el) return;
   const isAdmin = currentUser?.role === 'admin';
-  const items = filter === 'todos' ? ENRIQUECIMIENTOS_DB : ENRIQUECIMIENTOS_DB.filter(e => e.categoria === filter);
+  const items = filter === 'todos' ? ENRIQUECIMIENTOS_DB : ENRIQUECIMIENTOS_DB.filter(e => (e.categorias||[e.categoria||'alimenticio']).includes(filter));
   if (!items.length) {
     el.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--txt3)">
       <p style="font-size:.9rem">Sin enriquecimientos registrados.</p>
@@ -8431,6 +8561,17 @@ function renderEnriquecimientoScreen(filter='todos') {
           ${enr.descripcion?`<div><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Descripción</div><p style="font-size:.82rem;color:var(--txt2);line-height:1.5">${enr.descripcion}</p></div>`:''}
           ${enr.objetivo?`<div><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Objetivo</div><p style="font-size:.82rem;color:var(--txt2);line-height:1.5">${enr.objetivo}</p></div>`:''}
         </div>
+        <!-- Lista de especies -->
+        ${(enr.especies?.filter(e=>e?.sp||e?.especie).length||enr.especie)?`
+        <div style="margin-bottom:.5rem">
+          <div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.25rem">🐾 Especies aplicables</div>
+          <div style="display:flex;flex-wrap:wrap;gap:.3rem">
+            ${(enr.especies?.length ? enr.especies : [{sp:enr.especie,sci:enr.sci}]).filter(e=>e?.sp||e?.especie).map(e=>`
+            <span style="background:var(--g0);border:1px solid var(--g3);border-radius:20px;padding:.15rem .6rem;font-size:.78rem;color:var(--g7)">
+              ${e.sp||e.especie||''}${(e.sci)?' <em style=font-size:.7rem>('+e.sci+')</em>':''}
+            </span>`).join('')}
+          </div>
+        </div>`:''}
         ${enr.materiales?.length?`<div style="margin-bottom:.5rem">
           <div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.25rem">Materiales</div>
           <div style="display:flex;flex-wrap:wrap;gap:.25rem">
@@ -8508,7 +8649,7 @@ function openAddEnriquecimiento(editIdx=-1) {
           <div id="enriq-sp-list" style="margin-top:.25rem">
             ${(existing?.especies||((existing?.especie)?[{sp:existing.especie,sci:existing.sci||''}]:[])).map((e,i)=>`
             <div style="display:flex;gap:.3rem;margin-bottom:.25rem" class="enriq-sp-row">
-              <input class="form-control enriq-sp-inp" value="${e.sp||''}" placeholder="Nombre común" style="flex:1;font-size:.8rem">
+              <input class="form-control enriq-sp-inp" value="${e.sp||''}" placeholder="Nombre común" style="flex:1;font-size:.8rem" list="sp-hist-dl" oninput="autofillSciInRow(this)" onchange="autofillSciInRow(this)">
               <input class="form-control enriq-sci-inp" value="${e.sci||''}" placeholder="Nombre científico" style="flex:1;font-size:.8rem">
               <button onclick="this.closest('.enriq-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem;flex-shrink:0">✕</button>
             </div>`).join('')}
@@ -8549,15 +8690,75 @@ async function previewEnriqFotos(input) {
   }
 }
 
+
+// ─── Historial de especies en enriquecimientos / recintos ───
+function getSpeciesHistory() {
+  const map = {};
+  // De enriquecimientos
+  ENRIQUECIMIENTOS_DB.forEach(enr => {
+    const lista = enr.especies?.length ? enr.especies : (enr.especie ? [{sp:enr.especie,sci:enr.sci||''}] : []);
+    lista.forEach(e => {
+      const key = (e.sp||e.especie||'').toLowerCase();
+      if (key) map[key] = { nombre: e.sp||e.especie, sci: e.sci||'' };
+    });
+  });
+  // De recintos
+  RECINTOS_DB.forEach(r => {
+    if (r.especie) {
+      map[r.especie.toLowerCase()] = { nombre: r.especie, sci: r.sci||'' };
+    }
+  });
+  // De SPECIES_DB
+  SPECIES_DB.forEach(sp => {
+    if (sp.name) map[sp.name.toLowerCase()] = { nombre: sp.name, sci: sp.sci||'' };
+  });
+  return Object.values(map);
+}
+
+function buildSpeciesDatalist(datalistId) {
+  let dl = document.getElementById(datalistId);
+  if (!dl) {
+    dl = document.createElement('datalist');
+    dl.id = datalistId;
+    document.body.appendChild(dl);
+  }
+  const history = getSpeciesHistory();
+  dl.innerHTML = history.map(h => `<option value="${h.nombre}" data-sci="${h.sci}">${h.nombre} — ${h.sci}</option>`).join('');
+}
+
+function autofillSci(commonNameInput, sciInputId) {
+  const val = commonNameInput.value.trim().toLowerCase();
+  const history = getSpeciesHistory();
+  const match = history.find(h => h.nombre.toLowerCase() === val);
+  if (match) {
+    const sciEl = document.getElementById(sciInputId) || commonNameInput.closest('.enriq-sp-row, .vd-sp-row, [class*=row]')?.querySelector('.enriq-sci-inp, .vd-sci, .rec-sci-inp');
+    if (sciEl && !sciEl.value) sciEl.value = match.sci;
+  }
+}
 function addEnriqSpRow() {
   const list = document.getElementById('enriq-sp-list');
   if (!list) return;
+  buildSpeciesDatalist('sp-hist-dl');
   list.insertAdjacentHTML('beforeend', `
     <div style="display:flex;gap:.3rem;margin-bottom:.25rem" class="enriq-sp-row">
-      <input class="form-control enriq-sp-inp" value="" placeholder="Nombre común" style="flex:1;font-size:.8rem">
+      <input class="form-control enriq-sp-inp" value="" placeholder="Nombre común" style="flex:1;font-size:.8rem"
+        list="sp-hist-dl" oninput="autofillSciInRow(this)" onchange="autofillSciInRow(this)">
       <input class="form-control enriq-sci-inp" value="" placeholder="Nombre científico" style="flex:1;font-size:.8rem">
       <button onclick="this.closest('.enriq-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem;flex-shrink:0">✕</button>
     </div>`);
+}
+
+function autofillSciInRow(input) {
+  const val = input.value.trim().toLowerCase();
+  const history = getSpeciesHistory();
+  const match = history.find(h => h.nombre.toLowerCase() === val);
+  if (match) {
+    const row = input.closest('.enriq-sp-row, .vd-sp-row');
+    if (row) {
+      const sciEl = row.querySelector('.enriq-sci-inp, .vds-sci, .rec-sci-inp');
+      if (sciEl && !sciEl.value) sciEl.value = match.sci;
+    }
+  }
 }
 
 function addEnriqEspecieRow() {
@@ -8660,7 +8861,7 @@ function renderRecintosScreen() {
           `<div style="width:72px;height:56px;background:var(--sur2);border-radius:var(--rxs);display:flex;align-items:center;justify-content:center;font-size:1.5rem">🏠</div>`}
         <div style="flex:1">
           <div style="font-weight:700;font-size:.9rem">${r.nombre||'Sin nombre'}</div>
-          <div style="font-size:.75rem;color:var(--txt3)">${r.institucion||''} ${r.especie?'· 🐾 '+r.especie:''}</div>
+          <div style="font-size:.75rem;color:var(--txt3)">${r.institucion||''} ${r.especie?'· 🐾 '+r.especie+(r.sci?' <em>('+r.sci+')</em>':''):''}</div>
         </div>
         ${isAdmin?`<div style="display:flex;gap:.3rem">
           <button onclick="event.stopPropagation();openEditRecinto(${i})" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);cursor:pointer;font-size:.75rem;padding:.2rem .4rem">✏️</button>
@@ -8696,9 +8897,42 @@ function toggleRecinto(i) {
   if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
 }
 
+
+function autofillRecintoSci(input) {
+  buildSpeciesDatalist('sp-hist-dl');
+  autofillSciInRow(input);
+  // También en campo específico de recinto
+  const val = input.value.trim().toLowerCase();
+  const history = getSpeciesHistory();
+  const match = history.find(h => h.nombre.toLowerCase() === val);
+  if (match) {
+    const sciEl = document.getElementById('rec-sci-inp');
+    if (sciEl && !sciEl.value) sciEl.value = match.sci;
+  }
+}
+
+function filterRecintosBySpecies(q) {
+  if (!q.trim()) { renderRecintosScreen(); return; }
+  const term = q.toLowerCase();
+  const origDB = RECINTOS_DB;
+  const filtered = RECINTOS_DB.filter(r =>
+    (r.especie||'').toLowerCase().includes(term) ||
+    (r.sci||'').toLowerCase().includes(term)
+  );
+  if (!filtered.length) {
+    const el = document.getElementById('recintos-list');
+    if (el) el.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--txt3)">Sin recintos para esa especie.</div>`;
+    return;
+  }
+  const origFull = RECINTOS_DB;
+  RECINTOS_DB = filtered;
+  renderRecintosScreen();
+  RECINTOS_DB = origFull;
+}
 function openAddRecinto(editIdx=-1) {
   const existing = editIdx >= 0 ? RECINTOS_DB[editIdx] : null;
   document.getElementById('recinto-modal')?.remove();
+  buildSpeciesDatalist('sp-hist-dl');
   document.body.insertAdjacentHTML('beforeend', `
     <div id="recinto-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
@@ -8706,7 +8940,13 @@ function openAddRecinto(editIdx=-1) {
         <div class="form-group"><label>Nombre / Referencia *</label><input id="rec-nombre" class="form-control" value="${existing?.nombre||''}" placeholder="Ej: Recinto jaguar Colombia Zoo 2023"></div>
         <div class="form-row">
           <div class="form-group"><label>Institución</label><input id="rec-inst" class="form-control" value="${existing?.institucion||''}" placeholder="Zoológico, santuario..."></div>
-          <div class="form-group"><label>Especie</label><input id="rec-especie" class="form-control" value="${existing?.especie||''}" placeholder="Jaguar..."></div>
+          <div class="form-group"><label>Nombre común</label>
+            <input id="rec-especie" class="form-control" value="${existing?.especie||''}" placeholder="Jaguar..."
+              list="sp-hist-dl" oninput="autofillRecintoSci(this)" onchange="autofillRecintoSci(this)">
+          </div>
+          <div class="form-group"><label>Nombre científico</label>
+            <input id="rec-sci-inp" class="form-control" value="${existing?.sci||''}" placeholder="Panthera onca">
+          </div>
         </div>
         <div class="form-row">
           <div class="form-group"><label>Área (m²)</label><input id="rec-area" class="form-control" type="text" value="${existing?.area||''}" placeholder="500 m²"></div>
@@ -8762,6 +9002,7 @@ async function saveRecinto(editIdx=-1) {
     nombre,
     institucion: document.getElementById('rec-inst')?.value.trim()||'',
     especie:     document.getElementById('rec-especie')?.value.trim()||'',
+    sci:         document.getElementById('rec-sci-inp')?.value.trim()||'',
     area:        document.getElementById('rec-area')?.value||'',
     altura:      document.getElementById('rec-altura')?.value||'',
     tipo:        document.getElementById('rec-tipo')?.value||'',
