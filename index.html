@@ -130,7 +130,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .quick-card span{display:block;font-size:.72rem;font-weight:500;color:var(--txt2)}
 
 /* DETAIL */
-#species-detail{display:none;padding-top:156px;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem);box-sizing:border-box}
+#species-detail{display:none;padding-top:0;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
 .detail-header{background:var(--g9);padding:.5rem .75rem;display:flex;align-items:center;gap:.5rem;position:fixed;top:56px;left:0;right:0;z-index:90;box-shadow:0 1px 0 rgba(78,180,110,.2);flex-wrap:nowrap;min-height:48px}
 .back-btn{background:rgba(78,180,110,.2);border:none;color:var(--g3);width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .detail-name{color:white;font-size:.95rem;font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -144,7 +144,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .tab-btn.active{color:var(--g6);border-bottom-color:var(--g5)}
 /* spacer: 56px topbar + 48px detail-header + 40px tabs = 144px */
 .tab-content-spacer{height:0;display:none}
-.tab-content{display:none;padding:.75rem 1rem;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
+.tab-content{display:none;padding:1rem;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
 .tab-content.active{display:block}
 
 /* CARDS */
@@ -1606,247 +1606,10 @@ function buildSpeciesExportHTML(sp) {
   const bm  = sp.biometria || {};
   const cons = sp.conservacion || {};
   const esc = s => (String(s||'')).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const row2 = (a,b) => `<tr><td style="width:38%;font-weight:600;color:#1a6b3f;padding:4pt 8pt;border:1pt solid #e0e0e0;background:#f9fffe">${esc(a)}</td><td style="padding:4pt 8pt;border:1pt solid #e0e0e0">${esc(b)}</td></tr>`;
-  const sec = (title, content) => content ? `<div class="section" style="page-break-inside:avoid"><h2>${title}</h2>${content}</div>` : '';
+  const row2 = (a,b) => `<tr><td style="width:35%;font-weight:600;color:#1a6b3f;padding:4pt 8pt;border:1pt solid #e0e0e0">${esc(a)}</td><td style="padding:4pt 8pt;border:1pt solid #e0e0e0">${esc(b)}</td></tr>`;
+  const sec = (title, content) => content ? `<div class="section"><h2>${title}</h2>${content}</div>` : '';
   const tbl = (headers, rows) => `<table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
   const NA = 'N/D';
-  const img = (src, w='120px', h='90px') => src ? `<img src="${src}" style="width:${w};height:${h};object-fit:cover;border-radius:3pt;border:1pt solid #ddd;margin:2pt">` : '';
-
-  // ══ PORTADA ══
-  let html = '';
-  if (sp.cover_photo) html += img(sp.cover_photo,'180px','135px');
-  // Galería portada adicional
-  if ((sp.cover_photos||[]).length) {
-    html += `<div style="display:flex;flex-wrap:wrap;gap:4pt;margin:4pt 0">`;
-    sp.cover_photos.slice(0,4).forEach(p => { html += img(p.data,'100px','75px'); });
-    html += `</div>`;
-  }
-  html += `<h1>${esc(sp.name)}</h1>`;
-  html += `<p style="font-size:11pt;color:#444;margin:2pt 0"><em>${esc(sp.sci||'')}</em></p>`;
-  const badges = [
-    sp.uicn_world    ? `UICN Mundial: ${sp.uicn_world}` : '',
-    sp.uicn_colombia ? `UICN Colombia: ${sp.uicn_colombia}` : '',
-    cons.cites       ? `CITES: ${cons.cites}` : '',
-    cons.res0126     ? `Res 0126: ${cons.res0126}` : ''
-  ].filter(Boolean);
-  if (badges.length) html += `<p>${badges.map(b=>`<span class="badge">${esc(b)}</span>`).join(' &nbsp;')}</p>`;
-  html += `<p style="font-size:8pt;color:#888">Exportado el ${new Date().toLocaleString('es-CO')} · WildVet</p><hr style="border:none;border-top:1pt solid #ddd;margin:8pt 0">`;
-
-  // ══ 1. GENERALIDADES ══
-  if (sp.generalidades) html += sec('1. Generalidades', `<p style="line-height:1.6">${esc(sp.generalidades).replace(/\n/g,'<br>')}</p>`);
-
-  // ══ 2. TAXONOMÍA Y DATOS GENERALES ══
-  html += sec('2. Taxonomía e Información General', `<table><tbody>
-    ${sp.clase?row2('Clase',sp.clase):''}
-    ${row2('Orden', sp.order||NA)}
-    ${row2('Familia', sp.family||NA)}
-    ${row2('Distribución geográfica', sp.distribution||NA)}
-    ${row2('Temperatura óptima', ((sp.temp_range||[0,0]).join('–'))+' °C')}
-    ${row2('Humedad óptima', ((sp.humidity||[0,0]).join('–'))+'%')}
-    ${row2('Conservación UICN Mundial', sp.uicn_world||NA)}
-    ${row2('Conservación UICN Colombia', sp.uicn_colombia||NA)}
-    ${cons.cites?row2('CITES',cons.cites):''}
-    ${cons.res0126?row2('Res. 0126/2024',cons.res0126):''}
-  </tbody></table>
-  ${(sp.dist_maps||[]).length ? `<h3>Mapas de distribución</h3><div style="display:flex;flex-wrap:wrap;gap:6pt">${sp.dist_maps.map(m=>img(m.data,'200px','140px')).join('')}</div>` : ''}`);
-
-  // ══ 3. DIMORFISMO SEXUAL ══
-  if (sp.dimorphism || (sp.dimorfismo_fotos||[]).length) {
-    let dimoContent = '';
-    if (sp.dimorphism) dimoContent += `<p style="line-height:1.6">${esc(sp.dimorphism)}</p>`;
-    if ((sp.dimorfismo_fotos||[]).length) {
-      dimoContent += `<div style="display:flex;flex-wrap:wrap;gap:6pt;margin-top:6pt">`;
-      sp.dimorfismo_fotos.forEach(f => {
-        dimoContent += `<div style="text-align:center">${img(f.data,'130px','100px')}<br><span style="font-size:8pt;color:#666">${esc(f.label||'')}</span></div>`;
-      });
-      dimoContent += `</div>`;
-    }
-    html += sec('3. Dimorfismo Sexual', dimoContent);
-  }
-
-  // ══ 4. BIOMETRÍA Y LONGEVIDAD ══
-  const bmFields = [
-    ['Peso promedio (kg)', 'peso_prom'],['Rango de peso (kg)', 'peso_rango'],
-    ['Longitud CC (cm)', 'long_cc'],['Longitud cola (cm)', 'long_cola'],
-    ['Altura a la cruz (cm)', 'altura_cruz']
-  ];
-  const lifeFields = [
-    ['Esperanza de vida', 'esp_vida'],['Edad promedio', 'edad_prom'],
-    ['Edad máxima', 'edad_max'],['Madurez sexual', 'mad_sexual'],['Gestación', 'gestacion']
-  ];
-  let bmContent = '';
-  if (Object.keys(bm).length) {
-    const bmRows = bmFields.map(([lbl,field]) => bm[field] ? `<tr><td>${lbl}</td><td style="text-align:center">${esc(bm[field].m||'—')}</td><td style="text-align:center">${esc(bm[field].f||'—')}</td></tr>` : '').filter(Boolean).join('');
-    const extraRows = (bm._extra||[]).map(e=>`<tr><td>${esc(e.label)}</td><td style="text-align:center">${esc(e.m||'—')}</td><td style="text-align:center">${esc(e.f||'—')}</td></tr>`).join('');
-    if (bmRows||extraRows) bmContent += `<h3>Biometría (Macho / Hembra)</h3><table><thead><tr><th>Parámetro</th><th>Macho</th><th>Hembra</th></tr></thead><tbody>${bmRows}${extraRows}</tbody></table>`;
-    const lifeRows = lifeFields.map(([lbl,field]) => bm[field] ? `<tr><td>${lbl}</td><td style="text-align:center">${esc(bm[field].silv||'—')}</td><td style="text-align:center">${esc(bm[field].prof||'—')}</td></tr>` : '').filter(Boolean).join('');
-    if (lifeRows) bmContent += `<h3>Longevidad (Silvestre / Bajo cuidado profesional)</h3><table><thead><tr><th>Parámetro</th><th>Vida silvestre</th><th>Bajo cuidado profesional</th></tr></thead><tbody>${lifeRows}</tbody></table>`;
-  } else if (sp.weight_avg||sp.weight_min) {
-    bmContent = `<table><tbody>${row2('Peso promedio',sp.weight_avg?sp.weight_avg+' kg':NA)}${row2('Rango de peso',sp.weight_min&&sp.weight_max?sp.weight_min+'–'+sp.weight_max+' kg':NA)}</tbody></table>`;
-  }
-  if (bmContent) html += sec('4. Biometría y Longevidad', bmContent);
-
-  // ══ 5. FISIOLOGÍA ══
-  let fisioContent = `<h3>Constantes vitales</h3><table><tbody>
-    ${row2('Temperatura corporal', v.temp||NA)}${row2('Frecuencia cardíaca (bpm)', v.fc||NA)}
-    ${row2('Frecuencia respiratoria (rpm)', v.fr||NA)}${row2('Presión arterial', v.ps||NA)}
-    ${row2('Volumen sanguíneo', v.vol_sang||NA)}
-  </tbody></table>`;
-  if ((sp.venopuncion_lista||[]).length) {
-    fisioContent += `<h3>Sitios de venopunción</h3>` + tbl(['Sitio','Vol. máx.','Indicación / Notas'],
-      sp.venopuncion_lista.map(vp=>`<tr><td><strong>${esc(vp.sitio||vp[0]||'')}</strong></td><td style="text-align:center">${esc(vp.vol||vp[1]||'')}</td><td>${esc(vp.indicacion||vp[2]||'')}</td></tr>`).join(''));
-  }
-  if ((sp.hematology||[]).length) {
-    fisioContent += `<h3>Hematología</h3>` + tbl(['Parámetro','Rango normal','Unidades','Definición / Uso clínico'],
-      sp.hematology.map(h=>`<tr><td><strong>${esc(h[0]||'')}</strong></td><td style="text-align:center;font-weight:700;color:#1a6b3f">${esc(h[1]||'')}</td><td style="text-align:center">${esc(h[2]||'')}</td><td style="font-size:9pt;color:#555">${esc(h[3]||'')}</td></tr>`).join(''));
-  }
-  if ((sp.biochem||[]).length) {
-    fisioContent += `<h3>Bioquímica sérica</h3>` + tbl(['Parámetro','Rango normal','Unidades','Definición / Uso clínico'],
-      sp.biochem.map(b=>`<tr><td><strong>${esc(b[0]||'')}</strong></td><td style="text-align:center;font-weight:700;color:#1a6b3f">${esc(b[1]||'')}</td><td style="text-align:center">${esc(b[2]||'')}</td><td style="font-size:9pt;color:#555">${esc(b[3]||'')}</td></tr>`).join(''));
-  }
-  html += sec('5. Fisiología', fisioContent);
-
-  // ══ 6. NUTRICIÓN ══
-  let nutContent = `<table><tbody>
-    ${row2('Dieta bajo cuidado profesional', n.captive||NA)}
-    ${row2('Frecuencia de alimentación', n.freq||NA)}
-    ${row2('Dieta silvestre', sp.diet_wild||NA)}
-  </tbody></table>`;
-  if ((sp.dieta_silvestre_lista||[]).length) {
-    nutContent += `<div class="note"><strong>Alimentos en vida silvestre (${sp.dieta_silvestre_lista.length} items):</strong><br>${sp.dieta_silvestre_lista.map(a=>esc(a)).join(' &nbsp;·&nbsp; ')}</div>`;
-  }
-  if ((sp.req_energetico||[]).length) {
-    nutContent += `<h3>Requerimiento Energético</h3>` + tbl(['Categoría','kcal/kg/día'],
-      sp.req_energetico.map(r=>`<tr><td>${esc(r.cat)}</td><td style="text-align:center;font-weight:700">${esc(r.kcal)}</td></tr>`).join(''));
-  }
-  if ((sp.suplementos||[]).length) {
-    nutContent += `<h3>Suplementos</h3>` + tbl(['Suplemento','Categoría','Dosis','Unidad A','Unidad B','Concentración','Unidad C','Notas'],
-      sp.suplementos.map(s=>`<tr><td><strong>${esc(s.nombre)}</strong></td><td>${esc(s.cat||'')}</td>
-        <td style="text-align:center">${esc(String(s.dosis||''))}${s.dose_min?` (${s.dose_min}–${s.dose_max||'?'})`:''}</td>
-        <td>${esc(s.unitA||'kg(pv)')}</td><td>${esc(s.unitB||'mg')}</td>
-        <td style="text-align:center">${esc(String(s.conc||''))}</td><td>${esc(s.unitC||'ml')}</td>
-        <td style="font-size:9pt">${esc(s.notas||'')}</td></tr>`).join(''));
-  }
-  if ((sp.toxicos_lista||[]).length) {
-    nutContent += `<div class="warn">⚠ TÓXICOS Y PROHIBIDOS<br>` + tbl(['Sustancia / Alimento','Efecto tóxico'],
-      sp.toxicos_lista.map(t=>`<tr><td style="color:#991b1b;font-weight:600">${esc(t.nombre||t)}</td><td>${esc(t.efecto||'')}</td></tr>`).join('')) + `</div>`;
-  } else if (n.toxic) { nutContent += `<div class="warn">⚠ TÓXICOS: ${esc(n.toxic)}</div>`; }
-  if ((sp.denticion||[]).length) {
-    nutContent += `<h3>Fórmula Dentaria</h3>` + tbl(['Tipo de diente','Superior','Inferior','Función'],
-      sp.denticion.map(d=>`<tr><td>${esc(d.tipo||d[0]||'')}</td><td style="text-align:center">${esc(d.superior||d[1]||'')}</td><td style="text-align:center">${esc(d.inferior||d[2]||'')}</td><td>${esc(d.funcion||d[3]||'')}</td></tr>`).join(''));
-  }
-  if ((sp.dental_measures||[]).length) {
-    nutContent += `<h3>Medidas Odontológicas</h3>` + tbl(['N° Diente','Descripción','Valor','Fecha'],
-      sp.dental_measures.map(m=>`<tr><td style="text-align:center">${esc(m.num||'—')}</td><td>${esc(m.label||'')}</td><td style="font-weight:700">${esc(m.value||'')}</td><td style="font-size:9pt;color:#666">${esc(m.date||'')}</td></tr>`).join(''));
-  }
-  if ((sp.dental_fotos||[]).length) {
-    nutContent += `<h3>Fotos Dentales</h3><div style="display:flex;flex-wrap:wrap;gap:4pt">${sp.dental_fotos.map(f=>img(f.data,'110px','85px')).join('')}</div>`;
-  }
-  html += sec('6. Nutrición', nutContent);
-
-  // ══ 7. COMPORTAMIENTO ══
-  const behKeys = ['silvestre','cautiverio','estres','reproductivo','social'];
-  const behLabels = ['Vida silvestre','Bajo cuidado profesional','Bajo estrés / Captura','Reproductivo','Social / Compatibilidad'];
-  const spBeh = sp.comportamiento || {};
-  let behRows = '';
-  behKeys.forEach((k,i) => {
-    const val = spBeh[k] || beh[k] || beh[behLabels[i]] || '';
-    if (val) behRows += row2(behLabels[i], val);
-  });
-  if (behRows) html += sec('7. Comportamiento', `<table><tbody>${behRows}</tbody></table>`);
-
-  // ══ 8. ENFERMEDADES POR SISTEMA ══
-  const SISTEMAS_EXP = [
-    {id:'dental',label:'🦷 Enfermedades Dentales'},{id:'gastro',label:'🫁 Gastrointestinales'},
-    {id:'renal',label:'🫘 Renales / Urinarias'},{id:'cardiaco',label:'❤️ Cardíacas / Cardiovasculares'},
-    {id:'respiratorio',label:'🫧 Respiratorias'},{id:'nervioso',label:'🧠 Sistema Nervioso'},
-    {id:'musculo',label:'🦴 Músculo-esqueléticas'},{id:'dermatol',label:'🩹 Dermatológicas'},
-    {id:'infeccioso',label:'🦠 Infecciosas / Parasitarias'},{id:'otro',label:'📋 Otras'}
-  ];
-  const todosEnf = [...SISTEMAS_EXP, ...(sp.enfermedades_categorias||[])];
-  const sistData = sp.enfermedades_sistemas || {};
-  let enfContent = '';
-  todosEnf.forEach(sist => {
-    const enfs = sistData[sist.id]?.enfermedades || [];
-    if (!enfs.length) return;
-    enfContent += `<h3>${esc(sist.label||sist.id)}</h3>`;
-    // Notas del sistema
-    const notas = sistData[sist.id]?.notas;
-    if (notas) enfContent += `<div class="note">${esc(notas)}</div>`;
-    enfs.forEach(e => {
-      const signos = (e.signos_lista||[e.signos||'']).filter(Boolean).join('; ');
-      const dxItems = (e.dx_lista||[]).length ? e.dx_lista : [{metodo:e.dx||'',esperado:'',imagenes:[]}];
-      const txStr = (e.tx_lista||[e.tx||'']).filter(Boolean).join('; ');
-      const vias = [...(e.vias||[]), e.vias_extra].filter(Boolean).join(', ');
-      enfContent += `<div style="border:1pt solid #e0e0e0;border-radius:4pt;padding:6pt 8pt;margin-bottom:8pt;page-break-inside:avoid">
-        <p style="font-weight:700;font-size:11pt;color:#1a6b3f;margin:0 0 4pt">${esc(e.nombre)}</p>
-        ${e.agente?`<p style="margin:2pt 0;font-size:9pt"><strong>Agente/Causa:</strong> ${esc(e.agente)}</p>`:''}
-        ${vias?`<p style="margin:2pt 0;font-size:9pt"><strong>Vías de transmisión:</strong> ${esc(vias)}</p>`:''}
-        ${signos?`<p style="margin:2pt 0;font-size:9pt"><strong>Signos clínicos:</strong> ${esc(signos)}</p>`:''}
-        ${dxItems.length?`<p style="margin:4pt 0 2pt;font-size:9pt;font-weight:600">Diagnóstico:</p>
-        <ul style="margin:0;padding-left:14pt">${dxItems.filter(d=>d.metodo).map(d=>`<li style="font-size:9pt">${esc(d.metodo)}${d.esperado?`: <em>${esc(d.esperado)}</em>`:''}${d.imagenes?.length?`<br>${d.imagenes.map(im=>img(im.data,'90px','70px')).join('')}`:''}</li>`).join('')}</ul>`:''}
-        ${txStr?`<p style="margin:2pt 0;font-size:9pt"><strong>Tratamiento:</strong> ${esc(txStr)}</p>`:''}
-        ${e.notas?`<div class="note" style="margin-top:4pt;font-size:9pt">📋 ${esc(e.notas)}</div>`:''}
-      </div>`;
-    });
-  });
-  if (enfContent) html += sec('8. Enfermedades por Sistema', enfContent);
-
-  // ══ 9. MEDICAMENTOS ══
-  if ((sp.drugs||[]).length) {
-    const groups = {};
-    sp.drugs.forEach(d => {
-      const cats = d.cats?.length ? d.cats : [d.cat||'Otro'];
-      cats.forEach(cat => { if(!groups[cat]) groups[cat]=[]; groups[cat].push(d); });
-    });
-    let drugContent = '';
-    Object.entries(groups).forEach(([cat, drugs]) => {
-      drugContent += `<h3>${esc(cat)}</h3>`;
-      drugContent += tbl(['Nombre comercial','Principio activo','Categ. específica','Conc. (mg/ml)','Dosis rec. (mg/kg)','Rango','Vía','Frecuencia','Indicaciones','Contraindicaciones','Efectos adversos'],
-        drugs.map(d=>`<tr>
-          <td style="font-weight:700">${esc(d.name)}</td>
-          <td style="font-style:italic">${esc(d.active||'—')}</td>
-          <td style="font-size:9pt">${esc(d.cat_esp||'—')}</td>
-          <td style="text-align:center">${esc(String(d.conc||'—'))}</td>
-          <td style="text-align:center;font-weight:700;color:#1a6b3f">${esc(String(d.dose||'—'))}</td>
-          <td style="text-align:center;font-size:9pt">${(d.dose_min&&d.dose_max)?d.dose_min+'–'+d.dose_max:'—'}</td>
-          <td>${esc(d.route||'—')}</td><td>${esc(d.freq||'—')}</td>
-          <td style="font-size:9pt">${esc(d.indic||'—')}</td>
-          <td style="font-size:9pt;color:#991b1b">${esc(d.contra||d.contraindications||'—')}</td>
-          <td style="font-size:9pt">${esc(d.effects||'—')}</td>
-        </tr>`).join(''));
-    });
-    html += sec('9. Medicamentos', drugContent);
-  }
-
-  // ══ 10. PROTOCOLOS ANESTÉSICOS ══
-  if ((sp.protocols||[]).length) {
-    let protContent = '';
-    sp.protocols.forEach(p => {
-      const vis = p.visibility === 'private' ? ' 🔒' : ' 🌐';
-      protContent += `<div style="border:1pt solid #c2f0d3;border-radius:4pt;padding:8pt;margin-bottom:10pt;page-break-inside:avoid">
-        <h3 style="margin:0 0 4pt;color:#1a6b3f">${esc(p.name)}${vis}</h3>
-        <p style="font-size:9pt;margin:2pt 0"><strong>Inducción:</strong> ${esc(String(p.induction||'—'))} min &nbsp;|&nbsp; <strong>Duración estimada:</strong> ${esc(String(p.duration||'—'))} min</p>
-        ${(p.drugs||[]).length ? tbl(['Fármaco','Dosis (mg/kg)','Conc. (mg/ml)','Vía'],
-          p.drugs.map(d=>`<tr><td><strong>${esc(d.name)}</strong></td><td style="text-align:center;font-weight:700;color:#1a6b3f">${esc(String(d.dose||'—'))}</td><td style="text-align:center">${esc(String(d.conc||'—'))}</td><td>${esc(d.route||'IM')}</td></tr>`).join('')) : ''}
-        ${(p.reversals||[]).length ? `<p style="margin:4pt 0;font-size:9pt"><strong>Reversores:</strong> ${p.reversals.map(r=>`${esc(r.name)} ${r.dose} mg/kg ${esc(r.route||'IM')} · conc: ${r.conc||'—'} mg/ml`).join(' &nbsp;|&nbsp; ')}</p>` : ''}
-        ${p.notes?`<div class="note" style="font-size:9pt">📋 ${esc(p.notes)}</div>`:''}
-      </div>`;
-    });
-    html += sec('10. Protocolos Anestésicos', protContent);
-  }
-
-  // ══ 11. FLUIDOTERAPIA ══
-  if (sp.fluid_nota) html += sec('11. Fluidoterapia', `<div class="note">${esc(sp.fluid_nota).replace(/\n/g,'<br>')}</div>`);
-
-  // ══ 12. GALERÍA ══
-  const allPhotos = [...(sp.cover_photos||[])];
-  if (allPhotos.length) {
-    html += sec('12. Galería de fotos', `<div style="display:flex;flex-wrap:wrap;gap:6pt">${allPhotos.map(p=>img(p.data,'140px','105px')).join('')}</div>`);
-  }
-
-  return html;
-}
 
   // ══ PORTADA ══
   let html = '';
@@ -10117,93 +9880,8 @@ if ('serviceWorker' in navigator) {
 }
 
 // ═══════════════════════════════════
-// NAVIGATION HISTORY (back gesture)
-// ═══════════════════════════════════
-let navHistory = [];
-
-function pushNav(state) {
-  navHistory.push(state);
-}
-
-function handleBackNav() {
-  if (navHistory.length > 1) {
-    navHistory.pop();
-    const prev = navHistory[navHistory.length - 1];
-    if (prev.type === 'screen') {
-      showScreen(prev.name, false);
-    } else if (prev.type === 'species') {
-      openSpecies(prev.id, false);
-    } else if (prev.type === 'tab') {
-      showTab(prev.tab);
-    }
-  } else {
-    confirmDelete('¿Cerrar sesión?', 'Si sales perderás la sesión actual. ¿Deseas continuar?', '🚪')
-      .then(ok => { if (ok) logout(); });
-  }
-}
-
-// Interceptar botón atrás del navegador / gesto swipe back
-window.addEventListener('popstate', (e) => {
-  e.preventDefault();
-  handleBackNav();
-  history.pushState(null, '', location.href);
-});
-
-history.pushState(null, '', location.href);
-
-// ═══════════════════════════════════
 // INIT
 // ═══════════════════════════════════
-(async () => {
-  // 1. Abrir IndexedDB
-  await new Promise(res => {
-    const req = indexedDB.open('WildVetDB', 3);
-    req.onupgradeneeded = e => {
-      const d = e.target.result;
-      ['species','vademecum','records','inventory','settings'].forEach(s => {
-        if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, {keyPath: s === 'settings' ? 'key' : 'id'});
-      });
-    };
-    req.onsuccess = e => { db = e.target.result; res(); };
-    req.onerror   = () => res();
-  });
-
-  // 2. Mostrar spinner de sesión
-  const loginScr = document.getElementById('login-screen');
-  const statusEl = document.getElementById('login-status');
-  if (statusEl) { statusEl.textContent = '⏳ Verificando sesión...'; }
-
-  // 3. Cargar PIN admin guardado
-  const pinSaved = await dbGet('settings', 'admin_pin');
-  if (pinSaved?.value) ADMIN_PIN = pinSaved.value;
-
-  // 4. Inicializar Firebase con config builtin
-  initFirebase(FIREBASE_CONFIG_BUILTIN);
-
-  // 5. Esperar hasta 5s a que Firebase resuelva la sesión existente
-  let resolved = false;
-  await new Promise(res => {
-    const timeout = setTimeout(() => { resolved = true; res(); }, 5000);
-    firebaseAuth?.onAuthStateChanged(user => {
-      if (!resolved) {
-        clearTimeout(timeout);
-        resolved = true;
-        res();
-      }
-    });
-  });
-
-  // 6. Si Firebase no tiene sesión activa, mostrar login
-  if (!currentUser) {
-    if (statusEl) statusEl.textContent = '';
-    if (loginScr) loginScr.style.display = 'flex';
-  }
-
-  // 7. Inicializar historial de navegación
-  pushNav({ type: 'screen', name: 'home' });
-  history.pushState(null, '', location.href);
-})();
-
 // ═══════════════════════════════════
 // BIBLIOTECA DE REFERENCIAS
 // ═══════════════════════════════════
@@ -10242,6 +9920,79 @@ async function saveBiblioteca() {
   }
 }
 
+function renderBiblioteca() {
+  const el = document.getElementById('biblioteca-list');
+  if (!el) return;
+  const isAdmin = currentUser?.role === 'admin';
+  if (!SPECIES_DB.length) { el.innerHTML = '<p style="color:var(--txt3)">Sin especies cargadas.</p>'; return; }
+
+  // Widget de importación por IA (solo admin)
+  const aiWidget = isAdmin ? `
+    <div class="info-card" style="margin-bottom:1rem;background:var(--g0);border:2px dashed var(--g4)">
+      <div class="info-card-title">📄 Importar referencia desde archivo (PDF, Word, Excel)</div>
+      <p style="font-size:.78rem;color:var(--txt3);margin-bottom:.6rem">Sube un paper o libro y la IA extrae título, autores, año y tipo automáticamente. Luego elige a qué especie asignarla.</p>
+      <!-- Selector IA -->
+      <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-bottom:.4rem">
+        <span style="font-size:.7rem;color:var(--txt3);font-weight:600">IA:</span>
+        <button onclick="setModalAI(this,'gemini')" data-provider="gemini"
+          style="font-size:.72rem;padding:.2rem .5rem;border-radius:var(--rxs);border:2px solid var(--g4);background:var(--g1);color:var(--g7);cursor:pointer;font-family:var(--sans);font-weight:600">🔵 Gemini (gratis)</button>
+        <button onclick="setModalAI(this,'claude')" data-provider="claude"
+          style="font-size:.72rem;padding:.2rem .5rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--sur);color:var(--txt3);cursor:pointer;font-family:var(--sans)">🟠 Claude</button>
+        <input type="password" id="modal-ai-key" class="form-control" style="flex:1;min-width:150px;font-size:.75rem;height:1.8rem"
+          placeholder="API Key (AIzaSy... o sk-ant-...)" oninput="saveModalAIKey(this.value)">
+      </div>
+      <div id="modal-ai-status" style="font-size:.7rem;color:var(--txt3);margin-bottom:.5rem"></div>
+      <!-- Selector de especie -->
+      <div style="display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap">
+        <div style="flex:1;min-width:150px">
+          <label style="font-size:.7rem;color:var(--txt3)">Especie</label>
+          <select id="bib-sp-select" class="form-control" style="font-size:.82rem">
+            ${SPECIES_DB.map(sp=>`<option value="${sp.id}">${sp.name}</option>`).join('')}
+          </select>
+        </div>
+        <label for="bib-file-import" class="btn btn-primary" style="cursor:pointer;display:inline-flex;gap:.4rem;align-self:flex-end">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Subir archivo
+        </label>
+        <input type="file" id="bib-file-import" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt" style="display:none" onchange="importBibFile(this)">
+      </div>
+      <div id="bib-import-status" style="font-size:.78rem;color:var(--g6);margin-top:.4rem;min-height:1rem"></div>
+    </div>` : '';
+
+  el.innerHTML = aiWidget + SPECIES_DB.map(sp => {
+    const refs = BIBLIOTECA_DB[sp.id] || [];
+    return `
+    <div class="info-card" style="margin-bottom:.75rem">
+      <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;align-items:center;gap:.5rem">
+          ${sp.cover_photo ? `<img src="${sp.cover_photo}" style="width:32px;height:24px;object-fit:cover;border-radius:var(--rxs)">` : ''}
+          <span>${sp.name}</span>
+          <span style="font-size:.7rem;color:var(--txt3);font-weight:400;font-style:italic">${sp.sci||''}</span>
+        </div>
+        ${isAdmin ? `<button onclick="openAddRef('${sp.id}')" class="btn btn-admin btn-sm">+ Agregar</button>` : ''}
+      </div>
+      ${refs.length ? `
+      <div style="margin-top:.4rem">
+        ${refs.map((r,i) => `
+        <div style="padding:.4rem .5rem;border-left:3px solid var(--g5);margin-bottom:.4rem;background:var(--sur2);border-radius:0 var(--rxs) var(--rxs) 0">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div style="flex:1">
+              <div style="font-size:.82rem;font-weight:600;color:var(--txt)">${r.titulo||'Sin título'}</div>
+              ${r.autores ? `<div style="font-size:.75rem;color:var(--txt3)">${r.autores}${r.año?' · '+r.año:''}</div>` : ''}
+              <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
+                ${r.tipo ? `<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>` : ''}
+                ${r.url ? `<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver fuente</a>` : ''}
+                ${r.pdf ? `<a href="${r.pdf.data}" download="${r.pdf.name}" style="font-size:.65rem;color:var(--bl)">📄 ${r.pdf.name}</a>` : ''}
+              </div>
+              ${r.notas ? `<div style="font-size:.75rem;color:var(--txt3);margin-top:.2rem;font-style:italic">${r.notas}</div>` : ''}
+            </div>
+            ${isAdmin ? `<button onclick="removeRef('${sp.id}',${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem;padding:.1rem .3rem;flex-shrink:0">✕</button>` : ''}
+          </div>
+        </div>`).join('')}
+      </div>` : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic;margin-top:.3rem">Sin referencias agregadas.${isAdmin?' Toca + Agregar.':''}</p>`}
+    </div>`;
+  }).join('');
+}
 
 function setModalAI(btn, provider) {
   selectedAI = provider;
@@ -10255,7 +10006,6 @@ function setModalAI(btn, provider) {
   });
   updateModalAIStatus();
 }
-
 function saveModalAIKey(raw) {
   const key = (raw||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
   if (key.startsWith('AIza')) { localStorage.setItem('wv_key_gemini', key); selectedAI='gemini'; }
@@ -10263,7 +10013,6 @@ function saveModalAIKey(raw) {
   localStorage.setItem('wv_ai_provider', selectedAI);
   updateModalAIStatus();
 }
-
 function updateModalAIStatus() {
   const { key } = getActiveAIKey();
   const inp = document.getElementById('modal-ai-key');
@@ -10274,7 +10023,6 @@ function updateModalAIStatus() {
   else st.textContent = '✓ ' + (selectedAI==='gemini'?'Gemini':'Claude') + ': ' + key.substring(0,14) + '...';
   st.style.color = key ? 'var(--g6)' : 'var(--am)';
 }
-
 function getModalAIKey() {
   // Leer del campo modal o del almacenamiento según proveedor seleccionado
   const modalKey = (document.getElementById('modal-ai-key')?.value||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
@@ -10286,6 +10034,76 @@ function getModalAIKey() {
   }
   const { key } = getActiveAIKey();
   return key || '';
+}
+async function importBibFile(input) {
+  if (!input.files?.[0]) return;
+  const statusEl = document.getElementById('bib-import-status');
+  const spId = document.getElementById('bib-sp-select')?.value;
+  if (!spId) { if(statusEl) statusEl.textContent='⚠ Selecciona una especie'; return; }
+  if (statusEl) { statusEl.textContent = '⏳ Procesando archivo...'; statusEl.style.color='var(--g6)'; }
+  try {
+    const file = input.files[0];
+    const isPDF = file.name.match(/\.pdf$/i);
+    const apiKey = getModalAIKey();
+    if (!apiKey) throw new Error('Sin API Key — configúrala arriba');
+
+    const prompt = `Analiza este documento académico/científico y extrae sus metadatos bibliográficos. Devuelve SOLO un JSON:
+{"titulo":"título completo","autores":"Apellido1, N.; Apellido2, N.","año":"año","tipo":"Libro|Artículo científico|Paper|Guía clínica|Tesis|Manual|Otro","doi":"DOI o URL si está disponible","resumen":"resumen de 1-2 oraciones de qué trata el documento"}`;
+
+    let metadata = null;
+
+    if (isPDF) {
+      // Leer como base64
+      const base64 = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(file); });
+      const b64 = base64.split(',')[1];
+      if (apiKey.startsWith('sk-')) {
+        const resp = await fetch('https://api.anthropic.com/v1/messages',{
+          method:'POST', headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+          body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,messages:[{role:'user',content:[
+            {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}
+          ]}]})
+        });
+        if (!resp.ok) throw new Error('Claude error '+resp.status);
+        const d = await resp.json(); const raw=d.content.map(c=>c.text||'').join('');
+        const cl=raw.replace(/```json|```/g,'').trim(); const js=cl.indexOf('{'),je=cl.lastIndexOf('}');
+        if(js>=0) metadata=JSON.parse(cl.substring(js,je+1));
+      } else {
+        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:'application/pdf',data:b64}},{text:prompt}]}]})
+        });
+        if (!resp.ok) throw new Error('Gemini error '+resp.status);
+        const d=await resp.json(); const raw=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+        const cl=raw.replace(/```json|```/g,'').trim(); const js=cl.indexOf('{'),je=cl.lastIndexOf('}');
+        if(js>=0) metadata=JSON.parse(cl.substring(js,je+1));
+      }
+    } else {
+      // Word, Excel, TXT — usar importExcelWithAI
+      metadata = await importExcelWithAI(file, prompt);
+      if (Array.isArray(metadata)) metadata = metadata[0];
+    }
+
+    if (metadata && metadata.titulo) {
+      if (!BIBLIOTECA_DB[spId]) BIBLIOTECA_DB[spId] = [];
+      BIBLIOTECA_DB[spId].push({
+        titulo: metadata.titulo||'',
+        autores: metadata.autores||'',
+        año: metadata.año||'',
+        tipo: metadata.tipo||'Artículo científico',
+        url: metadata.doi||'',
+        notas: metadata.resumen||''
+      });
+      await saveBiblioteca();
+      if (statusEl) { statusEl.textContent = `✅ Referencia importada: "${metadata.titulo}"`;  statusEl.style.color='var(--g5)'; }
+      input.value = '';
+      renderBiblioteca();
+      setTimeout(updateModalAIStatus, 50);
+    } else {
+      throw new Error('No se encontraron metadatos en el documento');
+    }
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = '⚠ ' + e.message; statusEl.style.color='var(--r5)'; }
+  }
 }
 
 function saveRefAIKey(raw) {
@@ -10306,6 +10124,82 @@ function saveRefAIKey(raw) {
     else if (key.startsWith('sk-')) { status.textContent = '✓ Claude configurado'; status.style.color='var(--g6)'; }
     else { status.textContent = '⚠ Key no reconocida'; status.style.color='var(--r5)'; }
   }
+}
+
+function openAddRef(spId) {
+  document.getElementById('ref-modal')?.remove();
+  _refPDFData = null;
+  const sp = SPECIES_DB.find(s => s.id === spId);
+  const { provider, key } = getActiveAIKey();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">📚 Agregar referencia — ${sp?.name||''}</div>
+
+        <!-- IMPORTAR DESDE ARCHIVO (igual a agregar especie) -->
+        <div style="background:var(--g0);border:2px dashed var(--g4);border-radius:var(--r);padding:1rem;margin-bottom:1rem;text-align:center">
+          <div style="font-size:1.4rem;margin-bottom:.25rem">📄</div>
+          <div style="font-weight:600;font-size:.88rem;margin-bottom:.1rem">Importar desde PDF, Word o Excel</div>
+          <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.6rem">La IA extrae título, autores, año y tipo automáticamente</div>
+
+          <!-- Selector IA -->
+          <div style="display:flex;gap:.3rem;justify-content:center;margin-bottom:.4rem">
+            <button onclick="setRefAI(this,'gemini')" data-ai="gemini"
+              style="font-size:.72rem;padding:.2rem .55rem;border-radius:var(--rxs);border:2px solid var(--g4);background:var(--g1);color:var(--g7);cursor:pointer;font-family:var(--sans);font-weight:600">🔵 Gemini (gratis)</button>
+            <button onclick="setRefAI(this,'claude')" data-ai="claude"
+              style="font-size:.72rem;padding:.2rem .55rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--sur);color:var(--txt3);cursor:pointer;font-family:var(--sans)">🟠 Claude</button>
+          </div>
+
+          <!-- Key -->
+          <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
+            <input type="password" id="ref-ai-key" class="form-control" style="flex:1;font-size:.75rem"
+              placeholder="${key ? key.substring(0,8)+'...' : 'AIzaSy... o sk-ant-...'}"
+              value="${key||''}"
+              oninput="saveRefAIKey(this.value)">
+            <a href="https://aistudio.google.com/apikey" target="_blank" class="btn btn-secondary btn-sm" style="font-size:.68rem;white-space:nowrap">Obtener</a>
+          </div>
+          <div id="ref-ai-key-status" style="font-size:.68rem;color:${key?'var(--g6)':'var(--am)'};margin-bottom:.5rem;text-align:left">
+            ${key ? '✓ '+( provider==='gemini'?'Gemini':'Claude')+' configurado' : '⚠ Sin key — sin key solo se guarda el PDF sin extraer datos'}
+          </div>
+
+          <!-- Botón seleccionar archivo -->
+          <label for="ref-file-up" class="btn btn-primary" style="cursor:pointer;display:inline-flex;gap:.4rem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Seleccionar archivo
+          </label>
+          <input type="file" id="ref-file-up" accept=".pdf,.docx,.doc,.txt" style="display:none" onchange="importRefFile(this)">
+          <div id="ref-import-status" style="margin-top:.5rem;font-size:.8rem;color:var(--g6);min-height:1rem"></div>
+        </div>
+
+        <!-- Campos manuales -->
+        <div class="form-group"><label>Título *</label><input id="ref-titulo" class="form-control" placeholder="Ej: Wild Mammal Husbandry..."></div>
+        <div class="form-row">
+          <div class="form-group"><label>Autores</label><input id="ref-autores" class="form-control" placeholder="Apellido, N. et al."></div>
+          <div class="form-group"><label>Año</label><input id="ref-año" class="form-control" type="number" placeholder="2023" style="width:80px"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Tipo</label>
+            <select id="ref-tipo" class="form-control">
+              <option>Libro</option><option>Artículo científico</option><option>Paper</option>
+              <option>Guía clínica</option><option>Tesis</option><option>Manual</option><option>Otro</option>
+            </select>
+          </div>
+          <div class="form-group"><label>URL / DOI</label><input id="ref-url" class="form-control" placeholder="https://..."></div>
+        </div>
+        <div class="form-group"><label>Notas</label><textarea id="ref-notas" class="form-control" placeholder="Capítulos relevantes, páginas, observaciones..." style="min-height:50px"></textarea></div>
+
+        <!-- PDF adjunto guardado -->
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem" id="ref-pdf-preview" style="display:none">
+          <span style="font-size:.72rem;color:var(--g6)" id="ref-pdf-name"></span>
+        </div>
+
+        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveRef('${spId}')">💾 Guardar referencia</button>
+        </div>
+      </div>
+    </div>`);
+  document.getElementById('ref-titulo')?.focus();
 }
 
 function setRefAI(btn, provider) {
@@ -10413,6 +10307,8 @@ async function importRefFile(input) {
   }
 }
 
+let _refPDFData = null;
+
 async function previewRefPDF(input) {
   if (!input.files?.[0]) return;
   const file = input.files[0];
@@ -10516,3 +10412,258 @@ Si no encuentras algún dato deja el campo vacío "".`;
     if (nameEl) nameEl.textContent = file.name + ' (completa los campos manualmente)';
   }
 }
+
+async function saveRef(spId) {
+  const titulo = document.getElementById('ref-titulo')?.value.trim();
+  if (!titulo) { toast('⚠ El título es obligatorio'); return; }
+  if (!BIBLIOTECA_DB[spId]) BIBLIOTECA_DB[spId] = [];
+  BIBLIOTECA_DB[spId].push({
+    titulo,
+    autores: document.getElementById('ref-autores')?.value.trim() || '',
+    año:     document.getElementById('ref-año')?.value || '',
+    tipo:    document.getElementById('ref-tipo')?.value || 'Libro',
+    url:     document.getElementById('ref-url')?.value.trim() || '',
+    notas:   document.getElementById('ref-notas')?.value.trim() || '',
+    pdf:     _refPDFData || null
+  });
+  _refPDFData = null;
+  await saveBiblioteca();
+  document.getElementById('ref-modal')?.remove();
+  renderBiblioteca();
+  toast('✓ Referencia agregada');
+}
+
+async function removeRef(spId, i) {
+  const ok = await confirmDelete('¿Eliminar referencia?', `Se eliminará "${BIBLIOTECA_DB[spId]?.[i]?.titulo||''}".`);
+  if (!ok) return;
+  BIBLIOTECA_DB[spId].splice(i, 1);
+  await saveBiblioteca();
+  renderBiblioteca();
+}
+
+// ═══════════════════════════════════
+// EDITAR ENFERMEDAD EXISTENTE
+// ═══════════════════════════════════
+
+function buscarPorSignos() {
+  const query = document.getElementById('signos-search')?.value.toLowerCase().trim();
+  const resultsEl = document.getElementById('signos-results');
+  if (!query || !resultsEl) return;
+  const terminos = query.split(/[,;]+/).map(t=>t.trim()).filter(Boolean);
+  const sp = currentSpecies;
+  if (!sp) return;
+  const matches = [];
+  const sistemas = sp.enfermedades_sistemas || {};
+  const todos = [...SISTEMAS_ENFERMEDAD, ...(sp.enfermedades_categorias||[])];
+  todos.forEach(sist => {
+    const enfs = sistemas[sist.id]?.enfermedades || [];
+    enfs.forEach(enf => {
+      const signos = (enf.signos_lista||[enf.signos||'']).join(' ').toLowerCase();
+      const coincide = terminos.some(t => signos.includes(t));
+      if (coincide) matches.push({ sist: sist.label, icon: sist.icon, enf });
+    });
+  });
+  if (!matches.length) {
+    resultsEl.innerHTML = '<span style="color:var(--txt3)">Sin enfermedades compatibles con esos signos.</span>';
+    return;
+  }
+  resultsEl.innerHTML = `<div style="font-weight:600;color:var(--g6);margin-bottom:.3rem">${matches.length} enfermedad(es) compatible(s):</div>` +
+    matches.map(m=>`
+    <div style="padding:.3rem .5rem;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);margin-bottom:.25rem">
+      <div style="font-size:.72rem;color:var(--txt3)">${m.icon} ${m.sist}</div>
+      <div style="font-weight:600;font-size:.82rem">${m.enf.nombre}</div>
+      ${m.enf.agente?`<div style="font-size:.75rem;color:var(--txt3)">Agente: ${m.enf.agente}</div>`:''}
+    </div>`).join('');
+}
+
+function editCategoria(sistId) {
+  const sist = [...SISTEMAS_ENFERMEDAD, ...(currentSpecies?.enfermedades_categorias||[])].find(s=>s.id===sistId);
+  if (!sist) return;
+  const nombre = prompt('Nombre de la categoría:', sist.label);
+  if (!nombre) return;
+  const icono = prompt('Emoji/Icono:', sist.icon);
+  if (SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)) {
+    // Guardar override en species
+    if (!currentSpecies._cat_overrides) currentSpecies._cat_overrides = {};
+    currentSpecies._cat_overrides[sistId] = { label: nombre, icon: icono||sist.icon };
+  } else {
+    // Categoría custom
+    const idx = currentSpecies.enfermedades_categorias.findIndex(s=>s.id===sistId);
+    if (idx>=0) { currentSpecies.enfermedades_categorias[idx].label = nombre; currentSpecies.enfermedades_categorias[idx].icon = icono||sist.icon; }
+  }
+  dbPutSync('species', currentSpecies);
+  renderTab('enfermedades');
+  toast('✓ Categoría actualizada');
+}
+function openEditEnfermedad(sistId, enfIdx) {
+  const enf = currentSpecies?.enfermedades_sistemas?.[sistId]?.enfermedades?.[enfIdx];
+  if (!enf) return;
+  document.getElementById('enf-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="enf-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">✏️ Editar enfermedad</div>
+        <div class="form-group"><label>Nombre *</label><input id="enf-nombre" class="form-control" value="${enf.nombre||''}"></div>
+        <div class="form-group"><label>Agente / Causa</label><input id="enf-agente" class="form-control" value="${enf.agente||''}"></div>
+        <div class="form-group"><label>Signos clínicos</label><textarea id="enf-signos" class="form-control" style="min-height:70px">${enf.signos||''}</textarea></div>
+        <div class="form-group"><label>Diagnóstico</label><input id="enf-dx" class="form-control" value="${enf.dx||''}"></div>
+        <div class="form-group"><label>Tratamiento</label><textarea id="enf-tx" class="form-control" style="min-height:70px">${enf.tx||''}</textarea></div>
+        <div style="display:flex;gap:.5rem;margin-top:.5rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('enf-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveEditEnfermedad('${sistId}',${enfIdx})">💾 Guardar cambios</button>
+        </div>
+      </div>
+    </div>`);
+  document.getElementById('enf-nombre')?.focus();
+}
+
+async function saveEditEnfermedad(sistId, enfIdx) {
+  const nombre = document.getElementById('enf-nombre')?.value.trim();
+  if (!nombre) { toast('⚠ El nombre es obligatorio'); return; }
+  currentSpecies.enfermedades_sistemas[sistId].enfermedades[enfIdx] = {
+    nombre,
+    agente: document.getElementById('enf-agente')?.value || '',
+    signos: document.getElementById('enf-signos')?.value || '',
+    dx:     document.getElementById('enf-dx')?.value || '',
+    tx:     document.getElementById('enf-tx')?.value || ''
+  };
+  await dbPutSync('species', currentSpecies);
+  document.getElementById('enf-modal')?.remove();
+  renderTab('enfermedades');
+  toast('✓ Enfermedad actualizada');
+}
+
+// ═══════════════════════════════════
+// NAVEGACIÓN — historial interno
+// ═══════════════════════════════════
+let navHistory = [];
+
+function pushNav(state) {
+  navHistory.push(state);
+}
+
+function handleBackNav() {
+  if (navHistory.length > 1) {
+    navHistory.pop(); // quitar estado actual
+    const prev = navHistory[navHistory.length - 1];
+    if (prev.type === 'screen') {
+      showScreen(prev.name, false);
+    } else if (prev.type === 'species') {
+      openSpecies(prev.id, false);
+    } else if (prev.type === 'tab') {
+      showTab(prev.tab, false);
+    }
+  } else {
+    // Confirmar salida de sesión
+    confirmDelete('¿Cerrar sesión?', 'Si sales perderás la sesión actual. ¿Deseas continuar?', '🚪').then(ok => {
+      if (ok) logout();
+    });
+  }
+}
+
+// Interceptar botón atrás del navegador
+window.addEventListener('popstate', (e) => {
+  e.preventDefault();
+  handleBackNav();
+  // Mantener la URL sin cambios
+  history.pushState(null, '', location.href);
+});
+
+// Inicializar historial
+history.pushState(null, '', location.href);
+
+// ═══════════════════════════════════
+// CALCULADORA SUPLEMENTOS (con concentración)
+// ═══════════════════════════════════
+function calcSupConc(weightInput, dosisStr, concStr, unitStr, resultId) {
+  const w = parseFloat(weightInput.value);
+  const el = document.getElementById(resultId);
+  if (!el || !w) { if(el) el.textContent='—'; return; }
+  const parts = String(dosisStr||'').split('-').map(p=>parseFloat(p.trim())).filter(n=>!isNaN(n));
+  const conc = parseFloat(concStr) || 0;
+  const unit = unitStr || 'mg/kg';
+  const isDayUnit = unit.includes('/día') || unit.includes('/dia');
+
+  if (parts.length === 2) {
+    const totalMin = w * parts[0];
+    const totalMax = w * parts[1];
+    let result = `${totalMin.toFixed(1)}–${totalMax.toFixed(1)} ${unit.replace('/kg','').replace('/día','').replace('/dia','')} total`;
+    if (conc > 0 && !isDayUnit) {
+      result += ` · ${(totalMin/conc).toFixed(2)}–${(totalMax/conc).toFixed(2)} ml`;
+    }
+    el.textContent = result;
+  } else if (parts.length === 1) {
+    const total = w * parts[0];
+    let result = `${total.toFixed(2)} ${unit.replace('/kg','').replace('/día','').replace('/dia','')} total`;
+    if (conc > 0 && !isDayUnit) {
+      result += ` · ${(total/conc).toFixed(2)} ml`;
+    }
+    el.textContent = result;
+  } else { el.textContent='—'; }
+}
+
+async function init() {
+  await initDB();
+
+  const loginScreen = document.getElementById('login-screen');
+
+  // Mostrar spinner de carga (NO login) mientras Firebase verifica
+  if (loginScreen) {
+    loginScreen.innerHTML = `
+      <div style="text-align:center">
+        <div style="width:48px;height:48px;border:3px solid var(--g4);border-top-color:var(--g6);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 1rem"></div>
+        <p style="color:var(--g4);font-size:.85rem">Verificando sesión...</p>
+      </div>`;
+    loginScreen.style.display = 'flex';
+  }
+
+  // Inicializar Firebase
+  initFirebase(FIREBASE_CONFIG_BUILTIN);
+
+  // Esperar a que onAuthStateChanged resuelva (máx 5s)
+  await new Promise(resolve => {
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    // onAuthStateChanged ya está configurado en initFirebase y llama a finishGoogleLogin
+    // Solo esperamos que currentUser se establezca o que expire el timeout
+    const check = setInterval(() => { if (currentUser) { clearInterval(check); finish(); } }, 100);
+    setTimeout(() => { clearInterval(check); finish(); }, 5000);
+  });
+
+  // Si no hay sesión → mostrar login real
+  if (!currentUser) {
+    if (loginScreen) {
+      // Restaurar el HTML del login original
+      loginScreen.innerHTML = `
+        <div style="text-align:center;max-width:340px;width:100%;padding:0 1.5rem">
+          <div style="margin-bottom:1.5rem">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--g5)" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <h1 style="font-size:1.5rem;font-weight:700;color:var(--g6);margin-top:.5rem">WildVet</h1>
+            <p style="font-size:.8rem;color:var(--txt3)">Plataforma clínica para fauna silvestre</p>
+          </div>
+          <button id="google-btn" onclick="loginWithGoogle()"
+            style="width:100%;display:flex;align-items:center;justify-content:center;gap:.6rem;background:white;border:1px solid #dadce0;border-radius:var(--rsm);padding:.7rem 1rem;font-size:.9rem;font-weight:500;color:#3c4043;cursor:pointer;margin-bottom:.75rem;font-family:var(--sans)">
+            <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Continuar con Google
+          </button>
+          <div style="margin-bottom:.5rem;position:relative">
+            <hr style="border:none;border-top:1px solid var(--bor)">
+            <span style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:var(--g9);padding:0 .5rem;font-size:.72rem;color:var(--txt3)">o</span>
+          </div>
+          <button onclick="loginWithPin()"
+            style="width:100%;background:none;border:1px solid var(--bor);border-radius:var(--rsm);padding:.6rem;font-size:.82rem;color:var(--txt3);cursor:pointer;font-family:var(--sans)">
+            🔐 Entrar como Administrador (PIN)
+          </button>
+          <p id="login-status" style="font-size:.75rem;color:var(--r5);margin-top:.6rem;min-height:1rem"></p>
+        </div>`;
+      loginScreen.style.display = 'flex';
+    }
+  }
+
+  if (!navigator.onLine) document.getElementById('offline-badge')?.classList.add('show');
+  pushNav({ type: 'screen', name: 'home' });
+}
+init();
+</script>
+</body>
+</html>
