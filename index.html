@@ -10119,6 +10119,56 @@ if ('serviceWorker' in navigator) {
 // ═══════════════════════════════════
 // INIT
 // ═══════════════════════════════════
+(async () => {
+  // 1. Abrir IndexedDB
+  await new Promise(res => {
+    const req = indexedDB.open('WildVetDB', 3);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      ['species','vademecum','records','inventory','settings'].forEach(s => {
+        if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, {keyPath: s === 'settings' ? 'key' : 'id'});
+      });
+    };
+    req.onsuccess = e => { db = e.target.result; res(); };
+    req.onerror   = () => res();
+  });
+
+  // 2. Mostrar spinner de sesión
+  const loginScr = document.getElementById('login-screen');
+  const statusEl = document.getElementById('login-status');
+  if (statusEl) { statusEl.textContent = '⏳ Verificando sesión...'; }
+
+  // 3. Cargar PIN admin guardado
+  const pinSaved = await dbGet('settings', 'admin_pin');
+  if (pinSaved?.value) ADMIN_PIN = pinSaved.value;
+
+  // 4. Inicializar Firebase con config builtin
+  initFirebase(FIREBASE_CONFIG_BUILTIN);
+
+  // 5. Esperar hasta 5s a que Firebase resuelva la sesión existente
+  let resolved = false;
+  await new Promise(res => {
+    const timeout = setTimeout(() => { resolved = true; res(); }, 5000);
+    firebaseAuth?.onAuthStateChanged(user => {
+      if (!resolved) {
+        clearTimeout(timeout);
+        resolved = true;
+        res();
+      }
+    });
+  });
+
+  // 6. Si Firebase no tiene sesión activa, mostrar login
+  if (!currentUser) {
+    if (statusEl) statusEl.textContent = '';
+    if (loginScr) loginScr.style.display = 'flex';
+  }
+
+  // 7. Inicializar historial de navegación
+  pushNav({ type: 'screen', name: 'home' });
+  history.pushState(null, '', location.href);
+})();
+
 // ═══════════════════════════════════
 // BIBLIOTECA DE REFERENCIAS
 // ═══════════════════════════════════
