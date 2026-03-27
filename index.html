@@ -10117,6 +10117,41 @@ if ('serviceWorker' in navigator) {
 }
 
 // ═══════════════════════════════════
+// NAVIGATION HISTORY (back gesture)
+// ═══════════════════════════════════
+let navHistory = [];
+
+function pushNav(state) {
+  navHistory.push(state);
+}
+
+function handleBackNav() {
+  if (navHistory.length > 1) {
+    navHistory.pop();
+    const prev = navHistory[navHistory.length - 1];
+    if (prev.type === 'screen') {
+      showScreen(prev.name, false);
+    } else if (prev.type === 'species') {
+      openSpecies(prev.id, false);
+    } else if (prev.type === 'tab') {
+      showTab(prev.tab);
+    }
+  } else {
+    confirmDelete('¿Cerrar sesión?', 'Si sales perderás la sesión actual. ¿Deseas continuar?', '🚪')
+      .then(ok => { if (ok) logout(); });
+  }
+}
+
+// Interceptar botón atrás del navegador / gesto swipe back
+window.addEventListener('popstate', (e) => {
+  e.preventDefault();
+  handleBackNav();
+  history.pushState(null, '', location.href);
+});
+
+history.pushState(null, '', location.href);
+
+// ═══════════════════════════════════
 // INIT
 // ═══════════════════════════════════
 (async () => {
