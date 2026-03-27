@@ -130,7 +130,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .quick-card span{display:block;font-size:.72rem;font-weight:500;color:var(--txt2)}
 
 /* DETAIL */
-#species-detail{display:none;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
+#species-detail{display:none;padding-top:0;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
 .detail-header{background:var(--g9);padding:.5rem .75rem;display:flex;align-items:center;gap:.5rem;position:fixed;top:56px;left:0;right:0;z-index:90;box-shadow:0 1px 0 rgba(78,180,110,.2);flex-wrap:nowrap;min-height:48px}
 .back-btn{background:rgba(78,180,110,.2);border:none;color:var(--g3);width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .detail-name{color:white;font-size:.95rem;font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -143,7 +143,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .tab-btn{padding:.6rem .85rem;font-family:var(--sans);font-size:.78rem;font-weight:500;background:none;border:none;border-bottom:2px solid transparent;color:var(--txt3);cursor:pointer;white-space:nowrap;transition:all .15s}
 .tab-btn.active{color:var(--g6);border-bottom-color:var(--g5)}
 /* spacer: 56px topbar + 48px detail-header + 40px tabs = 144px */
-.tab-content-spacer{height:104px;min-height:104px;flex-shrink:0}
+.tab-content-spacer{height:0;display:none}
 .tab-content{display:none;padding:1rem;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
 .tab-content.active{display:block}
 
@@ -561,7 +561,10 @@ textarea.form-control{resize:vertical;min-height:70px}
   <div id="screen-inventario" class="screen">
     <div class="flex-between mb-2">
       <h2 style="font-size:1.1rem;font-weight:700">Inventario Institucional</h2>
-      <button class="btn btn-primary" onclick="openAddInventory()">+ Agregar</button>
+      <div style="display:flex;gap:.4rem" id="inventory-admin-btns">
+        <button class="btn btn-secondary btn-sm" id="inv-share-btn" style="display:none" onclick="shareInventoryWith()">🔗 Compartir</button>
+        <button class="btn btn-primary btn-sm" onclick="openAddInventory()">+ Agregar</button>
+      </div>
     </div>
     <div id="institution-tabs" style="overflow-x:auto;white-space:nowrap;margin-bottom:1rem;padding-bottom:.3rem"></div>
     <div id="inventory-list"></div>
@@ -662,15 +665,15 @@ textarea.form-control{resize:vertical;min-height:70px}
       <button class="tab-btn" onclick="showTab('fluidoterapia')">Fluidoterapia</button>
     </div>
   </div>
-  <div id="tab-general" class="tab-content active"><div class="tab-content-spacer"></div></div>
-  <div id="tab-fisiologia" class="tab-content"><div class="tab-content-spacer"></div></div>
-  <div id="tab-nutricion" class="tab-content"><div class="tab-content-spacer"></div></div>
-  <div id="tab-enfermedades" class="tab-content"><div class="tab-content-spacer"></div></div>
-  <div id="tab-comportamiento" class="tab-content"><div class="tab-content-spacer"></div></div>
-  <div id="tab-medicamentos" class="tab-content"><div class="tab-content-spacer"></div></div>
-  <div id="tab-protocolos" class="tab-content"><div class="tab-content-spacer"></div></div>
-  <div id="tab-fluidoterapia" class="tab-content"><div class="tab-content-spacer"></div></div>
-  <div id="tab-enriquecimiento" class="tab-content"><div class="tab-content-spacer"></div></div>
+  <div id="tab-general" class="tab-content active"></div>
+  <div id="tab-fisiologia" class="tab-content"></div>
+  <div id="tab-nutricion" class="tab-content"></div>
+  <div id="tab-enfermedades" class="tab-content"></div>
+  <div id="tab-comportamiento" class="tab-content"></div>
+  <div id="tab-medicamentos" class="tab-content"></div>
+  <div id="tab-protocolos" class="tab-content"></div>
+  <div id="tab-fluidoterapia" class="tab-content"></div>
+  <div id="tab-enriquecimiento" class="tab-content"></div>
 </div>
 
 <!-- BOTTOM NAV -->
@@ -2121,15 +2124,21 @@ function showScreen(name, trackNav=true) {
   if (s) s.classList.add('active');
   const b = document.getElementById('bnav-'+name);
   if (b) b.classList.add('active');
-  if (trackNav) pushNav({ type: 'screen', name });
+  if (trackNav) {
+    // Limpiar cualquier state de especie y dejar solo home + pantalla actual
+    // Así el back siempre va a home, no a la última especie visitada
+    navHistory = navHistory.filter(st => st.type === 'screen' && st.name === 'home');
+    if (!navHistory.length) navHistory = [{ type: 'screen', name: 'home' }];
+    if (name !== 'home') navHistory.push({ type: 'screen', name });
+  }
   if (name==='home') document.getElementById('bnav-home').classList.add('active');
   if (name==='admin') { renderAdminSpeciesList(); loadAdminEmails().then(renderAdminEmailsList); }
-  if (name==='biblioteca') { renderBiblioteca(); }
+  if (name==='biblioteca') { loadBibliotecaGeneral().then(renderBiblioteca); }
   if (name==='enriquecimiento') { renderEnriquecimientoScreen(); }
   if (name==='recintos') { renderRecintosScreen(); }
   if (name==='nutricion-calc') { renderNutricionCalcScreen(); }
   if (name==='historias') renderRecordsList();
-  if (name==='inventario') renderInventoryList();
+  if (name==='inventario') { renderInventoryList(); const sh=document.getElementById('inv-share-btn'); if(sh) sh.style.display=currentUser?.role==='admin'?'block':'none'; }
   if (name==='vademecum') { syncAndRenderVademecum(); }
 }
 function goHome() { showScreen('home'); }
@@ -2448,26 +2457,24 @@ function openSpecies(id, trackNav=true) {
   window.scrollTo({top:0, behavior:'instant'});
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
-  // Ajustar posición de tabs después de que el DOM se haya renderizado
+  // Ajustar posición de tabs: actualiza el padding-top del species-detail
   function adjustTabsPosition() {
     const header = document.getElementById('detail-header');
     const tabsScroll = document.querySelector('.tabs-scroll');
-    const spacers = document.querySelectorAll('.tab-content-spacer');
-    if (!header || !tabsScroll) return;
+    const detail = document.getElementById('species-detail');
+    if (!header || !tabsScroll || !detail) return;
     const topbarH = 56;
-    const headerH = header.offsetHeight || header.getBoundingClientRect().height || 48;
+    const headerH = header.getBoundingClientRect().height || 48;
     const tabsTop = topbarH + headerH;
     tabsScroll.style.top = tabsTop + 'px';
-    const tabsH = tabsScroll.offsetHeight || 40;
-    const spacerH = tabsTop + tabsH + 8; // +8px de margen visual
-    spacers.forEach(s => { s.style.height = spacerH + 'px'; s.style.minHeight = spacerH + 'px'; });
+    const tabsH = tabsScroll.getBoundingClientRect().height || 40;
+    // El padding-top del contenedor = total de headers fijos + pequeño margen
+    detail.style.paddingTop = (tabsTop + tabsH + 4) + 'px';
   }
-  requestAnimationFrame(() => {
-    adjustTabsPosition();
-    requestAnimationFrame(adjustTabsPosition);
-  });
-  setTimeout(adjustTabsPosition, 100);
-  setTimeout(adjustTabsPosition, 400);
+  // Calcular inmediatamente (sin delay visual)
+  adjustTabsPosition();
+  // Y refinar una vez que el DOM esté completamente pintado
+  requestAnimationFrame(adjustTabsPosition);
 }
 function showTab(tab) {
   const tabs = ['general','fisiologia','nutricion','enfermedades','comportamiento','medicamentos','protocolos','fluidoterapia','enriquecimiento'];
@@ -2476,6 +2483,20 @@ function showTab(tab) {
   document.getElementById('tab-'+tab).classList.add('active');
   renderTab(tab);
   window.scrollTo({top:0, behavior:'instant'});
+  // Mantener el padding-top correcto al cambiar de tab
+  requestAnimationFrame(() => {
+    const header = document.getElementById('detail-header');
+    const tabsScroll = document.querySelector('.tabs-scroll');
+    const detail = document.getElementById('species-detail');
+    if (header && tabsScroll && detail) {
+      const topbarH = 56;
+      const headerH = header.getBoundingClientRect().height || 48;
+      const tabsTop = topbarH + headerH;
+      tabsScroll.style.top = tabsTop + 'px';
+      const tabsH = tabsScroll.getBoundingClientRect().height || 40;
+      detail.style.paddingTop = (tabsTop + tabsH + 4) + 'px';
+    }
+  });
 }
 function renderTab(tab) {
   const sp = currentSpecies;
@@ -4507,18 +4528,6 @@ function openAddEnfermedad(sistId, editIdx=-1) {
               <input type="checkbox" value="${sist.id}" class="enf-sistema-chk"
                 ${(editEnf?.sistemas_afectados||[sistId]).includes(sist.id)?'checked':''} style="accent-color:var(--g5)">
               ${sist.icon} ${sist.label}
-            </label>`).join('')}
-          </div>
-        </div>
-
-        <!-- Sistemas afectados (3) -->
-        <div class="form-group">
-          <label>Sistemas afectados <span style="font-weight:400;color:var(--txt3);font-size:.72rem">(puede afectar varios)</span></label>
-          <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.25rem">
-            ${SISTEMAS_ENFERMEDAD.map(s=>`
-            <label style="display:inline-flex;align-items:center;gap:.25rem;padding:.2rem .45rem;border:1px solid var(--bor);border-radius:20px;cursor:pointer;font-size:.72rem;background:var(--sur)">
-              <input type="checkbox" value="${s.id}" ${(editEnf?.sistemas_afectados||[sistId]).includes(s.id)?'checked':''} style="accent-color:var(--g5)">
-              ${s.icon} ${s.label}
             </label>`).join('')}
           </div>
         </div>
@@ -8542,7 +8551,7 @@ function renderBiblioteca() {
   if (SPECIES_DB.length) {
     html += SPECIES_DB.map(sp => {
       const refs = BIBLIOTECA_DB[sp.id] || [];
-      const isOpen = refs.length > 0; // abrir si tiene refs
+      const isOpen = false; // todas cerradas por defecto - clic para abrir
       return `
       <div class="info-card" style="margin-bottom:.6rem" id="bib-card-${sp.id}">
         <div style="display:flex;align-items:center;gap:.5rem;cursor:pointer;padding:.1rem 0"
@@ -9105,13 +9114,17 @@ function addEnriqSpRow() {
 
 function openSpeciesHistoryManager() {
   document.getElementById('sp-hist-modal')?.remove();
-  const history = getSpeciesHistory();
-  // Obtener solo las que vienen de enriquecimientos y recintos (editables)
+  // Obtener solo las que vienen de enriquecimientos (editables), sin duplicar por nombre
+  const seen = new Set();
   const allItems = [];
   ENRIQUECIMIENTOS_DB.forEach((enr, enrIdx) => {
     const lista = enr.especies?.length ? enr.especies : (enr.especie ? [{sp:enr.especie, sci:enr.sci||''}] : []);
     lista.forEach((e, spIdx) => {
-      if (e.sp||e.sci) allItems.push({ source: 'enriq', enrIdx, spIdx, sp: e.sp||'', sci: e.sci||'', enrName: enr.nombre });
+      const key = (e.sp||'').toLowerCase().trim() + '|' + (e.sci||'').toLowerCase().trim();
+      if ((e.sp||e.sci) && !seen.has(key)) {
+        seen.add(key);
+        allItems.push({ source: 'enriq', enrIdx, spIdx, sp: e.sp||'', sci: e.sci||'', enrName: enr.nombre });
+      }
     });
   });
   document.body.insertAdjacentHTML('beforeend', `
