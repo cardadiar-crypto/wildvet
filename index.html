@@ -3951,73 +3951,46 @@ async function removeDentalMeasure(i) {
   renderTab('nutricion');
   toast('Medida eliminada');
 }
-// ── Helper: importar con IA (Anthropic o Gemini) ──
-async function importExcelWithAI(file, prompt) {
-  // Obtener key del modal activo o del almacenamiento
-  const rawKey = getModalAIKey();
-  if (!rawKey) throw new Error('Sin API Key. Configúrala arriba — Gemini es gratis en aistudio.google.com/apikey');
+// ── Claude API helper (directo desde el navegador, sin API key del usuario) ──
+async function callClaudeAPI(messages, maxTokens = 3000) {
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: maxTokens,
+      system: 'Responde ÚNICAMENTE con JSON válido. Sin texto adicional, sin backticks, sin explicaciones.',
+      messages
+    })
+  });
+  if (!resp.ok) {
+    const status = resp.status;
+    if (status === 429) throw new Error('Límite de uso alcanzado (429). Espera un momento e intenta de nuevo.');
+    if (status === 529) throw new Error('El servicio de IA está ocupado. Intenta en unos segundos.');
+    throw new Error('Error en el servicio de IA: ' + status);
+  }
+  const data = await resp.json();
+  const raw = data.content.map(c => c.text || '').join('');
+  const clean = raw.replace(/```json|```/g, '').trim();
+  return clean;
+}
 
+// ── Helper: importar con IA desde archivo de texto/Excel ──
+async function importExcelWithAI(file, prompt) {
   const text = await (file.name.match(/\.xlsx?$/i) ? readExcel(file) : file.text());
   const fullPrompt = prompt + '\n\nDocumento:\n' + text.substring(0, 12000);
-
-  // Detectar tipo de key
-  if (rawKey.startsWith('sk-')) {
-    // Anthropic Claude
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': rawKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 3000,
-        messages: [{ role: 'user', content: fullPrompt }]
-      })
-    });
-    if (!resp.ok) {
-      const status = resp.status;
-      if (status === 400) throw new Error('API Key inválida o expirada (400). Genera una nueva en console.anthropic.com y toca 🗑 Limpiar primero');
-      if (status === 401) throw new Error('API Key rechazada (401). Verifica que sea correcta');
-      if (status === 429) throw new Error('Límite de uso alcanzado (429). Espera un momento');
-      throw new Error('Error API Anthropic: ' + status);
-    }
-    const data = await resp.json();
-    const raw = data.content.map(c => c.text || '').join('');
-    const clean = raw.replace(/```json|```/g, '').trim();
-    const s = clean.indexOf('['), e = clean.lastIndexOf(']');
-    if (s === -1) { const js = clean.indexOf('{'); const je = clean.lastIndexOf('}'); if(js>=0) return JSON.parse(clean.substring(js,je+1)); throw new Error('No se encontró JSON'); }
-    return JSON.parse(clean.substring(s, e + 1));
-
-  } else if (rawKey.startsWith('AIza')) {
-    // Google Gemini
-    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${rawKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: fullPrompt }] }],
-        generationConfig: { temperature: 0.1 }
-      })
-    });
-    if (!resp.ok) {
-      const st = resp.status;
-      if (st===401) throw new Error('Gemini 401 — Key inválida. Verifica que sea AIzaSy... de aistudio.google.com/apikey');
-      if (st===400) throw new Error('Gemini 400 — Key incorrecta o proyecto sin habilitar Gemini API');
-      if (st===429) throw new Error('Gemini 429 — Límite alcanzado, espera un momento');
-      throw new Error('Error Gemini: ' + st);
-    }
-    const data = await resp.json();
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const clean = raw.replace(/```json|```/g, '').trim();
-    const s = clean.indexOf('['), e = clean.lastIndexOf(']');
-    if (s === -1) { const js = clean.indexOf('{'); const je = clean.lastIndexOf('}'); if(js>=0) return JSON.parse(clean.substring(js,je+1)); throw new Error('No se encontró JSON'); }
-    return JSON.parse(clean.substring(s, e + 1));
-
-  } else {
-    throw new Error('API Key no reconocida. Debe empezar con "sk-" (Anthropic) o "AIza" (Google Gemini)');
+  const clean = await callClaudeAPI([{ role: 'user', content: fullPrompt }]);
+  const s = clean.indexOf('['), e = clean.lastIndexOf(']');
+  if (s === -1) {
+    const js = clean.indexOf('{'), je = clean.lastIndexOf('}');
+    if (js >= 0) return JSON.parse(clean.substring(js, je + 1));
+    throw new Error('No se encontró JSON en la respuesta');
   }
+  return JSON.parse(clean.substring(s, e + 1));
 }
 
 // Hematología / Bioquímica desde Excel
@@ -4160,13 +4133,6 @@ async function importDentalMeasures(input) {
 async function importExcelMultiTab(input) {
   if (!input.files?.[0]) return;
   const statusEl = document.getElementById('sp-import-multitab-status');
-  const modalKey2 = (document.getElementById('gemini-api-key')?.value||document.getElementById('claude-api-key')?.value||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  const { key: _k2 } = getActiveAIKey();
-  const apiKey = modalKey2 || _k2 || (localStorage.getItem('wv_api_key')||'').replace(/[\s\u200B\u00A0\uFEFF]/g,'');
-  if (!apiKey) {
-    if (statusEl) { statusEl.textContent = '⚠ API Key requerida — configura Gemini o Claude arriba'; statusEl.style.color = 'var(--r5)'; }
-    return;
-  }
   if (statusEl) { statusEl.textContent = '⏳ Leyendo Excel multi-pestaña...'; statusEl.style.color = 'var(--g6)'; }
   try {
     // Leer todas las pestañas del Excel
@@ -4212,26 +4178,7 @@ Extrae TODA la información y devuelve ÚNICAMENTE un JSON válido con esta estr
   "protocols": [{"name":"","induction":0,"duration":0,"drugs":[{"name":"","dose":0,"conc":0}],"reversals":[{"name":"","dose":0,"conc":0,"route":"IM"}],"notes":""}]
 }`;
 
-    let raw = '';
-    if (apiKey.startsWith('AIza')) {
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ contents:[{parts:[{text: prompt+'\n\nContenido del Excel:\n'+text.substring(0,20000)}]}], generationConfig:{temperature:0.1} })
-      });
-      if (!resp.ok) { const e=await resp.json().catch(()=>{}); throw new Error('Gemini '+resp.status+': '+(e?.error?.message||'')); }
-      const d = await resp.json();
-      raw = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    } else {
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 8000, messages: [{ role: 'user', content: prompt + '\n\nContenido del Excel:\n' + text.substring(0, 20000) }] })
-      });
-      if (!resp.ok) throw new Error('Claude error: ' + resp.status);
-      const d = await resp.json();
-      raw = d.content.map(c => c.text || '').join('');
-    }
-    const clean = raw.replace(/```json|```/g, '').trim();
+    const clean = await callClaudeAPI([{ role: 'user', content: prompt + '\n\nContenido del Excel:\n' + text.substring(0, 20000) }], 8000);
     const js = clean.indexOf('{'), je = clean.lastIndexOf('}');
     const extracted = JSON.parse(clean.substring(js, je + 1));
 
@@ -4496,9 +4443,7 @@ function openAddEnfermedad(sistId, editIdx=-1) {
         ${editIdx<0?`<div style="background:var(--sur2);border-radius:var(--rsm);padding:.5rem;margin-bottom:.75rem">
           <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.25rem">📊 Importar desde Excel/CSV</div>
           <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
-            <button onclick="setModalAI(this,'gemini')" data-provider="gemini" style="font-size:.65rem;padding:.15rem .35rem;border-radius:var(--rxs);border:2px solid var(--g4);background:var(--g1);color:var(--g7);cursor:pointer;font-family:var(--sans);font-weight:600">🔵 Gemini</button>
-            <button onclick="setModalAI(this,'claude')" data-provider="claude" style="font-size:.65rem;padding:.15rem .35rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--sur);color:var(--txt3);cursor:pointer;font-family:var(--sans)">🟠 Claude</button>
-            <input type="password" id="modal-ai-key" class="form-control" style="flex:1;font-size:.72rem;height:1.6rem" placeholder="API Key..." oninput="saveModalAIKey(this.value)">
+            <span style="font-size:.7rem;color:var(--g7);font-weight:600">🤖 IA integrada</span>
           </div>
           <label class="btn btn-secondary btn-sm" for="enf-file-import" style="cursor:pointer;font-size:.7rem">📁 Subir archivo</label>
           <input type="file" id="enf-file-import" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="importEnfermedadesFile(this,'${sistId}')">
@@ -4780,9 +4725,6 @@ async function saveEnfermedadModal(sistId, editIdx=-1) {
 async function importEnfermedadesFile(input, sistId) {
   if (!input.files?.[0]) return;
   const statusEl = document.getElementById('enf-import-status');
-  // Limpiar la key de espacios, saltos de línea y caracteres invisibles
-  const apiKey = getModalAIKey();
-  if (!apiKey) { statusEl.textContent = '⚠ Sin API Key'; statusEl.style.color='var(--r5)'; return; }
   statusEl.textContent = '⏳ Leyendo archivo...'; statusEl.style.color='var(--g6)';
   try {
     const text = await (input.files[0].name.match(/\.xlsx?$/i)
@@ -4794,15 +4736,7 @@ async function importEnfermedadesFile(input, sistId) {
     const prompt = `Analiza este documento y extrae TODAS las enfermedades del sistema "${sistLabel}". Devuelve SOLO un array JSON sin texto adicional:
 [{"nombre":"","agente":"","signos":"","dx":"","tx":""}]
 Documento:\n${text.substring(0,12000)}`;
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:3000, messages:[{role:'user',content:prompt}] })
-    });
-    if (!resp.ok) throw new Error('API error: ' + resp.status);
-    const data = await resp.json();
-    const raw = data.content.map(c=>c.text||'').join('');
-    const clean = raw.replace(/```json|```/g,'').trim();
+    const clean = await callClaudeAPI([{role:'user',content:prompt}]);
     const start = clean.indexOf('['), end = clean.lastIndexOf(']');
     const enfs = JSON.parse(clean.substring(start, end+1));
     if (!currentSpecies.enfermedades_sistemas) currentSpecies.enfermedades_sistemas = {};
@@ -5457,75 +5391,17 @@ function renderAdminSpeciesList() {
     </div>`).join('') || '<p class="text-muted">Sin especies registradas</p>';
 }
 
-// ═══ GESTIÓN DE KEYS DE IA ═══
-let selectedAI = localStorage.getItem('wv_ai_provider') || 'gemini';
-
-function selectAI(provider) {
-  selectedAI = provider;
-  localStorage.setItem('wv_ai_provider', provider);
-  const geminiBlock = document.getElementById('gemini-key-block');
-  const claudeBlock = document.getElementById('claude-key-block');
-  const geminiBtn   = document.getElementById('ai-sel-gemini');
-  const claudeBtn   = document.getElementById('ai-sel-claude');
-  if (geminiBlock) geminiBlock.style.display = provider === 'gemini' ? 'block' : 'none';
-  if (claudeBlock) claudeBlock.style.display = provider === 'claude' ? 'block' : 'none';
-  if (geminiBtn) { geminiBtn.style.borderColor = provider==='gemini'?'var(--g4)':'var(--bor)'; geminiBtn.style.background = provider==='gemini'?'var(--g1)':'var(--sur2)'; geminiBtn.style.color = provider==='gemini'?'var(--g7)':'var(--txt3)'; }
-  if (claudeBtn) { claudeBtn.style.borderColor = provider==='claude'?'var(--am)':'var(--bor)'; claudeBtn.style.background = provider==='claude'?'#fff8e1':'var(--sur2)'; claudeBtn.style.color = provider==='claude'?'#b45309':'var(--txt3)'; }
-  updateAIKeyStatus(provider);
-}
-
-function saveAIKey(provider, raw) {
-  const key = (raw||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g, '');
-  localStorage.setItem('wv_key_' + provider, key);
-  updateAIKeyStatus(provider);
-}
-
-function clearAIKey(provider) {
-  localStorage.removeItem('wv_key_' + provider);
-  const inp = document.getElementById(provider + '-api-key');
-  if (inp) inp.value = '';
-  updateAIKeyStatus(provider);
-  toast('🗑 Key de ' + (provider==='gemini'?'Gemini':'Claude') + ' eliminada');
-}
-
-function updateAIKeyStatus(provider) {
-  const key = (localStorage.getItem('wv_key_' + provider) || '').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  const statusEl = document.getElementById(provider + '-key-status');
-  const inp = document.getElementById(provider + '-api-key');
-  if (!statusEl) return;
-  if (inp && !inp.value && key) inp.value = key;
-  if (!key) {
-    statusEl.textContent = provider==='gemini'
-      ? '⚠ Sin key — aistudio.google.com/apikey (gratis)'
-      : '⚠ Sin key — console.anthropic.com';
-    statusEl.style.color = 'var(--am)';
-  } else if (provider==='gemini' && key.startsWith('AIza')) {
-    statusEl.textContent = '✓ Gemini: ' + key.substring(0,12) + '...';
-    statusEl.style.color = 'var(--g6)';
-  } else if (provider==='claude' && key.startsWith('sk-')) {
-    statusEl.textContent = '✓ Claude: ' + key.substring(0,16) + '...';
-    statusEl.style.color = 'var(--g6)';
-  } else {
-    statusEl.textContent = provider==='gemini'
-      ? '⚠ Key inválida — debe empezar con AIza'
-      : '⚠ Key inválida — debe empezar con sk-ant-';
-    statusEl.style.color = 'var(--r5)';
-  }
-}
-
-function initAIKeyUI() {
-  selectAI(selectedAI);
-}
-
-// Funciones legacy para compatibilidad
-function saveApiKey(raw) { saveAIKey(selectedAI, raw); }
-function clearApiKey() { clearAIKey(selectedAI); }
-function showApiKeyStatus() { updateAIKeyStatus('gemini'); updateAIKeyStatus('claude'); }
-
-function getActiveAIKey() {
-  const key = (localStorage.getItem('wv_key_' + selectedAI) || '').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  return { provider: selectedAI, key };
-}
+// ═══ FUNCIONES DE IA (stub — la API se llama directamente sin key de usuario) ═══
+let selectedAI = 'claude';
+function selectAI(provider) {}
+function saveAIKey(provider, raw) {}
+function clearAIKey(provider) { toast('IA integrada — no se requiere key'); }
+function updateAIKeyStatus(provider) {}
+function initAIKeyUI() {}
+function saveApiKey(raw) {}
+function clearApiKey() {}
+function showApiKeyStatus() {}
+function getActiveAIKey() { return { provider: 'claude', key: '' }; }
 function openAddSpecies() {
   document.getElementById('modal-species-title').textContent = 'Nueva Especie';
   window._formCoverPhoto = null;
@@ -5576,17 +5452,7 @@ async function importSpeciesFile(input) {
       statusEl.style.color = 'var(--r5)'; return;
     }
 
-    // Obtener key activa (Gemini o Claude)
-    const modalKey = (document.getElementById('gemini-api-key')?.value || document.getElementById('claude-api-key')?.value || '').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-    const { key: savedKey } = getActiveAIKey();
-    const apiKey = modalKey || savedKey || (localStorage.getItem('wv_api_key')||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-
-    if (!apiKey) {
-      statusEl.textContent = '⚠ Sin API Key. Configúrala arriba — Gemini es gratis en aistudio.google.com/apikey';
-      statusEl.style.color = 'var(--r5)'; return;
-    }
-
-    statusEl.textContent = '🤖 Extrayendo información con IA...';
+        statusEl.textContent = '🤖 Extrayendo información con IA...';
 
     const PROMPT = `Eres un asistente experto en veterinaria de fauna silvestre. Analiza el documento y extrae TODA la información disponible sobre la especie. Devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional ni markdown.
 
@@ -5679,46 +5545,7 @@ Usa cadenas vacías "" para campos no encontrados, arrays vacíos [] si no hay d
       }];
     }
 
-    let raw = '';
-    if (apiKey.startsWith('AIza')) {
-      // ── Gemini ──
-      let parts = [];
-      if (base64Data && mediaType === 'application/pdf') {
-        parts = [{ inline_data: { mime_type: 'application/pdf', data: base64Data } }, { text: PROMPT }];
-      } else {
-        parts = [{ text: PROMPT + '\n\n--- CONTENIDO ---\n' + textContent.substring(0, 15000) }];
-      }
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0.1 } })
-      });
-      if (!resp.ok) { const e = await resp.json().catch(()=>{}); throw new Error('Gemini error ' + resp.status + ': ' + (e?.error?.message||'')); }
-      const d = await resp.json();
-      raw = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    } else if (apiKey.startsWith('sk-')) {
-      // ── Anthropic Claude ──
-      if (!messages) {
-        messages = base64Data
-          ? [{ role:'user', content:[
-              { type:'document', source:{ type:'base64', media_type: mediaType, data: base64Data } },
-              { type:'text', text: PROMPT }
-            ]}]
-          : [{ role:'user', content: PROMPT + '\n\n--- CONTENIDO ---\n' + textContent.substring(0,15000) }];
-      }
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
-        body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:4000, messages })
-      });
-      if (!resp.ok) throw new Error('Claude error ' + resp.status);
-      const d = await resp.json();
-      raw = d.content.map(c => c.text || '').join('');
-    } else {
-      throw new Error('API Key no reconocida. Usa Gemini (AIza...) o Claude (sk-ant-...)');
-    }
-
-    const clean = raw.replace(/```json|```/g, '').trim();
+    const clean = await callClaudeAPI(messages, 4000);
     const jsonStart = clean.indexOf('{');
     const jsonEnd = clean.lastIndexOf('}');
     if (jsonStart === -1) throw new Error('No se encontró JSON en la respuesta');
@@ -5905,47 +5732,10 @@ function buildSpeciesForm(sp) {
       <div style="font-weight:600;font-size:.9rem;margin-bottom:.15rem">Importar desde archivo</div>
       <div style="font-size:.73rem;color:var(--txt3);margin-bottom:.5rem">PDF, Word (.docx) o Excel (.xlsx) — La IA extrae la información automáticamente</div>
 
-      <!-- Selector de IA -->
-      <div style="margin-bottom:.5rem;text-align:left">
-        <label style="font-size:.7rem;color:var(--txt3);font-weight:600">IA para importar</label>
-        <div style="display:flex;gap:.4rem;margin-top:.25rem">
-          <button id="ai-sel-gemini" onclick="selectAI('gemini')"
-            style="flex:1;padding:.4rem;border-radius:var(--rsm);border:2px solid var(--g4);background:var(--g1);color:var(--g7);font-family:var(--sans);font-size:.78rem;font-weight:600;cursor:pointer">
-            🔵 Google Gemini <span style="font-size:.65rem;font-weight:400">(gratis)</span>
-          </button>
-          <button id="ai-sel-claude" onclick="selectAI('claude')"
-            style="flex:1;padding:.4rem;border-radius:var(--rsm);border:2px solid var(--bor);background:var(--sur2);color:var(--txt3);font-family:var(--sans);font-size:.78rem;cursor:pointer">
-            🟠 Anthropic Claude
-          </button>
-        </div>
-      </div>
-
-      <!-- Key de Gemini -->
-      <div id="gemini-key-block" style="margin-bottom:.4rem;text-align:left">
-        <div style="display:flex;gap:.3rem;align-items:center">
-          <input type="password" id="gemini-api-key" class="form-control"
-            placeholder="AIzaSy..."
-            value=""
-            style="font-size:.78rem;flex:1"
-            onchange="saveAIKey('gemini',this.value)">
-          <button onclick="clearAIKey('gemini')" class="btn btn-secondary btn-sm" style="color:var(--r5);font-size:.7rem">🗑</button>
-          <a href="https://aistudio.google.com/apikey" target="_blank" class="btn btn-secondary btn-sm" style="font-size:.7rem">Obtener</a>
-        </div>
-        <div id="gemini-key-status" style="font-size:.7rem;margin-top:.2rem;color:var(--txt3)">...</div>
-      </div>
-
-      <!-- Key de Claude -->
-      <div id="claude-key-block" style="display:none;margin-bottom:.4rem;text-align:left">
-        <div style="display:flex;gap:.3rem;align-items:center">
-          <input type="password" id="claude-api-key" class="form-control"
-            placeholder="sk-ant-api03-..."
-            value=""
-            style="font-size:.78rem;flex:1"
-            onchange="saveAIKey('claude',this.value)">
-          <button onclick="clearAIKey('claude')" class="btn btn-secondary btn-sm" style="color:var(--r5);font-size:.7rem">🗑</button>
-          <a href="https://console.anthropic.com" target="_blank" class="btn btn-secondary btn-sm" style="font-size:.7rem">Obtener</a>
-        </div>
-        <div id="claude-key-status" style="font-size:.7rem;margin-top:.2rem;color:var(--txt3)">...</div>
+      <!-- IA integrada — sin configuración requerida -->
+      <div style="background:var(--g1);border-radius:var(--rxs);padding:.35rem .6rem;margin-bottom:.5rem;text-align:left;display:flex;align-items:center;gap:.4rem">
+        <span style="font-size:.85rem">🤖</span>
+        <span style="font-size:.72rem;color:var(--g7);font-weight:600">IA integrada — Claude analiza el archivo automáticamente</span>
       </div>
 
       <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.5rem;text-align:left">
@@ -6370,15 +6160,9 @@ function openAddSpeciesDrug() {
     <!-- Importar desde Excel -->
     <div style="background:var(--g0);border-radius:var(--rsm);padding:.6rem;margin-bottom:.75rem">
       <div style="font-size:.75rem;font-weight:600;color:var(--g6);margin-bottom:.3rem">📊 Importar fármacos desde Excel</div>
-      <div style="background:var(--sur2);border-radius:var(--rsm);padding:.4rem .5rem;margin-bottom:.4rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
-          <span style="font-size:.68rem;color:var(--txt3);font-weight:600">IA:</span>
-          <button onclick="setModalAI(this,'gemini')" data-provider="gemini"
-            style="font-size:.68rem;padding:.15rem .4rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--g1);color:var(--g7);cursor:pointer;font-family:var(--sans)">🔵 Gemini</button>
-          <button onclick="setModalAI(this,'claude')" data-provider="claude"
-            style="font-size:.68rem;padding:.15rem .4rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--sur);color:var(--txt3);cursor:pointer;font-family:var(--sans)">🟠 Claude</button>
-          <input type="password" id="modal-ai-key" class="form-control" style="flex:1;min-width:0;font-size:.72rem;height:1.6rem"
-            placeholder="API Key..." oninput="saveModalAIKey(this.value)">
-          <div id="modal-ai-status" style="font-size:.65rem;color:var(--txt3);width:100%"></div>
+      <div style="background:var(--g1);border-radius:var(--rxs);padding:.35rem .6rem;margin-bottom:.4rem;display:flex;align-items:center;gap:.4rem">
+          <span style="font-size:.8rem">🤖</span>
+          <span id="modal-ai-status" style="font-size:.7rem;color:var(--g7);font-weight:600">IA integrada — Claude extrae los fármacos automáticamente</span>
         </div>
       <div style="display:flex;gap:.4rem;margin-top:.3rem">
         <label class="btn btn-secondary btn-sm" for="drug-file-import" style="cursor:pointer;white-space:nowrap">📁 Subir Excel</label>
@@ -6432,8 +6216,6 @@ function openAddSpeciesDrug() {
 async function importFarmacosFile(input) {
   if (!input.files?.[0]) return;
   const statusEl = document.getElementById('drug-import-status');
-  const apiKey = getModalAIKey();
-  if (!apiKey) { statusEl.textContent = '⚠ Sin API Key'; statusEl.style.color='var(--r5)'; return; }
   statusEl.textContent = '⏳ Leyendo archivo...'; statusEl.style.color='var(--g6)';
   try {
     const text = await (input.files[0].name.match(/\.xlsx?$/i)
@@ -6443,15 +6225,7 @@ async function importFarmacosFile(input) {
     const prompt = `Analiza este documento y extrae TODOS los fármacos/medicamentos para fauna silvestre. Devuelve SOLO un array JSON sin texto adicional:
 [{"name":"","cat":"categoría farmacológica","conc":0,"dose_min":0,"dose":0,"dose_max":0,"route":"IM","freq":"","effects":"","sites":"","notes":""}]
 Documento:\n${text.substring(0,12000)}`;
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:4000, messages:[{role:'user',content:prompt}] })
-    });
-    if (!resp.ok) throw new Error('API error: ' + resp.status);
-    const data = await resp.json();
-    const raw = data.content.map(c=>c.text||'').join('');
-    const clean = raw.replace(/```json|```/g,'').trim();
+    const clean = await callClaudeAPI([{role:'user',content:prompt}], 4000);
     const start = clean.indexOf('['), end = clean.lastIndexOf(']');
     const drugs = JSON.parse(clean.substring(start, end+1));
     if (!currentSpecies.drugs) currentSpecies.drugs = [];
@@ -7013,14 +6787,7 @@ Si no encuentras un valor numérico exacto, usa 0. Extrae tantos fármacos como 
       messages = [{ role:'user', content: PROMPT + '\n\n--- DOCUMENTO ---\n' + textContent.substring(0,15000) }];
     }
 
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:4000, messages })
-    });
-    if (!resp.ok) throw new Error('Error API: '+resp.status);
-    const data = await resp.json();
-    const raw = data.content.map(c=>c.text||'').join('');
-    const clean = raw.replace(/```json|```/g,'').trim();
+    const clean = await callClaudeAPI(messages, 4000);
     const arrStart = clean.indexOf('[');
     const arrEnd = clean.lastIndexOf(']');
     if (arrStart === -1) throw new Error('No se encontró JSON en la respuesta');
@@ -8598,12 +8365,11 @@ function openEditRef(spId, idx) {
   if (!r) return;
   _refPDFData = r.pdf || null;
   document.getElementById('ref-modal')?.remove();
-  const { provider, key } = getActiveAIKey();
   document.body.insertAdjacentHTML('beforeend', `
     <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">✏️ Editar referencia</div>
-        ${buildRefFormHTML(key, provider)}
+        ${buildRefFormHTML()}
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
           <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
           <button class="btn btn-primary" style="flex:2" onclick="updateRef('${spId}',${idx})">💾 Guardar cambios</button>
@@ -8645,12 +8411,11 @@ function openEditRefGeneral(idx) {
   if (!r) return;
   _refPDFData = r.pdf || null;
   document.getElementById('ref-modal')?.remove();
-  const { provider, key } = getActiveAIKey();
   document.body.insertAdjacentHTML('beforeend', `
     <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">✏️ Editar referencia general</div>
-        ${buildRefFormHTML(key, provider)}
+        ${buildRefFormHTML()}
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
           <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
           <button class="btn btn-primary" style="flex:2" onclick="updateRefGeneral(${idx})">💾 Guardar cambios</button>
@@ -8687,12 +8452,11 @@ async function updateRefGeneral(idx) {
 function openAddRefGeneral() {
   _refPDFData = null;
   document.getElementById('ref-modal')?.remove();
-  const { provider, key } = getActiveAIKey();
   document.body.insertAdjacentHTML('beforeend', `
     <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">📖 Agregar referencia general</div>
-        ${buildRefFormHTML(key, provider)}
+        ${buildRefFormHTML()}
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
           <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
           <button class="btn btn-primary" style="flex:2" onclick="saveRefGeneral()">💾 Guardar</button>
@@ -8701,14 +8465,13 @@ function openAddRefGeneral() {
     </div>`);
 }
 
-function buildRefFormHTML(key, provider) {
+function buildRefFormHTML() {
+  const key = '', provider = 'claude';
   return `
     <div style="background:var(--g0);border:2px dashed var(--g4);border-radius:var(--r);padding:.75rem;margin-bottom:.75rem;text-align:center">
       <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.35rem">📄 Importar desde archivo — la IA extrae los metadatos automáticamente</div>
-      <div style="display:flex;gap:.3rem;justify-content:center;margin-bottom:.35rem">
-        <button onclick="setRefAI(this,'gemini')" data-ai="gemini" style="font-size:.7rem;padding:.2rem .5rem;border-radius:var(--rxs);border:${provider==='gemini'?'2px solid var(--g4)':'1px solid var(--bor)'};background:${provider==='gemini'?'var(--g1)':'var(--sur)'};color:${provider==='gemini'?'var(--g7)':'var(--txt3)'};cursor:pointer">🔵 Gemini</button>
-        <button onclick="setRefAI(this,'claude')" data-ai="claude" style="font-size:.7rem;padding:.2rem .5rem;border-radius:var(--rxs);border:${provider==='claude'?'2px solid #f59e0b':'1px solid var(--bor)'};background:${provider==='claude'?'#fff8e1':'var(--sur)'};color:${provider==='claude'?'#b45309':'var(--txt3)'};cursor:pointer">🟠 Claude</button>
-        <input type="password" id="ref-ai-key" class="form-control" style="flex:1;min-width:80px;font-size:.72rem;height:1.6rem" placeholder="API Key..." value="${key||''}" oninput="saveRefAIKey(this.value)">
+      <div style="background:var(--g1);border-radius:var(--rxs);padding:.3rem .6rem;margin-bottom:.4rem;display:inline-flex;align-items:center;gap:.35rem">
+        <span>🤖</span><span style="font-size:.7rem;color:var(--g7);font-weight:600">IA integrada</span>
       </div>
       <label for="ref-file-up" class="btn btn-primary btn-sm" style="cursor:pointer">📂 Seleccionar archivo (PDF, Word, TXT)</label>
       <input type="file" id="ref-file-up" accept=".pdf,.docx,.doc,.txt" style="display:none" onchange="importRefFile(this)">
@@ -8788,12 +8551,11 @@ function openEditRefGeneral(idx) {
   if (!ref) return;
   _refPDFData = ref.pdf || null;
   document.getElementById('ref-modal')?.remove();
-  const { provider, key } = getActiveAIKey();
   document.body.insertAdjacentHTML('beforeend', `
     <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">✏️ Editar referencia general</div>
-        ${buildRefFormHTML(key, provider)}
+        ${buildRefFormHTML()}
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
           <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
           <button class="btn btn-primary" style="flex:2" onclick="updateRefGeneral(${idx})">💾 Guardar cambios</button>
@@ -9913,47 +9675,13 @@ async function saveBiblioteca() {
 }
 
 
-function setModalAI(btn, provider) {
-  selectedAI = provider;
-  localStorage.setItem('wv_ai_provider', provider);
-  // Actualizar estilos botones
-  btn.closest('div').querySelectorAll('[data-provider]').forEach(b => {
-    const isSel = b.dataset.provider === provider;
-    b.style.background = isSel ? (provider==='gemini'?'var(--g1)':'#fff8e1') : 'var(--sur)';
-    b.style.color = isSel ? (provider==='gemini'?'var(--g7)':'#b45309') : 'var(--txt3)';
-    b.style.borderColor = isSel ? (provider==='gemini'?'var(--g4)':'#f59e0b') : 'var(--bor)';
-  });
-  updateModalAIStatus();
-}
-function saveModalAIKey(raw) {
-  const key = (raw||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  if (key.startsWith('AIza')) { localStorage.setItem('wv_key_gemini', key); selectedAI='gemini'; }
-  else if (key.startsWith('sk-')) { localStorage.setItem('wv_key_claude', key); selectedAI='claude'; }
-  localStorage.setItem('wv_ai_provider', selectedAI);
-  updateModalAIStatus();
-}
+function setModalAI(btn, provider) {}
+function saveModalAIKey(raw) {}
 function updateModalAIStatus() {
-  const { key } = getActiveAIKey();
-  const inp = document.getElementById('modal-ai-key');
-  const st  = document.getElementById('modal-ai-status');
-  if (inp && !inp.value && key) inp.value = key;
-  if (!st) return;
-  if (!key) st.textContent = '⚠ Sin key — Gemini gratis: aistudio.google.com/apikey';
-  else st.textContent = '✓ ' + (selectedAI==='gemini'?'Gemini':'Claude') + ': ' + key.substring(0,14) + '...';
-  st.style.color = key ? 'var(--g6)' : 'var(--am)';
+  const st = document.getElementById('modal-ai-status');
+  if (st) { st.textContent = '✓ IA integrada — sin configuración requerida'; st.style.color = 'var(--g6)'; }
 }
-function getModalAIKey() {
-  // Leer del campo modal o del almacenamiento según proveedor seleccionado
-  const modalKey = (document.getElementById('modal-ai-key')?.value||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  if (modalKey) {
-    // Actualizar el proveedor según el tipo de key
-    if (modalKey.startsWith('AIza')) selectedAI = 'gemini';
-    else if (modalKey.startsWith('sk-')) selectedAI = 'claude';
-    return modalKey;
-  }
-  const { key } = getActiveAIKey();
-  return key || '';
-}
+function getModalAIKey() { return 'integrated'; }
 async function importBibFile(input) {
   if (!input.files?.[0]) return;
   const statusEl = document.getElementById('bib-import-status');
@@ -9963,8 +9691,7 @@ async function importBibFile(input) {
   try {
     const file = input.files[0];
     const isPDF = file.name.match(/\.pdf$/i);
-    const apiKey = getModalAIKey();
-    if (!apiKey) throw new Error('Sin API Key — configúrala arriba');
+
 
     const prompt = `Analiza este documento académico/científico y extrae sus metadatos bibliográficos. Devuelve SOLO un JSON:
 {"titulo":"título completo","autores":"Apellido1, N.; Apellido2, N.","año":"año","tipo":"Libro|Artículo científico|Paper|Guía clínica|Tesis|Manual|Otro","doi":"DOI o URL si está disponible","resumen":"resumen de 1-2 oraciones de qué trata el documento"}`;
@@ -9972,32 +9699,14 @@ async function importBibFile(input) {
     let metadata = null;
 
     if (isPDF) {
-      // Leer como base64
       const base64 = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(file); });
       const b64 = base64.split(',')[1];
-      if (apiKey.startsWith('sk-')) {
-        const resp = await fetch('https://api.anthropic.com/v1/messages',{
-          method:'POST', headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-          body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,messages:[{role:'user',content:[
-            {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}
-          ]}]})
-        });
-        if (!resp.ok) throw new Error('Claude error '+resp.status);
-        const d = await resp.json(); const raw=d.content.map(c=>c.text||'').join('');
-        const cl=raw.replace(/```json|```/g,'').trim(); const js=cl.indexOf('{'),je=cl.lastIndexOf('}');
-        if(js>=0) metadata=JSON.parse(cl.substring(js,je+1));
-      } else {
-        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,{
-          method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:'application/pdf',data:b64}},{text:prompt}]}]})
-        });
-        if (!resp.ok) throw new Error('Gemini error '+resp.status);
-        const d=await resp.json(); const raw=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
-        const cl=raw.replace(/```json|```/g,'').trim(); const js=cl.indexOf('{'),je=cl.lastIndexOf('}');
-        if(js>=0) metadata=JSON.parse(cl.substring(js,je+1));
-      }
+      const clean = await callClaudeAPI([{role:'user',content:[
+        {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}
+      ]}], 500);
+      const js=clean.indexOf('{'),je=clean.lastIndexOf('}');
+      if(js>=0) metadata=JSON.parse(clean.substring(js,je+1));
     } else {
-      // Word, Excel, TXT — usar importExcelWithAI
       metadata = await importExcelWithAI(file, prompt);
       if (Array.isArray(metadata)) metadata = metadata[0];
     }
@@ -10025,31 +9734,12 @@ async function importBibFile(input) {
   }
 }
 
-function saveRefAIKey(raw) {
-  const key = (raw||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  // Guardar como key activa del proveedor detectado
-  if (key.startsWith('AIza')) {
-    localStorage.setItem('wv_key_gemini', key);
-    selectedAI = 'gemini';
-  } else if (key.startsWith('sk-')) {
-    localStorage.setItem('wv_key_claude', key);
-    selectedAI = 'claude';
-  }
-  localStorage.setItem('wv_ai_provider', selectedAI);
-  const status = document.getElementById('ref-ai-key-status');
-  if (status) {
-    if (!key) { status.textContent = ''; return; }
-    if (key.startsWith('AIza')) { status.textContent = '✓ Gemini configurado'; status.style.color='var(--g6)'; }
-    else if (key.startsWith('sk-')) { status.textContent = '✓ Claude configurado'; status.style.color='var(--g6)'; }
-    else { status.textContent = '⚠ Key no reconocida'; status.style.color='var(--r5)'; }
-  }
-}
+function saveRefAIKey(raw) {}
 
 function openAddRef(spId) {
   document.getElementById('ref-modal')?.remove();
   _refPDFData = null;
   const sp = SPECIES_DB.find(s => s.id === spId);
-  const { provider, key } = getActiveAIKey();
   document.body.insertAdjacentHTML('beforeend', `
     <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
@@ -10062,23 +9752,11 @@ function openAddRef(spId) {
           <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.6rem">La IA extrae título, autores, año y tipo automáticamente</div>
 
           <!-- Selector IA -->
-          <div style="display:flex;gap:.3rem;justify-content:center;margin-bottom:.4rem">
-            <button onclick="setRefAI(this,'gemini')" data-ai="gemini"
-              style="font-size:.72rem;padding:.2rem .55rem;border-radius:var(--rxs);border:2px solid var(--g4);background:var(--g1);color:var(--g7);cursor:pointer;font-family:var(--sans);font-weight:600">🔵 Gemini (gratis)</button>
-            <button onclick="setRefAI(this,'claude')" data-ai="claude"
-              style="font-size:.72rem;padding:.2rem .55rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--sur);color:var(--txt3);cursor:pointer;font-family:var(--sans)">🟠 Claude</button>
+          <div style="background:var(--g1);border-radius:var(--rxs);padding:.3rem .6rem;margin-bottom:.5rem;display:inline-flex;align-items:center;gap:.35rem">
+            <span>🤖</span><span style="font-size:.7rem;color:var(--g7);font-weight:600">IA integrada</span>
           </div>
-
-          <!-- Key -->
-          <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
-            <input type="password" id="ref-ai-key" class="form-control" style="flex:1;font-size:.75rem"
-              placeholder="${key ? key.substring(0,8)+'...' : 'AIzaSy... o sk-ant-...'}"
-              value="${key||''}"
-              oninput="saveRefAIKey(this.value)">
-            <a href="https://aistudio.google.com/apikey" target="_blank" class="btn btn-secondary btn-sm" style="font-size:.68rem;white-space:nowrap">Obtener</a>
-          </div>
-          <div id="ref-ai-key-status" style="font-size:.68rem;color:${key?'var(--g6)':'var(--am)'};margin-bottom:.5rem;text-align:left">
-            ${key ? '✓ '+( provider==='gemini'?'Gemini':'Claude')+' configurado' : '⚠ Sin key — sin key solo se guarda el PDF sin extraer datos'}
+          <div id="ref-ai-key-status" style="font-size:.68rem;color:var(--g6);margin-bottom:.5rem;text-align:left">
+            ✓ Claude configurado
           </div>
 
           <!-- Botón seleccionar archivo -->
@@ -10121,18 +9799,7 @@ function openAddRef(spId) {
   document.getElementById('ref-titulo')?.focus();
 }
 
-function setRefAI(btn, provider) {
-  selectedAI = provider;
-  localStorage.setItem('wv_ai_provider', provider);
-  btn.closest('div').querySelectorAll('[data-ai]').forEach(b => {
-    const sel = b.dataset.ai === provider;
-    b.style.borderWidth = sel ? '2px' : '1px';
-    b.style.borderColor = sel ? (provider==='gemini'?'var(--g4)':'#f59e0b') : 'var(--bor)';
-    b.style.background  = sel ? (provider==='gemini'?'var(--g1)':'#fff8e1') : 'var(--sur)';
-    b.style.color       = sel ? (provider==='gemini'?'var(--g7)':'#b45309') : 'var(--txt3)';
-    b.style.fontWeight  = sel ? '600' : '400';
-  });
-}
+function setRefAI(btn, provider) {}
 
 async function importRefFile(input) {
   if (!input.files?.[0]) return;
@@ -10152,7 +9819,6 @@ async function importRefFile(input) {
   if (nameEl) { nameEl.textContent = '📎 ' + file.name; document.getElementById('ref-pdf-preview').style.display='flex'; }
 
   // Intentar extracción con IA
-  const rawKey = (document.getElementById('ref-ai-key')?.value||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'') || getActiveAIKey().key || '';
   if (!rawKey) {
     if (statusEl) { statusEl.textContent = 'Sin API key — completa los campos manualmente'; statusEl.style.color='var(--am)'; }
     return;
@@ -10166,43 +9832,17 @@ async function importRefFile(input) {
 
     let result = null;
 
-    if (file.name.toLowerCase().endsWith('.pdf') && rawKey.startsWith('sk-')) {
+    if (file.name.toLowerCase().endsWith('.pdf') && _refPDFData) {
       const b64 = _refPDFData.data.split(',')[1];
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':rawKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:500,
-          messages:[{role:'user',content:[
-            {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
-            {type:'text',text:prompt}
-          ]}]
-        })
-      });
-      if (resp.ok) { const d=await resp.json(); result = JSON.parse((d.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim().match(/\{[\s\S]*\}/))||'{}'); }
-    } else if (file.name.toLowerCase().endsWith('.pdf') && rawKey.startsWith('AIza')) {
-      const b64 = _refPDFData.data.split(',')[1];
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${rawKey}`,{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:'application/pdf',data:b64}},{text:prompt}]}]})
-      });
-      if (resp.ok) { const d=await resp.json(); const raw=d.candidates?.[0]?.content?.parts?.[0]?.text||''; const m=raw.replace(/```json|```/g,'').trim().match(/\{[\s\S]*\}/); if(m) result=JSON.parse(m[0]); }
+      const clean = await callClaudeAPI([{role:'user',content:[
+        {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
+        {type:'text',text:prompt}
+      ]}], 500);
+      const m = clean.match(/\{[\s\S]*\}/); if(m) result=JSON.parse(m[0]);
     } else {
-      // Word/TXT — leer como texto
-      let text = await file.text();
-      const fullPrompt = prompt + '\n\nDocumento:\n' + text.substring(0,8000);
-      if (rawKey.startsWith('AIza')) {
-        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${rawKey}`,{
-          method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({contents:[{parts:[{text:fullPrompt}]}]})
-        });
-        if (resp.ok) { const d=await resp.json(); const raw=d.candidates?.[0]?.content?.parts?.[0]?.text||''; const m=raw.replace(/```json|```/g,'').trim().match(/\{[\s\S]*\}/); if(m) result=JSON.parse(m[0]); }
-      } else if (rawKey.startsWith('sk-')) {
-        const resp = await fetch('https://api.anthropic.com/v1/messages',{
-          method:'POST',headers:{'Content-Type':'application/json','x-api-key':rawKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-          body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,messages:[{role:'user',content:fullPrompt}]})
-        });
-        if (resp.ok) { const d=await resp.json(); const raw=d.content.map(c=>c.text||'').join(''); const m=raw.replace(/```json|```/g,'').trim().match(/\{[\s\S]*\}/); if(m) result=JSON.parse(m[0]); }
-      }
+      const text = await file.text();
+      const clean = await callClaudeAPI([{role:'user',content:prompt+'\n\nDocumento:\n'+text.substring(0,8000)}], 500);
+      const m = clean.match(/\{[\s\S]*\}/); if(m) result=JSON.parse(m[0]);
     }
 
     if (result) {
@@ -10249,11 +9889,6 @@ async function previewRefPDF(input) {
 
   // Intentar extraer metadatos con IA
   // Priorizar key del campo del modal, luego la guardada
-  const modalKey = (document.getElementById('ref-ai-key')?.value||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  const { key: savedKey } = getActiveAIKey();
-  const rawKey = modalKey || savedKey || (localStorage.getItem('wv_api_key')||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  if (!rawKey) return; // Sin key, dejar campos vacíos
-
   if (nameEl) nameEl.textContent += ' · 🤖 Extrayendo metadatos...';
 
   try {
@@ -10262,46 +9897,13 @@ async function previewRefPDF(input) {
 Si no encuentras algún dato deja el campo vacío "".`;
 
     let metadata = null;
-
-    if (rawKey.startsWith('sk-')) {
-      // Anthropic — enviar como documento PDF base64
-      const b64 = base64.split(',')[1];
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json','x-api-key':rawKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
-        body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:500,
-          messages:[{ role:'user', content:[
-            { type:'document', source:{ type:'base64', media_type:'application/pdf', data:b64 } },
-            { type:'text', text:prompt }
-          ]}]
-        })
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        const raw = data.content.map(c=>c.text||'').join('');
-        const clean = raw.replace(/```json|```/g,'').trim();
-        const js = clean.indexOf('{'), je = clean.lastIndexOf('}');
-        if (js>=0) metadata = JSON.parse(clean.substring(js, je+1));
-      }
-    } else if (rawKey.startsWith('AIza')) {
-      // Gemini — enviar como inlineData
-      const b64 = base64.split(',')[1];
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${rawKey}`, {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ contents:[{ parts:[
-          { inline_data:{ mime_type:'application/pdf', data:b64 } },
-          { text: prompt }
-        ]}]})
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const clean = raw.replace(/```json|```/g,'').trim();
-        const js = clean.indexOf('{'), je = clean.lastIndexOf('}');
-        if (js>=0) metadata = JSON.parse(clean.substring(js, je+1));
-      }
-    }
+    const b64 = base64.split(',')[1];
+    const clean = await callClaudeAPI([{role:'user',content:[
+      {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
+      {type:'text',text:prompt}
+    ]}], 500);
+    const js=clean.indexOf('{'), je=clean.lastIndexOf('}');
+    if (js>=0) metadata = JSON.parse(clean.substring(js, je+1));
 
     if (metadata) {
       // Rellenar campos automáticamente
