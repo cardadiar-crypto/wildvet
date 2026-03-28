@@ -130,7 +130,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .quick-card span{display:block;font-size:.72rem;font-weight:500;color:var(--txt2)}
 
 /* DETAIL */
-#species-detail{display:none;padding-top:0;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
+#species-detail{display:none;padding-top:152px;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
 .detail-header{background:var(--g9);padding:.5rem .75rem;display:flex;align-items:center;gap:.5rem;position:fixed;top:56px;left:0;right:0;z-index:90;box-shadow:0 1px 0 rgba(78,180,110,.2);flex-wrap:nowrap;min-height:48px}
 .back-btn{background:rgba(78,180,110,.2);border:none;color:var(--g3);width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .detail-name{color:white;font-size:.95rem;font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -143,7 +143,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .tab-btn{padding:.6rem .85rem;font-family:var(--sans);font-size:.78rem;font-weight:500;background:none;border:none;border-bottom:2px solid transparent;color:var(--txt3);cursor:pointer;white-space:nowrap;transition:all .15s}
 .tab-btn.active{color:var(--g6);border-bottom-color:var(--g5)}
 /* spacer: 56px topbar + 48px detail-header + 40px tabs = 144px */
-.tab-content-spacer{height:0;display:none}
+.tab-content-spacer{height:0;min-height:0;display:none}
 .tab-content{display:none;padding:1rem;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
 .tab-content.active{display:block}
 
@@ -1600,253 +1600,245 @@ ${html}
 }
 
 function buildSpeciesExportHTML(sp) {
-  const n   = sp.nutrition || {};
-  const beh = sp.behavior  || {};
-  const v   = sp.vitals    || {};
-  const bm  = sp.biometria || {};
+  const n    = sp.nutrition || {};
+  const beh  = sp.behavior  || {};
+  const v    = sp.vitals    || {};
+  const bm   = sp.biometria || {};
   const cons = sp.conservacion || {};
-  const esc = s => (String(s||'')).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const row2 = (a,b) => `<tr><td style="width:35%;font-weight:600;color:#1a6b3f;padding:4pt 8pt;border:1pt solid #e0e0e0">${esc(a)}</td><td style="padding:4pt 8pt;border:1pt solid #e0e0e0">${esc(b)}</td></tr>`;
-  const sec = (title, content) => content ? `<div class="section"><h2>${title}</h2>${content}</div>` : '';
-  const tbl = (headers, rows) => `<table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
-  const NA = 'N/D';
+  const esc  = s => (String(s||'')).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const row2 = (a,b) => `<tr><td style="width:38%;font-weight:600;color:#1a6b3f;padding:4pt 8pt;border:1pt solid #e0e0e0;background:#f9fffe">${esc(a)}</td><td style="padding:4pt 8pt;border:1pt solid #e0e0e0">${esc(b)}</td></tr>`;
+  const sec  = (title, content) => content ? `<div class="section"><h2>${title}</h2>${content}</div>` : '';
+  const tbl  = (headers, rows) => `<table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
+  const img  = (src, w, h) => src ? `<img src="${src}" style="width:${w||'120px'};height:${h||'90px'};object-fit:cover;border-radius:3pt;border:1pt solid #ddd;margin:2pt">` : '';
+  const NA   = 'N/D';
+
+  let html = '';
 
   // ══ PORTADA ══
-  let html = '';
-  if (sp.cover_photo) html += `<img src="${sp.cover_photo}" style="width:160px;height:120px;object-fit:cover;border-radius:6pt;margin-bottom:8pt;display:block;border:2pt solid #c2f0d3">`;
+  if (sp.cover_photo) html += img(sp.cover_photo, '180px', '135px');
+  if ((sp.cover_photos||[]).length) {
+    html += `<div style="display:flex;flex-wrap:wrap;gap:4pt;margin:4pt 0">`;
+    sp.cover_photos.slice(0,4).forEach(p => { html += img(p.data,'100px','75px'); });
+    html += `</div>`;
+  }
   html += `<h1>${esc(sp.name)}</h1>`;
-  html += `<p style="font-size:10pt;color:#444"><em>${esc(sp.sci||'')}</em></p>`;
-  // Badges conservación
+  html += `<p style="font-size:11pt;color:#444;margin:2pt 0"><em>${esc(sp.sci||'')}</em></p>`;
   const badges = [
-    sp.uicn_world   ? `UICN Mundial: ${sp.uicn_world}` : '',
+    sp.uicn_world    ? `UICN Mundial: ${sp.uicn_world}`    : '',
     sp.uicn_colombia ? `UICN Colombia: ${sp.uicn_colombia}` : '',
-    cons.cites       ? `CITES: ${cons.cites}` : '',
-    cons.res0126     ? `Res 0126: ${cons.res0126}` : ''
+    cons.cites        ? `CITES: ${cons.cites}`              : '',
+    cons.res0126      ? `Res 0126: ${cons.res0126}`         : ''
   ].filter(Boolean);
   if (badges.length) html += `<p>${badges.map(b=>`<span class="badge">${esc(b)}</span>`).join(' &nbsp;')}</p>`;
   html += `<p style="font-size:8pt;color:#888">Exportado el ${new Date().toLocaleString('es-CO')} · WildVet</p>`;
+  html += `<hr style="border:none;border-top:1pt solid #ddd;margin:8pt 0">`;
 
-  // ══ 1. GENERALIDADES ══
-  if (sp.generalidades) html += sec('1. Generalidades', `<p>${esc(sp.generalidades).replace(/\n/g,'<br>')}</p>`);
+  // 1. GENERALIDADES
+  if (sp.generalidades) html += sec('1. Generalidades',
+    `<p style="line-height:1.6">${esc(sp.generalidades).replace(/\n/g,'<br>')}</p>`);
 
-  // ══ 2. TAXONOMÍA Y DATOS GENERALES ══
-  html += sec('2. Información General', `<table><tbody>
-    ${sp.clase?row2('Clase',sp.clase):''}${row2('Orden', sp.order||NA)}
-    ${row2('Familia', sp.family||NA)}
-    ${row2('Distribución', sp.distribution||NA)}
+  // 2. TAXONOMÍA E INFORMACIÓN GENERAL
+  html += sec('2. Taxonomía e Información General', `<table><tbody>
+    ${sp.clase   ? row2('Clase', sp.clase) : ''}
+    ${row2('Orden',   sp.order   || NA)}
+    ${row2('Familia', sp.family  || NA)}
+    ${row2('Distribución geográfica', sp.distribution || NA)}
     ${row2('Temperatura óptima', ((sp.temp_range||[0,0]).join('–'))+' °C')}
-    ${row2('Humedad óptima', ((sp.humidity||[0,0]).join('–'))+'%')}
-    ${row2('Dimorfismo sexual', sp.dimorphism||NA)}
-  </tbody></table>`);
+    ${row2('Humedad óptima',     ((sp.humidity  ||[0,0]).join('–'))+'%')}
+    ${row2('Conservación UICN Mundial',   sp.uicn_world    || NA)}
+    ${row2('Conservación UICN Colombia',  sp.uicn_colombia || NA)}
+    ${cons.cites   ? row2('CITES',        cons.cites)   : ''}
+    ${cons.res0126 ? row2('Res. 0126/2024', cons.res0126) : ''}
+  </tbody></table>
+  ${(sp.dist_maps||[]).length
+    ? `<h3>Mapas de distribución</h3><div style="display:flex;flex-wrap:wrap;gap:6pt">${sp.dist_maps.map(m=>img(m.data,'200px','140px')).join('')}</div>`
+    : ''}`);
 
-  // ══ 3. BIOMETRÍA ══
-  const bmFields = [
-    ['Peso promedio (kg)', 'peso_prom'],
-    ['Rango de peso (kg)', 'peso_rango'],
-    ['Longitud CC (cm)', 'long_cc'],
-    ['Longitud cola (cm)', 'long_cola'],
-    ['Altura a la cruz (cm)', 'altura_cruz']
-  ];
-  const lifeFields = [
-    ['Esperanza de vida', 'esp_vida'],
-    ['Edad promedio', 'edad_prom'],
-    ['Edad máxima', 'edad_max'],
-    ['Madurez sexual', 'mad_sexual'],
-    ['Período gestación', 'gestacion']
-  ];
+  // 3. DIMORFISMO SEXUAL
+  if (sp.dimorphism || (sp.dimorfismo_fotos||[]).length) {
+    let dimoContent = '';
+    if (sp.dimorphism) dimoContent += `<p style="line-height:1.6">${esc(sp.dimorphism)}</p>`;
+    if ((sp.dimorfismo_fotos||[]).length) {
+      dimoContent += `<div style="display:flex;flex-wrap:wrap;gap:6pt;margin-top:6pt">`;
+      sp.dimorfismo_fotos.forEach(f => {
+        dimoContent += `<div style="text-align:center">${img(f.data,'130px','100px')}<br><span style="font-size:8pt;color:#666">${esc(f.label||'')}</span></div>`;
+      });
+      dimoContent += `</div>`;
+    }
+    html += sec('3. Dimorfismo Sexual', dimoContent);
+  }
+
+  // 4. BIOMETRÍA Y LONGEVIDAD
+  const bmFields   = [['Peso promedio (kg)','peso_prom'],['Rango de peso (kg)','peso_rango'],['Longitud CC (cm)','long_cc'],['Longitud cola (cm)','long_cola'],['Altura a la cruz (cm)','altura_cruz']];
+  const lifeFields = [['Esperanza de vida','esp_vida'],['Edad promedio','edad_prom'],['Edad máxima','edad_max'],['Madurez sexual','mad_sexual'],['Gestación','gestacion']];
   let bmContent = '';
   if (Object.keys(bm).length) {
-    bmContent += `<h3>Biometría</h3><table>
-      <thead><tr><th>Parámetro</th><th>Macho</th><th>Hembra</th></tr></thead><tbody>
-      ${bmFields.map(([lbl,field]) => bm[field] ? `<tr><td>${lbl}</td><td>${esc(bm[field].m||'—')}</td><td>${esc(bm[field].f||'—')}</td></tr>` : '').join('')}
-      ${(bm._extra||[]).map(e=>`<tr><td>${esc(e.label)}</td><td>${esc(e.m||'—')}</td><td>${esc(e.f||'—')}</td></tr>`).join('')}
-      </tbody></table>`;
-    bmContent += `<h3 style="margin-top:8pt">Longevidad</h3><table>
-      <thead><tr><th>Parámetro</th><th>Silvestre</th><th>Bajo cuidado profesional</th></tr></thead><tbody>
-      ${lifeFields.map(([lbl,field]) => bm[field] ? `<tr><td>${lbl}</td><td>${esc(bm[field].silv||'—')}</td><td>${esc(bm[field].prof||'—')}</td></tr>` : '').join('')}
-      </tbody></table>`;
+    const bmRows = bmFields.map(([lbl,f]) => bm[f]
+      ? `<tr><td>${lbl}</td><td style="text-align:center">${esc(bm[f].m||'—')}</td><td style="text-align:center">${esc(bm[f].f||'—')}</td></tr>` : '').filter(Boolean).join('');
+    const extraRows = (bm._extra||[]).map(e =>
+      `<tr><td>${esc(e.label)}</td><td style="text-align:center">${esc(e.m||'—')}</td><td style="text-align:center">${esc(e.f||'—')}</td></tr>`).join('');
+    if (bmRows || extraRows)
+      bmContent += `<h3>Biometría (Macho / Hembra)</h3><table><thead><tr><th>Parámetro</th><th>Macho</th><th>Hembra</th></tr></thead><tbody>${bmRows}${extraRows}</tbody></table>`;
+    const lifeRows = lifeFields.map(([lbl,f]) => bm[f]
+      ? `<tr><td>${lbl}</td><td style="text-align:center">${esc(bm[f].silv||'—')}</td><td style="text-align:center">${esc(bm[f].prof||'—')}</td></tr>` : '').filter(Boolean).join('');
+    if (lifeRows)
+      bmContent += `<h3>Longevidad (Silvestre / Bajo cuidado profesional)</h3><table><thead><tr><th>Parámetro</th><th>Vida silvestre</th><th>Bajo cuidado profesional</th></tr></thead><tbody>${lifeRows}</tbody></table>`;
   } else {
-    bmContent = `${row2('Peso promedio',sp.weight_avg ? sp.weight_avg+' kg' : NA)} ${row2('Rango de peso', sp.weight_min&&sp.weight_max ? sp.weight_min+'–'+sp.weight_max+' kg' : NA)}`;
-    bmContent = `<table><tbody>${bmContent}</tbody></table>`;
+    const bwRows = `${sp.weight_avg ? row2('Peso promedio', sp.weight_avg+' kg') : ''}${sp.weight_min && sp.weight_max ? row2('Rango de peso', sp.weight_min+'–'+sp.weight_max+' kg') : ''}`;
+    if (bwRows) bmContent = `<table><tbody>${bwRows}</tbody></table>`;
   }
-  html += sec('3. Biometría y Longevidad', bmContent);
+  if (bmContent) html += sec('4. Biometría y Longevidad', bmContent);
 
-  // ══ 4. FISIOLOGÍA ══
+  // 5. FISIOLOGÍA
   let fisioContent = `<h3>Constantes vitales</h3><table><tbody>
     ${row2('Temperatura corporal', v.temp||NA)}
-    ${row2('Frecuencia cardíaca', v.fc||NA)}
-    ${row2('Frecuencia respiratoria', v.fr||NA)}
+    ${row2('Frecuencia cardíaca (bpm)', v.fc||NA)}
+    ${row2('Frecuencia respiratoria (rpm)', v.fr||NA)}
     ${row2('Presión arterial', v.ps||NA)}
     ${row2('Volumen sanguíneo', v.vol_sang||NA)}
   </tbody></table>`;
-  // Venopunción
-  if ((sp.venopuncion_lista||[]).length) {
-    fisioContent += `<h3>Venopunción</h3>` + tbl(['Sitio','Volumen máx','Indicación'],
-      sp.venopuncion_lista.map(vp=>`<tr><td>${esc(vp.sitio||vp[0]||'')}</td><td>${esc(vp.vol||vp[1]||'')}</td><td>${esc(vp.indicacion||vp[2]||'')}</td></tr>`).join(''));
-  }
-  // Hematología
-  if ((sp.hematology||[]).length) {
-    fisioContent += `<h3>Hematología</h3>` + tbl(['Parámetro','Rango normal','Unidades','Definición'],
-      sp.hematology.map(h=>`<tr><td>${esc(h[0]||'')}</td><td style="font-weight:600;text-align:center">${esc(h[1]||'')}</td><td style="text-align:center">${esc(h[2]||'')}</td><td style="font-size:9pt;color:#555">${esc(h[3]||'')}</td></tr>`).join(''));
-  }
-  // Bioquímica
-  if ((sp.biochem||[]).length) {
-    fisioContent += `<h3>Bioquímica</h3>` + tbl(['Parámetro','Rango normal','Unidades','Definición'],
-      sp.biochem.map(b=>`<tr><td>${esc(b[0]||'')}</td><td style="font-weight:600;text-align:center">${esc(b[1]||'')}</td><td style="text-align:center">${esc(b[2]||'')}</td><td style="font-size:9pt;color:#555">${esc(b[3]||'')}</td></tr>`).join(''));
-  }
-  html += sec('4. Fisiología', fisioContent);
+  if ((sp.venopuncion_lista||[]).length)
+    fisioContent += `<h3>Sitios de venopunción</h3>` + tbl(['Sitio','Vol. máx.','Indicación / Notas'],
+      sp.venopuncion_lista.map(vp=>`<tr><td><strong>${esc(vp.sitio||vp[0]||'')}</strong></td><td style="text-align:center">${esc(vp.vol||vp[1]||'')}</td><td>${esc(vp.indicacion||vp[2]||'')}</td></tr>`).join(''));
+  if ((sp.hematology||[]).length)
+    fisioContent += `<h3>Hematología</h3>` + tbl(['Parámetro','Rango normal','Unidades','Definición / Uso clínico'],
+      sp.hematology.map(h=>`<tr><td><strong>${esc(h[0]||'')}</strong></td><td style="text-align:center;font-weight:700;color:#1a6b3f">${esc(h[1]||'')}</td><td style="text-align:center">${esc(h[2]||'')}</td><td style="font-size:9pt;color:#555">${esc(h[3]||'')}</td></tr>`).join(''));
+  if ((sp.biochem||[]).length)
+    fisioContent += `<h3>Bioquímica sérica</h3>` + tbl(['Parámetro','Rango normal','Unidades','Definición / Uso clínico'],
+      sp.biochem.map(b=>`<tr><td><strong>${esc(b[0]||'')}</strong></td><td style="text-align:center;font-weight:700;color:#1a6b3f">${esc(b[1]||'')}</td><td style="text-align:center">${esc(b[2]||'')}</td><td style="font-size:9pt;color:#555">${esc(b[3]||'')}</td></tr>`).join(''));
+  html += sec('5. Fisiología', fisioContent);
 
-  // ══ 5. NUTRICIÓN ══
+  // 6. NUTRICIÓN
   let nutContent = `<table><tbody>
     ${row2('Dieta bajo cuidado profesional', n.captive||NA)}
     ${row2('Frecuencia de alimentación', n.freq||NA)}
     ${row2('Dieta silvestre', sp.diet_wild||NA)}
   </tbody></table>`;
-  // Lista alimentos silvestres
-  if ((sp.dieta_silvestre_lista||[]).length) {
-    nutContent += `<p><strong>Alimentos en vida silvestre:</strong> ${sp.dieta_silvestre_lista.map(a=>esc(a)).join(' · ')}</p>`;
-  }
-  // Requerimiento energético
-  if ((sp.req_energetico||[]).length) {
+  if ((sp.dieta_silvestre_lista||[]).length)
+    nutContent += `<div class="note"><strong>Alimentos en vida silvestre (${sp.dieta_silvestre_lista.length}):</strong><br>${sp.dieta_silvestre_lista.map(a=>esc(a)).join(' · ')}</div>`;
+  if ((sp.req_energetico||[]).length)
     nutContent += `<h3>Requerimiento Energético</h3>` + tbl(['Categoría','kcal/kg/día'],
-      sp.req_energetico.map(r=>`<tr><td>${esc(r.cat)}</td><td style="text-align:center;font-weight:600">${esc(r.kcal)}</td></tr>`).join(''));
-  }
-  // Suplementos
-  if ((sp.suplementos||[]).length) {
-    nutContent += `<h3>Suplementos</h3>` + tbl(['Suplemento','Categoría','Dosis','Unidad','Conc.(mg/ml)','Notas'],
-      sp.suplementos.map(s=>`<tr><td><strong>${esc(s.nombre)}</strong></td><td>${esc(s.cat||'')}</td><td style="text-align:center">${esc(s.dosis||'')}</td><td>${esc(s.unit||'')}</td><td style="text-align:center">${esc(s.conc||'')}</td><td>${esc(s.notas||'')}</td></tr>`).join(''));
-  }
-  // Tóxicos
-  if ((sp.toxicos_lista||[]).length) {
+      sp.req_energetico.map(r=>`<tr><td>${esc(r.cat)}</td><td style="text-align:center;font-weight:700">${esc(r.kcal)}</td></tr>`).join(''));
+  if ((sp.suplementos||[]).length)
+    nutContent += `<h3>Suplementos</h3>` + tbl(['Suplemento','Categoría','Dosis','A','B','Concentración','C','Notas'],
+      sp.suplementos.map(s=>`<tr><td><strong>${esc(s.nombre)}</strong></td><td>${esc(s.cat||'')}</td>
+        <td style="text-align:center">${esc(String(s.dosis||''))}${s.dose_min?` (${s.dose_min}–${s.dose_max||'?'})`:''}</td>
+        <td>${esc(s.unitA||'kg(pv)')}</td><td>${esc(s.unitB||'mg')}</td>
+        <td style="text-align:center">${esc(String(s.conc||''))}</td><td>${esc(s.unitC||'ml')}</td>
+        <td style="font-size:9pt">${esc(s.notas||'')}</td></tr>`).join(''));
+  if ((sp.toxicos_lista||[]).length)
     nutContent += `<div class="warn">⚠ TÓXICOS Y PROHIBIDOS<br>` + tbl(['Sustancia / Alimento','Efecto tóxico'],
       sp.toxicos_lista.map(t=>`<tr><td style="color:#991b1b;font-weight:600">${esc(t.nombre||t)}</td><td>${esc(t.efecto||'')}</td></tr>`).join('')) + `</div>`;
-  } else if (n.toxic) {
-    nutContent += `<div class="warn">⚠ TÓXICOS: ${esc(n.toxic)}</div>`;
-  }
-  // Fórmula dentaria
-  if ((sp.denticion||[]).length) {
-    nutContent += `<h3>Fórmula Dentaria</h3>` + tbl(['Tipo','Superior','Inferior','Función'],
+  else if (n.toxic) nutContent += `<div class="warn">⚠ TÓXICOS: ${esc(n.toxic)}</div>`;
+  if ((sp.denticion||[]).length)
+    nutContent += `<h3>Fórmula Dentaria</h3>` + tbl(['Tipo de diente','Superior','Inferior','Función'],
       sp.denticion.map(d=>`<tr><td>${esc(d.tipo||d[0]||'')}</td><td style="text-align:center">${esc(d.superior||d[1]||'')}</td><td style="text-align:center">${esc(d.inferior||d[2]||'')}</td><td>${esc(d.funcion||d[3]||'')}</td></tr>`).join(''));
-  }
-  html += sec('5. Nutrición', nutContent);
+  if ((sp.dental_measures||[]).length)
+    nutContent += `<h3>Medidas Odontológicas</h3>` + tbl(['N° Diente','Descripción','Valor','Fecha'],
+      sp.dental_measures.map(m=>`<tr><td>${esc(m.num||'—')}</td><td>${esc(m.label||'')}</td><td style="font-weight:700">${esc(m.value||'')}</td><td style="font-size:9pt;color:#666">${esc(m.date||'')}</td></tr>`).join(''));
+  if ((sp.dental_fotos||[]).length)
+    nutContent += `<h3>Fotos Dentales</h3><div style="display:flex;flex-wrap:wrap;gap:4pt">${sp.dental_fotos.map(f=>img(f.data,'110px','85px')).join('')}</div>`;
+  html += sec('6. Nutrición', nutContent);
 
-  // ══ 6. COMPORTAMIENTO ══
-  const behKeys = ['silvestre','cautiverio','estres','reproductivo','social'];
-  const behLabels = ['Vida silvestre','Bajo cuidado profesional','Bajo estrés','Reproductivo','Social'];
+  // 7. COMPORTAMIENTO
+  const behKeys   = ['silvestre','cautiverio','estres','reproductivo','social'];
+  const behLabels = ['Vida silvestre','Bajo cuidado profesional','Bajo estrés / Captura','Reproductivo','Social / Compatibilidad'];
   const spBeh = sp.comportamiento || {};
-  let behContent = `<table><tbody>`;
+  let behRows = '';
   behKeys.forEach((k,i) => {
     const val = spBeh[k] || beh[k] || beh[behLabels[i]] || '';
-    if (val) behContent += row2(behLabels[i], val);
+    if (val) behRows += row2(behLabels[i], val);
   });
-  behContent += `</tbody></table>`;
-  if (behContent !== '<table><tbody></tbody></table>') html += sec('6. Comportamiento', behContent);
+  if (behRows) html += sec('7. Comportamiento', `<table><tbody>${behRows}</tbody></table>`);
 
-  // ══ 7. ENFERMEDADES por sistema ══
-  const SISTEMAS = [
+  // 8. ENFERMEDADES POR SISTEMA
+  const SISTEMAS_EXP = [
     {id:'dental',label:'Enfermedades Dentales'},{id:'gastro',label:'Gastrointestinales'},
-    {id:'renal',label:'Renales / Urinarias'},{id:'cardiaco',label:'Cardíacas'},
+    {id:'renal',label:'Renales / Urinarias'},{id:'cardiaco',label:'Cardíacas / Cardiovasculares'},
     {id:'respiratorio',label:'Respiratorias'},{id:'nervioso',label:'Sistema Nervioso'},
     {id:'musculo',label:'Músculo-esqueléticas'},{id:'dermatol',label:'Dermatológicas'},
     {id:'infeccioso',label:'Infecciosas / Parasitarias'},{id:'otro',label:'Otras'}
   ];
-  const todosEnf = [...SISTEMAS, ...(sp.enfermedades_categorias||[])];
+  const todosEnf = [...SISTEMAS_EXP, ...(sp.enfermedades_categorias||[])];
   const sistData = sp.enfermedades_sistemas || {};
   let enfContent = '';
   todosEnf.forEach(sist => {
     const enfs = sistData[sist.id]?.enfermedades || [];
     if (!enfs.length) return;
-    enfContent += `<h3>${esc(sist.label)}</h3>`;
-    enfContent += tbl(['Enfermedad','Agente/Causa','Vías transmisión','Signos clínicos','Diagnóstico','Tratamiento','Notas'],
-      enfs.map(e => {
-        const signos = (e.signos_lista||[e.signos||'']).filter(Boolean).join('; ');
-        const dxStr = (e.dx_lista||[]).length
-          ? e.dx_lista.map(d=>d.metodo+(d.esperado?': '+d.esperado:'')).join('; ')
-          : (e.dx||'');
-        const txStr = (e.tx_lista||[e.tx||'']).filter(Boolean).join('; ');
-        const vias = [...(e.vias||[]), e.vias_extra].filter(Boolean).join(', ');
-        return `<tr>
-          <td style="font-weight:600">${esc(e.nombre)}</td>
-          <td>${esc(e.agente||'')}</td>
-          <td style="font-size:9pt">${esc(vias||'')}</td>
-          <td style="font-size:9pt">${esc(signos)}</td>
-          <td style="font-size:9pt">${esc(dxStr)}</td>
-          <td style="font-size:9pt">${esc(txStr)}</td>
-          <td style="font-size:9pt;color:#555">${esc(e.notas||'')}</td>
-        </tr>`;
-      }).join(''));
+    enfContent += `<h3>${esc(sist.label||sist.id)}</h3>`;
+    const notas = sistData[sist.id]?.notas;
+    if (notas) enfContent += `<div class="note">${esc(notas)}</div>`;
+    enfs.forEach(e => {
+      const signos = (e.signos_lista||[e.signos||'']).filter(Boolean).join('; ');
+      const dxItems = (e.dx_lista||[]).length ? e.dx_lista : [{metodo:e.dx||'',esperado:'',imagenes:[]}];
+      const txStr   = (e.tx_lista||[e.tx||'']).filter(Boolean).join('; ');
+      const vias    = [...(e.vias||[]), e.vias_extra].filter(Boolean).join(', ');
+      enfContent += `<div style="border:1pt solid #e0e0e0;border-radius:4pt;padding:6pt 8pt;margin-bottom:8pt">
+        <p style="font-weight:700;font-size:11pt;color:#1a6b3f;margin:0 0 4pt">${esc(e.nombre)}</p>
+        ${e.agente  ? `<p style="margin:2pt 0;font-size:9pt"><strong>Agente/Causa:</strong> ${esc(e.agente)}</p>` : ''}
+        ${vias      ? `<p style="margin:2pt 0;font-size:9pt"><strong>Vías de transmisión:</strong> ${esc(vias)}</p>` : ''}
+        ${signos    ? `<p style="margin:2pt 0;font-size:9pt"><strong>Signos clínicos:</strong> ${esc(signos)}</p>` : ''}
+        ${dxItems.length ? `<p style="margin:4pt 0 2pt;font-size:9pt;font-weight:600">Diagnóstico:</p>
+          <ul style="margin:0;padding-left:14pt">${dxItems.filter(d=>d.metodo).map(d=>`<li style="font-size:9pt">${esc(d.metodo)}${d.esperado?`: <em>${esc(d.esperado)}</em>`:''}${(d.imagenes||[]).length?`<br>${d.imagenes.map(im=>img(im.data,'90px','70px')).join('')}`:''}</li>`).join('')}</ul>` : ''}
+        ${txStr     ? `<p style="margin:2pt 0;font-size:9pt"><strong>Tratamiento:</strong> ${esc(txStr)}</p>` : ''}
+        ${e.notas   ? `<div class="note" style="margin-top:4pt;font-size:9pt">📋 ${esc(e.notas)}</div>` : ''}
+      </div>`;
+    });
   });
-  if (enfContent) html += sec('7. Enfermedades por Sistema', enfContent);
+  if (enfContent) html += sec('8. Enfermedades por Sistema', enfContent);
 
-  // ══ 8. MEDICAMENTOS ══
+  // 9. MEDICAMENTOS
   if ((sp.drugs||[]).length) {
-    // Agrupar por categoría
     const groups = {};
     sp.drugs.forEach(d => {
-      const cat = d.cat||'Otro';
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(d);
+      const cats = d.cats?.length ? d.cats : [d.cat||'Otro'];
+      cats.forEach(cat => { if (!groups[cat]) groups[cat]=[]; groups[cat].push(d); });
     });
     let drugContent = '';
     Object.entries(groups).forEach(([cat, drugs]) => {
       drugContent += `<h3>${esc(cat)}</h3>`;
-      drugContent += tbl(['Nombre comercial','Principio activo','Conc.(mg/ml)','Dosis(mg/kg)','Rango','Vía','Frecuencia','Indicaciones','Contraindicaciones','Efectos adversos','Notas'],
-        drugs.map(d => `<tr>
-          <td style="font-weight:600">${esc(d.name)}</td>
-          <td style="font-style:italic">${esc(d.active||'')}</td>
-          <td style="text-align:center">${d.conc||'—'}</td>
-          <td style="text-align:center;font-weight:700;color:#1a6b3f">${d.dose||'—'}</td>
+      drugContent += tbl(['Nombre comercial','Principio activo','Categ. esp.','Conc. (mg/ml)','Dosis rec. (mg/kg)','Rango','Vía','Frecuencia','Indicaciones','Contraindicaciones','Efectos adversos'],
+        drugs.map(d=>`<tr>
+          <td style="font-weight:700">${esc(d.name)}</td>
+          <td style="font-style:italic">${esc(d.active||'—')}</td>
+          <td style="font-size:9pt">${esc(d.cat_esp||'—')}</td>
+          <td style="text-align:center">${esc(String(d.conc||'—'))}</td>
+          <td style="text-align:center;font-weight:700;color:#1a6b3f">${esc(String(d.dose||'—'))}</td>
           <td style="text-align:center;font-size:9pt">${(d.dose_min&&d.dose_max)?d.dose_min+'–'+d.dose_max:'—'}</td>
-          <td>${esc(d.route||'')}</td>
-          <td>${esc(d.freq||'')}</td>
-          <td style="font-size:9pt">${esc(d.indic||'')}</td>
-          <td style="font-size:9pt;color:#991b1b">${esc(d.contra||d.contraindications||'')}</td>
-          <td style="font-size:9pt">${esc(d.effects||'')}</td>
-          <td style="font-size:9pt">${esc(d.notes||'')}</td>
+          <td>${esc(d.route||'—')}</td><td>${esc(d.freq||'—')}</td>
+          <td style="font-size:9pt">${esc(d.indic||'—')}</td>
+          <td style="font-size:9pt;color:#991b1b">${esc(d.contra||d.contraindications||'—')}</td>
+          <td style="font-size:9pt">${esc(d.effects||'—')}</td>
         </tr>`).join(''));
     });
-    html += sec('8. Medicamentos', drugContent);
+    html += sec('9. Medicamentos', drugContent);
   }
 
-  // ══ 9. PROTOCOLOS ANESTÉSICOS ══
+  // 10. PROTOCOLOS ANESTÉSICOS
   if ((sp.protocols||[]).length) {
     let protContent = '';
-    sp.protocols.forEach((p,pi) => {
-      const vis = p.visibility === 'private' ? ' 🔒 Privado' : ' 🌐 General';
-      protContent += `<h3>${esc(p.name)}${vis}</h3>`;
-      protContent += `<p><strong>Inducción:</strong> ${p.induction||'—'} min &nbsp;|&nbsp; <strong>Duración estimada:</strong> ${p.duration||'—'} min</p>`;
-      if ((p.drugs||[]).length) {
-        protContent += tbl(['Fármaco','Dosis (mg/kg)','Conc.(mg/ml)','Vía'],
-          p.drugs.map(d=>`<tr><td><strong>${esc(d.name)}</strong></td><td style="text-align:center;font-weight:700;color:#1a6b3f">${d.dose||'—'}</td><td style="text-align:center">${d.conc||'—'}</td><td>${esc(d.route||'IM')}</td></tr>`).join(''));
-      }
-      if ((p.reversals||[]).length) {
-        protContent += `<p><strong>Reversores:</strong> ` + p.reversals.map(r=>`${esc(r.name)} ${r.dose} mg/kg ${esc(r.route||'IM')} (${r.conc||'—'} mg/ml)`).join(' · ') + `</p>`;
-      }
-      if (p.notes) protContent += `<div class="note">📋 ${esc(p.notes)}</div>`;
+    sp.protocols.forEach(p => {
+      const vis = p.visibility === 'private' ? ' 🔒' : ' 🌐';
+      protContent += `<div style="border:1pt solid #c2f0d3;border-radius:4pt;padding:8pt;margin-bottom:10pt">
+        <h3 style="margin:0 0 4pt;color:#1a6b3f">${esc(p.name)}${vis}</h3>
+        <p style="font-size:9pt;margin:2pt 0"><strong>Inducción:</strong> ${esc(String(p.induction||'—'))} min &nbsp;|&nbsp; <strong>Duración:</strong> ${esc(String(p.duration||'—'))} min</p>
+        ${(p.drugs||[]).length ? tbl(['Fármaco','Dosis (mg/kg)','Conc. (mg/ml)','Vía'],
+          p.drugs.map(d=>`<tr><td><strong>${esc(d.name)}</strong></td><td style="text-align:center;font-weight:700;color:#1a6b3f">${esc(String(d.dose||'—'))}</td><td style="text-align:center">${esc(String(d.conc||'—'))}</td><td>${esc(d.route||'IM')}</td></tr>`).join('')) : ''}
+        ${(p.reversals||[]).length ? `<p style="margin:4pt 0;font-size:9pt"><strong>Reversores:</strong> ${p.reversals.map(r=>`${esc(r.name)} ${r.dose} mg/kg ${esc(r.route||'IM')} · ${r.conc||'—'} mg/ml`).join(' | ')}</p>` : ''}
+        ${p.notes ? `<div class="note" style="font-size:9pt">📋 ${esc(p.notes)}</div>` : ''}
+      </div>`;
     });
-    html += sec('9. Protocolos Anestésicos', protContent);
+    html += sec('10. Protocolos Anestésicos', protContent);
   }
 
-  // ══ 10. FLUIDOTERAPIA ══
-  if (sp.fluid_nota) html += sec('10. Fluidoterapia', `<div class="note">${esc(sp.fluid_nota).replace(/\n/g,'<br>')}</div>`);
+  // 11. FLUIDOTERAPIA
+  if (sp.fluid_nota) html += sec('11. Fluidoterapia',
+    `<div class="note">${esc(sp.fluid_nota).replace(/\n/g,'<br>')}</div>`);
 
-  // ══ 11. FOTOS DENTALES ══
-  if ((sp.dental_fotos||[]).length) {
-    let dentalGallery = `<div style="display:flex;flex-wrap:wrap;gap:6pt">`;
-    sp.dental_fotos.forEach(f => { dentalGallery += `<img src="${f.data}" style="height:80px;width:auto;border-radius:3pt;border:1pt solid #ddd">`; });
-    dentalGallery += `</div>`;
-    html += sec('11. Fotos Dentales', dentalGallery);
-  }
-
-  // ══ 12. GALERÍA ══
-  if ((sp.cover_photos||[]).length) {
-    let galleryContent = `<div style="display:flex;flex-wrap:wrap;gap:8pt;margin-top:6pt">`;
-    sp.cover_photos.forEach(p => {
-      galleryContent += `<img src="${p.data}" style="width:120px;height:90px;object-fit:cover;border-radius:4pt;border:1pt solid #ddd">`;
-    });
-    galleryContent += `</div>`;
-    html += sec('11. Galería de Fotos', galleryContent);
-  }
+  // 12. GALERÍA
+  if ((sp.cover_photos||[]).length)
+    html += sec('12. Galería de fotos',
+      `<div style="display:flex;flex-wrap:wrap;gap:6pt">${sp.cover_photos.map(p=>img(p.data,'140px','105px')).join('')}</div>`);
 
   return html;
 }
@@ -9920,79 +9912,6 @@ async function saveBiblioteca() {
   }
 }
 
-function renderBiblioteca() {
-  const el = document.getElementById('biblioteca-list');
-  if (!el) return;
-  const isAdmin = currentUser?.role === 'admin';
-  if (!SPECIES_DB.length) { el.innerHTML = '<p style="color:var(--txt3)">Sin especies cargadas.</p>'; return; }
-
-  // Widget de importación por IA (solo admin)
-  const aiWidget = isAdmin ? `
-    <div class="info-card" style="margin-bottom:1rem;background:var(--g0);border:2px dashed var(--g4)">
-      <div class="info-card-title">📄 Importar referencia desde archivo (PDF, Word, Excel)</div>
-      <p style="font-size:.78rem;color:var(--txt3);margin-bottom:.6rem">Sube un paper o libro y la IA extrae título, autores, año y tipo automáticamente. Luego elige a qué especie asignarla.</p>
-      <!-- Selector IA -->
-      <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-bottom:.4rem">
-        <span style="font-size:.7rem;color:var(--txt3);font-weight:600">IA:</span>
-        <button onclick="setModalAI(this,'gemini')" data-provider="gemini"
-          style="font-size:.72rem;padding:.2rem .5rem;border-radius:var(--rxs);border:2px solid var(--g4);background:var(--g1);color:var(--g7);cursor:pointer;font-family:var(--sans);font-weight:600">🔵 Gemini (gratis)</button>
-        <button onclick="setModalAI(this,'claude')" data-provider="claude"
-          style="font-size:.72rem;padding:.2rem .5rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--sur);color:var(--txt3);cursor:pointer;font-family:var(--sans)">🟠 Claude</button>
-        <input type="password" id="modal-ai-key" class="form-control" style="flex:1;min-width:150px;font-size:.75rem;height:1.8rem"
-          placeholder="API Key (AIzaSy... o sk-ant-...)" oninput="saveModalAIKey(this.value)">
-      </div>
-      <div id="modal-ai-status" style="font-size:.7rem;color:var(--txt3);margin-bottom:.5rem"></div>
-      <!-- Selector de especie -->
-      <div style="display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap">
-        <div style="flex:1;min-width:150px">
-          <label style="font-size:.7rem;color:var(--txt3)">Especie</label>
-          <select id="bib-sp-select" class="form-control" style="font-size:.82rem">
-            ${SPECIES_DB.map(sp=>`<option value="${sp.id}">${sp.name}</option>`).join('')}
-          </select>
-        </div>
-        <label for="bib-file-import" class="btn btn-primary" style="cursor:pointer;display:inline-flex;gap:.4rem;align-self:flex-end">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          Subir archivo
-        </label>
-        <input type="file" id="bib-file-import" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt" style="display:none" onchange="importBibFile(this)">
-      </div>
-      <div id="bib-import-status" style="font-size:.78rem;color:var(--g6);margin-top:.4rem;min-height:1rem"></div>
-    </div>` : '';
-
-  el.innerHTML = aiWidget + SPECIES_DB.map(sp => {
-    const refs = BIBLIOTECA_DB[sp.id] || [];
-    return `
-    <div class="info-card" style="margin-bottom:.75rem">
-      <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
-        <div style="display:flex;align-items:center;gap:.5rem">
-          ${sp.cover_photo ? `<img src="${sp.cover_photo}" style="width:32px;height:24px;object-fit:cover;border-radius:var(--rxs)">` : ''}
-          <span>${sp.name}</span>
-          <span style="font-size:.7rem;color:var(--txt3);font-weight:400;font-style:italic">${sp.sci||''}</span>
-        </div>
-        ${isAdmin ? `<button onclick="openAddRef('${sp.id}')" class="btn btn-admin btn-sm">+ Agregar</button>` : ''}
-      </div>
-      ${refs.length ? `
-      <div style="margin-top:.4rem">
-        ${refs.map((r,i) => `
-        <div style="padding:.4rem .5rem;border-left:3px solid var(--g5);margin-bottom:.4rem;background:var(--sur2);border-radius:0 var(--rxs) var(--rxs) 0">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div style="flex:1">
-              <div style="font-size:.82rem;font-weight:600;color:var(--txt)">${r.titulo||'Sin título'}</div>
-              ${r.autores ? `<div style="font-size:.75rem;color:var(--txt3)">${r.autores}${r.año?' · '+r.año:''}</div>` : ''}
-              <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
-                ${r.tipo ? `<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>` : ''}
-                ${r.url ? `<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver fuente</a>` : ''}
-                ${r.pdf ? `<a href="${r.pdf.data}" download="${r.pdf.name}" style="font-size:.65rem;color:var(--bl)">📄 ${r.pdf.name}</a>` : ''}
-              </div>
-              ${r.notas ? `<div style="font-size:.75rem;color:var(--txt3);margin-top:.2rem;font-style:italic">${r.notas}</div>` : ''}
-            </div>
-            ${isAdmin ? `<button onclick="removeRef('${sp.id}',${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem;padding:.1rem .3rem;flex-shrink:0">✕</button>` : ''}
-          </div>
-        </div>`).join('')}
-      </div>` : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic;margin-top:.3rem">Sin referencias agregadas.${isAdmin?' Toca + Agregar.':''}</p>`}
-    </div>`;
-  }).join('');
-}
 
 function setModalAI(btn, provider) {
   selectedAI = provider;
