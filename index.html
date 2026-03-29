@@ -3953,7 +3953,7 @@ async function removeDentalMeasure(i) {
 }
 // ── Helper centralizado para llamadas a IA (Claude o Gemini) ──
 // ── URL del proxy (se configura en Ajustes → URL Proxy IA) ──
-let _AI_PROXY_URL = localStorage.getItem('wv_proxy_url') || '';
+let _AI_PROXY_URL = localStorage.getItem('wv_proxy_url') || 'https://wildvet-proxy.cardadiar.workers.dev';
 
 function saveProxyUrl(url) {
   _AI_PROXY_URL = (url || '').trim().replace(/\/$/, '');
