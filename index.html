@@ -1606,246 +1606,334 @@ function buildSpeciesExportHTML(sp) {
   const bm   = sp.biometria || {};
   const cons = sp.conservacion || {};
   const spBeh = sp.comportamiento || {};
-  const ND   = '<span style="color:#aaa;font-style:italic">No se ha subido</span>';
-  const esc  = s => (String(s||'')).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const val  = v => v ? esc(v) : ND;
-  const row2 = (a,b) => `<tr><td style="width:40%;font-weight:600;color:#1a6b3f;padding:4pt 8pt;border:1pt solid #e0e0e0;background:#f9fffe">${esc(a)}</td><td style="padding:4pt 8pt;border:1pt solid #e0e0e0">${b||ND}</td></tr>`;
-  const sec  = (title, content) => `<div style="margin-bottom:14pt"><h2 style="font-size:13pt;color:#1a6b3f;border-bottom:1pt solid #c2f0d3;padding-bottom:3pt;margin-bottom:6pt">${title}</h2>${content}</div>`;
-  const tbl  = (headers, rows) => `<table style="border-collapse:collapse;width:100%;margin-bottom:8pt"><thead><tr>${headers.map(h=>`<th style="background:#e8faf0;color:#0f3d22;font-weight:bold;padding:4pt 7pt;border:1pt solid #c2f0d3;font-size:9.5pt;text-align:left">${h}</th>`).join('')}</tr></thead><tbody>${rows||`<tr><td colspan="${headers.length}" style="padding:5pt;color:#aaa;font-style:italic;border:1pt solid #e0e0e0">No se ha subido</td></tr>`}</tbody></table>`;
-  const img  = (src, w, h) => src ? `<img src="${src}" style="width:${w||'120px'};height:${h||'90px'};object-fit:cover;border-radius:3pt;border:1pt solid #ddd;margin:2pt">` : '';
 
+  const ND = '<span style="color:#bbb;font-style:italic">No se ha subido</span>';
+  const esc = s => (String(s||'')).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const v2h = v => (v !== null && v !== undefined && v !== '') ? esc(String(v)) : ND;
+
+  const row = (num, label, value) =>
+    `<tr>
+      <td style="width:5%;text-align:center;font-size:9pt;color:#888;padding:4pt 6pt;border:0.5pt solid #ddd;background:#f9fffe;vertical-align:top">${num}</td>
+      <td style="width:38%;font-weight:600;color:#1a6b3f;padding:4pt 8pt;border:0.5pt solid #ddd;background:#f9fffe;vertical-align:top">${esc(label)}</td>
+      <td style="padding:4pt 8pt;border:0.5pt solid #ddd;vertical-align:top">${value}</td>
+    </tr>`;
+
+  const secHeader = (title) =>
+    `<tr><td colspan="3" style="background:#0f3d22;color:#fff;font-weight:bold;font-size:11pt;padding:6pt 10pt;border:1pt solid #0f3d22">${esc(title)}</td></tr>`;
+
+  const subHeader = (title) =>
+    `<tr><td colspan="3" style="background:#e8faf0;color:#0f3d22;font-weight:bold;font-size:10pt;padding:5pt 10pt;border:0.5pt solid #c2f0d3">${esc(title)}</td></tr>`;
+
+  const img = (src, w, h) => src
+    ? `<img src="${src}" style="width:${w||'120px'};height:${h||'90px'};object-fit:cover;border-radius:3pt;border:0.5pt solid #ddd;margin:2pt">`
+    : '';
+
+  const tblInner = (headers, rows, emptyMsg) =>
+    `<table style="border-collapse:collapse;width:100%;margin:4pt 0">
+      <thead><tr>${headers.map(h=>`<th style="background:#d4f0e0;color:#0f3d22;font-weight:bold;padding:3pt 6pt;border:0.5pt solid #b2ddc0;font-size:9pt;text-align:left">${esc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${rows || `<tr><td colspan="${headers.length}" style="padding:4pt 6pt;color:#bbb;font-style:italic;border:0.5pt solid #e0e0e0;font-size:9pt">No se ha subido</td></tr>`}</tbody>
+    </table>`;
+
+  // ── PORTADA ──
   let html = '';
-
-  // ══ PORTADA ══
   const allPhotos = [...(sp.cover_photos||[])];
   if (sp.cover_photo && !allPhotos.find(p=>p.data===sp.cover_photo)) allPhotos.unshift({data:sp.cover_photo});
   if (allPhotos.length) {
-    html += `<div style="display:flex;flex-wrap:wrap;gap:4pt;margin-bottom:6pt">`;
-    allPhotos.slice(0,6).forEach(p => { html += img(p.data,'150px','112px'); });
+    html += `<div style="display:flex;flex-wrap:wrap;gap:5pt;margin-bottom:8pt">`;
+    allPhotos.slice(0,6).forEach(p => { html += img(p.data,'160px','120px'); });
     html += `</div>`;
   }
-  html += `<h1 style="font-size:20pt;color:#0f3d22;border-bottom:2pt solid #0f3d22;padding-bottom:4pt;margin-bottom:4pt">${esc(sp.name||'Sin nombre')}</h1>`;
-  html += `<p style="font-size:11pt;color:#444;margin:2pt 0 4pt"><em>${esc(sp.sci||'')}</em>${sp.order?` · <strong>Orden:</strong> ${esc(sp.order)}`:''}${sp.family?` · <strong>Familia:</strong> ${esc(sp.family)}`:''}</p>`;
-  const badges = [
-    sp.uicn_world    ? `UICN Mundial: ${sp.uicn_world}` : '',
-    sp.uicn_colombia ? `UICN Colombia: ${sp.uicn_colombia}` : '',
-    cons.cites       ? `CITES: ${cons.cites}` : '',
-    cons.res0126     ? `Res 0126: ${cons.res0126}` : ''
-  ].filter(Boolean);
-  if (badges.length) html += `<p style="margin:4pt 0">${badges.map(b=>`<span style="background:#e8faf0;color:#0f3d22;padding:2pt 7pt;border-radius:4pt;font-size:9pt;font-weight:bold;margin-right:4pt">${esc(b)}</span>`).join('')}</p>`;
-  html += `<p style="font-size:8pt;color:#888;margin:6pt 0 10pt">Exportado el ${new Date().toLocaleString('es-CO')} · WildVet</p>`;
-  html += `<hr style="border:none;border-top:1pt solid #ddd;margin:8pt 0 12pt">`;
+  html += `<h1 style="font-size:20pt;color:#0f3d22;border-bottom:2pt solid #0f3d22;padding-bottom:4pt;margin:0 0 4pt">${esc(sp.name||'Sin nombre')}</h1>`;
+  html += `<p style="font-size:11pt;color:#555;margin:2pt 0 6pt"><em>${esc(sp.sci||'')}</em></p>`;
+  html += `<p style="font-size:8pt;color:#999;margin:0 0 14pt">Exportado el ${new Date().toLocaleString('es-CO')} · WildVet — Fauna Silvestre</p>`;
+  html += `<hr style="border:none;border-top:1.5pt solid #0f3d22;margin:0 0 16pt">`;
 
-  // ══ 1. GENERAL ══
-  let genContent = `<table style="border-collapse:collapse;width:100%"><tbody>
-    ${row2('Clase', sp.clase)}
-    ${row2('Orden', sp.order)}
-    ${row2('Familia', sp.family)}
-    ${row2('Nombre común', sp.name)}
-    ${row2('Nombre científico', sp.sci)}
-    ${row2('Distribución geográfica', sp.distribution)}
-    ${row2('Temperatura óptima (°C)', sp.temp_range ? sp.temp_range.join(' – ') : null)}
-    ${row2('Humedad óptima (%)', sp.humidity ? sp.humidity.join(' – ') : null)}
-    ${row2('Conservación UICN Mundial', sp.uicn_world)}
-    ${row2('Conservación UICN Colombia', sp.uicn_colombia)}
-    ${row2('CITES', cons.cites)}
-    ${row2('Resolución 0126 de 2024', cons.res0126)}
-    ${row2('Dimorfismo sexual', sp.dimorphism)}
-    ${row2('Dieta silvestre', sp.diet_wild)}
-  </tbody></table>`;
-  if (sp.generalidades) genContent += `<h3 style="font-size:11pt;color:#228b52;margin:8pt 0 3pt">Generalidades</h3><p style="line-height:1.6;margin:0">${esc(sp.generalidades).replace(/\n/g,'<br>')}</p>`;
-  if ((sp.dieta_silvestre_lista||[]).length) genContent += `<p style="margin:6pt 0"><strong>Alimentos en vida silvestre:</strong> ${sp.dieta_silvestre_lista.map(a=>esc(a)).join(' · ')}</p>`;
-  if ((sp.dist_maps||[]).length) genContent += `<h3 style="font-size:11pt;color:#228b52;margin:8pt 0 3pt">Mapas de distribución</h3><div style="display:flex;flex-wrap:wrap;gap:4pt">${sp.dist_maps.map(m=>img(m.data,'180px','130px')).join('')}</div>`;
-  if ((sp.dimorfismo_fotos||[]).length) {
-    genContent += `<h3 style="font-size:11pt;color:#228b52;margin:8pt 0 3pt">Fotos dimorfismo sexual</h3><div style="display:flex;flex-wrap:wrap;gap:4pt">`;
-    sp.dimorfismo_fotos.forEach(f => { genContent += `<div style="text-align:center">${img(f.data,'130px','100px')}<br><span style="font-size:8pt;color:#666">${esc(f.label||'')}</span></div>`; });
-    genContent += `</div>`;
-  }
-  // Biometría y Longevidad dentro de General
-  const bmFields   = [['Peso promedio (kg)','peso_prom'],['Rango de peso (kg)','peso_rango'],['Longitud cabeza-cuerpo (cm)','long_cc'],['Longitud cola (cm)','long_cola'],['Altura a la cruz (cm)','altura_cruz']];
-  const lifeFields = [['Esperanza de vida','esp_vida'],['Edad promedio','edad_prom'],['Edad máxima','edad_max'],['Madurez sexual','mad_sexual'],['Gestación','gestacion']];
-  const bmRows = bmFields.map(([lbl,f]) => bm[f]
-    ? `<tr><td style="padding:3pt 7pt;border:1pt solid #e0e0e0">${lbl}</td><td style="text-align:center;padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(bm[f].m||'—')}</td><td style="text-align:center;padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(bm[f].f||'—')}</td></tr>` : '').join('');
-  const extraRows = (bm._extra||[]).map(e =>
-    `<tr><td style="padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(e.label)}</td><td style="text-align:center;padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(e.m||'—')}</td><td style="text-align:center;padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(e.f||'—')}</td></tr>`).join('');
-  const lifeRows = lifeFields.map(([lbl,f]) => bm[f]
-    ? `<tr><td style="padding:3pt 7pt;border:1pt solid #e0e0e0">${lbl}</td><td style="text-align:center;padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(bm[f].silv||'—')}</td><td style="text-align:center;padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(bm[f].prof||'—')}</td></tr>` : '').join('');
-  genContent += `<h3 style="font-size:11pt;color:#228b52;margin:10pt 0 3pt">Biometría (Macho / Hembra)</h3>`;
-  genContent += tbl(['Parámetro','Macho','Hembra'], bmRows+extraRows);
-  genContent += `<h3 style="font-size:11pt;color:#228b52;margin:10pt 0 3pt">Longevidad (Silvestre / Bajo cuidado profesional)</h3>`;
-  genContent += tbl(['Parámetro','Vida silvestre','Bajo cuidado profesional'], lifeRows);
-  // Legacy weight fields
-  if (!bmRows && (sp.weight_avg||sp.weight_min)) {
-    genContent += `<table style="border-collapse:collapse;width:100%"><tbody>
-      ${sp.weight_avg ? row2('Peso promedio', sp.weight_avg+' kg') : ''}
-      ${sp.weight_min&&sp.weight_max ? row2('Rango de peso', sp.weight_min+'–'+sp.weight_max+' kg') : ''}
-    </tbody></table>`;
-  }
-  html += sec('1. General', genContent);
+  // ── TABLA PRINCIPAL (todos los 55 campos) ──
+  html += `<table style="border-collapse:collapse;width:100%;font-size:10pt;font-family:Calibri,Arial">`;
+  html += `<thead><tr>
+    <th style="background:#0f3d22;color:#fff;padding:5pt 8pt;border:1pt solid #0f3d22;width:5%;text-align:center">#</th>
+    <th style="background:#0f3d22;color:#fff;padding:5pt 8pt;border:1pt solid #0f3d22;width:35%">Campo</th>
+    <th style="background:#0f3d22;color:#fff;padding:5pt 8pt;border:1pt solid #0f3d22">Información</th>
+  </tr></thead>
+  <tbody>`;
 
-  // ══ 2. FISIOLOGÍA ══
-  let fisioContent = `<h3 style="font-size:11pt;color:#228b52;margin:6pt 0 3pt">Constantes vitales</h3>
-    <table style="border-collapse:collapse;width:100%"><tbody>
-    ${row2('Temperatura corporal', v.temp)}
-    ${row2('Frecuencia cardíaca (bpm)', v.fc)}
-    ${row2('Frecuencia respiratoria (rpm)', v.fr)}
-    ${row2('Presión arterial', v.ps)}
-    ${row2('Volumen sanguíneo', v.vol_sang)}
-  </tbody></table>`;
-  // Venopunción
-  fisioContent += `<h3 style="font-size:11pt;color:#228b52;margin:10pt 0 3pt">Sitios de venopunción</h3>`;
-  const vpRows = (sp.venopuncion_lista||[]).map(vp=>`<tr><td style="padding:3pt 7pt;border:1pt solid #e0e0e0;font-weight:600">${esc(vp.sitio||vp[0]||'')}</td><td style="text-align:center;padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(vp.vol||vp[1]||'—')}</td><td style="padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(vp.indicacion||vp[2]||'—')}</td></tr>`).join('');
-  fisioContent += tbl(['Sitio / Vena','Volumen máx.','Indicación / Notas'], vpRows);
-  // Hematología
-  fisioContent += `<h3 style="font-size:11pt;color:#228b52;margin:10pt 0 3pt">Hematología</h3>`;
-  const hemoRows = (sp.hematology||[]).map(h=>`<tr><td style="padding:3pt 7pt;border:1pt solid #e0e0e0;font-weight:600">${esc(h[0]||'')}</td><td style="text-align:center;padding:3pt 7pt;border:1pt solid #e0e0e0;font-weight:700;color:#1a6b3f">${esc(h[1]||'')}</td><td style="text-align:center;padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(h[2]||'')}</td><td style="padding:3pt 7pt;border:1pt solid #e0e0e0;font-size:9pt;color:#555">${esc(h[3]||'')}</td></tr>`).join('');
-  fisioContent += tbl(['Parámetro','Rango normal','Unidades','Definición / Uso clínico'], hemoRows);
-  // Bioquímica
-  fisioContent += `<h3 style="font-size:11pt;color:#228b52;margin:10pt 0 3pt">Bioquímica sérica</h3>`;
-  const bioqRows = (sp.biochem||[]).map(b=>`<tr><td style="padding:3pt 7pt;border:1pt solid #e0e0e0;font-weight:600">${esc(b[0]||'')}</td><td style="text-align:center;padding:3pt 7pt;border:1pt solid #e0e0e0;font-weight:700;color:#1a6b3f">${esc(b[1]||'')}</td><td style="text-align:center;padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(b[2]||'')}</td><td style="padding:3pt 7pt;border:1pt solid #e0e0e0;font-size:9pt;color:#555">${esc(b[3]||'')}</td></tr>`).join('');
-  fisioContent += tbl(['Parámetro','Rango normal','Unidades','Definición / Uso clínico'], bioqRows);
-  html += sec('2. Fisiología', fisioContent);
+  // 1-10: Taxonomía y conservación
+  html += secHeader('Información general y taxonómica');
+  html += row(1,  'Generalidades',                          sp.generalidades ? esc(sp.generalidades).replace(/\n/g,'<br>') : ND);
+  html += row(2,  'Nombre común',                          v2h(sp.name));
+  html += row(3,  'Nombre científico',                     v2h(sp.sci));
+  html += row(4,  'Clase',                                 v2h(sp.clase));
+  html += row(5,  'Orden',                                 v2h(sp.order));
+  html += row(6,  'Familia',                               v2h(sp.family));
+  html += row(7,  'Estado de conservación UICN mundial',   v2h(sp.uicn_world));
+  html += row(8,  'Estado de conservación UICN Colombia',  v2h(sp.uicn_colombia));
+  html += row(9,  'Categoría CITES',                       v2h(cons.cites));
+  html += row(10, 'Categoría Resolución 0126 de 2024',     v2h(cons.res0126));
 
-  // ══ 3. NUTRICIÓN ══
-  let nutContent = `<table style="border-collapse:collapse;width:100%"><tbody>
-    ${row2('Dieta bajo cuidado profesional', n.captive)}
-    ${row2('Frecuencia de alimentación', n.freq)}
-    ${row2('kcal/kg/día', n.kcal_day)}
-    ${row2('Suplementos (resumen)', n.supplements)}
-  </tbody></table>`;
-  // Requerimiento energético
-  nutContent += `<h3 style="font-size:11pt;color:#228b52;margin:10pt 0 3pt">Requerimiento Energético</h3>`;
-  const reqRows = (sp.req_energetico||[]).map(r=>`<tr><td style="padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(r.cat)}</td><td style="text-align:center;padding:3pt 7pt;border:1pt solid #e0e0e0;font-weight:700">${esc(String(r.kcal||''))}</td></tr>`).join('');
-  nutContent += tbl(['Categoría','kcal/kg/día'], reqRows);
-  // Suplementos
-  nutContent += `<h3 style="font-size:11pt;color:#228b52;margin:10pt 0 3pt">Suplementos</h3>`;
-  const supRows = (sp.suplementos||[]).map(s=>`<tr>
-    <td style="padding:3pt 7pt;border:1pt solid #e0e0e0;font-weight:600">${esc(s.nombre)}</td>
-    <td style="padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(s.cat||'')}</td>
-    <td style="text-align:center;padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(String(s.dosis||''))} ${esc(s.unitB||'mg')}/${esc(s.unitA||'kg')}</td>
-    <td style="text-align:center;padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(String(s.conc||''))} ${esc(s.unitC||'ml')}</td>
-    <td style="padding:3pt 7pt;border:1pt solid #e0e0e0;font-size:9pt">${esc(s.notas||'')}</td>
-  </tr>`).join('');
-  nutContent += tbl(['Suplemento','Categoría','Dosis','Concentración','Notas'], supRows);
-  // Tóxicos
-  if ((sp.toxicos_lista||[]).length) {
-    const toxRows = sp.toxicos_lista.map(t=>`<tr><td style="padding:3pt 7pt;border:1pt solid #e0e0e0;color:#991b1b;font-weight:600">${esc(t.nombre||t)}</td><td style="padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(t.efecto||'')}</td></tr>`).join('');
-    nutContent += `<h3 style="font-size:11pt;color:#c0392b;margin:10pt 0 3pt">⚠ Tóxicos y prohibidos</h3>`;
-    nutContent += tbl(['Sustancia / Alimento','Efecto tóxico'], toxRows);
-  } else if (n.toxic) {
-    nutContent += `<div style="background:#fde8e8;color:#991b1b;padding:5pt 8pt;border-left:3pt solid #d63c3c;margin:6pt 0">⚠ TÓXICOS: ${esc(n.toxic)}</div>`;
-  }
-  // Fórmula dentaria
-  nutContent += `<h3 style="font-size:11pt;color:#228b52;margin:10pt 0 3pt">Fórmula dentaria</h3>`;
-  const dentRows = (sp.denticion||[]).map(d=>`<tr><td style="padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(d.tipo||d[0]||'')}</td><td style="text-align:center;padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(String(d.superior||d[1]||''))}</td><td style="text-align:center;padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(String(d.inferior||d[2]||''))}</td><td style="padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(d.funcion||d[3]||'')}</td></tr>`).join('');
-  nutContent += tbl(['Tipo de diente','Superior','Inferior','Función'], dentRows);
-  // Medidas odontológicas
-  if ((sp.dental_measures||[]).length) {
-    const dmRows = sp.dental_measures.map(m=>`<tr><td style="padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(m.num||'—')}</td><td style="padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(m.label||'')}</td><td style="font-weight:700;padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(m.value||'')}</td><td style="font-size:9pt;color:#666;padding:3pt 7pt;border:1pt solid #e0e0e0">${esc(m.date||'')}</td></tr>`).join('');
-    nutContent += `<h3 style="font-size:11pt;color:#228b52;margin:10pt 0 3pt">Medidas odontológicas</h3>`;
-    nutContent += tbl(['N° Diente','Descripción','Valor','Fecha'], dmRows);
-  }
-  if ((sp.dental_fotos||[]).length) {
-    nutContent += `<h3 style="font-size:11pt;color:#228b52;margin:10pt 0 3pt">Fotos dentales</h3><div style="display:flex;flex-wrap:wrap;gap:4pt">${sp.dental_fotos.map(f=>img(f.data,'110px','85px')).join('')}</div>`;
-  }
-  if (sp.fluid_nota) nutContent += `<h3 style="font-size:11pt;color:#228b52;margin:10pt 0 3pt">Fluidoterapia</h3><div style="background:#fef3cd;padding:5pt 8pt;border-left:3pt solid #e8a020;font-size:10pt">${esc(sp.fluid_nota).replace(/\n/g,'<br>')}</div>`;
-  html += sec('3. Nutrición', nutContent);
+  // 11-20: Biometría
+  html += secHeader('Biometría');
+  const bmGet = (field, sex) => {
+    const val = bm[field];
+    if (!val) return null;
+    return sex === 'm' ? val.m : val.f;
+  };
+  html += row(11, 'Peso promedio macho',                   v2h(bmGet('peso_prom','m')));
+  html += row(12, 'Peso promedio hembra',                  v2h(bmGet('peso_prom','f')));
+  html += row(13, 'Rango de peso macho',                   v2h(bmGet('peso_rango','m')));
+  html += row(14, 'Rango de peso hembra',                  v2h(bmGet('peso_rango','f')));
+  html += row(15, 'Longitud cabeza-cuerpo (cm) macho',     v2h(bmGet('long_cc','m')));
+  html += row(16, 'Longitud cabeza-cuerpo (cm) hembra',    v2h(bmGet('long_cc','f')));
+  html += row(17, 'Longitud cola (cm) macho',              v2h(bmGet('long_cola','m')));
+  html += row(18, 'Longitud cola (cm) hembra',             v2h(bmGet('long_cola','f')));
+  html += row(19, 'Altura a la cruz (cm) macho',           v2h(bmGet('altura_cruz','m')));
+  html += row(20, 'Altura a la cruz (cm) hembra',          v2h(bmGet('altura_cruz','f')));
 
-  // ══ 4. ENFERMEDADES ══
+  // 21-30: Longevidad y reproducción
+  html += secHeader('Longevidad y reproducción');
+  const lifeGet = (field, ctx) => {
+    const val = bm[field];
+    if (!val) return null;
+    return ctx === 'silv' ? val.silv : val.prof;
+  };
+  html += row(21, 'Esperanza de vida silvestre',                  v2h(lifeGet('esp_vida','silv')));
+  html += row(22, 'Esperanza de vida bajo cuidado profesional',   v2h(lifeGet('esp_vida','prof')));
+  html += row(23, 'Edad promedio silvestre',                      v2h(lifeGet('edad_prom','silv')));
+  html += row(24, 'Edad promedio bajo cuidado profesional',       v2h(lifeGet('edad_prom','prof')));
+  html += row(25, 'Edad máxima registrada silvestre',             v2h(lifeGet('edad_max','silv')));
+  html += row(26, 'Edad máxima registrada bajo cuidado prof.',    v2h(lifeGet('edad_max','prof')));
+  html += row(27, 'Edad madurez sexual silvestre',                v2h(lifeGet('mad_sexual','silv')));
+  html += row(28, 'Edad madurez sexual bajo cuidado profesional', v2h(lifeGet('mad_sexual','prof')));
+  html += row(29, 'Periodo gestación silvestre',                  v2h(lifeGet('gestacion','silv')));
+  html += row(30, 'Periodo gestación bajo cuidado profesional',   v2h(lifeGet('gestacion','prof')));
+
+  // 31-35: Ecología
+  html += secHeader('Ecología y distribución');
+  html += row(31, 'Dimorfismo sexual',               v2h(sp.dimorphism));
+  html += row(32, 'Rangos de temperatura y humedad óptimos',
+    `Temperatura: ${sp.temp_range ? sp.temp_range.join(' – ')+' °C' : '<span style="color:#bbb;font-style:italic">No se ha subido</span>'} &nbsp;|&nbsp; Humedad: ${sp.humidity ? sp.humidity.join(' – ')+'%' : '<span style="color:#bbb;font-style:italic">No se ha subido</span>'}`);
+  html += row(33, 'Distribución geográfica',         v2h(sp.distribution));
+  html += row(34, 'Dieta silvestre',                 v2h(sp.diet_wild));
+  const dietaLista = (sp.dieta_silvestre_lista||[]);
+  html += row(35, 'Lista de alimentos o presas',
+    dietaLista.length
+      ? `<ul style="margin:0;padding-left:14pt">${dietaLista.map(a=>`<li style="font-size:9.5pt">${esc(a)}</li>`).join('')}</ul>`
+      : ND);
+
+  // 36-41: Fisiología
+  html += secHeader('Fisiología y parámetros clínicos');
+  html += row(36, 'Temperatura corporal',    v2h(v.temp));
+  html += row(37, 'Frecuencia cardíaca',     v2h(v.fc));
+  html += row(38, 'Frecuencia respiratoria', v2h(v.fr));
+
+  // 39: Venopunción
+  const vpRows = (sp.venopuncion_lista||[]).map(vp=>
+    `<tr>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:600">${esc(vp.sitio||vp[0]||'')}</td>
+      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(vp.vol||vp[1]||'—')}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(vp.indicacion||vp[2]||'—')}</td>
+    </tr>`).join('');
+  html += row(39, 'Sitios de venopunción',
+    tblInner(['Nombre vena','Rango vol. min-max','Indicación'], vpRows));
+
+  // 40: Hematología
+  const hemoRows = (sp.hematology||[]).map(h=>
+    `<tr>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:600">${esc(h[0]||'')}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(h[2]||'')}</td>
+      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:700;color:#1a6b3f">${esc(h[1]||'')}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-size:9pt;color:#555">${esc(h[3]||'')}</td>
+    </tr>`).join('');
+  html += row(40, 'Hematología básica',
+    tblInner(['Parámetro','Unidad','Valor de referencia','Definición'], hemoRows));
+
+  // 41: Bioquímica
+  const bioqRows = (sp.biochem||[]).map(b=>
+    `<tr>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:600">${esc(b[0]||'')}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(b[2]||'')}</td>
+      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:700;color:#1a6b3f">${esc(b[1]||'')}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-size:9pt;color:#555">${esc(b[3]||'')}</td>
+    </tr>`).join('');
+  html += row(41, 'Bioquímicas relevantes',
+    tblInner(['Parámetro','Unidad','Valor de referencia','Definición'], bioqRows));
+
+  // 42-48: Nutrición
+  html += secHeader('Nutrición y alimentación');
+  html += row(42, 'Dieta bajo cuidado profesional', v2h(n.captive));
+  html += row(43, 'Frecuencia de alimentación',     v2h(n.freq));
+
+  const reqRows = (sp.req_energetico||[]).map(r=>
+    `<tr>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(r.cat)}</td>
+      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:700">${esc(String(r.kcal||''))}</td>
+    </tr>`).join('');
+  html += row(44, 'Requerimientos de energía (kcal/día)',
+    tblInner(['Categoría (adulto / juvenil / gestante)','kcal/día'], reqRows));
+
+  const supRows = (sp.suplementos||[]).map(s=>
+    `<tr>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:600">${esc(s.nombre)}</td>
+      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(String(s.dosis||''))}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(s.unitB||'mg')}/${esc(s.unitA||'kg')}</td>
+      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(String(s.conc||''))}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(s.unitC||'ml')}</td>
+    </tr>`).join('');
+  html += row(45, 'Suplementación',
+    tblInner(['Suplemento','Dosis','Unidad dosis','Concentración','Unidad concentración'], supRows));
+
+  const toxRows = (sp.toxicos_lista||[]).map(t=>
+    `<tr>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:600;color:#c0392b">${esc(t.nombre||String(t))}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(t.efecto||'')}</td>
+    </tr>`).join('');
+  html += row(46, 'Alimentos tóxicos y prohibidos',
+    (sp.toxicos_lista||[]).length
+      ? tblInner(['Alimento','Efecto tóxico'], toxRows)
+      : n.toxic ? `<div style="color:#c0392b">${esc(n.toxic)}</div>` : ND);
+
+  const dentRows = (sp.denticion||[]).map(d=>
+    `<tr>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(d.tipo||d[0]||'')}</td>
+      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(String(d.superior||d[1]||''))}</td>
+      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(String(d.inferior||d[2]||''))}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(d.funcion||d[3]||'')}</td>
+    </tr>`).join('');
+  html += row(47, 'Fórmula dentaria',
+    tblInner(['Tipo de diente','Superior','Inferior','Función'], dentRows));
+
+  const dmRows = (sp.dental_measures||[]).map(m=>
+    `<tr>
+      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(m.num||'—')}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(m.label||'')}</td>
+      <td style="font-weight:700;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(m.value||'')}</td>
+    </tr>`).join('');
+  html += row(48, 'Medidas odontológicas',
+    tblInner(['Número diente','Nombre diente','Tamaño'], dmRows));
+
+  // 49: Enfermedades
+  html += secHeader('Enfermedades frecuentes bajo cuidado profesional');
   const SISTEMAS_EXP = [
-    {id:'dental',label:'Enfermedades Dentales'},{id:'gastro',label:'Gastrointestinales'},
-    {id:'renal',label:'Renales / Urinarias'},{id:'cardiaco',label:'Cardíacas / Cardiovasculares'},
+    {id:'dental',label:'Dentales'},{id:'gastro',label:'Gastrointestinales'},
+    {id:'renal',label:'Renales / Urinarias'},{id:'cardiaco',label:'Cardíacas'},
     {id:'respiratorio',label:'Respiratorias'},{id:'nervioso',label:'Sistema Nervioso'},
     {id:'musculo',label:'Músculo-esqueléticas'},{id:'dermatol',label:'Dermatológicas'},
     {id:'infeccioso',label:'Infecciosas / Parasitarias'},{id:'otro',label:'Otras'}
   ];
   const todosEnf = [...SISTEMAS_EXP, ...(sp.enfermedades_categorias||[])];
   const sistData = sp.enfermedades_sistemas || {};
-  let enfContent = '';
+  let enfCell = '';
+  let hasEnf = false;
   todosEnf.forEach(sist => {
     const enfs = sistData[sist.id]?.enfermedades || [];
     if (!enfs.length) return;
-    enfContent += `<h3 style="font-size:11pt;color:#228b52;margin:10pt 0 3pt">${esc(sist.label||sist.id)}</h3>`;
+    hasEnf = true;
+    enfCell += `<p style="font-weight:700;font-size:10pt;color:#0f3d22;margin:8pt 0 3pt;border-bottom:0.5pt solid #c2f0d3;padding-bottom:2pt">Sistema: ${esc(sist.label||sist.id)}</p>`;
     const notas = sistData[sist.id]?.notas;
-    if (notas) enfContent += `<div style="background:#fef3cd;padding:5pt 8pt;border-left:3pt solid #e8a020;margin:4pt 0;font-size:10pt">${esc(notas)}</div>`;
+    if (notas) enfCell += `<p style="font-size:9pt;background:#fef3cd;padding:3pt 6pt;margin:0 0 4pt;border-left:2pt solid #e8a020">${esc(notas)}</p>`;
     enfs.forEach(e => {
       const signos = (e.signos_lista||[e.signos||'']).filter(Boolean).join('; ');
       const dxItems = (e.dx_lista||[]).length ? e.dx_lista : [{metodo:e.dx||'',esperado:'',imagenes:[]}];
       const txStr = (e.tx_lista||[e.tx||'']).filter(Boolean).join('; ');
       const vias = [...(e.vias||[]), e.vias_extra].filter(Boolean).join(', ');
-      enfContent += `<div style="border:1pt solid #e0e0e0;border-radius:4pt;padding:6pt 8pt;margin-bottom:8pt">
-        <p style="font-weight:700;font-size:11pt;color:#1a6b3f;margin:0 0 4pt">${esc(e.nombre)}</p>
-        ${e.agente  ? `<p style="margin:2pt 0;font-size:9.5pt"><strong>Agente/Causa:</strong> ${esc(e.agente)}</p>` : ''}
-        ${vias      ? `<p style="margin:2pt 0;font-size:9.5pt"><strong>Vías de transmisión:</strong> ${esc(vias)}</p>` : ''}
-        ${signos    ? `<p style="margin:2pt 0;font-size:9.5pt"><strong>Signos clínicos:</strong> ${esc(signos)}</p>` : ''}
-        ${dxItems.filter(d=>d.metodo).length ? `<p style="margin:4pt 0 2pt;font-size:9.5pt;font-weight:600">Diagnóstico:</p>
-          <ul style="margin:0 0 4pt;padding-left:14pt">${dxItems.filter(d=>d.metodo).map(d=>`<li style="font-size:9.5pt">${esc(d.metodo)}${d.esperado?`: <em>${esc(d.esperado)}</em>`:''}${(d.imagenes||[]).length?`<br>${d.imagenes.map(im=>img(im.data,'90px','70px')).join('')}`:''}</li>`).join('')}</ul>` : ''}
-        ${txStr ? `<p style="margin:2pt 0;font-size:9.5pt"><strong>Tratamiento:</strong> ${esc(txStr)}</p>` : ''}
-        ${e.notas ? `<div style="background:#fef3cd;padding:3pt 6pt;border-left:2pt solid #e8a020;margin-top:4pt;font-size:9pt">📋 ${esc(e.notas)}</div>` : ''}
+      enfCell += `<div style="border:0.5pt solid #ddd;border-radius:3pt;padding:5pt 7pt;margin-bottom:6pt">
+        <p style="font-weight:700;font-size:10pt;color:#1a6b3f;margin:0 0 3pt">${esc(e.nombre)}</p>
+        <table style="border-collapse:collapse;width:100%;font-size:9pt">
+          ${e.agente  ? `<tr><td style="width:30%;font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Agente causal</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(e.agente)}</td></tr>` : ''}
+          ${vias      ? `<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Vías de transmisión</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(vias)}</td></tr>` : ''}
+          ${signos    ? `<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Signos clínicos</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(signos)}</td></tr>` : ''}
+          ${dxItems.filter(d=>d.metodo).map(d=>`<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Diagnóstico</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(d.metodo)}${d.esperado?` — <em>Hallazgo esperado: ${esc(d.esperado)}</em>`:''}</td></tr>`).join('')}
+          ${txStr     ? `<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Tratamiento</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(txStr)}</td></tr>` : ''}
+          ${e.notas   ? `<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Notas</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(e.notas)}</td></tr>` : ''}
+        </table>
+        ${(e.dx_lista||[]).some(d=>(d.imagenes||[]).length)
+          ? `<div style="margin-top:4pt">${(e.dx_lista||[]).flatMap(d=>(d.imagenes||[]).map(im=>img(im.data,'90px','70px'))).join('')}</div>`
+          : ''}
       </div>`;
     });
   });
-  if (!enfContent) enfContent = `<p style="color:#aaa;font-style:italic">No se ha subido información de enfermedades</p>`;
-  html += sec('4. Enfermedades', enfContent);
+  if (!hasEnf) enfCell = ND;
+  html += row(49, 'Enfermedades frecuentes bajo cuidado profesional', enfCell);
 
-  // ══ 5. COMPORTAMIENTO ══
-  const behKeys   = ['silvestre','cautiverio','estres','reproductivo','social'];
-  const behLabels = ['Vida silvestre','Bajo cuidado profesional','Bajo estrés / Captura','Reproductivo','Social / Compatibilidad'];
-  let behRows = '';
-  behKeys.forEach((k,i) => {
-    const v2 = spBeh[k] || beh[k] || '';
-    behRows += row2(behLabels[i], v2 || null);
-  });
-  html += sec('5. Comportamiento', `<table style="border-collapse:collapse;width:100%"><tbody>${behRows}</tbody></table>`);
+  // 50-54: Comportamiento
+  html += secHeader('Comportamiento');
+  const behGet = k => spBeh[k] || beh[k] || '';
+  html += row(50, 'Comportamiento en vida silvestre',       v2h(behGet('silvestre')));
+  html += row(51, 'Comportamiento bajo cuidado profesional',v2h(behGet('cautiverio')));
+  html += row(52, 'Comportamiento social',                  v2h(behGet('social')));
+  html += row(53, 'Comportamiento bajo estrés',             v2h(behGet('estres')));
+  html += row(54, 'Comportamiento reproductivo',            v2h(behGet('reproductivo')));
 
-  // ══ 6. MEDICAMENTOS ══
-  let drugContent = '';
-  if ((sp.drugs||[]).length) {
-    const groups = {};
-    sp.drugs.forEach(d => {
-      const cats = d.cats?.length ? d.cats : [d.cat||'Otro'];
-      cats.forEach(cat => { if (!groups[cat]) groups[cat]=[]; groups[cat].push(d); });
-    });
-    Object.entries(groups).forEach(([cat, drugs]) => {
-      drugContent += `<h3 style="font-size:11pt;color:#228b52;margin:10pt 0 3pt">${esc(cat)}</h3>`;
-      const dRows = drugs.map(d=>`<tr>
-        <td style="padding:3pt 6pt;border:1pt solid #e0e0e0;font-weight:700">${esc(d.name)}</td>
-        <td style="padding:3pt 6pt;border:1pt solid #e0e0e0;font-style:italic">${esc(d.active||'—')}</td>
-        <td style="padding:3pt 6pt;border:1pt solid #e0e0e0;font-size:9pt">${esc(d.cat_esp||'—')}</td>
-        <td style="text-align:center;padding:3pt 6pt;border:1pt solid #e0e0e0">${esc(String(d.conc||'—'))}</td>
-        <td style="text-align:center;padding:3pt 6pt;border:1pt solid #e0e0e0;font-weight:700;color:#1a6b3f">${esc(String(d.dose||'—'))}</td>
-        <td style="text-align:center;padding:3pt 6pt;border:1pt solid #e0e0e0;font-size:9pt">${(d.dose_min&&d.dose_max)?d.dose_min+'–'+d.dose_max:'—'}</td>
-        <td style="padding:3pt 6pt;border:1pt solid #e0e0e0">${esc(d.route||'—')}</td>
-        <td style="padding:3pt 6pt;border:1pt solid #e0e0e0">${esc(d.freq||'—')}</td>
-        <td style="padding:3pt 6pt;border:1pt solid #e0e0e0;font-size:9pt">${esc(d.indic||'—')}</td>
-        <td style="padding:3pt 6pt;border:1pt solid #e0e0e0;font-size:9pt;color:#991b1b">${esc(d.contra||d.contraindications||'—')}</td>
-        <td style="padding:3pt 6pt;border:1pt solid #e0e0e0;font-size:9pt">${esc(d.effects||'—')}</td>
-      </tr>`).join('');
-      drugContent += tbl(['Nombre comercial','Principio activo','Categ. esp.','Conc. (mg/ml)','Dosis rec. (mg/kg)','Rango','Vía','Frecuencia','Indicaciones','Contraindicaciones','Efectos adversos'], dRows);
-    });
-  } else {
-    drugContent = `<p style="color:#aaa;font-style:italic">No se ha subido información de medicamentos</p>`;
+  // 55: Fotos
+  html += secHeader('Fotos');
+  const allPh = [...(sp.cover_photos||[])];
+  if (sp.cover_photo && !allPh.find(p=>p.data===sp.cover_photo)) allPh.unshift({data:sp.cover_photo});
+  let fotoCell = '';
+  if (allPh.length) {
+    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:0 0 3pt">Fotos generales (${allPh.length})</p>`;
+    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:4pt;margin-bottom:8pt">${allPh.map(p=>img(p.data,'140px','105px')).join('')}</div>`;
   }
-  html += sec('6. Medicamentos', drugContent);
-
-  // ══ 7. PROTOCOLOS ANESTÉSICOS ══
-  let protContent = '';
-  if ((sp.protocols||[]).length) {
-    sp.protocols.forEach(p => {
-      protContent += `<div style="border:1pt solid #c2f0d3;border-radius:4pt;padding:8pt;margin-bottom:10pt">
-        <h3 style="margin:0 0 4pt;color:#1a6b3f;font-size:11pt">${esc(p.name)} ${p.visibility==='private'?'🔒':'🌐'}</h3>
-        <p style="font-size:9.5pt;margin:2pt 0"><strong>Inducción:</strong> ${esc(String(p.induction||'—'))} min &nbsp;|&nbsp; <strong>Duración:</strong> ${esc(String(p.duration||'—'))} min</p>
-        ${(p.drugs||[]).length ? tbl(['Fármaco','Dosis (mg/kg)','Conc. (mg/ml)','Vía'],
-          p.drugs.map(d=>`<tr><td style="padding:3pt 6pt;border:1pt solid #e0e0e0;font-weight:600">${esc(d.name)}</td><td style="text-align:center;padding:3pt 6pt;border:1pt solid #e0e0e0;font-weight:700;color:#1a6b3f">${esc(String(d.dose||'—'))}</td><td style="text-align:center;padding:3pt 6pt;border:1pt solid #e0e0e0">${esc(String(d.conc||'—'))}</td><td style="padding:3pt 6pt;border:1pt solid #e0e0e0">${esc(d.route||'IM')}</td></tr>`).join('')) : ''}
-        ${(p.reversals||[]).length ? `<p style="margin:4pt 0;font-size:9.5pt"><strong>Reversores:</strong> ${p.reversals.map(r=>`${esc(r.name)} ${r.dose} mg/kg ${esc(r.route||'IM')} · ${r.conc||'—'} mg/ml`).join(' | ')}</p>` : ''}
-        ${p.notes ? `<div style="background:#fef3cd;padding:4pt 7pt;border-left:2pt solid #e8a020;font-size:9.5pt;margin-top:4pt">📋 ${esc(p.notes)}</div>` : ''}
-      </div>`;
-    });
-  } else {
-    protContent = `<p style="color:#aaa;font-style:italic">No se ha subido información de protocolos</p>`;
+  if ((sp.dimorfismo_fotos||[]).length) {
+    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:4pt 0 3pt">Dimorfismo sexual</p>`;
+    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:4pt;margin-bottom:8pt">${sp.dimorfismo_fotos.map(f=>`<div style="text-align:center">${img(f.data,'120px','90px')}<br><span style="font-size:7pt;color:#666">${esc(f.label||'')}</span></div>`).join('')}</div>`;
   }
-  html += sec('7. Protocolos anestésicos', protContent);
+  if ((sp.dental_fotos||[]).length) {
+    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:4pt 0 3pt">Fotos dentales</p>`;
+    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:4pt;margin-bottom:8pt">${sp.dental_fotos.map(f=>img(f.data,'110px','85px')).join('')}</div>`;
+  }
+  if ((sp.dist_maps||[]).length) {
+    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:4pt 0 3pt">Mapas de distribución</p>`;
+    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:4pt">${sp.dist_maps.map(m=>img(m.data,'180px','130px')).join('')}</div>`;
+  }
+  if (!fotoCell) fotoCell = ND;
+  html += row(55, 'Fotos', fotoCell);
 
+  // Medicamentos y Protocolos al final (secciones extra)
+  if ((sp.drugs||[]).length || (sp.protocols||[]).length) {
+    html += secHeader('Medicamentos y protocolos (información adicional)');
+    if ((sp.drugs||[]).length) {
+      const groups = {};
+      sp.drugs.forEach(d => {
+        const cats = d.cats?.length ? d.cats : [d.cat||'Otro'];
+        cats.forEach(cat => { if (!groups[cat]) groups[cat]=[]; groups[cat].push(d); });
+      });
+      let drugHtml = '';
+      Object.entries(groups).forEach(([cat, drugs]) => {
+        drugHtml += `<p style="font-weight:700;font-size:10pt;color:#0f3d22;margin:6pt 0 3pt">${esc(cat)}</p>`;
+        const dRows = drugs.map(d=>`<tr>
+          <td style="padding:3pt 5pt;border:0.5pt solid #ddd;font-weight:700">${esc(d.name)}</td>
+          <td style="padding:3pt 5pt;border:0.5pt solid #ddd;font-style:italic">${esc(d.active||'—')}</td>
+          <td style="text-align:center;padding:3pt 5pt;border:0.5pt solid #ddd">${esc(String(d.conc||'—'))}</td>
+          <td style="text-align:center;padding:3pt 5pt;border:0.5pt solid #ddd;font-weight:700;color:#1a6b3f">${esc(String(d.dose||'—'))}</td>
+          <td style="text-align:center;padding:3pt 5pt;border:0.5pt solid #ddd;font-size:9pt">${(d.dose_min&&d.dose_max)?d.dose_min+'–'+d.dose_max:'—'}</td>
+          <td style="padding:3pt 5pt;border:0.5pt solid #ddd">${esc(d.route||'—')}</td>
+          <td style="padding:3pt 5pt;border:0.5pt solid #ddd">${esc(d.freq||'—')}</td>
+        </tr>`).join('');
+        drugHtml += tblInner(['Nombre comercial','Principio activo','Conc. mg/ml','Dosis mg/kg','Rango','Vía','Frecuencia'], dRows);
+      });
+      html += row('', 'Medicamentos', drugHtml);
+    }
+    if ((sp.protocols||[]).length) {
+      let protHtml = '';
+      sp.protocols.forEach(p => {
+        protHtml += `<div style="border:0.5pt solid #c2f0d3;border-radius:3pt;padding:6pt;margin-bottom:8pt">
+          <p style="font-weight:700;font-size:10pt;color:#1a6b3f;margin:0 0 3pt">${esc(p.name)} ${p.visibility==='private'?'🔒':'🌐'}</p>
+          <p style="font-size:9pt;margin:2pt 0"><strong>Inducción:</strong> ${esc(String(p.induction||'—'))} min &nbsp;|&nbsp; <strong>Duración:</strong> ${esc(String(p.duration||'—'))} min</p>
+          ${(p.drugs||[]).length ? tblInner(['Fármaco','Dosis mg/kg','Conc. mg/ml','Vía'],
+            p.drugs.map(d=>`<tr>
+              <td style="padding:2pt 5pt;border:0.5pt solid #ddd;font-weight:600">${esc(d.name)}</td>
+              <td style="text-align:center;padding:2pt 5pt;border:0.5pt solid #ddd;font-weight:700;color:#1a6b3f">${esc(String(d.dose||'—'))}</td>
+              <td style="text-align:center;padding:2pt 5pt;border:0.5pt solid #ddd">${esc(String(d.conc||'—'))}</td>
+              <td style="padding:2pt 5pt;border:0.5pt solid #ddd">${esc(d.route||'IM')}</td>
+            </tr>`).join('')) : ''}
+          ${(p.reversals||[]).length ? `<p style="font-size:9pt;margin:3pt 0"><strong>Reversores:</strong> ${p.reversals.map(r=>`${esc(r.name)} ${r.dose}mg/kg ${esc(r.route||'IM')} · ${r.conc||'—'}mg/ml`).join(' | ')}</p>` : ''}
+          ${p.notes ? `<p style="font-size:9pt;background:#fef3cd;padding:3pt 6pt;margin:3pt 0;border-left:2pt solid #e8a020">📋 ${esc(p.notes)}</p>` : ''}
+        </div>`;
+      });
+      html += row('', 'Protocolos anestésicos', protHtml);
+    }
+  }
+
+  html += `</tbody></table>`;
   return html;
 }
 
