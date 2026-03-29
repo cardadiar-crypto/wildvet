@@ -494,6 +494,7 @@ textarea.form-control{resize:vertical;min-height:70px}
     <div class="flex-between mb-2">
       <h2 style="font-size:1.1rem;font-weight:700">🌿 Enriquecimiento Ambiental</h2>
       <div id="enriq-admin-btns" style="display:none;display:flex;gap:.35rem">
+        <button class="btn btn-secondary btn-sm" onclick="openGroupsManager()" style="margin-right:.3rem">🗂 Grupos</button>
         <button class="btn btn-secondary btn-sm" onclick="openSpeciesHistoryManager()">📋 Historial</button>
         <button class="btn btn-admin btn-sm" onclick="openAddEnriquecimiento()">+ Agregar</button>
       </div>
@@ -725,7 +726,7 @@ textarea.form-control{resize:vertical;min-height:70px}
     <div class="form-row">
       <div class="form-group">
         <label>Nombre común *</label>
-        <input type="text" id="inv-nombre-comun" class="form-control" placeholder="Ej: Jaguar">
+        <input type="text" id="inv-nombre-comun" class="form-control" placeholder="Ej: Jaguar" list="sp-hist-dl" oninput="autofillSci(this,'inv-nombre-cientifico')" onchange="autofillSci(this,'inv-nombre-cientifico')">
       </div>
       <div class="form-group">
         <label>Nombre científico</label>
@@ -1464,6 +1465,7 @@ async function finishGoogleLogin(profile) {
   await loadBiblioteca();
   await loadBibliotecaGeneral();
   await loadEnriquecimientos();
+  await loadSpeciesGroups();
   await loadRecintos();
   updateAdminUI();
   renderSpeciesGrid();
@@ -1624,8 +1626,8 @@ function buildSpeciesExportHTML(sp) {
   const subHeader = (title) =>
     `<tr><td colspan="3" style="background:#e8faf0;color:#0f3d22;font-weight:bold;font-size:10pt;padding:5pt 10pt;border:0.5pt solid #c2f0d3">${esc(title)}</td></tr>`;
 
-  const img = (src, w, h) => src
-    ? `<img src="${src}" style="width:${w||'120px'};height:${h||'90px'};object-fit:cover;border-radius:3pt;border:0.5pt solid #ddd;margin:2pt">`
+  const img = (src, w, h, fullRes) => src
+    ? `<img src="${src}" style="${fullRes ? 'max-width:100%;width:auto;height:auto;' : `width:${w||'120px'};height:${h||'90px'};object-fit:cover;`}border-radius:3pt;border:0.5pt solid #ddd;margin:2pt">`
     : '';
 
   const tblInner = (headers, rows, emptyMsg) =>
@@ -1634,15 +1636,10 @@ function buildSpeciesExportHTML(sp) {
       <tbody>${rows || `<tr><td colspan="${headers.length}" style="padding:4pt 6pt;color:#bbb;font-style:italic;border:0.5pt solid #e0e0e0;font-size:9pt">No se ha subido</td></tr>`}</tbody>
     </table>`;
 
-  // ── PORTADA ──
+  // ── PORTADA (sin fotos arriba — van solo al final en campo 55) ──
   let html = '';
   const allPhotos = [...(sp.cover_photos||[])];
   if (sp.cover_photo && !allPhotos.find(p=>p.data===sp.cover_photo)) allPhotos.unshift({data:sp.cover_photo});
-  if (allPhotos.length) {
-    html += `<div style="display:flex;flex-wrap:wrap;gap:5pt;margin-bottom:8pt">`;
-    allPhotos.slice(0,6).forEach(p => { html += img(p.data,'160px','120px'); });
-    html += `</div>`;
-  }
   html += `<h1 style="font-size:20pt;color:#0f3d22;border-bottom:2pt solid #0f3d22;padding-bottom:4pt;margin:0 0 4pt">${esc(sp.name||'Sin nombre')}</h1>`;
   html += `<p style="font-size:11pt;color:#555;margin:2pt 0 6pt"><em>${esc(sp.sci||'')}</em></p>`;
   html += `<p style="font-size:8pt;color:#999;margin:0 0 14pt">Exportado el ${new Date().toLocaleString('es-CO')} · WildVet — Fauna Silvestre</p>`;
@@ -1856,7 +1853,22 @@ function buildSpeciesExportHTML(sp) {
 
   // 50-54: Comportamiento
   html += secHeader('Comportamiento');
-  const behGet = k => spBeh[k] || beh[k] || '';
+  // behavior keys: wild/captive/social/stress/reproductive (app uses English keys)
+  const behGet = k => {
+    // Try Spanish keys (old), English keys (current), then behavior object
+    const maps = {
+      'silvestre':   ['wild','silvestre'],
+      'cautiverio':  ['captive','cautiverio'],
+      'social':      ['social'],
+      'estres':      ['stress','estres'],
+      'reproductivo':['reproductive','reproductivo']
+    };
+    for (const key of (maps[k]||[k])) {
+      const v = spBeh[key] || beh[key];
+      if (v) return v;
+    }
+    return '';
+  };
   html += row(50, 'Comportamiento en vida silvestre',       v2h(behGet('silvestre')));
   html += row(51, 'Comportamiento bajo cuidado profesional',v2h(behGet('cautiverio')));
   html += row(52, 'Comportamiento social',                  v2h(behGet('social')));
@@ -1870,22 +1882,23 @@ function buildSpeciesExportHTML(sp) {
   let fotoCell = '';
   if (allPh.length) {
     fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:0 0 3pt">Fotos generales (${allPh.length})</p>`;
-    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:4pt;margin-bottom:8pt">${allPh.map(p=>img(p.data,'140px','105px')).join('')}</div>`;
+    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:6pt;margin-bottom:10pt">${allPh.map(p=>img(p.data,null,null,true)).join('')}</div>`;
   }
   if ((sp.dimorfismo_fotos||[]).length) {
-    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:4pt 0 3pt">Dimorfismo sexual</p>`;
-    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:4pt;margin-bottom:8pt">${sp.dimorfismo_fotos.map(f=>`<div style="text-align:center">${img(f.data,'120px','90px')}<br><span style="font-size:7pt;color:#666">${esc(f.label||'')}</span></div>`).join('')}</div>`;
+    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:6pt 0 3pt">Dimorfismo sexual</p>`;
+    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:6pt;margin-bottom:10pt">${sp.dimorfismo_fotos.map(f=>`<div style="text-align:center">${img(f.data,null,null,true)}<br><span style="font-size:7pt;color:#666">${esc(f.label||'')}</span></div>`).join('')}</div>`;
   }
   if ((sp.dental_fotos||[]).length) {
-    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:4pt 0 3pt">Fotos dentales</p>`;
-    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:4pt;margin-bottom:8pt">${sp.dental_fotos.map(f=>img(f.data,'110px','85px')).join('')}</div>`;
+    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:6pt 0 3pt">Fotos dentales</p>`;
+    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:6pt;margin-bottom:10pt">${sp.dental_fotos.map(f=>img(f.data,null,null,true)).join('')}</div>`;
   }
   if ((sp.dist_maps||[]).length) {
-    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:4pt 0 3pt">Mapas de distribución</p>`;
-    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:4pt">${sp.dist_maps.map(m=>img(m.data,'180px','130px')).join('')}</div>`;
+    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:6pt 0 3pt">Mapas de distribución</p>`;
+    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:6pt">${sp.dist_maps.map(m=>img(m.data,null,null,true)).join('')}</div>`;
   }
   if (!fotoCell) fotoCell = ND;
   html += row(55, 'Fotos', fotoCell);
+  // Note: img() uses original data URLs for maximum quality in export
 
   // Medicamentos y Protocolos al final (secciones extra)
   if ((sp.drugs||[]).length || (sp.protocols||[]).length) {
@@ -7034,7 +7047,7 @@ function addVdSpeciesDoseRow() {
   rows.insertAdjacentHTML('beforeend', `
     <div class="vd-sp-row" style="background:var(--sur2);border-radius:var(--rsm);padding:.5rem;margin-bottom:.4rem;border:1px solid var(--bor)">
       <div style="display:flex;gap:.3rem;margin-bottom:.3rem;align-items:center">
-        <input class="form-control vds-sp" value="" placeholder="Nombre común" style="flex:1;font-size:.78rem">
+        <input class="form-control vds-sp" value="" placeholder="Nombre común" style="flex:1;font-size:.78rem" list="sp-hist-dl" oninput="autofillSciInRow(this)" onchange="autofillSciInRow(this)">
         <input class="form-control vds-sci" value="" placeholder="Nombre científico" style="flex:1;font-size:.78rem">
         <button onclick="this.closest('.vd-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .35rem;font-size:.7rem;flex-shrink:0">✕</button>
       </div>
@@ -9188,6 +9201,10 @@ function openAddEnriquecimiento(editIdx=-1) {
         <!-- Múltiples especies -->
         <div class="form-group">
           <label>Especies <span style="font-weight:400;color:var(--txt3);font-size:.72rem">(puede aplicar a varias o ninguna)</span></label>
+          ${SPECIES_GROUPS.length ? `<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.4rem;align-items:center">
+            <span style="font-size:.7rem;color:var(--txt3);font-weight:600">Agregar grupo:</span>
+            ${SPECIES_GROUPS.map((g,gi)=>`<button onclick="addGroupSpeciesToEnriq(${gi})" style="font-size:.7rem;padding:.15rem .5rem;border-radius:20px;border:1px solid var(--bor);background:var(--sur2);cursor:pointer;font-family:var(--sans)">${g.icon||'🐾'} ${g.nombre} (${g.especies?.length||0})</button>`).join('')}
+          </div>` : ''}
           <div id="enriq-sp-list" style="margin-top:.25rem">
             ${(existing?.especies||((existing?.especie)?[{sp:existing.especie,sci:existing.sci||''}]:[])).map((e,i)=>`
             <div style="display:flex;gap:.3rem;margin-bottom:.25rem" class="enriq-sp-row">
@@ -9236,7 +9253,6 @@ async function previewEnriqFotos(input) {
 // ─── Historial de especies en enriquecimientos / recintos ───
 function getSpeciesHistory() {
   const map = {};
-  // De enriquecimientos
   ENRIQUECIMIENTOS_DB.forEach(enr => {
     const lista = enr.especies?.length ? enr.especies : (enr.especie ? [{sp:enr.especie,sci:enr.sci||''}] : []);
     lista.forEach(e => {
@@ -9244,17 +9260,179 @@ function getSpeciesHistory() {
       if (key) map[key] = { nombre: e.sp||e.especie, sci: e.sci||'' };
     });
   });
-  // De recintos
   RECINTOS_DB.forEach(r => {
-    if (r.especie) {
-      map[r.especie.toLowerCase()] = { nombre: r.especie, sci: r.sci||'' };
-    }
+    if (r.especie) map[r.especie.toLowerCase()] = { nombre: r.especie, sci: r.sci||'' };
   });
-  // De SPECIES_DB
   SPECIES_DB.forEach(sp => {
     if (sp.name) map[sp.name.toLowerCase()] = { nombre: sp.name, sci: sp.sci||'' };
   });
-  return Object.values(map);
+  return Object.values(map).sort((a,b) => a.nombre.localeCompare(b.nombre));
+}
+
+// ═══ GRUPOS TAXONÓMICOS DE ESPECIES ═══
+let SPECIES_GROUPS = [];
+
+async function loadSpeciesGroups() {
+  const saved = await dbGet('settings', 'species_groups');
+  SPECIES_GROUPS = saved?.value || [];
+  if (firestore && fbUid()) {
+    try {
+      const snap = await firestore.collection('settings').doc('species_groups').get();
+      if (snap.exists) SPECIES_GROUPS = snap.data().value || [];
+    } catch(e) {}
+  }
+}
+
+async function saveSpeciesGroups() {
+  await dbPut('settings', { key: 'species_groups', value: SPECIES_GROUPS });
+  if (firestore && fbUid()) {
+    try { await firestore.collection('settings').doc('species_groups').set({ value: SPECIES_GROUPS }); } catch(e) {}
+  }
+}
+
+function openGroupsManager() {
+  document.getElementById('groups-modal')?.remove();
+  const history = getSpeciesHistory();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="groups-modal" style="position:fixed;inset:0;z-index:1300;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:580px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+          <div style="font-weight:700;font-size:.95rem">🗂 Grupos taxonómicos</div>
+          <button class="btn btn-admin btn-sm" onclick="openAddGroup()">+ Nuevo grupo</button>
+        </div>
+        <p style="font-size:.75rem;color:var(--txt3);margin-bottom:.75rem">Agrupa especies similares. Al seleccionar un grupo en enriquecimientos, se agregan todas sus especies automáticamente.</p>
+        <div id="groups-list"></div>
+        <button class="btn btn-secondary btn-block" style="margin-top:.75rem" onclick="document.getElementById('groups-modal').remove()">Cerrar</button>
+      </div>
+    </div>`);
+  renderGroupsList();
+}
+
+function renderGroupsList() {
+  const el = document.getElementById('groups-list');
+  if (!el) return;
+  if (!SPECIES_GROUPS.length) {
+    el.innerHTML = '<p style="text-align:center;color:var(--txt3);font-size:.82rem;padding:1rem">Sin grupos creados. Toca "+ Nuevo grupo" para empezar.</p>';
+    return;
+  }
+  const history = getSpeciesHistory();
+  el.innerHTML = SPECIES_GROUPS.map((g, gi) => `
+    <div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.65rem .75rem;margin-bottom:.5rem;background:var(--sur2)">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
+        <span style="font-size:1rem">${g.icon||'🐾'}</span>
+        <span style="font-weight:700;font-size:.9rem;flex:1">${g.nombre}</span>
+        <button onclick="openEditGroup(${gi})" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);cursor:pointer;font-size:.72rem;padding:.15rem .4rem">✏️ Editar</button>
+        <button onclick="confirmDeleteGroup(${gi})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.72rem;padding:.15rem .4rem">✕</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:.25rem">
+        ${(g.especies||[]).length
+          ? g.especies.map(e=>`<span style="font-size:.7rem;background:var(--g1);color:var(--g7);border-radius:20px;padding:.1rem .45rem">${e.sp}${e.sci?` <em style="font-weight:400">(${e.sci})</em>`:''}</span>`).join('')
+          : '<span style="font-size:.72rem;color:var(--txt3);font-style:italic">Sin especies asignadas</span>'}
+      </div>
+    </div>`).join('');
+}
+
+function openAddGroup() { openEditGroup(-1); }
+
+function openEditGroup(gi) {
+  const existing = gi >= 0 ? SPECIES_GROUPS[gi] : null;
+  const history = getSpeciesHistory();
+  document.getElementById('group-edit-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="group-edit-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:580px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.92rem;margin-bottom:.75rem">${existing?'✏️ Editar':'+ Nuevo'} grupo taxonómico</div>
+        <div class="form-row">
+          <div class="form-group" style="flex:0 0 60px">
+            <label style="font-size:.72rem">Ícono</label>
+            <input id="grp-icon" class="form-control" value="${existing?.icon||'🐾'}" placeholder="🐾" style="font-size:1.2rem;text-align:center">
+          </div>
+          <div class="form-group">
+            <label>Nombre del grupo *</label>
+            <input id="grp-nombre" class="form-control" value="${existing?.nombre||''}" placeholder="Ej: Félidos, Cánidos, Psitácidos...">
+          </div>
+        </div>
+        <div class="form-group">
+          <label style="font-size:.78rem;font-weight:600">Especies del grupo</label>
+          <p style="font-size:.7rem;color:var(--txt3);margin-bottom:.35rem">Escribe el nombre o selecciona del historial. El científico se autocompleta si está guardado.</p>
+          <div id="grp-sp-list" style="margin-bottom:.35rem">
+            ${(existing?.especies||[]).map((e,i)=>`
+            <div class="grp-sp-row" style="display:flex;gap:.3rem;margin-bottom:.25rem">
+              <input class="form-control grp-sp-inp" value="${e.sp||''}" placeholder="Nombre común" style="flex:1;font-size:.8rem" list="sp-hist-dl" oninput="autofillSciInRow(this)" onchange="autofillSciInRow(this)">
+              <input class="form-control grp-sci-inp" value="${e.sci||''}" placeholder="Nombre científico" style="flex:1;font-size:.8rem">
+              <button onclick="this.closest('.grp-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem;flex-shrink:0">✕</button>
+            </div>`).join('')}
+          </div>
+          <button onclick="addGrpSpRow()" class="btn btn-secondary btn-sm">+ Agregar especie</button>
+        </div>
+        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('group-edit-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveGroup(${gi})">💾 Guardar grupo</button>
+        </div>
+      </div>
+    </div>`);
+  buildSpeciesDatalist('sp-hist-dl');
+}
+
+function addGrpSpRow() {
+  const list = document.getElementById('grp-sp-list');
+  if (!list) return;
+  buildSpeciesDatalist('sp-hist-dl');
+  list.insertAdjacentHTML('beforeend', `
+    <div class="grp-sp-row" style="display:flex;gap:.3rem;margin-bottom:.25rem">
+      <input class="form-control grp-sp-inp" value="" placeholder="Nombre común" style="flex:1;font-size:.8rem" list="sp-hist-dl" oninput="autofillSciInRow(this)" onchange="autofillSciInRow(this)">
+      <input class="form-control grp-sci-inp" value="" placeholder="Nombre científico" style="flex:1;font-size:.8rem">
+      <button onclick="this.closest('.grp-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem;flex-shrink:0">✕</button>
+    </div>`);
+}
+
+async function saveGroup(gi) {
+  const nombre = document.getElementById('grp-nombre')?.value.trim();
+  if (!nombre) { toast('⚠ El nombre del grupo es obligatorio'); return; }
+  const icon = document.getElementById('grp-icon')?.value.trim() || '🐾';
+  const rows = document.querySelectorAll('#grp-sp-list .grp-sp-row');
+  const especies = Array.from(rows).map(row => ({
+    sp:  row.querySelector('.grp-sp-inp')?.value.trim() || '',
+    sci: row.querySelector('.grp-sci-inp')?.value.trim() || ''
+  })).filter(e => e.sp);
+  const grp = { nombre, icon, especies };
+  if (gi >= 0) SPECIES_GROUPS[gi] = grp;
+  else SPECIES_GROUPS.push(grp);
+  await saveSpeciesGroups();
+  document.getElementById('group-edit-modal')?.remove();
+  renderGroupsList();
+  toast('✓ Grupo guardado');
+}
+
+async function confirmDeleteGroup(gi) {
+  const ok = await confirmDelete('¿Eliminar grupo?', `Se eliminará el grupo "${SPECIES_GROUPS[gi]?.nombre}". Las especies no se eliminan.`);
+  if (!ok) return;
+  SPECIES_GROUPS.splice(gi, 1);
+  await saveSpeciesGroups();
+  renderGroupsList();
+  toast('Grupo eliminado');
+}
+
+function addGroupSpeciesToEnriq(groupIdx) {
+  const grp = SPECIES_GROUPS[groupIdx];
+  if (!grp?.especies?.length) { toast('⚠ Este grupo no tiene especies'); return; }
+  const list = document.getElementById('enriq-sp-list') || document.getElementById('enriq-especies-list');
+  if (!list) return;
+  // Get existing species to avoid duplicates
+  const existing = new Set(Array.from(list.querySelectorAll('.enriq-sp-inp, .enriq-sp')).map(el=>el.value.toLowerCase()));
+  let added = 0;
+  grp.especies.forEach(e => {
+    if (!e.sp || existing.has(e.sp.toLowerCase())) return;
+    existing.add(e.sp.toLowerCase());
+    list.insertAdjacentHTML('beforeend', `
+      <div style="display:flex;gap:.3rem;margin-bottom:.25rem" class="enriq-sp-row">
+        <input class="form-control enriq-sp-inp" value="${e.sp}" placeholder="Nombre común" style="flex:1;font-size:.8rem" list="sp-hist-dl" oninput="autofillSciInRow(this)">
+        <input class="form-control enriq-sci-inp" value="${e.sci||''}" placeholder="Nombre científico" style="flex:1;font-size:.8rem">
+        <button onclick="this.closest('.enriq-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem;flex-shrink:0">✕</button>
+      </div>`);
+    added++;
+  });
+  toast(added > 0 ? `✓ ${added} especie(s) del grupo "${grp.nombre}" agregadas` : 'Todas las especies del grupo ya estaban agregadas');
 }
 
 function buildSpeciesDatalist(datalistId) {
