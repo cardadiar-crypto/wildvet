@@ -4110,7 +4110,7 @@ async function callAI(apiKey, messages, maxTokens = 3000) {
   }
 
   // ── Modo directo: el usuario pone su propia key ──
-  if (!apiKey) throw new Error('Sin API Key — configúrala en el campo de la sección o configura el Proxy en Ajustes');
+  if (!apiKey && !_AI_PROXY_URL) throw new Error('Sin API Key — configúrala en el campo de la sección o configura el Proxy en Ajustes');
   let raw = '';
   if (apiKey.startsWith('sk-')) {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -6953,98 +6953,137 @@ async function saveProtocol() {
 // ═══════════════════════════════════
 // ADMIN — VADEMECUM CRUD
 // ═══════════════════════════════════
+// ═══════════════════════════════════
+// VADEMÉCUM — FUNCIONES COMPLETAS
+// ═══════════════════════════════════
+const VAD_CATS = [
+  'Antibiótico','Antiinflamatorio (AINE)','Analgésico','Sedante / Tranquilizante',
+  'Disociativo','Anestésico','Antiparasitario','Reversor',
+  'Vitaminas / Suplementos','Antifúngico','Antiviral','Hormonal','Fluidoterapia','Otro'
+];
+
+// Abre el modal en modo Agregar o Editar
 function openAddDrug(editId=null) {
-  const isEdit = !!editId;
-  const existing = isEdit ? VADEMECUM_DB.find(d=>d.id===editId) : null;
-  const modal = document.getElementById('modal-add-drug') || (() => {
-    const m = document.createElement('div');
-    m.id = 'modal-add-drug';
-    m.className = 'modal-overlay';
-    document.body.appendChild(m);
-    return m;
-  })();
-
-  // Nombres comerciales como lista
+  const existing = editId ? VADEMECUM_DB.find(d=>d.id===editId) : null;
   const nombres = existing?.nombres || (existing?.drug ? [existing.drug] : ['']);
+  const cats = existing?.cats || (existing?.category ? [existing.category] : []);
 
-  modal.innerHTML = `
-    <div class="modal-box" style="max-width:560px">
-      <div class="modal-title">${isEdit?'Editar':'Agregar'} fármaco al vademécum</div>
-      <div class="modal-body">
+  document.getElementById('modal-add-drug')?.remove();
+  const m = document.createElement('div');
+  m.id = 'modal-add-drug';
+  m.style.cssText = 'position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;overflow-y:auto';
+  m.innerHTML = `
+    <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+      <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${existing?'✏️ Editar':'+ Agregar'} fármaco al vademécum</div>
 
-        <!-- Nombres comerciales (lista) -->
-        <div style="margin-bottom:.5rem">
-          <label style="font-size:.75rem;font-weight:600">Nombres comerciales <span style="font-weight:400;color:var(--txt3)">(puede haber varios)</span></label>
-          <div id="vd-nombres-list" style="margin-top:.25rem">
-            ${nombres.map((n,i)=>`
-            <div style="display:flex;gap:.3rem;margin-bottom:.25rem" id="vdn-row-${i}">
-              <input class="form-control vd-nombre-inp" value="${n}" placeholder="Ej: Ketavet, Ketamidor..." style="flex:1;font-size:.82rem">
-              <button onclick="document.getElementById('vdn-row-${i}').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
-            </div>`).join('')}
-          </div>
-          <button onclick="addVdNombreRow()" class="btn btn-secondary btn-sm" style="margin-top:.2rem">+ Otro nombre</button>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group"><label>Principio activo</label><input id="vd-active" class="form-control" value="${existing?.active||''}" placeholder="Ej: Ketamina, Meloxicam..."></div>
-          <div class="form-group"><label>Categoría</label>
-            <select id="vd-cat" class="form-control">
-              ${['Antibiótico','Antiinflamatorio','Analgésico','Antieméticos','Emético','Sedante','Disociativo','Anestésico','Antiparasitario','Vitaminas/Suplementos','Reversor','Otro'].map(cat=>`<option ${(existing?.category||'')===cat?'selected':''}>${cat}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>Concentración (mg/ml)</label><input id="vd-conc" class="form-control" type="number" step="0.01" value="${existing?.conc||''}" placeholder="100"></div>
-          <div class="form-group"><label>Vía habitual</label>
-            <select id="vd-route" class="form-control">
-              ${['IM','IV','SC','VO','IM dardo','IN','Tópico','Inhalatorio'].map(r=>`<option ${(existing?.route||'IM')===r?'selected':''}>${r}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-        <div class="form-group"><label>Indicaciones</label><textarea id="vd-indic" class="form-control" style="min-height:50px">${existing?.indic||''}</textarea></div>
-        <div class="form-group"><label>Contraindicaciones</label><textarea id="vd-contra" class="form-control" style="min-height:50px">${existing?.contraindications||''}</textarea></div>
-        <div class="form-group"><label>Efectos adversos</label><input id="vd-info" class="form-control" value="${existing?.info||''}" placeholder="Bradicardia, hipotensión..."></div>
-        <div class="form-group"><label>Notas clínicas</label><textarea id="vd-notes" class="form-control" style="min-height:40px">${existing?.notes||''}</textarea></div>
-
-        <!-- Dosis por especie -->
-        <div style="margin-top:.5rem">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem">
-            <label style="font-size:.75rem;font-weight:600">Dosis por especie</label>
-            <button onclick="addVdSpeciesDoseRow()" class="btn btn-admin btn-sm">+ Agregar especie</button>
-          </div>
-          <div id="vd-species-rows">
-            ${(existing?.species_doses||[]).map((s,i)=>`
-            <div class="vd-sp-row" style="background:var(--sur2);border-radius:var(--rsm);padding:.5rem;margin-bottom:.4rem;border:1px solid var(--bor)">
-              <div style="display:flex;gap:.3rem;margin-bottom:.3rem;align-items:center">
-                <input class="form-control vds-sp" value="${s.species||''}" placeholder="Nombre común" style="flex:1;font-size:.78rem">
-                <input class="form-control vds-sci" value="${s.sci||''}" placeholder="Nombre científico" style="flex:1;font-size:.78rem">
-                <button onclick="this.closest('.vd-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .35rem;font-size:.7rem;flex-shrink:0">✕</button>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.3rem">
-                <div><label style="font-size:.65rem;color:var(--txt3)">Dosis mín</label><input class="form-control vds-dmin" type="number" step="0.001" value="${s.dose_min||''}" placeholder="1.0" style="font-size:.78rem"></div>
-                <div><label style="font-size:.65rem;color:var(--txt3)">Dosis rec.</label><input class="form-control vds-drec" type="number" step="0.001" value="${s.dose||''}" placeholder="2.0" style="font-size:.78rem"></div>
-                <div><label style="font-size:.65rem;color:var(--txt3)">Dosis máx</label><input class="form-control vds-dmax" type="number" step="0.001" value="${s.dose_max||''}" placeholder="4.0" style="font-size:.78rem"></div>
-                <div><label style="font-size:.65rem;color:var(--txt3)">Vía</label>
-                  <select class="form-control vds-route" style="font-size:.72rem">
-                    ${['IM','IV','SC','VO','IM dardo','IN','Tópico'].map(r=>`<option ${s.route===r?'selected':''}>${r}</option>`).join('')}
-                  </select>
-                </div>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 2fr;gap:.3rem;margin-top:.3rem">
-                <div><label style="font-size:.65rem;color:var(--txt3)">Frecuencia</label><input class="form-control vds-freq" value="${s.freq||''}" placeholder="SID x 7 días" style="font-size:.78rem"></div>
-                <div><label style="font-size:.65rem;color:var(--txt3)">Notas</label><input class="form-control vds-notes" value="${s.notes||''}" placeholder="Observaciones..." style="font-size:.78rem"></div>
-              </div>
-            </div>`).join('')}
-          </div>
-        </div>
-
-        <div style="display:flex;gap:.5rem;margin-top:.75rem">
-          <button class="btn btn-secondary" style="flex:1" onclick="this.closest('.modal-overlay').classList.remove('open')">Cancelar</button>
-          <button class="btn btn-primary" style="flex:2" onclick="saveDrug(${isEdit?`'${editId}'`:null})">💾 Guardar</button>
+      <!-- IA import -->
+      <div style="background:var(--g0);border:1.5px dashed var(--g4);border-radius:var(--rsm);padding:.5rem .6rem;margin-bottom:.75rem">
+        <div style="font-size:.68rem;color:var(--g7);font-weight:600;margin-bottom:.3rem">🤖 Importar con IA — PDF, Word o Excel</div>
+        <div style="display:flex;gap:.3rem;align-items:center">
+          <label for="vd-file-import" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem;white-space:nowrap">📂 Seleccionar archivo</label>
+          <input type="file" id="vd-file-import" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importVademecumFile(this)">
+          <span id="vd-import-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
         </div>
       </div>
+
+      <!-- Nombres comerciales -->
+      <div style="margin-bottom:.5rem">
+        <label style="font-size:.75rem;font-weight:600">Nombres comerciales <span style="font-weight:400;color:var(--txt3)">(puede haber varios)</span></label>
+        <div id="vd-nombres-list" style="margin-top:.25rem">
+          ${nombres.map((n,i)=>`
+          <div style="display:flex;gap:.3rem;margin-bottom:.25rem" id="vdn-row-${i}">
+            <input class="form-control vd-nombre-inp" value="${n}" placeholder="Ej: Ketavet, Ketamidor..." style="flex:1;font-size:.82rem">
+            <button onclick="document.getElementById('vdn-row-${i}').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+          </div>`).join('')}
+        </div>
+        <button onclick="addVdNombreRow()" class="btn btn-secondary btn-sm" style="margin-top:.2rem">+ Otro nombre</button>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group"><label>Principio activo</label>
+          <input id="vd-active" class="form-control" value="${existing?.active||''}" placeholder="Ej: Ketamina, Meloxicam...">
+        </div>
+        <div class="form-group"><label>Concentración (mg/ml)</label>
+          <input id="vd-conc" class="form-control" type="number" step="0.01" value="${existing?.conc||''}" placeholder="100">
+        </div>
+      </div>
+
+      <!-- Categorías generales (múltiple) -->
+      <div class="form-group">
+        <label>Categoría(s) general(es) <span style="font-size:.7rem;font-weight:400;color:var(--txt3)">(puede ser más de una)</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.25rem">
+          ${VAD_CATS.map(cat=>`
+          <label style="display:inline-flex;align-items:center;gap:.2rem;cursor:pointer;font-size:.75rem;padding:.2rem .5rem;border-radius:20px;border:1px solid var(--bor)">
+            <input type="checkbox" class="vd-cat-chk" value="${cat}" ${cats.includes(cat)?'checked':''} style="accent-color:var(--g5)"> ${cat}
+          </label>`).join('')}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Categoría específica <span style="font-size:.7rem;font-weight:400;color:var(--txt3)">(ej: α2-adrenérgico, AINE, aminoglucósido)</span></label>
+        <input id="vd-cat-esp" class="form-control" value="${existing?.cat_esp||''}" placeholder="Ej: AINE, α2-adrenérgico, Aminoglucósido...">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group"><label>Vía habitual</label>
+          <select id="vd-route" class="form-control">
+            ${['IM','IV','SC','VO','IM dardo','IN','Tópico','Inhalatorio'].map(r=>`<option ${(existing?.route||'IM')===r?'selected':''}>${r}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group"><label>Indicaciones</label>
+        <textarea id="vd-indic" class="form-control" style="min-height:50px">${existing?.indic||''}</textarea>
+      </div>
+      <div class="form-group"><label>Contraindicaciones</label>
+        <textarea id="vd-contra" class="form-control" style="min-height:50px">${existing?.contraindications||''}</textarea>
+      </div>
+      <div class="form-group"><label>Efectos adversos</label>
+        <input id="vd-info" class="form-control" value="${existing?.info||''}" placeholder="Bradicardia, hipotensión...">
+      </div>
+      <div class="form-group"><label>Notas clínicas</label>
+        <textarea id="vd-notes" class="form-control" style="min-height:40px">${existing?.notes||''}</textarea>
+      </div>
+
+      <!-- Dosis por especie -->
+      <div style="margin-top:.5rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem">
+          <label style="font-size:.75rem;font-weight:600">Dosis por especie</label>
+          <button onclick="addVdSpeciesDoseRow()" class="btn btn-admin btn-sm">+ Agregar especie</button>
+        </div>
+        <div id="vd-species-rows">
+          ${(existing?.species_doses||[]).map(s=>`
+          <div class="vd-sp-row" style="background:var(--sur2);border-radius:var(--rsm);padding:.5rem;margin-bottom:.4rem;border:1px solid var(--bor)">
+            <div style="display:flex;gap:.3rem;margin-bottom:.3rem;align-items:center">
+              <input class="form-control vds-sp" value="${s.species||''}" placeholder="Nombre común" style="flex:1;font-size:.78rem" list="sp-hist-dl" oninput="autofillSciInRow(this)" onchange="autofillSciInRow(this)">
+              <input class="form-control vds-sci" value="${s.sci||''}" placeholder="Nombre científico" style="flex:1;font-size:.78rem">
+              <button onclick="this.closest('.vd-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .35rem;font-size:.7rem;flex-shrink:0">✕</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.3rem">
+              <div><label style="font-size:.65rem;color:var(--txt3)">Dosis mín</label><input class="form-control vds-dmin" type="number" step="0.001" value="${s.dose_min||''}" placeholder="1.0" style="font-size:.78rem"></div>
+              <div><label style="font-size:.65rem;color:var(--txt3)">Dosis rec.</label><input class="form-control vds-drec" type="number" step="0.001" value="${s.dose||''}" placeholder="2.0" style="font-size:.78rem"></div>
+              <div><label style="font-size:.65rem;color:var(--txt3)">Dosis máx</label><input class="form-control vds-dmax" type="number" step="0.001" value="${s.dose_max||''}" placeholder="4.0" style="font-size:.78rem"></div>
+              <div><label style="font-size:.65rem;color:var(--txt3)">Vía</label>
+                <select class="form-control vds-route" style="font-size:.72rem">
+                  ${['IM','IV','SC','VO','IM dardo','IN','Tópico'].map(r=>`<option ${s.route===r?'selected':''}>${r}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 2fr;gap:.3rem;margin-top:.3rem">
+              <div><label style="font-size:.65rem;color:var(--txt3)">Frecuencia</label><input class="form-control vds-freq" value="${s.freq||''}" placeholder="SID x 7 días" style="font-size:.78rem"></div>
+              <div><label style="font-size:.65rem;color:var(--txt3)">Notas</label><input class="form-control vds-notes" value="${s.notes||''}" placeholder="Observaciones..." style="font-size:.78rem"></div>
+            </div>
+          </div>`).join('')}
+        </div>
+      </div>
+
+      <div style="display:flex;gap:.5rem;margin-top:.75rem">
+        <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('modal-add-drug').remove()">Cancelar</button>
+        <button class="btn btn-primary" style="flex:2" onclick="saveDrug('${editId||''}')">💾 Guardar</button>
+      </div>
     </div>`;
-  modal.classList.add('open');
+  document.body.appendChild(m);
+  buildSpeciesDatalist('sp-hist-dl');
 }
 
 function addVdNombreRow() {
@@ -7061,6 +7100,7 @@ function addVdNombreRow() {
 function addVdSpeciesDoseRow() {
   const rows = document.getElementById('vd-species-rows');
   if (!rows) return;
+  buildSpeciesDatalist('sp-hist-dl');
   rows.insertAdjacentHTML('beforeend', `
     <div class="vd-sp-row" style="background:var(--sur2);border-radius:var(--rsm);padding:.5rem;margin-bottom:.4rem;border:1px solid var(--bor)">
       <div style="display:flex;gap:.3rem;margin-bottom:.3rem;align-items:center">
@@ -7085,50 +7125,14 @@ function addVdSpeciesDoseRow() {
     </div>`);
 }
 
-let vdSpeciesCount = 0;
-function addVdSpeciesRow() {
-  vdSpeciesCount++;
-  const id = 'vds_'+vdSpeciesCount;
-  document.getElementById('vd-species-doses').insertAdjacentHTML('beforeend', `
-    <div id="${id}" style="background:var(--sur2);border-radius:var(--rsm);padding:.6rem;margin-bottom:.4rem;border:1px solid var(--bor)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
-        <span style="font-size:.7rem;font-weight:600;color:var(--txt3);text-transform:uppercase">Especie ${vdSpeciesCount}</span>
-        <button class="icon-btn danger" style="width:22px;height:22px;font-size:.65rem" onclick="document.getElementById('${id}').remove()">✕</button>
-      </div>
-      <div class="form-group" style="margin-bottom:.35rem"><label style="font-size:.72rem">Nombre de la especie</label>
-        <input class="form-control vds-sp" placeholder="Ej: Guacamaya Roja (Ara macao)" style="font-size:.82rem">
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;margin-bottom:.3rem">
-        <div><label style="font-size:.72rem;color:var(--txt3)">Dosis mín (mg/kg)</label><input class="form-control vds-dmin" type="number" step="0.001" placeholder="1.0" style="font-size:.82rem"></div>
-        <div><label style="font-size:.72rem;color:var(--txt3)">Dosis rec. (mg/kg)</label><input class="form-control vds-drec" type="number" step="0.001" placeholder="2.0" style="font-size:.82rem"></div>
-        <div><label style="font-size:.72rem;color:var(--txt3)">Dosis máx (mg/kg)</label><input class="form-control vds-dmax" type="number" step="0.001" placeholder="4.0" style="font-size:.82rem"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.3rem">
-        <div><label style="font-size:.72rem;color:var(--txt3)">Concentración (mg/ml)</label><input class="form-control vds-conc" type="number" step="0.01" placeholder="100" style="font-size:.82rem"></div>
-        <div><label style="font-size:.72rem;color:var(--txt3)">Vía</label>
-          <select class="form-control vds-route" style="font-size:.82rem">
-            <option>IM</option><option>IV</option><option>SC</option><option>VO</option><option>IM dardo</option><option>IN</option><option>Tópico</option><option>Inhalatorio</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group" style="margin-bottom:.3rem"><label style="font-size:.72rem;color:var(--txt3)">Frecuencia / duración</label>
-        <input class="form-control vds-freq" placeholder="SID × 7 días, Dosis única..." style="font-size:.82rem">
-      </div>
-      <div class="form-group" style="margin-bottom:0"><label style="font-size:.72rem;color:var(--txt3)">Notas clínicas</label>
-        <input class="form-control vds-notes" placeholder="Precauciones, combinaciones, observaciones..." style="font-size:.82rem">
-      </div>
-    </div>`);
-}
-
-async function saveDrug(editId=null) {
-  // Recoger nombres comerciales
-  const nombreEls = document.querySelectorAll('.vd-nombre-inp');
+async function saveDrug(editId='') {
+  const nombreEls = document.querySelectorAll('#modal-add-drug .vd-nombre-inp');
   const nombres = Array.from(nombreEls).map(el=>el.value.trim()).filter(Boolean);
   const drugName = nombres[0] || '';
-  if (!drugName && !document.getElementById('vd-active')?.value.trim()) {
-    toast('⚠ Ingresa al menos un nombre comercial o el principio activo'); return;
-  }
-  // Recoger dosis por especie
+  const active = document.getElementById('vd-active')?.value.trim()||'';
+  if (!drugName && !active) { toast('⚠ Ingresa al menos un nombre o el principio activo'); return; }
+
+  const cats = Array.from(document.querySelectorAll('#modal-add-drug .vd-cat-chk:checked')).map(el=>el.value);
   const species_doses = [];
   document.querySelectorAll('#vd-species-rows .vd-sp-row').forEach(row => {
     const sp = row.querySelector('.vds-sp')?.value.trim();
@@ -7143,11 +7147,14 @@ async function saveDrug(editId=null) {
       notes:    row.querySelector('.vds-notes')?.value||''
     });
   });
+
   const drugData = {
     drug:             drugName,
-    nombres:          nombres,
-    active:           document.getElementById('vd-active')?.value||'',
-    category:         document.getElementById('vd-cat')?.value||'Otro',
+    nombres,
+    active,
+    cats,
+    category:         cats[0]||'Otro',
+    cat_esp:          document.getElementById('vd-cat-esp')?.value||'',
     conc:             parseFloat(document.getElementById('vd-conc')?.value)||0,
     route:            document.getElementById('vd-route')?.value||'IM',
     indic:            document.getElementById('vd-indic')?.value||'',
@@ -7156,162 +7163,81 @@ async function saveDrug(editId=null) {
     notes:            document.getElementById('vd-notes')?.value||'',
     species_doses
   };
+
   if (editId) {
     const existing = VADEMECUM_DB.find(d=>d.id===editId);
     if (existing) { Object.assign(existing, drugData); await dbPutSync('vademecum', existing); }
   } else {
-    const newDrug = { id: 'vad_'+Date.now()+'_'+Math.random().toString(36).slice(2,5), ...drugData };
+    const newDrug = { id:'vad_'+Date.now()+'_'+Math.random().toString(36).slice(2,5), ...drugData };
     VADEMECUM_DB.push(newDrug);
     await dbPutSync('vademecum', newDrug);
   }
-  document.getElementById('modal-add-drug')?.classList.remove('open');
+  document.getElementById('modal-add-drug')?.remove();
   renderVademecum();
   toast('✓ Fármaco ' + (editId?'actualizado':'agregado'));
 }
+
+// openEditDrug: simplified — just calls openAddDrug with the id
+function openEditDrug(id) { openAddDrug(id); }
 
 async function importVademecumFile(input) {
   if (!input.files||!input.files[0]) return;
   const file = input.files[0];
   const ext = file.name.split('.').pop().toLowerCase();
   const statusEl = document.getElementById('vd-import-status');
-  statusEl.textContent = '⏳ Leyendo archivo...';
-  statusEl.style.color = 'var(--g6)';
+  if (!statusEl) return;
+  statusEl.textContent = '⏳ Leyendo archivo...'; statusEl.style.color='var(--g6)';
   try {
-    let textContent = '';
-    let base64Data = '';
-    let isPDF = false;
-    if (ext === 'pdf') {
-      base64Data = await fileToBase64(file);
-      isPDF = true;
-      statusEl.textContent = '🤖 Extrayendo fármacos del PDF con IA...';
-    } else if (ext === 'xlsx'||ext === 'xls') {
-      statusEl.textContent = '⏳ Procesando Excel...';
-      textContent = await readExcel(file);
-      statusEl.textContent = '🤖 Interpretando con IA...';
-    } else {
-      textContent = await file.text();
-      statusEl.textContent = '🤖 Interpretando con IA...';
-    }
-
-    const PROMPT = `Analiza este documento de farmacología veterinaria y extrae TODOS los fármacos mencionados con sus dosis por especie. Devuelve ÚNICAMENTE un array JSON válido sin texto adicional, sin markdown, sin explicaciones:
-
-[
-  {
-    "drug": "Nombre del fármaco",
-    "category": "Clasificación farmacológica",
-    "info": "Descripción, mecanismo de acción e indicaciones",
-    "contraindications": "Contraindicaciones",
-    "species_doses": [
-      {
-        "species": "Nombre de la especie",
-        "dose_min": número_mg/kg,
-        "dose": número_mg/kg,
-        "dose_max": número_mg/kg,
-        "conc": número_mg/ml,
-        "route": "vía de administración",
-        "freq": "frecuencia y duración",
-        "notes": "notas clínicas"
-      }
-    ]
-  }
-]
-
-Si no encuentras un valor numérico exacto, usa 0. Extrae tantos fármacos como encuentres en el documento.`;
-
     let messages;
-    if (isPDF) {
-      messages = [{ role:'user', content:[
-        { type:'document', source:{ type:'base64', media_type:'application/pdf', data:base64Data }},
-        { type:'text', text:PROMPT }
-      ]}];
+    const PROMPT = `Analiza este documento de farmacología veterinaria y extrae TODOS los fármacos con sus dosis por especie. Devuelve ÚNICAMENTE un array JSON válido:\n[{"drug":"Nombre","active":"Principio activo","category":"Categoría","cat_esp":"Cat. específica (ej: AINE)","conc":100,"route":"IM","indic":"Indicaciones","contraindications":"","info":"Efectos adversos","notes":"","species_doses":[{"species":"Nombre esp.","sci":"Nombre científico","dose_min":0,"dose":2,"dose_max":4,"route":"IM","freq":"SID x 5 días","notes":""}]}]`;
+
+    if (ext === 'pdf') {
+      const b64 = await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});
+      statusEl.textContent='🤖 Extrayendo fármacos del PDF con IA...';
+      messages = [{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:PROMPT}]}];
     } else {
-      messages = [{ role:'user', content: PROMPT + '\n\n--- DOCUMENTO ---\n' + textContent.substring(0,15000) }];
+      let text = '';
+      if (ext==='xlsx'||ext==='xls') { statusEl.textContent='⏳ Procesando Excel...'; text = await readExcel(file); }
+      else if (ext==='docx'||ext==='doc') { text = await readDocx(file); }
+      else { text = await file.text(); }
+      statusEl.textContent='🤖 Interpretando con IA...';
+      messages = [{role:'user',content: PROMPT+'\n\n--- DOCUMENTO ---\n'+text.substring(0,15000)}];
     }
 
-    const vadKey = getActiveAIKey().key;
-    if (!vadKey) throw new Error('Sin API Key — configúrala en Ajustes');
+    const vadKey = _AI_PROXY_URL ? 'proxy' : (getActiveAIKey().key || '');
     const clean = await callAI(vadKey, messages, 4000);
-    const extracted = parseAIJson(clean);
+    const arrStart = clean.indexOf('['), arrEnd = clean.lastIndexOf(']');
+    if (arrStart === -1) throw new Error('No se encontró JSON en la respuesta');
+    const extracted = JSON.parse(clean.substring(arrStart, arrEnd+1));
 
-    // Fill form with first drug, save rest automatically
-    let savedCount = 0;
-    for (let i = 0; i < extracted.length; i++) {
-      const d = extracted[i];
-      if (!d.drug) continue;
-      const drug = { id:'vd_'+Date.now()+'_'+i, drug:d.drug, category:d.category||'', info:d.info||'', contraindications:d.contraindications||'', species_doses:d.species_doses||[] };
-      await dbPutSync('vademecum', drug);
-      VADEMECUM_DB.push(drug);
-      savedCount++;
+    let saved = 0;
+    for (const d of extracted) {
+      if (!d.drug && !d.active) continue;
+      const cats = d.cats || (d.category ? [d.category] : []);
+      const newDrug = {
+        id: 'vad_'+Date.now()+'_'+Math.random().toString(36).slice(2,5),
+        drug: d.drug||d.active||'Sin nombre', nombres:[d.drug||d.active||''], active:d.active||'',
+        cats, category: cats[0]||d.category||'Otro', cat_esp:d.cat_esp||'',
+        conc:parseFloat(d.conc)||0, route:d.route||'IM',
+        indic:d.indic||'', contraindications:d.contraindications||'',
+        info:d.info||d.effects||'', notes:d.notes||'',
+        species_doses:(d.species_doses||[]).map(s=>({
+          species:s.species||'', sci:s.sci||'',
+          dose_min:parseFloat(s.dose_min)||0, dose:parseFloat(s.dose)||0,
+          dose_max:parseFloat(s.dose_max)||0, route:s.route||d.route||'IM',
+          freq:s.freq||'', notes:s.notes||''
+        }))
+      };
+      VADEMECUM_DB.push(newDrug);
+      await dbPutSync('vademecum', newDrug);
+      saved++;
     }
-    if (savedCount > 0) {
-      // Pre-fill form with first extracted drug for review
-      const first = extracted[0];
-      if (first) {
-        document.getElementById('vd-name').value = first.drug||'';
-        document.getElementById('vd-cat').value = first.category||'';
-        document.getElementById('vd-info').value = first.info||'';
-        document.getElementById('vd-contra').value = first.contraindications||'';
-      }
-      renderVademecum();
-      statusEl.textContent = `✅ ${savedCount} fármaco(s) importado(s) y guardado(s) automáticamente.`;
-      if (savedCount > 1) statusEl.textContent += ' El primero aparece abajo para revisión.';
-    } else {
-      statusEl.textContent = '⚠ No se encontraron fármacos en el documento.';
-    }
+    statusEl.textContent = `✅ ${saved} fármaco(s) importados`; statusEl.style.color='var(--g5)';
+    renderVademecum();
+    toast(`✓ ${saved} fármaco(s) importados al vademécum`);
   } catch(e) {
-    console.error(e);
-    statusEl.textContent = '⚠ Error: '+e.message+'. Completa manualmente.';
-    statusEl.style.color = 'var(--r5)';
+    statusEl.textContent = '⚠ ' + e.message; statusEl.style.color='var(--r5)';
   }
-}
-
-function openEditDrug(id) {
-  const d = VADEMECUM_DB.find(x=>x.id===id);
-  if (!d) return;
-  openAddDrug();
-  setTimeout(()=>{
-    document.getElementById('modal-drug-title').textContent = 'Editar — '+d.drug;
-    document.getElementById('vd-name').value = d.drug||'';
-    document.getElementById('vd-cat').value = d.category||'';
-    document.getElementById('vd-info').value = d.info||'';
-    document.getElementById('vd-contra').value = d.contraindications||'';
-    document.getElementById('vd-species-doses').innerHTML = '';
-    vdSpeciesCount = 0;
-    (d.species_doses||[]).forEach(sd=>{
-      addVdSpeciesRow();
-      const lastRow = document.getElementById('vd-species-doses').lastElementChild;
-      if (!lastRow) return;
-      lastRow.querySelector('.vds-sp').value = sd.species||'';
-      lastRow.querySelector('.vds-dmin').value = sd.dose_min||'';
-      lastRow.querySelector('.vds-drec').value = sd.dose||'';
-      lastRow.querySelector('.vds-dmax').value = sd.dose_max||'';
-      lastRow.querySelector('.vds-conc').value = sd.conc||'';
-      const routeSel = lastRow.querySelector('.vds-route');
-      if (routeSel) { for(const o of routeSel.options) { if(o.value===sd.route){o.selected=true;break;} } }
-      lastRow.querySelector('.vds-freq').value = sd.freq||'';
-      lastRow.querySelector('.vds-notes').value = sd.notes||'';
-    });
-    // Override save to update instead of push
-    const origSave = window.saveDrug;
-    window.saveDrug = async function() {
-      const name = document.getElementById('vd-name').value.trim();
-      if (!name) { toast('⚠ Ingresa el nombre'); return; }
-      const species_doses = [];
-      document.querySelectorAll('#vd-species-doses > div').forEach(div=>{
-        const sp = div.querySelector('.vds-sp')?.value.trim();
-        if (sp) species_doses.push({ species:sp, dose_min:parseFloat(div.querySelector('.vds-dmin')?.value)||0, dose:parseFloat(div.querySelector('.vds-drec')?.value)||0, dose_max:parseFloat(div.querySelector('.vds-dmax')?.value)||0, conc:parseFloat(div.querySelector('.vds-conc')?.value)||100, route:div.querySelector('.vds-route')?.value||'IM', freq:div.querySelector('.vds-freq')?.value||'', notes:div.querySelector('.vds-notes')?.value||'' });
-      });
-      const updated = { id, drug:name, category:document.getElementById('vd-cat').value, info:document.getElementById('vd-info').value, contraindications:document.getElementById('vd-contra').value, species_doses };
-      await dbPutSync('vademecum', updated);
-      const idx = VADEMECUM_DB.findIndex(x=>x.id===id);
-      if (idx>=0) VADEMECUM_DB[idx]=updated; else VADEMECUM_DB.push(updated);
-      vdSpeciesCount = 0;
-      closeModal('modal-drug');
-      renderVademecum();
-      window.saveDrug = origSave;
-      toast('✓ Fármaco actualizado');
-    };
-  }, 50);
 }
 
 function renderVademecum(filter='') {
@@ -7322,81 +7248,76 @@ function renderVademecum(filter='') {
 
   const items = q
     ? VADEMECUM_DB.filter(d=>
-        d.drug.toLowerCase().includes(q) ||
-        (d.active||'').toLowerCase().includes(q) ||
-        (d.category||'').toLowerCase().includes(q) ||
-        (d.info||'').toLowerCase().includes(q) ||
-        (d.nombres||[]).some(n=>n.toLowerCase().includes(q)) ||
-        (d.species_doses||[]).some(s=>
-          s.species.toLowerCase().includes(q) ||
-          (s.sci||'').toLowerCase().includes(q)
-        )
+        (d.drug||'').toLowerCase().includes(q)||
+        (d.active||'').toLowerCase().includes(q)||
+        (d.category||'').toLowerCase().includes(q)||
+        (d.cat_esp||'').toLowerCase().includes(q)||
+        (d.info||'').toLowerCase().includes(q)||
+        (d.names||[]).some(n=>n.toLowerCase().includes(q))||
+        (d.nombres||[]).some(n=>n.toLowerCase().includes(q))||
+        (d.cats||[]).some(c=>c.toLowerCase().includes(q))||
+        (d.species_doses||[]).some(s=>(s.species||'').toLowerCase().includes(q)||(s.sci||'').toLowerCase().includes(q))
       )
     : VADEMECUM_DB;
 
   if (!items.length) {
-    list.innerHTML = `<div class="empty-state"><p>Sin resultados${q?' para "'+q+'"':''}</p></div>`;
-    return;
+    list.innerHTML = `<div class="empty-state"><p>Sin resultados${q?' para "'+q+'"':''}</p></div>`; return;
   }
 
-  // Agrupar por categoría
+  // Group by all categories (a drug can be in multiple)
   const groups = {};
   items.forEach(d => {
-    const cat = d.category || 'Otro';
-    if (!groups[cat]) groups[cat] = [];
-    groups[cat].push(d);
+    const drugCats = d.cats?.length ? d.cats : [d.category||'Otro'];
+    drugCats.forEach(cat => { if(!groups[cat]) groups[cat]=[]; groups[cat].push(d); });
   });
 
-  // Ordenar categorías predefinidas primero
-  const CAT_ORDER = ['Antibiótico','Antiinflamatorio','Analgésico','Sedante','Disociativo','Anestésico','Antiparasitario','Reversor','Vitaminas/Suplementos','Otro'];
   const sortedCats = Object.keys(groups).sort((a,b) => {
-    const ia = CAT_ORDER.indexOf(a), ib = CAT_ORDER.indexOf(b);
-    if (ia >= 0 && ib >= 0) return ia - ib;
-    if (ia >= 0) return -1;
-    if (ib >= 0) return 1;
+    const ia = VAD_CATS.indexOf(a), ib = VAD_CATS.indexOf(b);
+    if (ia>=0&&ib>=0) return ia-ib; if (ia>=0) return -1; if (ib>=0) return 1;
     return a.localeCompare(b);
   });
 
   list.innerHTML = sortedCats.map(cat => `
     <div style="margin-bottom:1rem">
-      <div style="font-size:.72rem;font-weight:700;color:var(--g6);text-transform:uppercase;letter-spacing:.08em;padding:.3rem 0;border-bottom:2px solid var(--g3);margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:center">
-        <span>${cat} <span style="font-weight:400;color:var(--txt3)">(${groups[cat].length})</span></span>
+      <div style="font-size:.72rem;font-weight:700;color:var(--g6);text-transform:uppercase;letter-spacing:.08em;padding:.3rem 0;border-bottom:2px solid var(--g3);margin-bottom:.4rem">
+        ${cat} <span style="font-weight:400;color:var(--txt3)">(${groups[cat].length})</span>
       </div>
       ${groups[cat].map(d => {
-        const doses = d.species_doses || [];
+        const doses = d.species_doses||[];
+        const displayName = (d.nombres?.length>1)?d.nombres.join(' / '):(d.drug||d.active||'Sin nombre');
         return `
         <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.4rem;overflow:hidden" id="vd-card-${d.id}">
           <div style="display:flex;align-items:center;gap:.6rem;padding:.65rem .85rem;cursor:pointer" onclick="toggleVdCard('${d.id}')">
             <div style="flex:1;min-width:0">
-              <div style="font-size:.92rem;font-weight:700;color:var(--txt)">${(d.nombres&&d.nombres.length>1)?d.nombres.join(' / '):d.drug}</div>
+              <div style="font-size:.92rem;font-weight:700;color:var(--txt)">${displayName}</div>
               ${d.active?`<div style="font-size:.72rem;color:var(--txt3);font-style:italic">${d.active}</div>`:''}
-              ${d.info?`<div style="font-size:.75rem;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${d.info.substring(0,80)}${d.info.length>80?'…':''}</div>`:''}
+              ${d.cat_esp?`<div style="font-size:.68rem;color:var(--g6);margin-top:.1rem">${d.cat_esp}</div>`:''}
             </div>
             <div style="display:flex;align-items:center;gap:.3rem;flex-shrink:0">
               <span style="font-size:.65rem;background:var(--g1);color:var(--g7);border-radius:20px;padding:.1rem .4rem;font-weight:600">${doses.length} esp.</span>
               ${isAdmin?`
               <button onclick="event.stopPropagation();openEditDrug('${d.id}')" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);width:26px;height:26px;cursor:pointer;font-size:.75rem">✏️</button>
-              <button onclick="event.stopPropagation();deleteDrug('${d.id}')" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);width:26px;height:26px;cursor:pointer;font-size:.7rem;color:var(--r5)">✕</button>`:''}
+              <button onclick="event.stopPropagation();deleteDrugVad('${d.id}')" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);width:26px;height:26px;cursor:pointer;font-size:.7rem;color:var(--r5)">✕</button>`:''}
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="vd-chev-${d.id}"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
           </div>
           <div id="vd-panel-${d.id}" style="display:none;border-top:1px solid var(--bor)">
-            ${d.indic?`<div style="padding:.4rem .85rem;font-size:.8rem;color:var(--txt2)"><strong style="color:var(--g6)">✅ Indicaciones:</strong> ${d.indic}</div>`:''}
+            ${d.indic?`<div style="padding:.4rem .85rem;font-size:.8rem"><strong style="color:var(--g6)">✅ Indicaciones:</strong> ${d.indic}</div>`:''}
             ${d.contraindications?`<div style="padding:.3rem .85rem;background:var(--r1);display:flex;gap:.3rem"><span style="color:var(--r5)">⚠</span><span style="font-size:.75rem;color:var(--r5)">${d.contraindications}</span></div>`:''}
             ${d.info?`<div style="padding:.3rem .85rem;font-size:.78rem;color:var(--txt3)"><strong>Efectos adversos:</strong> ${d.info}</div>`:''}
             ${d.notes?`<div style="padding:.3rem .85rem .1rem;font-size:.78rem;color:var(--txt3);font-style:italic">📋 ${d.notes}</div>`:''}
             <div style="padding:.5rem .85rem;background:var(--sur2)">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
                 <span style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Dosis por especie</span>
-                <button onclick="openAddSpeciesDoseModal('${d.id}')" style="background:var(--g5);color:white;border:none;border-radius:var(--rxs);padding:.2rem .5rem;font-size:.7rem;cursor:pointer">+ Especie</button>
+                ${isAdmin?`<button onclick="openEditDrug('${d.id}')" style="background:var(--g5);color:white;border:none;border-radius:var(--rxs);padding:.2rem .5rem;font-size:.7rem;cursor:pointer">+ Especie</button>`:''}
               </div>
-              ${doses.length ? `<div style="display:flex;flex-wrap:wrap;gap:.3rem">
+              ${doses.length?`<div style="display:flex;flex-wrap:wrap;gap:.3rem">
                 ${doses.map((s,i)=>`
                 <button onclick="toggleVdCalc('${d.id}',${i})" id="vd-sp-chip-${d.id}-${i}"
                   style="background:var(--sur);border:1px solid var(--bor);border-radius:20px;padding:.25rem .6rem;font-size:.75rem;cursor:pointer">
-                  🐾 ${s.species.split('(')[0].trim()} <span style="font-size:.65rem;color:var(--txt3)">${s.dose||0} mg/kg</span>
+                  🐾 ${(s.species||'').split('(')[0].trim()} <span style="font-size:.65rem;color:var(--txt3)">${s.dose||0} mg/kg</span>
                 </button>`).join('')}
-              </div>` : '<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin dosis registradas</p>'}
+              </div>`:'<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin dosis registradas</p>'}
             </div>
             <div id="vd-calc-container-${d.id}"></div>
           </div>
@@ -7409,334 +7330,96 @@ function toggleVdCard(id) {
   const panel = document.getElementById('vd-panel-'+id);
   const chev  = document.getElementById('vd-chev-'+id);
   if (!panel) return;
-  const open = panel.style.display === 'none';
-  panel.style.display = open ? 'block' : 'none';
-  if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
+  const open = panel.style.display==='none';
+  panel.style.display = open?'block':'none';
+  if (chev) chev.style.transform = open?'rotate(180deg)':'';
 }
 
-
-// Toggle panel de especies
-function toggleVdSpecies(drugId) {
-  const panel = document.getElementById('vd-sp-panel-'+drugId);
-  const btn   = document.getElementById('vd-sp-btn-'+drugId);
-  if (!panel) return;
-  const isOpen = panel.style.display !== 'none';
-  panel.style.display = isOpen ? 'none' : 'block';
-  if (btn) btn.style.background = isOpen ? 'var(--g5)' : 'var(--g7)';
-}
-
-// Toggle calculadora de especie específica
 function toggleVdCalc(drugId, idx) {
   const container = document.getElementById('vd-calc-container-'+drugId);
-  const chip = document.getElementById('vd-sp-chip-'+drugId+'-'+idx);
   if (!container) return;
-
-  // Si ya está mostrando esta especie, cerrar
-  if (container.dataset.open === String(idx)) {
-    container.innerHTML = '';
-    container.dataset.open = '';
-    // Quitar activo del chip
-    document.querySelectorAll(`[id^="vd-sp-chip-${drugId}-"]`).forEach(c=>{
-      c.classList.remove('active');
-      c.style.background='var(--sur)'; c.style.borderColor='var(--bor)';
-    });
+  if (container.dataset.open===String(idx)) {
+    container.innerHTML=''; container.dataset.open='';
+    document.querySelectorAll(`[id^="vd-sp-chip-${drugId}-"]`).forEach(c=>{c.style.background='var(--sur)';c.style.borderColor='var(--bor)';});
     return;
   }
-
-  // Marcar chip activo
-  document.querySelectorAll(`[id^="vd-sp-chip-${drugId}-"]`).forEach(c=>{
-    c.classList.remove('active');
-    c.style.background='var(--sur)'; c.style.borderColor='var(--bor)';
-  });
-  if (chip) { chip.classList.add('active'); chip.style.background='var(--g0)'; chip.style.borderColor='var(--g5)'; }
-  container.dataset.open = String(idx);
-
-  const d = VADEMECUM_DB.find(x=>x.id===drugId);
-  if (!d) return;
-  const s = (d.species_doses||[])[idx];
+  document.querySelectorAll(`[id^="vd-sp-chip-${drugId}-"]`).forEach(c=>{c.style.background='var(--sur)';c.style.borderColor='var(--bor)';});
+  const chip = document.getElementById(`vd-sp-chip-${drugId}-${idx}`);
+  if (chip) {chip.style.background='var(--g0)';chip.style.borderColor='var(--g5)';}
+  container.dataset.open=String(idx);
+  const drug = VADEMECUM_DB.find(d=>d.id===drugId);
+  const s = drug?.species_doses?.[idx];
   if (!s) return;
-  const isAdmin = currentUser?.role==='admin';
-  const calcId = `vdcalc_${drugId}_${idx}`;
-  const unitId = `vdunit_${drugId}_${idx}`;
-  const concId = `vdconc_${drugId}_${idx}`;
-  const doseId = `vddose_${drugId}_${idx}`;
-  const wId    = `vdw_${drugId}_${idx}`;
-
-  container.innerHTML = `
-    <div style="padding:.75rem .85rem;border-top:1px solid var(--bor);background:var(--sur)">
-      <!-- Encabezado especie -->
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.65rem">
-        <div>
-          <div style="font-size:.9rem;font-weight:700;color:var(--txt)">${s.species}</div>
-          <div style="font-size:.75rem;color:var(--txt3);margin-top:.1rem">${s.route||'IM'} · ${s.freq||''} ${s.notes?'· '+s.notes:''}</div>
-        </div>
-        ${isAdmin?`<button onclick="removeSpeciesDose('${drugId}',${idx})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);padding:.2rem .45rem;font-size:.7rem;color:var(--r5);cursor:pointer">Eliminar</button>`:''}
+  const conc = drug.conc||100;
+  container.innerHTML=`
+    <div style="padding:.75rem .85rem;border-top:1px solid var(--bor)">
+      <div style="font-size:.78rem;font-weight:700;margin-bottom:.4rem">🧮 Calculadora — ${s.species}</div>
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
+        <label style="font-size:.75rem;color:var(--txt3)">Peso (kg):</label>
+        <input type="number" id="vd-wt-${drugId}-${idx}" min="0.01" step="0.1" value="${currentWeight||10}" class="form-control" style="width:90px;font-size:.85rem" oninput="calcVdDose('${drugId}',${idx})">
       </div>
-
-      <!-- Inputs de calculadora -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.5rem">
-        <div>
-          <label style="font-size:.7rem;color:var(--txt3);display:block;margin-bottom:.2rem">Peso del animal</label>
-          <div style="display:flex;align-items:center;gap:.3rem">
-            <input type="number" id="${wId}" min="0.001" max="5000" step="0.001"
-              value="${currentWeight}" placeholder="kg"
-              style="flex:1;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.4rem .5rem;font-family:var(--mono);font-size:.9rem;color:var(--txt);outline:none;font-weight:600"
-              oninput="runVdCalc('${drugId}',${idx})">
-            <span style="font-size:.8rem;color:var(--txt3);white-space:nowrap">kg</span>
-          </div>
-        </div>
-        <div>
-          <label style="font-size:.7rem;color:var(--txt3);display:block;margin-bottom:.2rem">Dosis (mg/kg) <span style="color:var(--g6)">editable</span></label>
-          <div style="display:flex;align-items:center;gap:.3rem">
-            <input type="number" id="${doseId}" min="0.001" max="9999" step="0.001"
-              value="${s.dose||0}" placeholder="mg/kg"
-              style="flex:1;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.4rem .5rem;font-family:var(--mono);font-size:.9rem;color:var(--txt);outline:none"
-              oninput="runVdCalc('${drugId}',${idx})">
-            <span style="font-size:.7rem;color:var(--txt3);white-space:nowrap">mg/kg</span>
-          </div>
-          <div style="font-size:.68rem;color:var(--txt3);margin-top:.15rem">Rango: ${s.dose_min||0}–${s.dose_max||0} mg/kg</div>
-        </div>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.65rem">
-        <div>
-          <label style="font-size:.7rem;color:var(--txt3);display:block;margin-bottom:.2rem">Concentración <span style="color:var(--g6)">editable</span></label>
-          <input type="number" id="${concId}" min="0.001" max="99999" step="0.001"
-            value="${s.conc||100}" placeholder="conc."
-            style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.4rem .5rem;font-family:var(--mono);font-size:.9rem;color:var(--txt);outline:none"
-            oninput="runVdCalc('${drugId}',${idx})">
-        </div>
-        <div>
-          <label style="font-size:.7rem;color:var(--txt3);display:block;margin-bottom:.2rem">Unidad de concentración</label>
-          <select id="${unitId}"
-            style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.4rem .5rem;font-family:var(--sans);font-size:.82rem;color:var(--txt);outline:none"
-            onchange="runVdCalc('${drugId}',${idx})">
-            <option value="ml" ${(!s.unit||s.unit==='ml')?'selected':''}>mg/ml — Solución inyectable</option>
-            <option value="g"  ${s.unit==='g'?'selected':''}>mg/g — Ungüento / polvo</option>
-            <option value="tab"${s.unit==='tab'?'selected':''}>mg/tab — Comprimidos</option>
-            <option value="cap"${s.unit==='cap'?'selected':''}>mg/cáp — Cápsulas</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- RESULTADO -->
-      <div id="${calcId}" style="background:var(--g9);border-radius:var(--rsm);padding:.65rem .85rem;color:white;text-align:center">
-        <div style="font-size:.7rem;color:var(--g2);margin-bottom:.2rem">Resultado</div>
-        <div style="font-size:1.1rem;font-weight:700;color:var(--g3);font-family:var(--mono)">← ingresa el peso</div>
-      </div>
+      <div id="vd-dose-result-${drugId}-${idx}" style="font-size:.82rem;line-height:1.7"></div>
     </div>`;
-
-  // Calcular inmediatamente con valores actuales
-  runVdCalc(drugId, idx);
+  calcVdDose(drugId, idx);
 }
 
-function runVdCalc(drugId, idx) {
-  const calcId = `vdcalc_${drugId}_${idx}`;
-  const el = document.getElementById(calcId);
-  if (!el) return;
-
-  const w    = parseFloat(document.getElementById(`vdw_${drugId}_${idx}`)?.value)    || 0;
-  const dose = parseFloat(document.getElementById(`vddose_${drugId}_${idx}`)?.value)  || 0;
-  const conc = parseFloat(document.getElementById(`vdconc_${drugId}_${idx}`)?.value)  || 0;
-  const unit = document.getElementById(`vdunit_${drugId}_${idx}`)?.value || 'ml';
-
-  if (!w || !dose) {
-    el.innerHTML = `<div style="font-size:.7rem;color:var(--g2);margin-bottom:.2rem">Resultado</div><div style="font-size:1rem;color:var(--g2);font-family:var(--mono)">← ingresa el peso</div>`;
-    return;
-  }
-
-  const totalMg = w * dose;
-
-  // Calcular resultado según unidad
-  let resultLine = '';
-  let unitLabel = '';
-  if (conc > 0) {
-    const qty = totalMg / conc;
-    if (unit === 'ml') {
-      resultLine = qty.toFixed(3) + ' ml';
-      unitLabel  = '(volumen a inyectar/administrar)';
-    } else if (unit === 'g') {
-      resultLine = qty.toFixed(3) + ' g';
-      unitLabel  = '(gramos de producto)';
-    } else if (unit === 'tab') {
-      resultLine = qty.toFixed(2) + ' comprimido' + (qty !== 1 ? 's' : '');
-      unitLabel  = qty < 0.5 ? '⚠ fracción muy pequeña — revisar dosis' : qty > 4 ? '⚠ muchos comprimidos — revisar' : '(tabletas a administrar)';
-    } else if (unit === 'cap') {
-      resultLine = qty.toFixed(2) + ' cápsula' + (qty !== 1 ? 's' : '');
-      unitLabel  = qty < 1 ? '⚠ menos de 1 cápsula — considera otra forma' : '(cápsulas a administrar)';
-    }
-  }
-
-  const unitSymbol = unit === 'ml' ? 'mg/ml' : unit === 'g' ? 'mg/g' : unit === 'tab' ? 'mg/tab' : 'mg/cáp';
-
-  el.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.5rem">
-      <div>
-        <div style="font-size:.68rem;color:var(--g2);margin-bottom:.15rem">Dosis total</div>
-        <div style="font-size:1.3rem;font-weight:700;color:white;font-family:var(--mono)">${totalMg.toFixed(3)} mg</div>
-        <div style="font-size:.7rem;color:var(--g3)">${w} kg × ${dose} mg/kg</div>
-      </div>
-      ${conc > 0 ? `
-      <div style="text-align:right">
-        <div style="font-size:.68rem;color:var(--g2);margin-bottom:.15rem">Cantidad a administrar</div>
-        <div style="font-size:1.3rem;font-weight:700;color:var(--g3);font-family:var(--mono)">${resultLine}</div>
-        <div style="font-size:.7rem;color:var(--g4)">conc. ${conc} ${unitSymbol}</div>
-        ${unitLabel ? `<div style="font-size:.65rem;color:var(--am);margin-top:.1rem">${unitLabel}</div>` : ''}
-      </div>` : `
-      <div style="font-size:.8rem;color:var(--am)">⚠ Ingresa la concentración</div>`}
-    </div>`;
+function calcVdDose(drugId, idx) {
+  const drug = VADEMECUM_DB.find(d=>d.id===drugId);
+  const s = drug?.species_doses?.[idx];
+  if (!s) return;
+  const wt = parseFloat(document.getElementById(`vd-wt-${drugId}-${idx}`)?.value)||10;
+  const conc = drug.conc||100;
+  const fmt = (v,d=2) => isNaN(v)||v===0?'—':(v*wt/conc).toFixed(d)+' ml';
+  const mg = (v) => isNaN(v)||v===0?'—':((v*wt).toFixed(2))+' mg';
+  document.getElementById(`vd-dose-result-${drugId}-${idx}`).innerHTML=`
+    <table style="width:100%;border-collapse:collapse;font-size:.78rem">
+      <tr><td style="color:var(--txt3);padding:.1rem .2rem">Dosis mín:</td><td><strong>${mg(s.dose_min)}</strong> (${fmt(s.dose_min)})</td></tr>
+      <tr><td style="color:var(--txt3);padding:.1rem .2rem">Dosis rec.:</td><td><strong style="color:var(--g6)">${mg(s.dose)}</strong> (${fmt(s.dose)})</td></tr>
+      <tr><td style="color:var(--txt3);padding:.1rem .2rem">Dosis máx:</td><td><strong>${mg(s.dose_max)}</strong> (${fmt(s.dose_max)})</td></tr>
+      <tr><td style="color:var(--txt3);padding:.1rem .2rem">Vía / Frec.:</td><td>${s.route||'—'} ${s.freq?'· '+s.freq:''}</td></tr>
+      ${s.notes?`<tr><td style="color:var(--txt3);padding:.1rem .2rem">Notas:</td><td>${s.notes}</td></tr>`:''}
+    </table>`;
 }
 
-function openAddSpeciesDoseModal(drugId) {
-  const d = VADEMECUM_DB.find(x=>x.id===drugId);
-  if (!d) return;
-  // Quitar modal previo si existe
-  document.getElementById('quick-dose-modal')?.remove();
-  // Construir lista de sugerencias de especies (de SPECIES_DB + las que ya tiene el fármaco)
-  const speciesSuggestions = [
-    ...SPECIES_DB.map(s => s.name + ' (' + s.sci + ')'),
-    ...(d.species_doses||[]).map(s => s.species)
-  ].filter((v,i,a) => a.indexOf(v) === i);
-  const datalistId = 'vd-species-list-' + drugId;
-
-  const modalHtml = `
-    <div style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center" id="quick-dose-modal">
-      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
-        <div style="width:36px;height:4px;background:var(--bor2);border-radius:2px;margin:-.25rem auto .85rem"></div>
-        <div style="font-weight:700;font-size:.95rem;margin-bottom:.2rem">Agregar dosis de especie</div>
-        <div style="font-size:.78rem;color:var(--g6);margin-bottom:.85rem;background:var(--g0);padding:.3rem .6rem;border-radius:var(--rxs);display:inline-block">💊 ${d.drug} — ${d.category}</div>
-
-        <datalist id="${datalistId}">
-          ${speciesSuggestions.map(s=>`<option value="${s}">`).join('')}
-        </datalist>
-
-        <div class="form-group">
-          <label>Nombre de la especie <span style="color:var(--r5)">*</span></label>
-          <input id="qdose-sp" class="form-control" placeholder="Ej: Jaguar (Panthera onca)" list="${datalistId}" autocomplete="off">
-          <div style="font-size:.72rem;color:var(--txt3);margin-top:.2rem">Puedes escribir o elegir de la lista de especies registradas</div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.5rem">
-          <div>
-            <label style="font-size:.72rem;color:var(--txt3);display:block;margin-bottom:.2rem">Dosis mínima (mg/kg)</label>
-            <input id="qdose-dmin" class="form-control" type="number" step="0.001" min="0" placeholder="0.5" style="font-size:.85rem">
-          </div>
-          <div>
-            <label style="font-size:.72rem;color:var(--txt3);display:block;margin-bottom:.2rem">Dosis recomendada</label>
-            <input id="qdose-drec" class="form-control" type="number" step="0.001" min="0" placeholder="1.0" style="font-size:.85rem" oninput="previewVdDose()">
-          </div>
-          <div>
-            <label style="font-size:.72rem;color:var(--txt3);display:block;margin-bottom:.2rem">Dosis máxima (mg/kg)</label>
-            <input id="qdose-dmax" class="form-control" type="number" step="0.001" min="0" placeholder="2.0" style="font-size:.85rem">
-          </div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:.5rem">
-          <div>
-            <label style="font-size:.72rem;color:var(--txt3);display:block;margin-bottom:.2rem">Concentración (mg/ml)</label>
-            <input id="qdose-conc" class="form-control" type="number" step="0.01" min="0" placeholder="100" style="font-size:.85rem" oninput="previewVdDose()">
-          </div>
-          <div>
-            <label style="font-size:.72rem;color:var(--txt3);display:block;margin-bottom:.2rem">Vía de administración</label>
-            <select id="qdose-route" class="form-control" style="font-size:.85rem">
-              <option>IM</option><option>IV</option><option>SC</option><option>VO</option>
-              <option>IM dardo</option><option>IN (intranasal)</option><option>Tópico</option>
-              <option>Inhalatorio</option><option>IT (intratraqueal)</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>Frecuencia / duración del tratamiento</label>
-          <input id="qdose-freq" class="form-control" placeholder="Ej: SID × 7 días, Dosis única, BID × 5 días..." style="font-size:.85rem">
-        </div>
-        <div class="form-group">
-          <label>Notas clínicas</label>
-          <textarea id="qdose-notes" class="form-control" placeholder="Precauciones, combinaciones recomendadas, efectos adversos conocidos..." style="min-height:60px;font-size:.85rem"></textarea>
-        </div>
-
-        <!-- Preview calculadora -->
-        <div id="qdose-preview" style="display:none;background:var(--g0);border-radius:var(--rsm);padding:.5rem .65rem;margin-bottom:.75rem;font-size:.8rem;color:var(--g7)">
-          <strong>Vista previa:</strong> con <span id="qdose-prev-dose">—</span> mg/kg y conc. <span id="qdose-prev-conc">—</span> mg/ml → para 50 kg: <span id="qdose-prev-calc" style="font-family:var(--mono);font-weight:700">—</span>
-        </div>
-
-        <div style="display:flex;gap:.5rem">
-          <button class="btn btn-secondary" style="flex:1;justify-content:center" onclick="document.getElementById('quick-dose-modal').remove()">Cancelar</button>
-          <button class="btn btn-primary" style="flex:2;justify-content:center" onclick="saveQuickDose('${drugId}')">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Guardar dosis
-          </button>
-        </div>
-      </div>
-    </div>`;
-  document.body.insertAdjacentHTML('beforeend', modalHtml);
-  // Focus en especie
-  setTimeout(()=>document.getElementById('qdose-sp')?.focus(), 100);
-}
-
-function previewVdDose() {
-  const dose = parseFloat(document.getElementById('qdose-drec')?.value);
-  const conc = parseFloat(document.getElementById('qdose-conc')?.value);
-  const preview = document.getElementById('qdose-preview');
-  if (!preview) return;
-  if (dose > 0) {
-    preview.style.display = 'block';
-    document.getElementById('qdose-prev-dose').textContent = dose;
-    document.getElementById('qdose-prev-conc').textContent = conc || '?';
-    const total = (50 * dose).toFixed(2);
-    const vol = conc ? (50 * dose / conc).toFixed(2) + ' ml' : '—';
-    document.getElementById('qdose-prev-calc').textContent = total + ' mg → ' + vol;
-  } else {
-    preview.style.display = 'none';
-  }
-}
-
-async function saveQuickDose(drugId) {
-  const sp = document.getElementById('qdose-sp')?.value.trim();
-  if (!sp) { toast('⚠ Ingresa el nombre de la especie'); document.getElementById('qdose-sp')?.focus(); return; }
-  const drec = parseFloat(document.getElementById('qdose-drec')?.value);
-  if (!drec || drec <= 0) { toast('⚠ Ingresa al menos la dosis recomendada'); document.getElementById('qdose-drec')?.focus(); return; }
-  const d = VADEMECUM_DB.find(x=>x.id===drugId);
-  if (!d) return;
-  if (!d.species_doses) d.species_doses = [];
-  d.species_doses.push({
-    species:   sp,
-    dose_min:  parseFloat(document.getElementById('qdose-dmin')?.value)  || 0,
-    dose:      drec,
-    dose_max:  parseFloat(document.getElementById('qdose-dmax')?.value)  || 0,
-    conc:      parseFloat(document.getElementById('qdose-conc')?.value)  || 100,
-    route:     document.getElementById('qdose-route')?.value  || 'IM',
-    freq:      document.getElementById('qdose-freq')?.value   || '',
-    notes:     document.getElementById('qdose-notes')?.value  || ''
-  });
-  await dbPutSync('vademecum', d);
-  document.getElementById('quick-dose-modal')?.remove();
-  renderVademecum();
-  toast('✓ Dosis de ' + sp + ' agregada a ' + d.drug);
-}
-
-async function removeSpeciesDose(drugId, idx) {
-  const d = VADEMECUM_DB.find(x=>x.id===drugId);
-  if (!d||!d.species_doses) return;
-  const sp = d.species_doses[idx];
-  const ok = await confirmDelete('¿Eliminar dosis?', `Se eliminará la dosis de "${sp?.species||''}" para ${d.drug}.`);
-  if (!ok) return;
-  d.species_doses.splice(idx,1);
-  await dbPutSync('vademecum', d);
-  renderVademecum();
-  toast('Dosis eliminada');
-}
-
-function filterVademecum(val) { renderVademecum(val.toLowerCase()); }
-async function deleteDrug(id) {
+async function deleteDrugVad(id) {
   const d = VADEMECUM_DB.find(x=>x.id===id);
-  const ok = await confirmDelete('¿Eliminar fármaco?', `Se eliminará "${d?.drug||''}" del vademécum global, incluyendo todas sus dosis por especie.`, '💊');
+  const ok = await confirmDelete('¿Eliminar fármaco?', `Se eliminará "${d?.drug||''}" del vademécum.`, '💊');
   if (!ok) return;
   await dbDeleteSync('vademecum', id);
   VADEMECUM_DB = VADEMECUM_DB.filter(x=>x.id!==id);
   renderVademecum();
-  toast('Fármaco eliminado del vademécum');
+  toast('Fármaco eliminado');
 }
+
+async function saveQuickDose(drugId) {
+  const drug = VADEMECUM_DB.find(d=>d.id===drugId);
+  if (!drug) return;
+  const sp=document.getElementById('vd-qs-sp-'+drugId)?.value.trim();
+  if (!sp) {toast('⚠ Ingresa la especie');return;}
+  if (!drug.species_doses) drug.species_doses=[];
+  drug.species_doses.push({
+    species:sp, sci:document.getElementById('vd-qs-sci-'+drugId)?.value.trim()||'',
+    dose_min:parseFloat(document.getElementById('vd-qs-dmin-'+drugId)?.value)||0,
+    dose:parseFloat(document.getElementById('vd-qs-drec-'+drugId)?.value)||0,
+    dose_max:parseFloat(document.getElementById('vd-qs-dmax-'+drugId)?.value)||0,
+    route:document.getElementById('vd-qs-route-'+drugId)?.value||'IM',
+    freq:document.getElementById('vd-qs-freq-'+drugId)?.value||'',
+    notes:''
+  });
+  await dbPutSync('vademecum',drug);
+  renderVademecum();
+  toast('✓ Especie agregada');
+}
+
+async function removeSpeciesDose(drugId, idx) {
+  const drug = VADEMECUM_DB.find(d=>d.id===drugId);
+  if (!drug?.species_doses) return;
+  drug.species_doses.splice(idx,1);
+  await dbPutSync('vademecum',drug);
+  renderVademecum();
+}
+
+
 // ═══════════════════════════════════
 function renderRecordsList(filter='') {
   const list = document.getElementById('records-list');
@@ -9220,7 +8903,7 @@ function openAddEnriquecimiento(editIdx=-1) {
           <label>Especies <span style="font-weight:400;color:var(--txt3);font-size:.72rem">(puede aplicar a varias o ninguna)</span></label>
           ${SPECIES_GROUPS.length ? `<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.4rem;align-items:center">
             <span style="font-size:.7rem;color:var(--txt3);font-weight:600">Agregar grupo:</span>
-            ${SPECIES_GROUPS.map((g,gi)=>`<button onclick="addGroupSpeciesToEnriq(${gi})" style="font-size:.7rem;padding:.15rem .5rem;border-radius:20px;border:1px solid var(--bor);background:var(--sur2);cursor:pointer;font-family:var(--sans)">${g.icon||'🐾'} ${g.nombre} (${g.especies?.length||0})</button>`).join('')}
+            ${SPECIES_GROUPS.map((g,gi)=>`<button onclick="addGroupSpeciesToEnriq(${gi})" style="font-size:.7rem;padding:.15rem .5rem;border-radius:20px;border:1px solid var(--bor);background:var(--sur2);cursor:pointer;font-family:var(--sans);display:inline-flex;align-items:center;gap:.25rem">${g.iconImg?`<img src="${g.iconImg}" style="width:14px;height:14px;object-fit:cover;border-radius:2px">`:(g.icon||'🐾')} ${g.nombre} (${g.especies?.length||0})</button>`).join('')}
           </div>` : ''}
           <div id="enriq-sp-list" style="margin-top:.25rem">
             ${(existing?.especies||((existing?.especie)?[{sp:existing.especie,sci:existing.sci||''}]:[])).map((e,i)=>`
@@ -9336,7 +9019,7 @@ function renderGroupsList() {
   el.innerHTML = SPECIES_GROUPS.map((g, gi) => `
     <div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.65rem .75rem;margin-bottom:.5rem;background:var(--sur2)">
       <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
-        <span style="font-size:1rem">${g.icon||'🐾'}</span>
+        ${g.iconImg?`<img src="${g.iconImg}" style="width:20px;height:20px;object-fit:cover;border-radius:4px;vertical-align:middle">`:`<span style="font-size:1rem">${g.icon||'🐾'}</span>`}
         <span style="font-weight:700;font-size:.9rem;flex:1">${g.nombre}</span>
         <button onclick="openEditGroup(${gi})" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);cursor:pointer;font-size:.72rem;padding:.15rem .4rem">✏️ Editar</button>
         <button onclick="confirmDeleteGroup(${gi})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.72rem;padding:.15rem .4rem">✕</button>
@@ -9360,9 +9043,16 @@ function openEditGroup(gi) {
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:580px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.92rem;margin-bottom:.75rem">${existing?'✏️ Editar':'+ Nuevo'} grupo taxonómico</div>
         <div class="form-row">
-          <div class="form-group" style="flex:0 0 60px">
-            <label style="font-size:.72rem">Ícono</label>
-            <input id="grp-icon" class="form-control" value="${existing?.icon||'🐾'}" placeholder="🐾" style="font-size:1.2rem;text-align:center">
+          <div class="form-group" style="flex:0 0 80px">
+            <label style="font-size:.72rem">Ícono / Imagen</label>
+            <div style="display:flex;flex-direction:column;gap:.2rem;align-items:center">
+              <div id="grp-icon-preview" style="width:44px;height:44px;border-radius:8px;border:1px solid var(--bor);display:flex;align-items:center;justify-content:center;font-size:1.4rem;overflow:hidden;background:var(--sur2)">
+                ${existing?.iconImg?`<img src="${existing.iconImg}" style="width:100%;height:100%;object-fit:cover">`:(existing?.icon||'🐾')}
+              </div>
+              <label for="grp-icon-upload" style="font-size:.6rem;color:var(--g6);cursor:pointer;text-align:center">📷 PNG</label>
+              <input type="file" id="grp-icon-upload" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="display:none" onchange="previewGrpIcon(this)">
+            </div>
+            <input id="grp-icon" class="form-control" value="${existing?.icon||''}" placeholder="o emoji" style="font-size:1rem;text-align:center;margin-top:.2rem">
           </div>
           <div class="form-group">
             <label>Nombre del grupo *</label>
@@ -9403,16 +9093,33 @@ function addGrpSpRow() {
     </div>`);
 }
 
+function previewGrpIcon(input) {
+  if (!input.files?.[0]) return;
+  const r = new FileReader();
+  r.onload = e => {
+    const preview = document.getElementById('grp-icon-preview');
+    if (preview) preview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">`;
+    // Store as data URL for saving
+    input._dataUrl = e.target.result;
+    // Clear text emoji since we have image
+    const iconInp = document.getElementById('grp-icon');
+    if (iconInp) iconInp.value = '';
+  };
+  r.readAsDataURL(input.files[0]);
+}
+
 async function saveGroup(gi) {
   const nombre = document.getElementById('grp-nombre')?.value.trim();
   if (!nombre) { toast('⚠ El nombre del grupo es obligatorio'); return; }
-  const icon = document.getElementById('grp-icon')?.value.trim() || '🐾';
+  const icon = document.getElementById('grp-icon')?.value.trim() || '';
+  const iconUpload = document.getElementById('grp-icon-upload');
+  const iconImg = iconUpload?._dataUrl || (gi>=0?SPECIES_GROUPS[gi]?.iconImg:'') || '';
   const rows = document.querySelectorAll('#grp-sp-list .grp-sp-row');
   const especies = Array.from(rows).map(row => ({
     sp:  row.querySelector('.grp-sp-inp')?.value.trim() || '',
     sci: row.querySelector('.grp-sci-inp')?.value.trim() || ''
   })).filter(e => e.sp);
-  const grp = { nombre, icon, especies };
+  const grp = { nombre, icon: icon || (iconImg ? '' : '🐾'), iconImg, especies };
   if (gi >= 0) SPECIES_GROUPS[gi] = grp;
   else SPECIES_GROUPS.push(grp);
   await saveSpeciesGroups();
