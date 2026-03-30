@@ -650,8 +650,8 @@ textarea.form-control{resize:vertical;min-height:70px}
     <div style="display:flex;gap:.25rem;flex-shrink:0">
       <button onclick="exportSpeciesWord(currentSpecies)" title="Word" style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .4rem;cursor:pointer;font-size:.65rem;font-family:var(--sans)">📄</button>
       <button onclick="exportSpeciesPDF(currentSpecies)" title="PDF" style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .4rem;cursor:pointer;font-size:.65rem;font-family:var(--sans)">🖨</button>
-      <label for="multitab-excel-up" title="Importar Excel" style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .4rem;cursor:pointer;font-size:.65rem;font-family:var(--sans);display:inline-flex;align-items:center">📊</label>
-      <input type="file" id="multitab-excel-up" accept=".xlsx,.xls" style="display:none" onchange="importExcelMultiTab(this)">
+      <label for="multitab-excel-up" title="Importar ficha con IA (PDF, Word, Excel)" style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .4rem;cursor:pointer;font-size:.65rem;font-family:var(--sans);display:inline-flex;align-items:center">🤖</label>
+      <input type="file" id="multitab-excel-up" accept=".pdf,.xlsx,.xls,.docx,.txt,.csv" style="display:none" onchange="importExcelMultiTab(this)">
     </div>
   </div>
   <div class="tabs-scroll">
@@ -2720,12 +2720,17 @@ function renderGeneral(el, sp) {
       <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
         Biometría
         ${isAdmin?`<div style="display:flex;gap:.4rem;align-items:center">
-          <label for="biom-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem">📊 Excel</label>
-          <input type="file" id="biom-excel-up" accept=".xlsx,.xls,.csv" style="display:none" onchange="importBiometriaExcel(this)">
           <button onclick="addBiometriaRow()" class="btn btn-admin btn-sm" style="font-size:.68rem">+ Agregar dato</button>
         </div>`:''}
       </div>
-      <div id="biom-excel-status" style="font-size:.72rem;color:var(--g6);min-height:.9rem"></div>
+      <div style="background:var(--g0);border:1.5px dashed var(--g4);border-radius:var(--rsm);padding:.5rem .6rem;margin-bottom:.4rem">
+        <div style="font-size:.68rem;color:var(--g7);font-weight:600;margin-bottom:.3rem">🤖 Importar con IA — PDF, Word o Excel</div>
+        <div style="display:flex;gap:.3rem;align-items:center">
+          <label for="biom-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem;white-space:nowrap">📂 Seleccionar archivo</label>
+          <input type="file" id="biom-excel-up" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importBiometriaExcel(this)">
+          <span id="biom-excel-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
+        </div>
+      </div>
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse">
           <thead>${tblH}</thead>
@@ -2765,12 +2770,12 @@ function renderGeneral(el, sp) {
       <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
         Longevidad y Reproducción
         ${isAdmin?`<div style="display:flex;gap:.4rem;align-items:center">
-          <label for="life-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem">📊 Excel</label>
-          <input type="file" id="life-excel-up" accept=".xlsx,.xls,.csv" style="display:none" onchange="importLongevidadExcel(this)">
+          <label for="life-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem;background:var(--g1);color:var(--g7);border-color:var(--g4)">🤖 IA</label>
+          <input type="file" id="life-excel-up" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importLongevidadExcel(this)">
           <span style="font-size:.68rem;color:var(--g6);font-weight:400">Toca los campos para editar</span>
         </div>`:''}
       </div>
-      <div id="life-excel-status" style="font-size:.72rem;color:var(--g6);min-height:.9rem"></div>
+      <div id="life-excel-status" style="font-size:.72rem;color:var(--g6);min-height:.9rem;margin-top:.2rem"></div>
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse">
           <thead>${tblLifeH}</thead>
@@ -3135,12 +3140,17 @@ function renderFisiologia(el, sp) {
       <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
         Hematología básica
         ${isAdmin?`<div style="display:flex;gap:.4rem;align-items:center">
-          <label for="hemo-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem">📊 Excel</label>
-          <input type="file" id="hemo-excel-up" accept=".xlsx,.xls,.csv" style="display:none" onchange="importHemoExcel(this,'hematology')">
           <button class="btn btn-admin btn-sm" onclick="addHemoRow('hemo-table','hematology')">+ Agregar</button>
         </div>`:''}
       </div>
-      <div id="hemo-excel-status" style="font-size:.72rem;color:var(--g6);min-height:.9rem"></div>
+      <div style="background:var(--g0);border:1.5px dashed var(--g4);border-radius:var(--rsm);padding:.5rem .6rem;margin-bottom:.4rem">
+        <div style="font-size:.68rem;color:var(--g7);font-weight:600;margin-bottom:.3rem">🤖 Importar con IA — PDF, Word o Excel</div>
+        <div style="display:flex;gap:.3rem;align-items:center">
+          <label for="hemo-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem;white-space:nowrap">📂 Seleccionar archivo</label>
+          <input type="file" id="hemo-excel-up" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importHemoExcel(this,'hematology')">
+          <span id="hemo-excel-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
+        </div>
+      </div>
       <table style="width:100%;font-size:.82rem;border-collapse:collapse" id="hemo-table">
         <thead><tr>
           <th style="text-align:left;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Parámetro</th>
@@ -3171,12 +3181,17 @@ function renderFisiologia(el, sp) {
       <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
         Bioquímicas relevantes
         ${isAdmin?`<div style="display:flex;gap:.4rem;align-items:center">
-          <label for="bio-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem">📊 Excel</label>
-          <input type="file" id="bio-excel-up" accept=".xlsx,.xls,.csv" style="display:none" onchange="importHemoExcel(this,'biochem')">
           <button class="btn btn-admin btn-sm" onclick="addHemoRow('bio-table','biochem')">+ Agregar</button>
         </div>`:''}
       </div>
-      <div id="bio-excel-status" style="font-size:.72rem;color:var(--g6);min-height:.9rem"></div>
+      <div style="background:var(--g0);border:1.5px dashed var(--g4);border-radius:var(--rsm);padding:.5rem .6rem;margin-bottom:.4rem">
+        <div style="font-size:.68rem;color:var(--g7);font-weight:600;margin-bottom:.3rem">🤖 Importar con IA — PDF, Word o Excel</div>
+        <div style="display:flex;gap:.3rem;align-items:center">
+          <label for="bio-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem;white-space:nowrap">📂 Seleccionar archivo</label>
+          <input type="file" id="bio-excel-up" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importHemoExcel(this,'biochem')">
+          <span id="bio-excel-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
+        </div>
+      </div>
       <table style="width:100%;font-size:.82rem;border-collapse:collapse" id="bio-table">
         <thead><tr>
           <th style="text-align:left;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Parámetro</th>
@@ -3554,12 +3569,17 @@ function renderNutricion(el, sp) {
       <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
         Fórmula Dentaria
         ${isAdmin?`<div style="display:flex;gap:.4rem;align-items:center">
-          <label for="dent-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem">📊 Excel</label>
-          <input type="file" id="dent-excel-up" accept=".xlsx,.xls,.csv" style="display:none" onchange="importFormulaDentariaExcel(this)">
           <button onclick="addDiente()" class="btn btn-admin btn-sm">+ Diente</button>
         </div>`:''}
       </div>
-      <div id="dent-excel-status" style="font-size:.72rem;color:var(--g6);min-height:.9rem"></div>
+      <div style="background:var(--g0);border:1.5px dashed var(--g4);border-radius:var(--rsm);padding:.5rem .6rem;margin-bottom:.4rem">
+        <div style="font-size:.68rem;color:var(--g7);font-weight:600;margin-bottom:.3rem">🤖 Importar con IA — PDF, Word o Excel</div>
+        <div style="display:flex;gap:.3rem;align-items:center">
+          <label for="dent-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem;white-space:nowrap">📂 Seleccionar archivo</label>
+          <input type="file" id="dent-excel-up" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importFormulaDentariaExcel(this)">
+          <span id="dent-excel-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
+        </div>
+      </div>
       ${denticion.length ? `
       <div style="overflow-x:auto;margin-bottom:.5rem">
         <table style="width:100%;border-collapse:collapse;font-size:.8rem">
@@ -4650,16 +4670,13 @@ function openAddEnfermedad(sistId, editIdx=-1) {
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${editEnf?'✏️ Editar':'+'} enfermedad — ${sName}</div>
 
         <!-- Importar desde Excel con selector IA -->
-        ${editIdx<0?`<div style="background:var(--sur2);border-radius:var(--rsm);padding:.5rem;margin-bottom:.75rem">
-          <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.25rem">📊 Importar desde Excel/CSV</div>
-          <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
-            <button onclick="setModalAI(this,'gemini')" data-provider="gemini" style="font-size:.65rem;padding:.15rem .35rem;border-radius:var(--rxs);border:2px solid var(--g4);background:var(--g1);color:var(--g7);cursor:pointer;font-family:var(--sans);font-weight:600">🔵 Gemini</button>
-            <button onclick="setModalAI(this,'claude')" data-provider="claude" style="font-size:.65rem;padding:.15rem .35rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--sur);color:var(--txt3);cursor:pointer;font-family:var(--sans)">🟠 Claude</button>
-            <input type="password" id="modal-ai-key" class="form-control" style="flex:1;font-size:.72rem;height:1.6rem" placeholder="API Key..." oninput="saveModalAIKey(this.value)">
+        ${editIdx<0?`<div style="background:var(--g0);border:1.5px dashed var(--g4);border-radius:var(--rsm);padding:.5rem .6rem;margin-bottom:.75rem">
+          <div style="font-size:.68rem;color:var(--g7);font-weight:600;margin-bottom:.3rem">🤖 Importar con IA — PDF, Word o Excel</div>
+          <div style="display:flex;gap:.3rem;align-items:center">
+            <label for="enf-file-import" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem;white-space:nowrap">📂 Seleccionar archivo</label>
+            <input type="file" id="enf-file-import" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importEnfermedadesFile(this,'${sistId}')">
+            <span id="enf-import-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
           </div>
-          <label class="btn btn-secondary btn-sm" for="enf-file-import" style="cursor:pointer;font-size:.7rem">📁 Subir archivo</label>
-          <input type="file" id="enf-file-import" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="importEnfermedadesFile(this,'${sistId}')">
-          <span id="enf-import-status" style="font-size:.7rem;color:var(--g6);margin-left:.4rem"></span>
         </div>`:''}
 
         <div class="form-group"><label>Nombre de la enfermedad *</label>
@@ -6579,8 +6596,8 @@ function openAddSpeciesDrug() {
           <div id="modal-ai-status" style="font-size:.65rem;color:var(--txt3);width:100%"></div>
         </div>
       <div style="display:flex;gap:.4rem;margin-top:.3rem">
-        <label class="btn btn-secondary btn-sm" for="drug-file-import" style="cursor:pointer;white-space:nowrap">📁 Subir Excel</label>
-        <input type="file" id="drug-file-import" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="importFarmacosFile(this)">
+        <label class="btn btn-secondary btn-sm" for="drug-file-import" style="cursor:pointer;white-space:nowrap">📂 Seleccionar archivo</label>
+        <input type="file" id="drug-file-import" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importFarmacosFile(this)">
       </div>
       <div id="drug-import-status" style="font-size:.72rem;color:var(--g6);margin-top:.25rem;min-height:1rem"></div>
     </div>
@@ -9548,12 +9565,14 @@ async function removeHistItem(displayIdx, item) {
 }
 function autofillSciInRow(input) {
   const val = input.value.trim().toLowerCase();
+  if (!val) return;
   const history = getSpeciesHistory();
   const match = history.find(h => h.nombre.toLowerCase() === val);
-  if (match) {
-    const row = input.closest('.enriq-sp-row, .vd-sp-row');
+  if (match && match.sci) {
+    // Look in parent row (any row class) for a sci input
+    const row = input.closest('[class*="sp-row"], [class*="sp_row"], .vd-sp-row, div');
     if (row) {
-      const sciEl = row.querySelector('.enriq-sci-inp, .vds-sci, .rec-sci-inp');
+      const sciEl = row.querySelector('.enriq-sci-inp, .vds-sci, .rec-sci-inp, .grp-sci-inp, [placeholder*="científico"], [placeholder*="cientifico"]');
       if (sciEl && !sciEl.value) sciEl.value = match.sci;
     }
   }
