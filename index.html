@@ -466,10 +466,6 @@ textarea.form-control{resize:vertical;min-height:70px}
     <!-- Filtro rápido por clase -->
     <div id="class-filter-pills" style="overflow-x:auto;white-space:nowrap;margin-bottom:.5rem;padding-bottom:.2rem">
       <button class="tab-filter-btn active" onclick="filterByClass('',this)" style="font-size:.72rem">Todas</button>
-      <button class="tab-filter-btn" onclick="filterByClass('Mammalia',this)" style="font-size:.72rem">🦁 Mamíferos</button>
-      <button class="tab-filter-btn" onclick="filterByClass('Aves',this)" style="font-size:.72rem">🦜 Aves</button>
-      <button class="tab-filter-btn" onclick="filterByClass('Reptilia',this)" style="font-size:.72rem">🐊 Reptiles</button>
-      <button class="tab-filter-btn" onclick="filterByClass('Amphibia',this)" style="font-size:.72rem">🐸 Anfibios</button>
     </div>
     <div class="flex-between mb-1"><div class="sec-title" style="margin-bottom:0">Especies</div><div id="admin-add-sp-btn" style="display:none"><button class="btn btn-admin btn-sm" onclick="openAddSpecies()">+ Nueva especie</button></div></div>
     <div style="height:.75rem"></div>
@@ -2250,6 +2246,31 @@ function closeDetail() {
 // SPECIES GRID
 // ═══════════════════════════════════
 
+function buildClassFilters() {
+  const pills = document.getElementById('class-filter-pills');
+  if (!pills) return;
+  // Collect all unique classes from SPECIES_DB
+  const CLASS_ICONS = {
+    'Mammalia':'🦁','Aves':'🦜','Reptilia':'🐊','Amphibia':'🐸',
+    'Actinopterygii':'🐟','Chondrichthyes':'🦈','Insecta':'🐛',
+    'Arachnida':'🕷','Arthropoda':'🦀','Peces':'🐠'
+  };
+  const classes = [...new Set(SPECIES_DB.map(s=>s.clase).filter(Boolean))].sort();
+  // Update datalist
+  let dl = document.getElementById('sp-class-dl');
+  if (!dl) { dl=document.createElement('datalist'); dl.id='sp-class-dl'; document.body.appendChild(dl); }
+  dl.innerHTML = classes.map(c=>`<option value="${c}">`).join('');
+  // Rebuild pills
+  const activeBtn = pills.querySelector('.tab-filter-btn.active');
+  const activeClass = activeBtn?.dataset?.clase || '';
+  pills.innerHTML = `<button class="tab-filter-btn${!activeClass?' active':''}" onclick="filterByClass('',this)" style="font-size:.72rem" data-clase="">Todas</button>`;
+  classes.forEach(c => {
+    const icon = CLASS_ICONS[c] || '🐾';
+    pills.insertAdjacentHTML('beforeend',
+      `<button class="tab-filter-btn${activeClass===c?' active':''}" onclick="filterByClass('${c}',this)" style="font-size:.72rem" data-clase="${c}">${icon} ${c}</button>`);
+  });
+}
+
 function filterByClass(clase, btn) {
   document.querySelectorAll('#class-filter-pills .tab-filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
@@ -2313,6 +2334,7 @@ function renderSpeciesGrid() {
       </div>
     </div>`;
   }).join('');
+  buildClassFilters();
 }
 
 async function setCoverPhoto(spId, input) {
@@ -2730,6 +2752,13 @@ function renderGeneral(el, sp) {
           <input type="file" id="biom-excel-up" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importBiometriaExcel(this)">
           <span id="biom-excel-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
         </div>
+          <div style="margin-top:.3rem">
+            <button onclick="togglePasteBox('biom-excel-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
+            <div id="paste-box-biom-excel-status" style="display:none;margin-top:.25rem">
+              <textarea id="paste-text-biom-excel-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí la información sobre biometría (parámetros por macho y hembra)..."></textarea>
+              <button onclick="processTextInput('biom-excel-status','importBiometriaExcel(null)')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
+            </div>
+          </div>
       </div>
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse">
@@ -2776,6 +2805,13 @@ function renderGeneral(el, sp) {
         </div>`:''}
       </div>
       <div id="life-excel-status" style="font-size:.72rem;color:var(--g6);min-height:.9rem;margin-top:.2rem"></div>
+      <div style="margin-top:.3rem">
+        <button onclick="togglePasteBox('life-excel-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
+        <div id="paste-box-life-excel-status" style="display:none;margin-top:.25rem">
+          <textarea id="paste-text-life-excel-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí datos de longevidad y reproducción (silvestre y bajo cuidado profesional)..."></textarea>
+          <button onclick="processAIText(document.getElementById('paste-text-life-excel-status').value,'life-excel-status','')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
+        </div>
+      </div>
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse">
           <thead>${tblLifeH}</thead>
@@ -2878,52 +2914,7 @@ function renderGeneral(el, sp) {
       </div>
     </div>
 
-    <!-- DIETA SILVESTRE -->
-    <div class="info-card">
-      <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
-        Dieta en Vida Silvestre
-        ${isAdmin?`<div style="display:flex;gap:.4rem">
-          <button onclick="addDietaItem()" class="btn btn-admin btn-sm" style="font-size:.7rem">+ Agregar</button>
-          <button onclick="editTextField('diet_wild','Dieta silvestre (descripción)')" class="btn-inline-edit">✏️</button>
-        </div>`:''}
-      </div>
-      <div id="field-view-diet_wild">
-        <p style="font-size:.875rem;line-height:1.6;color:var(--txt2)">${sp.diet_wild||'<span style="color:var(--txt3);font-style:italic">Sin información.</span>'}</p>
-      </div>
-      <div id="field-edit-diet_wild" style="display:none;margin-top:.4rem">
-        <textarea id="field-input-diet_wild" class="form-control" style="min-height:60px">${sp.diet_wild||''}</textarea>
-        <div style="display:flex;gap:.4rem;margin-top:.4rem">
-          <button class="btn btn-secondary btn-sm" onclick="cancelTextField('diet_wild')">Cancelar</button>
-          <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveTextField('diet_wild')">💾 Guardar</button>
-        </div>
-      </div>
-      <!-- Lista de alimentos -->
-      ${(sp.dieta_silvestre_lista||[]).length ? `
-      <div style="margin-top:.5rem">
-        <div style="font-size:.7rem;color:var(--txt3);font-weight:600;margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.06em">Lista de alimentos</div>
-        <div style="display:flex;flex-wrap:wrap;gap:.3rem">
-          ${(sp.dieta_silvestre_lista||[]).map((item,i)=>`
-          <span style="display:inline-flex;align-items:center;gap:.25rem;background:var(--g0);border:1px solid var(--g3);border-radius:20px;padding:.2rem .6rem;font-size:.78rem;color:var(--g7)">
-            ${item}
-            ${isAdmin?`<button onclick="removeDietaItem(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.7rem;padding:0;margin-left:.1rem;line-height:1">✕</button>`:''}
-          </span>`).join('')}
-        </div>
-      </div>` : ''}
-      ${isAdmin?`
-      <div id="dieta-item-form" style="display:none;margin-top:.5rem">
-        <div style="background:var(--sur2);border-radius:var(--rsm);padding:.5rem;margin-bottom:.4rem">
-          <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.3rem">
-            💡 Puedes pegar una lista completa separada por comas, punto y coma o saltos de línea y se organizará automáticamente.
-          </div>
-          <textarea id="dieta-item-input" class="form-control" style="min-height:80px;font-size:.82rem"
-            placeholder="Venado cola blanca, Pecari de collar, Armadillo, Tapir, Tortuga morrocoy&#10;(o pega aquí una lista larga separada por comas)"></textarea>
-          <div style="display:flex;gap:.3rem;margin-top:.3rem">
-            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('dieta-item-form').style.display='none'">Cancelar</button>
-            <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveDietaItemLista()">+ Agregar a la lista</button>
-          </div>
-        </div>
-      </div>`:''}
-    </div>
+
 
     <!-- GALERÍA -->
     <div class="sec-title" style="margin-top:1rem">Galería de fotos</div>
@@ -3150,6 +3141,13 @@ function renderFisiologia(el, sp) {
           <input type="file" id="hemo-excel-up" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importHemoExcel(this,'hematology')">
           <span id="hemo-excel-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
         </div>
+          <div style="margin-top:.3rem">
+            <button onclick="togglePasteBox('hemo-excel-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
+            <div id="paste-box-hemo-excel-status" style="display:none;margin-top:.25rem">
+              <textarea id="paste-text-hemo-excel-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí la información sobre hematología básica (parámetro, unidad, rango, definición)..."></textarea>
+              <button onclick="processTextInput('hemo-excel-status','importHemoExcel(null,'hematology')')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
+            </div>
+          </div>
       </div>
       <table style="width:100%;font-size:.82rem;border-collapse:collapse" id="hemo-table">
         <thead><tr>
@@ -3191,6 +3189,13 @@ function renderFisiologia(el, sp) {
           <input type="file" id="bio-excel-up" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importHemoExcel(this,'biochem')">
           <span id="bio-excel-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
         </div>
+          <div style="margin-top:.3rem">
+            <button onclick="togglePasteBox('bio-excel-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
+            <div id="paste-box-bio-excel-status" style="display:none;margin-top:.25rem">
+              <textarea id="paste-text-bio-excel-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí la información sobre bioquímica sérica (parámetro, unidad, rango, definición)..."></textarea>
+              <button onclick="processTextInput('bio-excel-status','importHemoExcel(null,'biochem')')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
+            </div>
+          </div>
       </div>
       <table style="width:100%;font-size:.82rem;border-collapse:collapse" id="bio-table">
         <thead><tr>
@@ -3293,6 +3298,53 @@ function renderNutricion(el, sp) {
 
   el.innerHTML = `
     <!-- DIETA EN CAUTIVERIO -->
+    <!-- DIETA SILVESTRE -->
+    <div class="info-card">
+      <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
+        Dieta en Vida Silvestre
+        ${isAdmin?`<div style="display:flex;gap:.4rem">
+          <button onclick="addDietaItem()" class="btn btn-admin btn-sm" style="font-size:.7rem">+ Agregar</button>
+          <button onclick="editTextField('diet_wild','Dieta silvestre (descripción)')" class="btn-inline-edit">✏️</button>
+        </div>`:''}
+      </div>
+      <div id="field-view-diet_wild">
+        <p style="font-size:.875rem;line-height:1.6;color:var(--txt2)">${sp.diet_wild||'<span style="color:var(--txt3);font-style:italic">Sin información.</span>'}</p>
+      </div>
+      <div id="field-edit-diet_wild" style="display:none;margin-top:.4rem">
+        <textarea id="field-input-diet_wild" class="form-control" style="min-height:60px">${sp.diet_wild||''}</textarea>
+        <div style="display:flex;gap:.4rem;margin-top:.4rem">
+          <button class="btn btn-secondary btn-sm" onclick="cancelTextField('diet_wild')">Cancelar</button>
+          <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveTextField('diet_wild')">💾 Guardar</button>
+        </div>
+      </div>
+      <!-- Lista de alimentos -->
+      ${(sp.dieta_silvestre_lista||[]).length ? `
+      <div style="margin-top:.5rem">
+        <div style="font-size:.7rem;color:var(--txt3);font-weight:600;margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.06em">Lista de alimentos</div>
+        <div style="display:flex;flex-wrap:wrap;gap:.3rem">
+          ${(sp.dieta_silvestre_lista||[]).map((item,i)=>`
+          <span style="display:inline-flex;align-items:center;gap:.25rem;background:var(--g0);border:1px solid var(--g3);border-radius:20px;padding:.2rem .6rem;font-size:.78rem;color:var(--g7)">
+            ${item}
+            ${isAdmin?`<button onclick="removeDietaItem(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.7rem;padding:0;margin-left:.1rem;line-height:1">✕</button>`:''}
+          </span>`).join('')}
+        </div>
+      </div>` : ''}
+      ${isAdmin?`
+      <div id="dieta-item-form" style="display:none;margin-top:.5rem">
+        <div style="background:var(--sur2);border-radius:var(--rsm);padding:.5rem;margin-bottom:.4rem">
+          <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.3rem">
+            💡 Puedes pegar una lista completa separada por comas, punto y coma o saltos de línea y se organizará automáticamente.
+          </div>
+          <textarea id="dieta-item-input" class="form-control" style="min-height:80px;font-size:.82rem"
+            placeholder="Venado cola blanca, Pecari de collar, Armadillo, Tapir, Tortuga morrocoy&#10;(o pega aquí una lista larga separada por comas)"></textarea>
+          <div style="display:flex;gap:.3rem;margin-top:.3rem">
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('dieta-item-form').style.display='none'">Cancelar</button>
+            <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveDietaItemLista()">+ Agregar a la lista</button>
+          </div>
+        </div>
+      </div>`:''}
+    </div>
+
     <div class="info-card">
       <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
         Dieta en Cautiverio
@@ -3420,7 +3472,7 @@ function renderNutricion(el, sp) {
               <select id="sup-unitB-${i}"
                 style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .2rem;font-size:.75rem;color:var(--txt);outline:none"
                 onchange="updateSupConcUnits(${i});calcSupI(${i})">
-                ${['mg','UI','g','mcg','mmol','mEq'].map(u=>`<option ${(s.unitB||s.unit?.split('/')[0]||'mg')===u?'selected':''}>${u}</option>`).join('')}
+                ${['mg','UI','g','mcg','mmol','mEq','%','kcal','mL','L','otra'].map(u=>`<option ${(s.unitB||s.unit?.split('/')[0]||'mg')===u?'selected':''}>${u}</option>`).join('')}
               </select>
             </div>
             <div>
@@ -3457,6 +3509,10 @@ function renderNutricion(el, sp) {
                 <option value="cáp" ${(s.unitC)==='cáp'?'selected':''}>cáp</option>
                 <option value="g" ${(s.unitC)==='g'?'selected':''}>g</option>
                 <option value="mg" ${(s.unitC)==='mg'?'selected':''}>mg</option>
+                <option value="UI" ${(s.unitC)==='UI'?'selected':''}>UI</option>
+                <option value="mcg" ${(s.unitC)==='mcg'?'selected':''}>mcg</option>
+                <option value="%" ${(s.unitC)==='%'?'selected':''}>%</option>
+                <option value="kcal" ${(s.unitC)==='kcal'?'selected':''}>kcal</option>
               </select>
             </div>
             <div style="text-align:right">
@@ -3579,6 +3635,13 @@ function renderNutricion(el, sp) {
           <input type="file" id="dent-excel-up" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importFormulaDentariaExcel(this)">
           <span id="dent-excel-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
         </div>
+          <div style="margin-top:.3rem">
+            <button onclick="togglePasteBox('dent-excel-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
+            <div id="paste-box-dent-excel-status" style="display:none;margin-top:.25rem">
+              <textarea id="paste-text-dent-excel-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí la información sobre fórmula dentaria (tipo, superior, inferior, función)..."></textarea>
+              <button onclick="processTextInput('dent-excel-status','importFormulaDentariaExcel(null)')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
+            </div>
+          </div>
       </div>
       ${denticion.length ? `
       <div style="overflow-x:auto;margin-bottom:.5rem">
@@ -4078,6 +4141,128 @@ async function removeDentalMeasure(i) {
   renderTab('nutricion');
   toast('Medida eliminada');
 }
+// ── Funciones de texto libre para extracción con IA ──
+function togglePasteBox(statusId) {
+  const box = document.getElementById('paste-box-'+statusId);
+  if (box) box.style.display = box.style.display==='none'?'block':'none';
+}
+
+async function processTextInput(statusId, fnName) {
+  const textarea = document.getElementById('paste-text-'+statusId);
+  const text = textarea?.value?.trim();
+  if (!text) { toast('⚠ Pega texto en el cuadro primero'); return; }
+  const statusEl = document.getElementById(statusId);
+  if (statusEl) { statusEl.textContent = '🤖 Procesando texto con IA...'; statusEl.style.color='var(--g6)'; }
+  // Create a fake file-like object with the text
+  const fakeFile = new Blob([text], {type:'text/plain'});
+  fakeFile.name = 'texto_pegado.txt';
+  fakeFile.text = () => Promise.resolve(text);
+  // Create fake input
+  const fakeInput = { files: [fakeFile] };
+  try {
+    // Call the appropriate import function with the text directly
+    await processAIText(text, statusId, fnName);
+    if (textarea) textarea.value='';
+    const box = document.getElementById('paste-box-'+statusId);
+    if (box) box.style.display='none';
+  } catch(e) {
+    if (statusEl) { statusEl.textContent='⚠ '+e.message; statusEl.style.color='var(--r5)'; }
+  }
+}
+
+async function processAIText(text, statusId, fnName) {
+  const apiKey = _AI_PROXY_URL ? 'proxy' : (getModalAIKey() || getActiveAIKey().key || '');
+  const statusEl = document.getElementById(statusId);
+  // Route to correct import function based on statusId
+  const routes = {
+    'hemo-excel-status': async () => {
+      const prompt = `Extrae todos los parámetros de hematología. Devuelve SOLO un array JSON: [["Parámetro","Rango normal","Unidades","Definición"]]
+
+Texto:
+${text.substring(0,12000)}`;
+      const clean = await callAI(apiKey,[{role:'user',content:prompt}],2000);
+      const items = parseAIJson(clean);
+      if (!Array.isArray(items)) throw new Error('Formato inesperado');
+      if (!currentSpecies.hematology) currentSpecies.hematology=[];
+      currentSpecies.hematology.push(...items);
+      await dbPutSync('species',currentSpecies); renderTab('fisiologia');
+      if(statusEl){statusEl.textContent=`✅ ${items.length} parámetros importados`;statusEl.style.color='var(--g5)';}
+    },
+    'bio-excel-status': async () => {
+      const prompt = `Extrae todos los parámetros de bioquímica sérica. Devuelve SOLO un array JSON: [["Parámetro","Rango normal","Unidades","Definición"]]
+
+Texto:
+${text.substring(0,12000)}`;
+      const clean = await callAI(apiKey,[{role:'user',content:prompt}],2000);
+      const items = parseAIJson(clean);
+      if (!currentSpecies.biochem) currentSpecies.biochem=[];
+      currentSpecies.biochem.push(...items);
+      await dbPutSync('species',currentSpecies); renderTab('fisiologia');
+      if(statusEl){statusEl.textContent=`✅ ${items.length} parámetros importados`;statusEl.style.color='var(--g5)';}
+    },
+    'biom-excel-status': async () => {
+      const prompt = `Extrae datos biométricos con valores por sexo. Devuelve SOLO un array JSON: [{"label":"parámetro","m":"valor macho","f":"valor hembra"}]
+
+Texto:
+${text.substring(0,8000)}`;
+      const clean = await callAI(apiKey,[{role:'user',content:prompt}],2000);
+      const items = parseAIJson(clean);
+      if (!currentSpecies.biometria) currentSpecies.biometria={};
+      if (!currentSpecies.biometria._extra) currentSpecies.biometria._extra=[];
+      currentSpecies.biometria._extra.push(...items);
+      await dbPutSync('species',currentSpecies); renderTab('general');
+      if(statusEl){statusEl.textContent=`✅ ${items.length} datos importados`;statusEl.style.color='var(--g5)';}
+    },
+    'dent-excel-status': async () => {
+      const prompt = `Extrae la fórmula dentaria. Devuelve SOLO un array JSON: [{"tipo":"tipo de diente","sup":"cantidad superior","inf":"cantidad inferior","funcion":"función"}]
+
+Texto:
+${text.substring(0,8000)}`;
+      const clean = await callAI(apiKey,[{role:'user',content:prompt}],2000);
+      const items = parseAIJson(clean);
+      if (!currentSpecies.denticion) currentSpecies.denticion=[];
+      currentSpecies.denticion.push(...items);
+      await dbPutSync('species',currentSpecies); renderTab('nutricion');
+      if(statusEl){statusEl.textContent=`✅ ${items.length} dientes importados`;statusEl.style.color='var(--g5)';}
+    },
+    'drug-import-status': async () => {
+      const prompt = `Extrae fármacos/medicamentos. Devuelve SOLO un array JSON: [{"name":"","cat":"","conc":0,"dose_min":0,"dose":0,"dose_max":0,"route":"IM","freq":"","effects":"","notes":""}]
+
+Texto:
+${text.substring(0,12000)}`;
+      const clean = await callAI(apiKey,[{role:'user',content:prompt}],3000);
+      const drugs = parseAIJson(clean);
+      if (!currentSpecies.drugs) currentSpecies.drugs=[];
+      currentSpecies.drugs.push(...drugs);
+      await dbPutSync('species',currentSpecies);
+      for(const d of drugs) await syncDrugToVademecum(d,currentSpecies.name,currentSpecies.sci);
+      VADEMECUM_DB = await dbGetAll('vademecum');
+      renderTab('medicamentos');
+      if(statusEl){statusEl.textContent=`✅ ${drugs.length} fármacos importados`;statusEl.style.color='var(--g5)';}
+    },
+    'vd-import-status': async () => {
+      const prompt = `Extrae fármacos del vademécum veterinario. Devuelve SOLO array JSON: [{"drug":"","active":"","category":"","conc":0,"route":"IM","indic":"","contraindications":"","info":"","notes":"","species_doses":[{"species":"","dose_min":0,"dose":0,"dose_max":0,"route":"IM","freq":"","notes":""}]}]
+
+Texto:
+${text.substring(0,14000)}`;
+      const clean = await callAI(apiKey,[{role:'user',content:prompt}],4000);
+      const extracted = parseAIJson(clean);
+      let saved=0;
+      for(const d of extracted){
+        if(!d.drug&&!d.active)continue;
+        const cats=d.cats||(d.category?[d.category]:[]);
+        const nd={id:'vad_'+Date.now()+'_'+Math.random().toString(36).slice(2,5),drug:d.drug||d.active||'Sin nombre',nombres:[d.drug||d.active||''],active:d.active||'',cats,category:cats[0]||'Otro',cat_esp:d.cat_esp||'',conc:parseFloat(d.conc)||0,route:d.route||'IM',indic:d.indic||'',contraindications:d.contraindications||'',info:d.info||'',notes:d.notes||'',species_doses:(d.species_doses||[])};
+        VADEMECUM_DB.push(nd); await dbPutSync('vademecum',nd); saved++;
+      }
+      renderVademecum();
+      if(statusEl){statusEl.textContent=`✅ ${saved} fármacos importados`;statusEl.style.color='var(--g5)';}
+    },
+  };
+  const handler = routes[statusId];
+  if (handler) { await handler(); }
+  else { toast('⚠ Función no implementada para esta sección'); }
+}
+
 // ── Helper centralizado para llamadas a IA (Claude o Gemini) ──
 // ── URL del proxy (se configura en Ajustes → URL Proxy IA) ──
 let _AI_PROXY_URL = localStorage.getItem('wv_proxy_url') || 'https://wildvet-proxy.cardadiar.workers.dev';
@@ -4676,6 +4861,14 @@ function openAddEnfermedad(sistId, editIdx=-1) {
             <label for="enf-file-import" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem;white-space:nowrap">📂 Seleccionar archivo</label>
             <input type="file" id="enf-file-import" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importEnfermedadesFile(this,'${sistId}')">
             <span id="enf-import-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
+
+          <div style="margin-top:.3rem">
+            <button onclick="togglePasteBox('enf-import-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
+            <div id="paste-box-enf-import-status" style="display:none;margin-top:.25rem">
+              <textarea id="paste-text-enf-import-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí la información sobre enfermedades (agente, vías, signos, diagnóstico, tratamiento)..."></textarea>
+              <button onclick="processTextInput('enf-import-status','importEnfermedadesFile(null,currentSistId)')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
+            </div>
+          </div>
           </div>
         </div>`:''}
 
@@ -6173,6 +6366,13 @@ function buildSpeciesForm(sp) {
       </label>
       <input type="file" id="sp-file-import" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.csv" style="display:none" onchange="importSpeciesFile(this)">
       <div id="import-status" style="margin-top:.6rem;font-size:.8rem;color:var(--g6);min-height:1.2rem"></div>
+      <div style="margin-top:.3rem">
+        <button onclick="togglePasteBox('import-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
+        <div id="paste-box-import-status" style="display:none;margin-top:.25rem">
+          <textarea id="paste-text-import-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí toda la información de la especie (generalidades, biometría, fisiología, etc.)..."></textarea>
+          <button onclick="processAIText(document.getElementById('paste-text-import-status').value,'import-status','')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
+        </div>
+      </div>
     </div>
 
     <div style="font-size:.75rem;color:var(--g6);background:var(--g0);border-radius:var(--rsm);padding:.4rem .65rem;margin-bottom:.75rem">
@@ -6214,17 +6414,9 @@ function buildSpeciesForm(sp) {
     </div>
     <div class="form-row">
       <div class="form-group"><label>Clase</label>
-        <select id="sp-class" class="form-control">
-          <option value="">— Seleccionar —</option>
-          <option value="Mammalia">Mammalia (Mamíferos)</option>
-          <option value="Aves">Aves</option>
-          <option value="Reptilia">Reptilia (Reptiles)</option>
-          <option value="Amphibia">Amphibia (Anfibios)</option>
-          <option value="Actinopterygii">Actinopterygii (Peces óseos)</option>
-          <option value="Chondrichthyes">Chondrichthyes (Tiburones/Rayas)</option>
-          <option value="Insecta">Insecta</option>
-          <option value="Otra">Otra</option>
-        </select>
+        <input id="sp-class" class="form-control" list="sp-class-dl" value="${v('clase')}" placeholder="Ej: Mammalia, Arthropoda..." autocomplete="off">
+        <datalist id="sp-class-dl"></datalist>
+        <div style="font-size:.65rem;color:var(--txt3);margin-top:.15rem">Si no existe la clase, escríbela y se agregará automáticamente al filtro</div>
       </div>
       <div class="form-group"><label>Orden</label><input id="sp-order" class="form-control" value="${v('order')}" placeholder="Perissodactyla"></div>
       <div class="form-group"><label>Familia</label><input id="sp-family" class="form-control" value="${v('family')}" placeholder="Tapiridae"></div>
@@ -6600,6 +6792,13 @@ function openAddSpeciesDrug() {
         <input type="file" id="drug-file-import" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importFarmacosFile(this)">
       </div>
       <div id="drug-import-status" style="font-size:.72rem;color:var(--g6);margin-top:.25rem;min-height:1rem"></div>
+      <div style="margin-top:.3rem">
+        <button onclick="togglePasteBox('drug-import-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
+        <div id="paste-box-drug-import-status" style="display:none;margin-top:.25rem">
+          <textarea id="paste-text-drug-import-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí información de fármacos (nombre, dosis, vía, indicaciones, efectos adversos)..."></textarea>
+          <button onclick="processAIText(document.getElementById('paste-text-drug-import-status').value,'drug-import-status','')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
+        </div>
+      </div>
     </div>
 
     <div class="form-row">
@@ -6984,6 +7183,13 @@ function openAddDrug(editId=null) {
           <input type="file" id="vd-file-import" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importVademecumFile(this)">
           <span id="vd-import-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
         </div>
+          <div style="margin-top:.3rem">
+            <button onclick="togglePasteBox('vd-import-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
+            <div id="paste-box-vd-import-status" style="display:none;margin-top:.25rem">
+              <textarea id="paste-text-vd-import-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí la información sobre fármacos del vademécum (nombre, categoría, dosis por especie)..."></textarea>
+              <button onclick="processTextInput('vd-import-status','importVademecumFile(null)')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
+            </div>
+          </div>
       </div>
 
       <!-- Nombres comerciales -->
