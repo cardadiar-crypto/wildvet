@@ -4977,7 +4977,7 @@ function openAddEnfermedad(sistId, editIdx=-1) {
             <label style="display:inline-flex;align-items:center;gap:.2rem;cursor:pointer;font-size:.75rem;padding:.15rem .4rem;border-radius:20px;border:1px solid var(--bor);background:${(editEnf?.sistemas_afectados||[sistId]).includes(sist.id)?'var(--g1)':'var(--sur)'}">
               <input type="checkbox" value="${sist.id}" class="enf-sistema-chk"
                 ${(editEnf?.sistemas_afectados||[sistId]).includes(sist.id)?'checked':''} style="accent-color:var(--g5)">
-              ${sist.icon} ${sist.label}
+              ${sist.iconImg?`<img src="${sist.iconImg}" style="width:18px;height:18px;object-fit:cover;border-radius:3px;vertical-align:middle;margin-right:.25rem">`:sist.icon} ${sist.label}
             </label>`).join('')}
           </div>
         </div>
@@ -10375,7 +10375,14 @@ async function saveCalcCustom() {
   }
 }
 function getAllCalcFormulas() {
-  return { ...CALC_FORMULAS, ...CALC_CUSTOM };
+  const merged = { ...CALC_FORMULAS, ...CALC_CUSTOM };
+  const order = _calcCustomOrder;
+  if (!order?.length) return merged;
+  const sorted = {};
+  order.forEach(k => { if (merged[k]) sorted[k] = merged[k]; });
+  // Agregar las que no están en el orden (nuevas)
+  Object.keys(merged).forEach(k => { if (!sorted[k]) sorted[k] = merged[k]; });
+  return sorted;
 }
 
 // ── Dietas guardadas ──
@@ -10400,6 +10407,35 @@ async function saveDietasGuardadas() {
 
 
 
+// ── Drag & drop para reordenar calculadoras ──
+let _calcDragId = null;
+let _calcCustomOrder = JSON.parse(localStorage.getItem('wv_calc_order')||'null');
+
+function onCalcDragStart(event, id) {
+  _calcDragId = id;
+  event.dataTransfer.effectAllowed = 'move';
+}
+
+function onCalcDrop(event, targetId) {
+  event.preventDefault();
+  if (!_calcDragId || _calcDragId === targetId) { _calcDragId = null; return; }
+  // Obtener todas las claves en orden actual
+  const all = getAllCalcFormulas();
+  const keys = Object.keys(all);
+  const fromIdx = keys.indexOf(_calcDragId);
+  const toIdx   = keys.indexOf(targetId);
+  if (fromIdx < 0 || toIdx < 0) { _calcDragId = null; return; }
+  // Reorganizar
+  keys.splice(fromIdx, 1);
+  keys.splice(toIdx, 0, _calcDragId);
+  _calcDragId = null;
+  // Guardar nuevo orden en localStorage
+  localStorage.setItem('wv_calc_order', JSON.stringify(keys));
+  _calcCustomOrder = keys;
+  renderNutricionCalcScreen();
+  toast('✓ Calculadoras reorganizadas');
+}
+
 function renderNutricionCalcScreen() {
   const grid = document.getElementById('calc-grid');
   loadDietasGuardadas().then(renderDietasGuardadas); // refrescar
@@ -10411,17 +10447,35 @@ function renderNutricionCalcScreen() {
   grid.innerHTML = `
     <div style="grid-column:1/-1;font-size:.7rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">🦁 Adultos (${adultos.length})</div>
     ${adultos.map(([id,f])=>`
-    <div class="calc-option" id="calc-opt-${id}" onclick="openCalcFormula('${id}',event)">
-      <div style="font-size:1.2rem;margin-bottom:.2rem">${f.icon||'🧮'}</div>
+    <div class="calc-option" id="calc-opt-${id}"
+      draggable="${isAdmin}"
+      ondragstart="onCalcDragStart(event,'${id}')"
+      ondragover="event.preventDefault()"
+      ondrop="onCalcDrop(event,'${id}')"
+      onclick="openCalcFormula('${id}',event)"
+      style="position:relative">
+      <div style="margin-bottom:.2rem">
+        ${f.iconImg ? `<img src="${f.iconImg}" style="width:32px;height:32px;object-fit:cover;border-radius:6px">` : `<span style="font-size:1.3rem">${f.icon||'🧮'}</span>`}
+      </div>
       <div style="font-size:.72rem;font-weight:600;line-height:1.3">${f.label}</div>
-      ${isAdmin?`<button onclick="event.stopPropagation();editCalcFormula('${id}')" style="background:none;border:none;color:var(--txt3);font-size:.65rem;cursor:pointer;margin-top:.2rem;padding:0">✏️</button>`:''}
+      ${isAdmin?`<button onclick="event.stopPropagation();editCalcFormula('${id}')"
+        style="background:none;border:none;color:var(--txt3);font-size:.65rem;cursor:pointer;margin-top:.2rem;padding:0">✏️</button>`:''}
     </div>`).join('')}
     <div style="grid-column:1/-1;font-size:.7rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin:.5rem 0 .2rem">🐣 Crías (${crias.length})</div>
     ${crias.map(([id,f])=>`
-    <div class="calc-option" id="calc-opt-${id}" onclick="openCalcFormula('${id}',event)">
-      <div style="font-size:1.2rem;margin-bottom:.2rem">${f.icon||'🧮'}</div>
+    <div class="calc-option" id="calc-opt-${id}"
+      draggable="${isAdmin}"
+      ondragstart="onCalcDragStart(event,'${id}')"
+      ondragover="event.preventDefault()"
+      ondrop="onCalcDrop(event,'${id}')"
+      onclick="openCalcFormula('${id}',event)"
+      style="position:relative">
+      <div style="margin-bottom:.2rem">
+        ${f.iconImg ? `<img src="${f.iconImg}" style="width:32px;height:32px;object-fit:cover;border-radius:6px">` : `<span style="font-size:1.3rem">${f.icon||'🧮'}</span>`}
+      </div>
       <div style="font-size:.72rem;font-weight:600;line-height:1.3">${f.label}</div>
-      ${isAdmin?`<button onclick="event.stopPropagation();editCalcFormula('${id}')" style="background:none;border:none;color:var(--txt3);font-size:.65rem;cursor:pointer;margin-top:.2rem;padding:0">✏️</button>`:''}
+      ${isAdmin?`<button onclick="event.stopPropagation();editCalcFormula('${id}')"
+        style="background:none;border:none;color:var(--txt3);font-size:.65rem;cursor:pointer;margin-top:.2rem;padding:0">✏️</button>`:''}
     </div>`).join('')}
     ${isAdmin?`<div class="calc-option" style="border-style:dashed;color:var(--txt3)" onclick="openNewCalcModal()">
       <div style="font-size:1.5rem">＋</div>
@@ -10678,55 +10732,183 @@ function openGuardarDietaModal(fid) {
   const pct    = parseFloat(document.getElementById('calc-pct')?.value)||formula.pct_default;
   const mult   = parseFloat(document.getElementById('calc-mult')?.value)||1;
   const notas  = document.getElementById('calc-notas')?.value||'';
-  // Recoger nombre de especie + número de dieta
+
   document.getElementById('guardar-dieta-modal')?.remove();
-  const spNames = SPECIES_DB.map(sp=>`<option value="${sp.name}" data-sci="${sp.sci}">${sp.name} (${sp.sci})</option>`).join('');
+
+  // Historial de especies de enriquecimientos (igual que en enriq)
+  const spHistory = getSpeciesHistory();
+  const spOpts = spHistory.map(h =>
+    `<option value="${h.nombre}" data-sci="${h.sci}">${h.nombre}${h.sci ? ' — '+h.sci : ''}</option>`
+  ).join('');
+
+  // También opciones de SPECIES_DB por si no están en el historial
+  const spDbOpts = SPECIES_DB.map(sp =>
+    `<option value="${sp.name}" data-sci="${sp.sci}">${sp.name} (${sp.sci})</option>`
+  ).join('');
+
+  // Grupos de SPECIES_GROUPS
+  const grupoOpts = SPECIES_GROUPS.length
+    ? SPECIES_GROUPS.map((g,gi) =>
+        `<option value="__grp_${gi}">${g.iconImg?'▪':g.icon||'🐾'} Grupo: ${g.nombre} (${g.especies?.length||0} especies)</option>`
+      ).join('')
+    : '';
+
   document.body.insertAdjacentHTML('beforeend', `
-    <div id="guardar-dieta-modal" style="position:fixed;inset:0;z-index:800;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center">
-      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:520px;max-height:85vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
-        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">💾 Guardar dieta — ${formula.icon} ${formula.label}</div>
+    <div id="guardar-dieta-modal" style="position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.25rem">💾 Guardar dieta</div>
+        <div style="font-size:.78rem;color:var(--g6);margin-bottom:.75rem">${formula.icon||'🧮'} ${formula.label}</div>
+
+        <!-- Selector: especie individual o grupo -->
         <div class="form-group">
-          <label>Nombre común de la especie</label>
-          <input id="gd-especie" class="form-control" list="gd-sp-list" placeholder="Jaguar, Danta..." oninput="autofillGdSci(this)">
-          <datalist id="gd-sp-list">${spNames}</datalist>
+          <label>¿Para especie individual o grupo?</label>
+          <div style="display:flex;gap:.5rem;margin-top:.25rem">
+            <button id="gd-mode-ind" onclick="setGdMode('ind')"
+              style="flex:1;padding:.4rem;border-radius:var(--rsm);border:2px solid var(--g5);background:var(--g1);color:var(--g7);cursor:pointer;font-size:.8rem;font-weight:600">
+              🐾 Especie individual
+            </button>
+            <button id="gd-mode-grp" onclick="setGdMode('grp')"
+              style="flex:1;padding:.4rem;border-radius:var(--rsm);border:2px solid var(--bor);background:var(--sur2);color:var(--txt3);cursor:pointer;font-size:.8rem">
+              🗂 Grupo de especies
+            </button>
+          </div>
         </div>
-        <div class="form-group">
-          <label>Nombre científico</label>
-          <input id="gd-sci" class="form-control" placeholder="Panthera onca...">
+
+        <!-- Modo: especie individual -->
+        <div id="gd-ind-section">
+          <div class="form-group">
+            <label>Nombre común <span style="font-size:.7rem;color:var(--txt3)">(del historial de enriquecimientos o fichas)</span></label>
+            <input id="gd-especie" class="form-control" list="gd-sp-hist-list"
+              placeholder="Jaguar, Tapir, Danta..." oninput="autofillGdSci(this)">
+            <datalist id="gd-sp-hist-list">${spOpts}${spDbOpts}</datalist>
+          </div>
+          <div class="form-group">
+            <label>Nombre científico</label>
+            <input id="gd-sci" class="form-control" placeholder="Panthera onca...">
+          </div>
         </div>
+
+        <!-- Modo: grupo -->
+        <div id="gd-grp-section" style="display:none">
+          ${grupoOpts ? `
+          <div class="form-group">
+            <label>Seleccionar grupo</label>
+            <select id="gd-grupo-sel" class="form-control" onchange="previewGdGrupo(this)">
+              <option value="">— Seleccionar grupo —</option>
+              ${grupoOpts}
+            </select>
+          </div>
+          <div id="gd-grp-preview" style="font-size:.78rem;color:var(--txt3);margin-bottom:.5rem"></div>` :
+          `<div style="background:var(--sur2);border-radius:var(--rsm);padding:.6rem;font-size:.8rem;color:var(--txt3)">
+            Sin grupos creados. Ve a <strong>Enriquecimiento → Grupos</strong> para crear uno.
+          </div>`}
+        </div>
+
+        <!-- Número de dieta y nombre -->
         <div class="form-row">
           <div class="form-group">
-            <label>Número de dieta <span style="font-size:.7rem;color:var(--txt3)">(si hay más de una para la especie)</span></label>
-            <input id="gd-num" class="form-control" type="number" min="1" value="1" style="width:80px">
+            <label>N° de dieta <span style="font-size:.7rem;color:var(--txt3)">(si hay varias para la especie)</span></label>
+            <input id="gd-num" class="form-control" type="number" min="1" value="1" style="width:70px">
           </div>
           <div class="form-group">
             <label>Nombre personalizado <span style="font-size:.7rem;color:var(--txt3)">(opcional)</span></label>
-            <input id="gd-nombre" class="form-control" placeholder="Dieta mantenimiento...">
+            <input id="gd-nombre" class="form-control" placeholder="Dieta mantenimiento, Dieta gestación...">
           </div>
         </div>
+
+        <!-- Preview de pestañas por especie de grupo (se llena dinámicamente) -->
+        <div id="gd-tabs-container" style="display:none;margin-bottom:.75rem">
+          <div style="font-size:.78rem;font-weight:600;color:var(--g6);margin-bottom:.4rem">
+            📋 Una pestaña por especie del grupo — edita si es necesario y guarda una por una:
+          </div>
+          <div id="gd-tabs-list"></div>
+        </div>
+
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
-          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('guardar-dieta-modal').remove()">Cancelar</button>
-          <button class="btn btn-primary" style="flex:2" onclick="confirmarGuardarDieta('${fid}',${pesoKg},${pct},${mult},'${notas.replace(/'/g,"\\'")}')">✓ Guardar</button>
+          <button class="btn btn-secondary" style="flex:1"
+            onclick="document.getElementById('guardar-dieta-modal').remove()">Cancelar</button>
+          <button id="gd-save-btn" class="btn btn-primary" style="flex:2"
+            onclick="confirmarGuardarDieta('${fid}',${pesoKg},${pct},${mult},'${notas.replace(/'/g,"\\'").replace(/\n/g,' ')}')">
+            ✓ Guardar dieta
+          </button>
         </div>
       </div>
     </div>`);
 }
 
+function setGdMode(mode) {
+  const isGrp = mode === 'grp';
+  document.getElementById('gd-ind-section').style.display = isGrp ? 'none' : 'block';
+  document.getElementById('gd-grp-section').style.display = isGrp ? 'block' : 'none';
+  document.getElementById('gd-tabs-container').style.display = 'none';
+  document.getElementById('gd-save-btn').textContent = isGrp ? '✓ Guardar para grupo' : '✓ Guardar dieta';
+  // Estilos botones
+  document.getElementById('gd-mode-ind').style.cssText =
+    'flex:1;padding:.4rem;border-radius:var(--rsm);cursor:pointer;font-size:.8rem;font-weight:'+(isGrp?'400':'600')+
+    ';border:2px solid '+(isGrp?'var(--bor)':'var(--g5)')+
+    ';background:'+(isGrp?'var(--sur2)':'var(--g1)')+
+    ';color:'+(isGrp?'var(--txt3)':'var(--g7)');
+  document.getElementById('gd-mode-grp').style.cssText =
+    'flex:1;padding:.4rem;border-radius:var(--rsm);cursor:pointer;font-size:.8rem;font-weight:'+(isGrp?'600':'400')+
+    ';border:2px solid '+(isGrp?'var(--g5)':'var(--bor)')+
+    ';background:'+(isGrp?'var(--g1)':'var(--sur2)')+
+    ';color:'+(isGrp?'var(--g7)':'var(--txt3)');
+}
+
+function previewGdGrupo(sel) {
+  const val = sel.value;
+  if (!val || !val.startsWith('__grp_')) {
+    document.getElementById('gd-tabs-container').style.display = 'none';
+    return;
+  }
+  const gi = parseInt(val.replace('__grp_',''));
+  const grp = SPECIES_GROUPS[gi];
+  if (!grp) return;
+  const especies = grp.especies || [];
+  document.getElementById('gd-grp-preview').textContent =
+    especies.length ? `${especies.length} especie(s): ${especies.map(e=>e.sp).join(', ')}` : 'Sin especies en este grupo';
+  if (!especies.length) { document.getElementById('gd-tabs-container').style.display = 'none'; return; }
+
+  // Generar pestañas editables para cada especie del grupo
+  const tabsList = document.getElementById('gd-tabs-list');
+  tabsList.innerHTML = especies.map((e, idx) => `
+    <div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.55rem .65rem;margin-bottom:.4rem;background:var(--sur2)" id="gd-tab-${idx}">
+      <div style="font-size:.75rem;font-weight:600;color:var(--g6);margin-bottom:.3rem">
+        Especie ${idx+1} de ${especies.length}
+      </div>
+      <div class="form-row" style="margin-bottom:.25rem">
+        <div class="form-group" style="margin-bottom:0">
+          <label style="font-size:.7rem;color:var(--txt3)">Nombre común</label>
+          <input class="form-control gd-tab-sp" value="${e.sp||''}" style="font-size:.82rem">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label style="font-size:.7rem;color:var(--txt3)">Nombre científico</label>
+          <input class="form-control gd-tab-sci" value="${e.sci||''}" style="font-size:.82rem">
+        </div>
+      </div>
+    </div>`).join('');
+  document.getElementById('gd-tabs-container').style.display = 'block';
+}
+
 function autofillGdSci(input) {
-  const sp = SPECIES_DB.find(s=>s.name.toLowerCase()===input.value.trim().toLowerCase());
-  if (sp) document.getElementById('gd-sci').value = sp.sci;
+  const val = input.value.trim().toLowerCase();
+  // Buscar en SPECIES_DB primero
+  const sp = SPECIES_DB.find(s => s.name.toLowerCase() === val);
+  if (sp) { document.getElementById('gd-sci').value = sp.sci; return; }
+  // Luego en historial de enriquecimientos
+  const hist = getSpeciesHistory();
+  const match = hist.find(h => h.nombre.toLowerCase() === val);
+  if (match) document.getElementById('gd-sci').value = match.sci;
 }
 
 async function confirmarGuardarDieta(fid, pesoKg, pct, mult, notas) {
-  const especie = document.getElementById('gd-especie')?.value.trim();
-  const sci     = document.getElementById('gd-sci')?.value.trim();
-  const num     = parseInt(document.getElementById('gd-num')?.value)||1;
-  const nombre  = document.getElementById('gd-nombre')?.value.trim();
   const all     = getAllCalcFormulas();
   const formula = all[fid];
-  if (!especie) { toast('⚠ Ingresa el nombre de la especie'); return; }
+  if (!formula) return;
+  const num    = parseInt(document.getElementById('gd-num')?.value)||1;
+  const nombre = document.getElementById('gd-nombre')?.value.trim();
 
-  // Recoger estado actual de componentes e ingredientes
+  // Recoger estado actual de componentes
   const compState = {};
   function collectComps(comps) {
     comps.forEach(c => {
@@ -10739,51 +10921,73 @@ async function confirmarGuardarDieta(fid, pesoKg, pct, mult, notas) {
   }
   collectComps(formula.componentes);
 
-  const dieta = {
-    id: 'dieta_' + Date.now(),
-    fid, num, nombre,
-    label: `${formula.label} — ${especie}${num>1?' #'+num:''}${nombre?' ('+nombre+')':''}`,
-    especie, sci, pesoKg, pct, mult,
-    notas,
-    componentes: compState,
-    ingredientes: JSON.parse(JSON.stringify(_ingredientes)),
-    fecha: new Date().toISOString()
-  };
+  // Determinar si es modo grupo o individual
+  const grpSel  = document.getElementById('gd-grupo-sel');
+  const grpTabs = document.querySelectorAll('#gd-tabs-list > div');
+  const isGrpMode = grpSel && grpSel.value.startsWith('__grp_') && grpTabs.length > 0;
 
-  DIETAS_GUARDADAS.push(dieta);
-  await saveDietasGuardadas();
-
-  // Si la especie tiene ficha técnica, guardar también en sp.nutricion
-  const sp = SPECIES_DB.find(s =>
-    s.name.toLowerCase()===especie.toLowerCase() ||
-    (sci && s.sci?.toLowerCase()===sci.toLowerCase())
-  );
-  if (sp) {
-    if (!sp.nutricion) sp.nutricion = {};
-    if (!sp.dietas_calc) sp.dietas_calc = [];
-    sp.dietas_calc.push(dieta);
-    // Guardar en dieta bajo cuidado profesional si es la dieta #1
-    if (num === 1 && !nombre) {
-      // Resumir como texto para el campo n.captive
-      const resumen = Object.entries(compState).map(([id,v])=>`${id}: ${v.val}`).join(', ');
-      sp.nutricion.captive = `[Dieta calculada ${new Date().toLocaleDateString('es-CO')}] ${resumen}`;
-    }
-    await dbPutSync('species', sp);
-    toast(`✓ Dieta guardada y vinculada a la ficha de ${sp.name}`);
+  let especiesList = [];
+  if (isGrpMode) {
+    grpTabs.forEach(tab => {
+      const sp  = tab.querySelector('.gd-tab-sp')?.value.trim();
+      const sci = tab.querySelector('.gd-tab-sci')?.value.trim();
+      if (sp) especiesList.push({ especie: sp, sci: sci||'' });
+    });
+    if (!especiesList.length) { toast('⚠ El grupo no tiene especies'); return; }
   } else {
-    toast(`✓ Dieta guardada — quedará en calculadoras hasta crear la ficha de "${especie}"`);
+    const especie = document.getElementById('gd-especie')?.value.trim();
+    const sci     = document.getElementById('gd-sci')?.value.trim();
+    if (!especie) { toast('⚠ Ingresa el nombre de la especie'); return; }
+    especiesList = [{ especie, sci }];
   }
 
+  // Guardar una dieta por especie
+  let guardadas = 0;
+  for (const item of especiesList) {
+    const dieta = {
+      id: 'dieta_' + Date.now() + '_' + Math.random().toString(36).slice(2,5),
+      fid, num, nombre,
+      label: formula.label + ' — ' + item.especie + (num>1?' #'+num:'') + (nombre?' ('+nombre+')':''),
+      especie: item.especie,
+      sci: item.sci,
+      pesoKg, pct, mult,
+      notas,
+      componentes: compState,
+      ingredientes: JSON.parse(JSON.stringify(_ingredientes)),
+      fecha: new Date().toISOString()
+    };
+    DIETAS_GUARDADAS.push(dieta);
+    guardadas++;
+    // Vincular a ficha de especie si existe
+    const sp = SPECIES_DB.find(s =>
+      s.name.toLowerCase() === item.especie.toLowerCase() ||
+      (item.sci && s.sci?.toLowerCase() === item.sci.toLowerCase())
+    );
+    if (sp) {
+      if (!sp.nutricion) sp.nutricion = {};
+      if (!sp.dietas_calc) sp.dietas_calc = [];
+      sp.dietas_calc.push(dieta);
+      if (num === 1 && !nombre) {
+        const resumen = Object.entries(compState).map(([id,v])=>id+': '+v.val).join(', ');
+        sp.nutricion.captive = '[Dieta calculada ' + new Date().toLocaleDateString('es-CO') + '] ' + resumen;
+      }
+      await dbPutSync('species', sp);
+    }
+  }
+
+  await saveDietasGuardadas();
   document.getElementById('guardar-dieta-modal')?.remove();
   renderDietasGuardadas();
-  // Si la especie está abierta, actualizar su pestaña nutrición
-  if (currentSpecies && (
-    currentSpecies.name?.toLowerCase() === especie.toLowerCase() ||
-    (sci && currentSpecies.sci?.toLowerCase() === sci.toLowerCase())
-  )) {
-    renderTab('nutricion');
-  }
+
+  // Si alguna especie está abierta, actualizar pestaña nutrición
+  if (currentSpecies && especiesList.some(item =>
+    currentSpecies.name?.toLowerCase() === item.especie.toLowerCase() ||
+    (item.sci && currentSpecies.sci?.toLowerCase() === item.sci.toLowerCase())
+  )) renderTab('nutricion');
+
+  toast('✓ ' + guardadas + ' dieta(s) guardada(s)' + (guardadas>1?' para '+guardadas+' especies':' para '+especiesList[0].especie));
 }
+
 
 function toggleDietasSection() {
   const sec = document.getElementById('dietas-guardadas-section');
@@ -10841,6 +11045,24 @@ async function eliminarDietaGuardada(id) {
 }
 
 // ── Modal nueva calculadora personalizada ──
+function previewNcIconPng(input) {
+  if (!input.files?.[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const dataUrl = e.target.result;
+    const prev = document.getElementById('nc-icon-png-preview');
+    if (prev) {
+      prev.style.display = 'block';
+      prev.innerHTML = '<img src="'+dataUrl+'" style="width:100%;height:100%;object-fit:cover">';
+    }
+    input._dataUrl = dataUrl;
+    // Limpiar emoji si subieron PNG
+    const iconEl = document.getElementById('nc-icon');
+    if (iconEl) iconEl.value = '';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
 function openNewCalcModal(editId=null) {
   const all = getAllCalcFormulas();
   const existing = editId ? all[editId] : null;
@@ -10851,7 +11073,17 @@ function openNewCalcModal(editId=null) {
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${editId?'Editar':'Nueva'} calculadora</div>
         <div class="form-row">
           <div class="form-group"><label>Nombre *</label><input id="nc-label" class="form-control" value="${existing?.label||''}" placeholder="Ej: Marsupial omnívoro"></div>
-          <div class="form-group"><label>Emoji / Icono</label><input id="nc-icon" class="form-control" value="${existing?.icon||''}" placeholder="🦘 o URL PNG" style="width:80px"></div>
+          <div class="form-group"><label>Emoji / Icono PNG</label>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <input id="nc-icon" class="form-control" value="${existing?.icon||''}" placeholder="🦘" style="width:55px;text-align:center;font-size:1.2rem">
+            <label class="btn btn-secondary btn-sm" for="nc-icon-png" style="cursor:pointer;white-space:nowrap">📷 PNG</label>
+            <input type="file" id="nc-icon-png" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none"
+              onchange="previewNcIconPng(this)">
+            <div id="nc-icon-png-preview" style="width:36px;height:36px;border-radius:6px;overflow:hidden;display:${existing?.iconImg?'block':'none'}">
+              ${existing?.iconImg ? '<img src="'+existing.iconImg+'" style="width:100%;height:100%;object-fit:cover">' : ''}
+            </div>
+          </div>
+        </div>
         </div>
         <div class="form-row">
           <div class="form-group"><label>Tipo</label>
@@ -10911,11 +11143,14 @@ async function saveCustomCalc(editId) {
     const pct = parseFloat(row.querySelector('.nc-comp-pct')?.value)||0;
     if (lbl) comps.push({ id:'c'+i, label:lbl, pct });
   });
+  const ncPngInput = document.getElementById('nc-icon-png');
+  const ncIconImg = ncPngInput?._dataUrl || (CALC_CUSTOM[id]?.iconImg) || '';
   CALC_CUSTOM[id] = {
     label,
-    icon:  document.getElementById('nc-icon')?.value.trim()||'🧮',
-    tipo:  document.getElementById('nc-tipo')?.value||'adulto',
-    unidad:document.getElementById('nc-unidad')?.value||'g',
+    icon:    ncIconImg ? '' : (document.getElementById('nc-icon')?.value.trim()||'🧮'),
+    iconImg: ncIconImg,
+    tipo:    document.getElementById('nc-tipo')?.value||'adulto',
+    unidad:  document.getElementById('nc-unidad')?.value||'g',
     pct_min:    parseFloat(document.getElementById('nc-pmin')?.value)||3,
     pct_default:parseFloat(document.getElementById('nc-pdef')?.value)||5,
     pct_max:    parseFloat(document.getElementById('nc-pmax')?.value)||10,
@@ -11472,19 +11707,73 @@ function buscarPorSignos() {
 function editCategoria(sistId) {
   const sist = [...SISTEMAS_ENFERMEDAD, ...(currentSpecies?.enfermedades_categorias||[])].find(s=>s.id===sistId);
   if (!sist) return;
-  const nombre = prompt('Nombre de la categoría:', sist.label);
-  if (!nombre) return;
-  const icono = prompt('Emoji/Icono:', sist.icon);
+  // Modal de edición con opción de PNG
+  document.getElementById('edit-cat-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="edit-cat-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:1rem">
+      <div style="background:var(--sur);border-radius:var(--r);padding:1.25rem;width:100%;max-width:360px;box-shadow:var(--shl)">
+        <div style="font-weight:700;font-size:.9rem;margin-bottom:.75rem">✏️ Editar categoría</div>
+        <div class="form-group">
+          <label>Nombre</label>
+          <input id="edit-cat-nombre" class="form-control" value="${sist.label}">
+        </div>
+        <div class="form-group">
+          <label>Emoji / Icono PNG</label>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <input id="edit-cat-icon" class="form-control" value="${sist.icon||''}" placeholder="🦷" style="width:55px;text-align:center;font-size:1.2rem">
+            <label class="btn btn-secondary btn-sm" for="edit-cat-png-input" style="cursor:pointer">📷 PNG</label>
+            <input type="file" id="edit-cat-png-input" accept="image/*" style="display:none"
+              onchange="previewEditCatPng(this,'${sistId}')">
+            ${sist.iconImg ? '<img src="'+sist.iconImg+'" id="edit-cat-png-preview" style="width:32px;height:32px;object-fit:cover;border-radius:4px">' :
+              '<div id="edit-cat-png-preview" style="display:none"></div>'}
+          </div>
+        </div>
+        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('edit-cat-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveEditCategoria('${sistId}')">💾 Guardar</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+function previewEditCatPng(input, sistId) {
+  if (!input.files?.[0]) return;
+  const r = new FileReader();
+  r.onload = e => {
+    input._dataUrl = e.target.result;
+    const prev = document.getElementById('edit-cat-png-preview');
+    if (prev) {
+      prev.src = e.target.result;
+      prev.style.display = 'block';
+      prev.style.width = '32px'; prev.style.height = '32px';
+      prev.style.objectFit = 'cover'; prev.style.borderRadius = '4px';
+      if (prev.tagName !== 'IMG') {
+        prev.insertAdjacentHTML('afterend', '<img id="edit-cat-png-preview" src="'+e.target.result+'" style="width:32px;height:32px;object-fit:cover;border-radius:4px">');
+        prev.remove();
+      }
+    }
+    document.getElementById('edit-cat-icon').value = '';
+  };
+  r.readAsDataURL(input.files[0]);
+}
+
+async function saveEditCategoria(sistId) {
+  const nombre = document.getElementById('edit-cat-nombre')?.value.trim();
+  if (!nombre) { toast('⚠ Ingresa el nombre'); return; }
+  const icono   = document.getElementById('edit-cat-icon')?.value.trim();
+  const pngInp  = document.getElementById('edit-cat-png-input');
+  const iconImg = pngInp?._dataUrl || '';
+  const data = { label: nombre, icon: iconImg?'':icono, iconImg };
+
   if (SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)) {
-    // Guardar override en species
     if (!currentSpecies._cat_overrides) currentSpecies._cat_overrides = {};
-    currentSpecies._cat_overrides[sistId] = { label: nombre, icon: icono||sist.icon };
+    currentSpecies._cat_overrides[sistId] = data;
   } else {
-    // Categoría custom
-    const idx = currentSpecies.enfermedades_categorias.findIndex(s=>s.id===sistId);
-    if (idx>=0) { currentSpecies.enfermedades_categorias[idx].label = nombre; currentSpecies.enfermedades_categorias[idx].icon = icono||sist.icon; }
+    const idx = currentSpecies.enfermedades_categorias?.findIndex(s=>s.id===sistId);
+    if (idx>=0) Object.assign(currentSpecies.enfermedades_categorias[idx], data);
   }
-  dbPutSync('species', currentSpecies);
+  await dbPutSync('species', currentSpecies);
+  document.getElementById('edit-cat-modal')?.remove();
   renderTab('enfermedades');
   toast('✓ Categoría actualizada');
 }
