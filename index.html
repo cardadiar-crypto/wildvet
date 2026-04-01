@@ -541,6 +541,11 @@ textarea.form-control{resize:vertical;min-height:70px}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.4rem" id="calc-grid"></div>
       </div>
       <div id="nutr-calc-active"></div>
+    <!-- Dietas guardadas -->
+    <div style="margin-top:1rem">
+      <div style="font-size:.78rem;font-weight:700;color:var(--txt2);border-bottom:1px solid var(--bor);padding-bottom:.3rem;margin-bottom:.5rem">📂 Dietas formuladas guardadas</div>
+      <div id="dietas-guardadas-list"></div>
+    </div>
     </div>
   </div>
 
@@ -9977,179 +9982,690 @@ const CALC_FORMULAS = {
       {id:'suero',     label:'Suero oral', pct:45}
     ]
   },
-  'cria_reptil': {
-    label:'Cría reptil', icon:'🐍', tipo:'cria',
-    pct_default:7, pct_min:6, pct_max:8,
-    esRacion: true,
+  'cria_ave_carnivora_neonato': {
+    label:'Cría ave carnívora — Neonato', icon:'🦅', tipo:'cria', unidad:'ml',
+    pct_default:5, pct_min:5, pct_max:5, esRacion:true,
     componentes:[
-      {id:'proteina',  label:'Proteína', pct:98},
+      {id:'papilla_prot', label:'Papilla proteica', pct:48},
+      {id:'minerales',    label:'Minerales',         pct:2},
+      {id:'suero',        label:'Suero oral',         pct:50}
+    ]
+  },
+  'cria_ave_carnivora_2da': {
+    label:'Cría ave carnívora — 2ª etapa', icon:'🦅', tipo:'cria',
+    pct_default:5, pct_min:5, pct_max:5, esRacion:true,
+    componentes:[
+      {id:'papilla_prot', label:'Papilla proteica', pct:98},
+      {id:'minerales',    label:'Minerales (sobre papilla)', pct:2}
+    ]
+  },
+  'cria_ave_insectivora_neonato': {
+    label:'Cría ave insectívora — Neonato', icon:'🐛', tipo:'cria', unidad:'ml',
+    pct_default:5, pct_min:5, pct_max:5, esRacion:true,
+    componentes:[
+      {id:'papilla_prot', label:'Papilla proteica', pct:48},
+      {id:'minerales',    label:'Minerales',         pct:2},
+      {id:'suero',        label:'Suero oral',         pct:50}
+    ]
+  },
+  'cria_ave_insectivora_2da': {
+    label:'Cría ave insectívora — 2ª etapa', icon:'🐛', tipo:'cria',
+    pct_default:5, pct_min:5, pct_max:5, esRacion:true,
+    componentes:[
+      {id:'papilla_prot', label:'Papilla proteica', pct:98},
+      {id:'minerales',    label:'Minerales',         pct:2}
+    ]
+  },
+  'cria_ave_piscivora_neonato': {
+    label:'Cría ave piscívora — Neonato', icon:'🐟', tipo:'cria', unidad:'ml',
+    pct_default:5, pct_min:5, pct_max:5, esRacion:true,
+    componentes:[
+      {id:'papilla_prot', label:'Papilla proteica', pct:48},
+      {id:'minerales',    label:'Minerales',         pct:2},
+      {id:'suero',        label:'Suero oral',         pct:50}
+    ]
+  },
+  'cria_ave_piscivora_2da': {
+    label:'Cría ave piscívora — 2ª etapa', icon:'🐟', tipo:'cria',
+    pct_default:5, pct_min:5, pct_max:5, esRacion:true,
+    componentes:[
+      {id:'papilla_prot', label:'Papilla proteica', pct:98},
+      {id:'minerales',    label:'Minerales',         pct:2}
+    ]
+  },
+  'cria_ave_granivora_neonato': {
+    label:'Cría ave granívora — Neonato', icon:'🌾', tipo:'cria', unidad:'ml',
+    pct_default:7, pct_min:5, pct_max:10, esRacion:true,
+    componentes:[
+      {id:'papilla', label:'Papilla', pct:48, sub:[
+        {id:'cereales', label:'Cereales para bebé', pct:30},
+        {id:'alpiste',  label:'Alpiste',            pct:50},
+        {id:'frutas_d', label:'Frutas dulces',      pct:20}
+      ]},
+      {id:'minerales', label:'Minerales', pct:2},
+      {id:'suero',     label:'Suero oral', pct:50}
+    ]
+  },
+  'cria_ave_granivora_2da': {
+    label:'Cría ave granívora — 2ª etapa', icon:'🌾', tipo:'cria',
+    pct_default:7, pct_min:5, pct_max:10, esRacion:true,
+    componentes:[
+      {id:'papilla', label:'Papilla', pct:98, sub:[
+        {id:'cereales', label:'Cereales para bebé', pct:50},
+        {id:'frutas_d', label:'Frutas dulces',      pct:50}
+      ]},
       {id:'minerales', label:'Minerales', pct:2}
     ]
+  },
+  'cria_mam_omnivoro_infante': {
+    label:'Cría mamífero omnívoro — Infante', icon:'🐒', tipo:'cria',
+    pct_default:12, pct_min:10, pct_max:15, esRacion:true,
+    componentes:[
+      {id:'papilla', label:'Papilla', pct:98, sub:[
+        {id:'frutas_verd', label:'Frutas y verduras (50-70%)', pct:60},
+        {id:'proteina',    label:'Proteína (30-50%)',           pct:40}
+      ]},
+      {id:'minerales', label:'Minerales', pct:2}
+    ]
+  },
+  'cria_mam_herbivoro_neonato': {
+    label:'Cría mamífero herbívoro — Neonato', icon:'🍼', tipo:'cria', unidad:'ml',
+    pct_default:12, pct_min:10, pct_max:15, esRacion:true,
+    componentes:[
+      {id:'lactea',    label:'Parte láctea (25-50-75%)', pct:37.5},
+      {id:'minerales', label:'Minerales',                 pct:2},
+      {id:'suero',     label:'Suero oral',                pct:36}
+    ]
+  },
+  'cria_mam_herbivoro_infante': {
+    label:'Cría mamífero herbívoro — Infante', icon:'🦌', tipo:'cria',
+    pct_default:12, pct_min:10, pct_max:15, esRacion:true,
+    componentes:[
+      {id:'papilla', label:'Papilla', pct:98, sub:[
+        {id:'frutas_verd', label:'Frutas y verduras', pct:55},
+        {id:'concentrado', label:'Concentrado',        pct:5},
+        {id:'cereales',    label:'Cereales',            pct:38}
+      ]},
+      {id:'minerales', label:'Minerales', pct:2}
+    ]
+  },
+  'cria_mam_carnivoro_infante': {
+    label:'Cría mamífero carnívoro/insectívoro — Infante', icon:'🐱', tipo:'cria', unidad:'ml',
+    pct_default:7, pct_min:5, pct_max:10, esRacion:true,
+    componentes:[
+      {id:'papilla_prot', label:'Papilla proteica', pct:40},
+      {id:'minerales',    label:'Minerales',         pct:5},
+      {id:'suero',        label:'Suero oral',         pct:55}
+    ]
   }
-};
+}; // ← FIN DE CALC_FORMULAS
+
+let _ingredientes = {};
+// ── Formularios de calculadoras personalizadas (guardadas en IndexedDB) ──
+let CALC_CUSTOM = {}; // { id: { label, icon, tipo, pct_default, pct_min, pct_max, componentes, esRacion, unidad } }
+
+async function loadCalcCustom() {
+  const saved = await dbGet('settings', 'calc_custom');
+  CALC_CUSTOM = saved?.value || {};
+  if (firestore && fbUid()) {
+    try {
+      const snap = await firestore.collection('settings').doc('calc_custom').get();
+      if (snap.exists) CALC_CUSTOM = snap.data().value || {};
+    } catch(e) {}
+  }
+}
+async function saveCalcCustom() {
+  await dbPut('settings', { key:'calc_custom', value: CALC_CUSTOM });
+  if (firestore && fbUid()) {
+    try { await firestore.collection('settings').doc('calc_custom').set({ value: CALC_CUSTOM }); } catch(e) {}
+  }
+}
+function getAllCalcFormulas() {
+  return { ...CALC_FORMULAS, ...CALC_CUSTOM };
+}
+
+// ── Dietas guardadas ──
+let DIETAS_GUARDADAS = []; // [{ id, fid, label, especie, sci, pesoKg, pct, mult, raciones, componentes, ingredientes, notas, fecha }]
+
+async function loadDietasGuardadas() {
+  const saved = await dbGet('settings', 'dietas_guardadas');
+  DIETAS_GUARDADAS = saved?.value || [];
+  if (firestore && fbUid()) {
+    try {
+      const snap = await firestore.collection('settings').doc('dietas_guardadas').get();
+      if (snap.exists) DIETAS_GUARDADAS = snap.data().value || [];
+    } catch(e) {}
+  }
+}
+async function saveDietasGuardadas() {
+  await dbPut('settings', { key:'dietas_guardadas', value: DIETAS_GUARDADAS });
+  if (firestore && fbUid()) {
+    try { await firestore.collection('settings').doc('dietas_guardadas').set({ value: DIETAS_GUARDADAS }); } catch(e) {}
+  }
+}
+
+
 
 function renderNutricionCalcScreen() {
   const grid = document.getElementById('calc-grid');
   if (!grid) return;
-  // Separar adultos y crías
-  const adultos = Object.entries(CALC_FORMULAS).filter(([,f])=>f.tipo==='adulto');
-  const crias   = Object.entries(CALC_FORMULAS).filter(([,f])=>f.tipo==='cria');
+  const all = getAllCalcFormulas();
+  const adultos = Object.entries(all).filter(([,f])=>f.tipo==='adulto');
+  const crias   = Object.entries(all).filter(([,f])=>f.tipo==='cria');
+  const isAdmin = currentUser?.role==='admin';
   grid.innerHTML = `
-    <div style="grid-column:1/-1;font-size:.7rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">Adultos</div>
+    <div style="grid-column:1/-1;font-size:.7rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">🦁 Adultos (${adultos.length})</div>
     ${adultos.map(([id,f])=>`
-    <div class="calc-option" onclick="openCalcFormula('${id}')">
-      <div style="font-size:1.2rem;margin-bottom:.2rem">${f.icon}</div>
-      <div style="font-size:.75rem;font-weight:600;line-height:1.3">${f.label}</div>
+    <div class="calc-option" id="calc-opt-${id}" onclick="openCalcFormula('${id}',event)">
+      <div style="font-size:1.2rem;margin-bottom:.2rem">${f.icon||'🧮'}</div>
+      <div style="font-size:.72rem;font-weight:600;line-height:1.3">${f.label}</div>
+      ${isAdmin?`<button onclick="event.stopPropagation();editCalcFormula('${id}')" style="background:none;border:none;color:var(--txt3);font-size:.65rem;cursor:pointer;margin-top:.2rem;padding:0">✏️</button>`:''}
     </div>`).join('')}
-    <div style="grid-column:1/-1;font-size:.7rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin:.5rem 0 .2rem">Crías</div>
+    <div style="grid-column:1/-1;font-size:.7rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin:.5rem 0 .2rem">🐣 Crías (${crias.length})</div>
     ${crias.map(([id,f])=>`
-    <div class="calc-option" onclick="openCalcFormula('${id}')">
-      <div style="font-size:1.2rem;margin-bottom:.2rem">${f.icon}</div>
-      <div style="font-size:.75rem;font-weight:600;line-height:1.3">${f.label}</div>
-    </div>`).join('')}`;
+    <div class="calc-option" id="calc-opt-${id}" onclick="openCalcFormula('${id}',event)">
+      <div style="font-size:1.2rem;margin-bottom:.2rem">${f.icon||'🧮'}</div>
+      <div style="font-size:.72rem;font-weight:600;line-height:1.3">${f.label}</div>
+      ${isAdmin?`<button onclick="event.stopPropagation();editCalcFormula('${id}')" style="background:none;border:none;color:var(--txt3);font-size:.65rem;cursor:pointer;margin-top:.2rem;padding:0">✏️</button>`:''}
+    </div>`).join('')}
+    ${isAdmin?`<div class="calc-option" style="border-style:dashed;color:var(--txt3)" onclick="openNewCalcModal()">
+      <div style="font-size:1.5rem">＋</div>
+      <div style="font-size:.72rem">Nueva calculadora</div>
+    </div>`:''}`;
+  renderDietasGuardadas();
 }
 
-function openCalcFormula(fid) {
-  const formula = CALC_FORMULAS[fid];
+function openCalcFormula(fid, ev) {
+  const all = getAllCalcFormulas();
+  const formula = all[fid];
   if (!formula) return;
+  document.querySelectorAll('.calc-option').forEach(el=>el.classList.remove('selected'));
+  document.getElementById('calc-opt-'+fid)?.classList.add('selected');
   const container = document.getElementById('nutr-calc-active');
   if (!container) return;
+
+  // Construir filas de componentes (con subcomponentes si los hay)
+  function buildCompRows(comps, parentPct=null) {
+    return comps.map(comp => {
+      const rowId = `calc-row-${comp.id}`;
+      const pctInput = `<input type="number" id="calc-pct-${comp.id}" value="${comp.pct}" min="0" max="200" step="0.5"
+        style="width:52px;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.82rem;font-weight:700;color:var(--g6);text-align:center"
+        oninput="runCalc('${fid}')">%`;
+      const subRows = comp.sub?.length ? `
+        <tr><td colspan="5" style="padding:0 0 0 1.5rem">
+          <table style="width:100%;border-collapse:collapse">
+            ${buildCompRows(comp.sub)}
+          </table>
+        </td></tr>` : '';
+      return `<tr id="${rowId}" style="border-bottom:1px solid var(--bor)">
+        <td style="padding:.3rem .4rem;text-align:center">${pctInput}</td>
+        <td style="padding:.3rem .5rem;font-weight:600;font-size:.82rem">${comp.label}</td>
+        <td id="calc-val-${comp.id}" style="padding:.3rem .4rem;font-family:var(--mono);font-weight:700;color:var(--g5);text-align:center">—</td>
+        <td id="calc-val-rac-${comp.id}" style="padding:.3rem .4rem;font-family:var(--mono);font-size:.78rem;color:var(--g6);text-align:center">—</td>
+        <td style="padding:.2rem .3rem">
+          <div id="ing-list-${comp.id}"></div>
+          <button onclick="addIngrediente('${comp.id}','${fid}')" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.7rem;padding:.1rem 0;white-space:nowrap">+ ingrediente</button>
+        </td>
+      </tr>${subRows}`;
+    }).join('');
+  }
+
   container.innerHTML = `
     <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:1rem;margin-top:.5rem">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
         <div>
-          <span style="font-size:1.4rem">${formula.icon}</span>
+          <span style="font-size:1.3rem">${formula.icon||'🧮'}</span>
           <span style="font-size:.95rem;font-weight:700;margin-left:.35rem">${formula.label}</span>
-          <span style="font-size:.7rem;color:var(--txt3);margin-left:.35rem">${formula.tipo==='cria'?'· Cría (por ración)':'· Adulto (por día)'}</span>
+          <span style="font-size:.7rem;color:var(--txt3);margin-left:.35rem">${formula.esRacion?'· Cría (por ración)':'· Adulto (por día)'}</span>
         </div>
-        <button onclick="document.getElementById('nutr-calc-active').innerHTML=''" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:1rem">✕</button>
+        <button onclick="document.getElementById('nutr-calc-active').innerHTML='';document.querySelectorAll('.calc-option').forEach(e=>e.classList.remove('selected'))"
+          style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:1rem">✕</button>
       </div>
 
       <!-- Peso y % ración -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.75rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:.6rem">
         <div>
-          <label style="font-size:.72rem;color:var(--txt3);display:block;margin-bottom:.15rem">Peso del animal (kg)</label>
-          <input type="number" id="calc-peso" value="10" min="0.001" step="0.1"
-            style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rsm);padding:.35rem .5rem;font-family:var(--mono);font-size:1rem;font-weight:700;color:var(--g3);outline:none;text-align:center"
+          <label style="font-size:.72rem;color:var(--txt3);display:block;margin-bottom:.1rem">Peso (kg)</label>
+          <input type="number" id="calc-peso" value="10" min="0.001" step="0.001"
+            style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rsm);padding:.3rem .4rem;font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--g3);outline:none;text-align:center"
             oninput="runCalc('${fid}')">
-          <div style="font-size:.68rem;color:var(--txt3);text-align:center;margin-top:.1rem" id="calc-gramos">= 10,000 g</div>
+          <div style="font-size:.65rem;color:var(--txt3);text-align:center;margin-top:.1rem" id="calc-gramos">= 10,000 g</div>
         </div>
         <div>
-          <label style="font-size:.72rem;color:var(--txt3);display:block;margin-bottom:.15rem">% ración (${formula.pct_min}–${formula.pct_max}%)</label>
+          <label style="font-size:.72rem;color:var(--txt3);display:block;margin-bottom:.1rem">% ración (${formula.pct_min}–${formula.pct_max}%)</label>
           <input type="number" id="calc-pct" value="${formula.pct_default}" min="${formula.pct_min}" max="${formula.pct_max}" step="0.5"
-            style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rsm);padding:.35rem .5rem;font-family:var(--mono);font-size:1rem;font-weight:700;color:var(--g6);outline:none;text-align:center"
+            style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rsm);padding:.3rem .4rem;font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--g6);outline:none;text-align:center"
+            oninput="runCalc('${fid}')">
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:var(--txt3);display:block;margin-bottom:.1rem">${formula.esRacion?'Nº raciones a preparar':'Multiplicador (caquexia)'}</label>
+          <input type="number" id="calc-mult" value="1" min="${formula.esRacion?1:-10}" max="${formula.esRacion?48:10}" step="${formula.esRacion?1:0.1}"
+            style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rsm);padding:.3rem .4rem;font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--bl);outline:none;text-align:center"
             oninput="runCalc('${fid}')">
         </div>
       </div>
 
-      <!-- Resultado total -->
-      <div style="background:var(--g0);border-radius:var(--rsm);padding:.6rem;margin-bottom:.75rem;text-align:center">
-        <div style="font-size:.7rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em">${formula.esRacion?'Ración por toma':'Ración diaria total'}</div>
-        <div id="calc-total" style="font-size:1.8rem;font-weight:700;color:var(--g5);font-family:var(--mono)">—</div>
-        <div style="font-size:.72rem;color:var(--txt3)">${formula.unidad==='ml'?'ml':'gramos'}</div>
-      </div>
-
-      <!-- Multiplicador de raciones -->
-      ${formula.esRacion ? `
-      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;padding:.4rem .6rem;background:var(--sur2);border-radius:var(--rsm)">
-        <label style="font-size:.75rem;color:var(--txt2);flex:1">Nº de raciones para preparar:</label>
-        <input type="number" id="calc-raciones" value="1" min="1" max="24" step="1"
-          style="width:60px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.25rem;font-family:var(--mono);font-size:.88rem;text-align:center"
-          oninput="runCalc('${fid}')">
-        <span id="calc-total-raciones" style="font-size:.88rem;font-weight:700;color:var(--g6);font-family:var(--mono);min-width:80px;text-align:right">—</span>
-      </div>` : `
-      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;padding:.4rem .6rem;background:var(--sur2);border-radius:var(--rsm)">
-        <label style="font-size:.75rem;color:var(--txt2);flex:1">Multiplicador (caquexia / mayor demanda):</label>
-        <input type="number" id="calc-mult" value="1" min="0.5" max="3" step="0.1"
-          style="width:60px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.25rem;font-family:var(--mono);font-size:.88rem;text-align:center"
-          oninput="runCalc('${fid}')">
-        <span id="calc-total-mult" style="font-size:.88rem;font-weight:700;color:var(--g6);font-family:var(--mono);min-width:80px;text-align:right">—</span>
-      </div>`}
-
-      <!-- Tabla de componentes -->
-      <table class="calc-result-table">
-        <thead><tr><th>%</th><th>Componente</th><th>Cantidad</th><th>Ingredientes</th></tr></thead>
-        <tbody id="calc-tbody">
-          ${formula.componentes.map(comp=>`
-          <tr id="calc-row-${comp.id}">
-            <td style="text-align:center;font-weight:700;color:var(--g6);font-family:var(--mono)">
-              <input type="number" id="calc-pct-${comp.id}" value="${comp.pct}" min="0" max="100" step="0.5"
-                style="width:50px;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.82rem;font-weight:700;color:var(--g6);text-align:center"
-                oninput="runCalc('${fid}')">%
-            </td>
-            <td style="font-weight:600">${comp.label}</td>
-            <td id="calc-val-${comp.id}" style="font-family:var(--mono);font-weight:700;color:var(--g5)">—</td>
-            <td>
-              <div id="ing-list-${comp.id}" style="font-size:.75rem;color:var(--txt3)">
-                <div style="font-style:italic">— Agrega ingredientes →</div>
-              </div>
-              <button onclick="addIngrediente('${comp.id}')" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.72rem;padding:.1rem 0">+ ingrediente</button>
-            </td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-      <div style="margin-top:.5rem;padding:.4rem;background:var(--g0);border-radius:var(--rxs)">
-        <div class="form-group" style="margin-bottom:.3rem"><label style="font-size:.72rem;color:var(--txt3)">Notas / Instrucciones de preparación</label>
-          <textarea id="calc-notas" class="form-control" style="min-height:50px;font-size:.8rem" placeholder="Ej: Licuar todo junto, servir a temperatura ambiente..."></textarea>
+      <!-- Totales -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.6rem">
+        <div style="background:var(--g0);border-radius:var(--rsm);padding:.5rem;text-align:center">
+          <div style="font-size:.65rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em">${formula.esRacion?'Por ración':'Ración diaria'}</div>
+          <div id="calc-total" style="font-size:1.7rem;font-weight:700;color:var(--g5);font-family:var(--mono)">—</div>
+          <div style="font-size:.7rem;color:var(--txt3)">${formula.unidad||'g'}</div>
+        </div>
+        <div style="background:var(--g1);border-radius:var(--rsm);padding:.5rem;text-align:center">
+          <div style="font-size:.65rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em">${formula.esRacion?'Total preparado':'Con multiplicador'}</div>
+          <div id="calc-total-mult" style="font-size:1.7rem;font-weight:700;color:var(--g6);font-family:var(--mono)">—</div>
+          <div style="font-size:.7rem;color:var(--txt3)">${formula.unidad||'g'}</div>
         </div>
       </div>
+
+      <!-- Número de raciones diarias (solo adultos) -->
+      ${!formula.esRacion ? `
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem;padding:.4rem .6rem;background:var(--sur2);border-radius:var(--rsm)">
+        <label style="font-size:.78rem;color:var(--txt2);flex:1">Raciones diarias (se divide la ración total):</label>
+        <input type="number" id="calc-nraciones" value="1" min="1" max="10" step="1"
+          style="width:55px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.25rem;font-family:var(--mono);font-size:.88rem;text-align:center;outline:none"
+          oninput="runCalc('${fid}')">
+      </div>` : ''}
+
+      <!-- Tabla principal -->
+      <div style="overflow-x:auto">
+        <table class="calc-result-table" style="width:100%;border-collapse:collapse;font-size:.82rem">
+          <thead><tr style="background:var(--sur2)">
+            <th style="padding:.3rem .4rem;text-align:center;color:var(--txt3)">%</th>
+            <th style="padding:.3rem .5rem;text-align:left">Componente</th>
+            <th style="padding:.3rem .4rem;text-align:center;color:var(--g6)">${formula.esRacion?'Por ración':'Ración diaria'}</th>
+            <th style="padding:.3rem .4rem;text-align:center;color:var(--g5)">${formula.esRacion?'Total preparado':'Por ración'}</th>
+            <th style="padding:.3rem .5rem;text-align:left">Ingredientes</th>
+          </tr></thead>
+          <tbody id="calc-tbody">
+            ${buildCompRows(formula.componentes)}
+          </tbody>
+          <tfoot>
+            <tr id="calc-add-comp-row" style="border-top:2px solid var(--bor)">
+              <td colspan="5" style="padding:.3rem .5rem">
+                <button onclick="addCalcComponente('${fid}')" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem">+ Agregar componente</button>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Notas -->
+      <div style="margin-top:.5rem;padding:.4rem;background:var(--g0);border-radius:var(--rxs)">
+        <label style="font-size:.72rem;color:var(--txt3);display:block;margin-bottom:.2rem">Notas / Instrucciones de preparación</label>
+        <textarea id="calc-notas" class="form-control" style="min-height:50px;font-size:.8rem" placeholder="Ej: Licuar todo junto, servir a temperatura ambiente..."></textarea>
+      </div>
+
+      <!-- Botón guardar dieta -->
+      <button onclick="openGuardarDietaModal('${fid}')"
+        style="width:100%;margin-top:.6rem;padding:.5rem;background:var(--g5);color:white;border:none;border-radius:var(--rsm);font-size:.85rem;font-weight:600;cursor:pointer">
+        💾 Guardar dieta formulada
+      </button>
     </div>`;
   runCalc(fid);
-  document.querySelectorAll('.calc-option').forEach(el => el.classList.remove('selected'));
-  event?.target?.closest('.calc-option')?.classList.add('selected');
 }
 
 function runCalc(fid) {
-  const formula = CALC_FORMULAS[fid];
+  const all = getAllCalcFormulas();
+  const formula = all[fid];
   if (!formula) return;
-  const pesoKg = parseFloat(document.getElementById('calc-peso')?.value)||0;
-  const pesoG  = pesoKg * 1000;
-  const pct    = parseFloat(document.getElementById('calc-pct')?.value)||formula.pct_default;
-  const unidad = formula.unidad || 'g';
-  // Actualizar display de gramos
+  const pesoKg  = parseFloat(document.getElementById('calc-peso')?.value)||0;
+  const pesoG   = pesoKg * 1000;
+  const pct     = parseFloat(document.getElementById('calc-pct')?.value)||formula.pct_default;
+  const mult    = parseFloat(document.getElementById('calc-mult')?.value)||1;
+  const nRac    = parseInt(document.getElementById('calc-nraciones')?.value)||1;
+  const unidad  = formula.unidad||'g';
+
+  // Actualizar display gramos
   const gEl = document.getElementById('calc-gramos');
   if (gEl) gEl.textContent = '= ' + pesoG.toLocaleString('es-CO') + ' g';
-  // Ración total
-  const racion = pesoG * pct / 100;
+
+  // Ración base
+  let racionBase = pesoG * pct / 100;
+
+  // Para adultos: multiplicador modifica la ración (puede ser negativo → reducción)
+  // Para crías: mult = número de raciones a preparar
+  const racionFinal = formula.esRacion ? racionBase : racionBase * mult;
+
   const totalEl = document.getElementById('calc-total');
-  if (totalEl) totalEl.textContent = racion.toFixed(1) + ' ' + unidad;
-  // Raciones / multiplicador
-  if (formula.esRacion) {
-    const nRac = parseInt(document.getElementById('calc-raciones')?.value)||1;
-    const multEl = document.getElementById('calc-total-raciones');
-    if (multEl) multEl.textContent = (racion * nRac).toFixed(1) + ' ' + unidad + ' total';
-  } else {
-    const mult = parseFloat(document.getElementById('calc-mult')?.value)||1;
-    const multEl = document.getElementById('calc-total-mult');
-    if (multEl) multEl.textContent = (racion * mult).toFixed(1) + ' ' + unidad;
+  if (totalEl) totalEl.textContent = racionBase.toFixed(1) + ' ' + unidad;
+
+  const multEl = document.getElementById('calc-total-mult');
+  if (multEl) {
+    if (formula.esRacion) {
+      multEl.textContent = (racionBase * mult).toFixed(1) + ' ' + unidad;
+    } else {
+      multEl.textContent = racionFinal.toFixed(1) + ' ' + unidad;
+    }
   }
-  // Componentes
-  formula.componentes.forEach(comp => {
-    const pctComp = parseFloat(document.getElementById('calc-pct-'+comp.id)?.value) ?? comp.pct;
-    const val = racion * pctComp / 100;
-    const valEl = document.getElementById('calc-val-'+comp.id);
-    if (valEl) valEl.textContent = val.toFixed(2) + ' ' + unidad;
-  });
+
+  // Componentes: calcular sobre racionFinal (adultos) o racionBase (crías base) / mult (crías total)
+  function calcComp(comps, parentVal) {
+    comps.forEach(comp => {
+      const pctComp = parseFloat(document.getElementById('calc-pct-'+comp.id)?.value) ?? comp.pct;
+      const val = parentVal * pctComp / 100;
+      const valEl = document.getElementById('calc-val-'+comp.id);
+      if (valEl) valEl.textContent = val.toFixed(2) + ' ' + unidad;
+      // Columna "por ración" / "total preparado"
+      const valRacEl = document.getElementById('calc-val-rac-'+comp.id);
+      if (valRacEl) {
+        if (formula.esRacion) {
+          valRacEl.textContent = (val * mult).toFixed(2) + ' ' + unidad;
+        } else {
+          valRacEl.textContent = nRac > 1 ? (val / nRac).toFixed(2) + ' ' + unidad : '—';
+        }
+      }
+      if (comp.sub?.length) calcComp(comp.sub, val);
+    });
+  }
+  calcComp(formula.componentes, formula.esRacion ? racionBase : racionFinal);
 }
 
-let _ingredientes = {}; // { compId: [{nombre,gramos,tamano}] }
-function addIngrediente(compId) {
+function addIngrediente(compId, fid) {
   const listEl = document.getElementById('ing-list-'+compId);
   if (!listEl) return;
   if (!_ingredientes[compId]) _ingredientes[compId] = [];
-  const idx = _ingredientes[compId].length;
   _ingredientes[compId].push({nombre:'',gramos:0,tamano:''});
-  listEl.innerHTML = _ingredientes[compId].map((ing,i)=>`
-    <div style="display:flex;gap:.25rem;margin-bottom:.25rem;align-items:center">
-      <input type="text" value="${ing.nombre}" placeholder="Ingrediente" style="flex:2;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .3rem;font-size:.73rem;color:var(--txt);outline:none"
+  renderIngredientesComp(compId, fid);
+}
+function renderIngredientesComp(compId, fid) {
+  const listEl = document.getElementById('ing-list-'+compId);
+  if (!listEl) return;
+  listEl.innerHTML = (_ingredientes[compId]||[]).map((ing,i)=>`
+    <div style="display:flex;gap:.25rem;margin-bottom:.2rem;align-items:center">
+      <input type="text" value="${ing.nombre}" placeholder="Ingrediente"
+        style="flex:2;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .3rem;font-size:.73rem;outline:none"
         onchange="_ingredientes['${compId}'][${i}].nombre=this.value">
-      <input type="number" value="${ing.gramos}" placeholder="g" style="width:45px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .25rem;font-size:.73rem;text-align:center;font-family:var(--mono);outline:none"
+      <input type="number" value="${ing.gramos||''}" placeholder="g"
+        style="width:45px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .25rem;font-size:.73rem;text-align:center;font-family:var(--mono);outline:none"
         onchange="_ingredientes['${compId}'][${i}].gramos=parseFloat(this.value)||0">
-      <input type="text" value="${ing.tamano}" placeholder="Tamaño" style="flex:1;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .3rem;font-size:.73rem;color:var(--txt);outline:none"
+      <input type="text" value="${ing.tamano}" placeholder="Tamaño"
+        style="flex:1;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .3rem;font-size:.73rem;outline:none"
         onchange="_ingredientes['${compId}'][${i}].tamano=this.value">
-      <button onclick="_ingredientes['${compId}'].splice(${i},1);addIngrediente('${compId}')" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.7rem">✕</button>
+      <button onclick="_ingredientes['${compId}'].splice(${i},1);renderIngredientesComp('${compId}','${fid}')"
+        style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.7rem;flex-shrink:0">✕</button>
     </div>`).join('');
 }
+
+function addCalcComponente(fid) {
+  const tbody = document.getElementById('calc-tbody');
+  const addRow = document.getElementById('calc-add-comp-row');
+  if (!tbody || !addRow) return;
+  const newId = 'comp_' + Date.now();
+  const newRow = document.createElement('tr');
+  newRow.style.borderBottom = '1px solid var(--bor)';
+  newRow.innerHTML = `
+    <td style="padding:.3rem .4rem;text-align:center">
+      <input type="number" id="calc-pct-${newId}" value="0" min="0" max="200" step="0.5"
+        style="width:52px;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.82rem;font-weight:700;color:var(--g6);text-align:center"
+        oninput="runCalc('${fid}')">%
+    </td>
+    <td style="padding:.3rem .5rem">
+      <input type="text" placeholder="Componente" class="form-control" style="font-size:.82rem;height:1.6rem">
+    </td>
+    <td id="calc-val-${newId}" style="padding:.3rem .4rem;font-family:var(--mono);font-weight:700;color:var(--g5);text-align:center">—</td>
+    <td id="calc-val-rac-${newId}" style="padding:.3rem .4rem;font-family:var(--mono);font-size:.78rem;color:var(--g6);text-align:center">—</td>
+    <td>
+      <div id="ing-list-${newId}"></div>
+      <button onclick="addIngrediente('${newId}','${fid}')" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.7rem">+ ingrediente</button>
+    </td>`;
+  tbody.insertBefore(newRow, addRow);
+  runCalc(fid);
+}
+
+// ── Guardar dieta ──
+function openGuardarDietaModal(fid) {
+  const all = getAllCalcFormulas();
+  const formula = all[fid];
+  if (!formula) return;
+  const pesoKg = parseFloat(document.getElementById('calc-peso')?.value)||0;
+  const pct    = parseFloat(document.getElementById('calc-pct')?.value)||formula.pct_default;
+  const mult   = parseFloat(document.getElementById('calc-mult')?.value)||1;
+  const notas  = document.getElementById('calc-notas')?.value||'';
+  // Recoger nombre de especie + número de dieta
+  document.getElementById('guardar-dieta-modal')?.remove();
+  const spNames = SPECIES_DB.map(sp=>`<option value="${sp.name}" data-sci="${sp.sci}">${sp.name} (${sp.sci})</option>`).join('');
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="guardar-dieta-modal" style="position:fixed;inset:0;z-index:800;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:520px;max-height:85vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">💾 Guardar dieta — ${formula.icon} ${formula.label}</div>
+        <div class="form-group">
+          <label>Nombre común de la especie</label>
+          <input id="gd-especie" class="form-control" list="gd-sp-list" placeholder="Jaguar, Danta..." oninput="autofillGdSci(this)">
+          <datalist id="gd-sp-list">${spNames}</datalist>
+        </div>
+        <div class="form-group">
+          <label>Nombre científico</label>
+          <input id="gd-sci" class="form-control" placeholder="Panthera onca...">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Número de dieta <span style="font-size:.7rem;color:var(--txt3)">(si hay más de una para la especie)</span></label>
+            <input id="gd-num" class="form-control" type="number" min="1" value="1" style="width:80px">
+          </div>
+          <div class="form-group">
+            <label>Nombre personalizado <span style="font-size:.7rem;color:var(--txt3)">(opcional)</span></label>
+            <input id="gd-nombre" class="form-control" placeholder="Dieta mantenimiento...">
+          </div>
+        </div>
+        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('guardar-dieta-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="confirmarGuardarDieta('${fid}',${pesoKg},${pct},${mult},'${notas.replace(/'/g,"\\'")}')">✓ Guardar</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+function autofillGdSci(input) {
+  const sp = SPECIES_DB.find(s=>s.name.toLowerCase()===input.value.trim().toLowerCase());
+  if (sp) document.getElementById('gd-sci').value = sp.sci;
+}
+
+async function confirmarGuardarDieta(fid, pesoKg, pct, mult, notas) {
+  const especie = document.getElementById('gd-especie')?.value.trim();
+  const sci     = document.getElementById('gd-sci')?.value.trim();
+  const num     = parseInt(document.getElementById('gd-num')?.value)||1;
+  const nombre  = document.getElementById('gd-nombre')?.value.trim();
+  const all     = getAllCalcFormulas();
+  const formula = all[fid];
+  if (!especie) { toast('⚠ Ingresa el nombre de la especie'); return; }
+
+  // Recoger estado actual de componentes e ingredientes
+  const compState = {};
+  function collectComps(comps) {
+    comps.forEach(c => {
+      compState[c.id] = {
+        pct: parseFloat(document.getElementById('calc-pct-'+c.id)?.value)||c.pct,
+        val: document.getElementById('calc-val-'+c.id)?.textContent||'—'
+      };
+      if (c.sub?.length) collectComps(c.sub);
+    });
+  }
+  collectComps(formula.componentes);
+
+  const dieta = {
+    id: 'dieta_' + Date.now(),
+    fid, num, nombre,
+    label: `${formula.label} — ${especie}${num>1?' #'+num:''}${nombre?' ('+nombre+')':''}`,
+    especie, sci, pesoKg, pct, mult,
+    notas,
+    componentes: compState,
+    ingredientes: JSON.parse(JSON.stringify(_ingredientes)),
+    fecha: new Date().toISOString()
+  };
+
+  DIETAS_GUARDADAS.push(dieta);
+  await saveDietasGuardadas();
+
+  // Si la especie tiene ficha técnica, guardar también en sp.nutricion
+  const sp = SPECIES_DB.find(s =>
+    s.name.toLowerCase()===especie.toLowerCase() ||
+    (sci && s.sci?.toLowerCase()===sci.toLowerCase())
+  );
+  if (sp) {
+    if (!sp.nutricion) sp.nutricion = {};
+    if (!sp.dietas_calc) sp.dietas_calc = [];
+    sp.dietas_calc.push(dieta);
+    // Guardar en dieta bajo cuidado profesional si es la dieta #1
+    if (num === 1 && !nombre) {
+      // Resumir como texto para el campo n.captive
+      const resumen = Object.entries(compState).map(([id,v])=>`${id}: ${v.val}`).join(', ');
+      sp.nutricion.captive = `[Dieta calculada ${new Date().toLocaleDateString('es-CO')}] ${resumen}`;
+    }
+    await dbPutSync('species', sp);
+    toast(`✓ Dieta guardada y vinculada a la ficha de ${sp.name}`);
+  } else {
+    toast(`✓ Dieta guardada — quedará en calculadoras hasta crear la ficha de "${especie}"`);
+  }
+
+  document.getElementById('guardar-dieta-modal')?.remove();
+  renderDietasGuardadas();
+}
+
+function renderDietasGuardadas() {
+  const el = document.getElementById('dietas-guardadas-list');
+  if (!el) return;
+  if (!DIETAS_GUARDADAS.length) {
+    el.innerHTML = '<p style="font-size:.8rem;color:var(--txt3);font-style:italic;text-align:center;padding:1rem">Sin dietas guardadas</p>';
+    return;
+  }
+  // Agrupar por fid
+  const all = getAllCalcFormulas();
+  const groups = {};
+  DIETAS_GUARDADAS.forEach(d => {
+    if (!groups[d.fid]) groups[d.fid] = [];
+    groups[d.fid].push(d);
+  });
+  el.innerHTML = Object.entries(groups).map(([fid, dietas]) => {
+    const f = all[fid] || { label: fid, icon:'🧮' };
+    return `<div style="margin-bottom:.75rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--g6);text-transform:uppercase;letter-spacing:.06em;padding:.25rem 0;border-bottom:1px solid var(--bor);margin-bottom:.3rem">
+        ${f.icon} ${f.label}
+      </div>
+      ${dietas.map(d=>`
+      <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--rsm);padding:.5rem .75rem;margin-bottom:.3rem">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="font-size:.85rem;font-weight:600">${d.especie}${d.num>1?' #'+d.num:''} ${d.nombre?'· '+d.nombre:''}</div>
+            <div style="font-size:.72rem;color:var(--txt3);font-style:italic">${d.sci||''}</div>
+            <div style="font-size:.72rem;color:var(--txt3)">Peso: ${d.pesoKg} kg · ${d.pct}% ración · ${new Date(d.fecha).toLocaleDateString('es-CO')}</div>
+            ${d.notas?`<div style="font-size:.7rem;color:var(--txt3);font-style:italic;margin-top:.2rem">📋 ${d.notas.substring(0,80)}${d.notas.length>80?'…':''}</div>`:''}
+          </div>
+          <button onclick="eliminarDietaGuardada('${d.id}')"
+            style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.8rem;flex-shrink:0">✕</button>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+async function eliminarDietaGuardada(id) {
+  const ok = await confirmDelete('¿Eliminar dieta?', 'Esta acción no se puede deshacer.');
+  if (!ok) return;
+  DIETAS_GUARDADAS = DIETAS_GUARDADAS.filter(d=>d.id!==id);
+  await saveDietasGuardadas();
+  renderDietasGuardadas();
+  toast('✓ Dieta eliminada');
+}
+
+// ── Modal nueva calculadora personalizada ──
+function openNewCalcModal(editId=null) {
+  const all = getAllCalcFormulas();
+  const existing = editId ? all[editId] : null;
+  document.getElementById('new-calc-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="new-calc-modal" style="position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${editId?'Editar':'Nueva'} calculadora</div>
+        <div class="form-row">
+          <div class="form-group"><label>Nombre *</label><input id="nc-label" class="form-control" value="${existing?.label||''}" placeholder="Ej: Marsupial omnívoro"></div>
+          <div class="form-group"><label>Emoji / Icono</label><input id="nc-icon" class="form-control" value="${existing?.icon||''}" placeholder="🦘 o URL PNG" style="width:80px"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Tipo</label>
+            <select id="nc-tipo" class="form-control">
+              <option value="adulto" ${(!existing||existing.tipo==='adulto')?'selected':''}>Adulto (ración diaria)</option>
+              <option value="cria"   ${existing?.tipo==='cria'?'selected':''}>Cría (por ración)</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Unidad resultado</label>
+            <select id="nc-unidad" class="form-control">
+              <option value="g"  ${(!existing||existing.unidad!=='ml')?'selected':''}>g (gramos)</option>
+              <option value="ml" ${existing?.unidad==='ml'?'selected':''}>ml</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>% ración mínimo</label><input id="nc-pmin" class="form-control" type="number" value="${existing?.pct_min||3}" style="width:70px"></div>
+          <div class="form-group"><label>% ración predeterminado</label><input id="nc-pdef" class="form-control" type="number" value="${existing?.pct_default||5}" style="width:70px"></div>
+          <div class="form-group"><label>% ración máximo</label><input id="nc-pmax" class="form-control" type="number" value="${existing?.pct_max||10}" style="width:70px"></div>
+        </div>
+        <div style="margin-bottom:.5rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
+            <label style="font-size:.78rem;font-weight:600">Componentes</label>
+            <button onclick="addNcRow()" class="btn btn-secondary btn-sm">+ Componente</button>
+          </div>
+          <div id="nc-comps">
+            ${(existing?.componentes||[{id:'comp1',label:'',pct:0}]).map((c,i)=>`
+            <div style="display:flex;gap:.3rem;margin-bottom:.25rem;align-items:center">
+              <input class="form-control nc-comp-label" value="${c.label}" placeholder="Nombre componente" style="flex:2;font-size:.8rem">
+              <input class="form-control nc-comp-pct" type="number" value="${c.pct}" placeholder="%" style="width:60px;font-size:.8rem">
+              <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+            </div>`).join('')}
+          </div>
+        </div>
+        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('new-calc-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveCustomCalc('${editId||''}')">✓ Guardar calculadora</button>
+        </div>
+      </div>
+    </div>`);
+}
+function addNcRow() {
+  document.getElementById('nc-comps')?.insertAdjacentHTML('beforeend',`
+    <div style="display:flex;gap:.3rem;margin-bottom:.25rem;align-items:center">
+      <input class="form-control nc-comp-label" value="" placeholder="Nombre componente" style="flex:2;font-size:.8rem">
+      <input class="form-control nc-comp-pct" type="number" value="0" placeholder="%" style="width:60px;font-size:.8rem">
+      <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+    </div>`);
+}
+async function saveCustomCalc(editId) {
+  const label = document.getElementById('nc-label')?.value.trim();
+  if (!label) { toast('⚠ Ingresa el nombre'); return; }
+  const id = editId || 'custom_'+Date.now();
+  const comps = [];
+  document.querySelectorAll('#nc-comps > div').forEach((row,i) => {
+    const lbl = row.querySelector('.nc-comp-label')?.value.trim();
+    const pct = parseFloat(row.querySelector('.nc-comp-pct')?.value)||0;
+    if (lbl) comps.push({ id:'c'+i, label:lbl, pct });
+  });
+  CALC_CUSTOM[id] = {
+    label,
+    icon:  document.getElementById('nc-icon')?.value.trim()||'🧮',
+    tipo:  document.getElementById('nc-tipo')?.value||'adulto',
+    unidad:document.getElementById('nc-unidad')?.value||'g',
+    pct_min:    parseFloat(document.getElementById('nc-pmin')?.value)||3,
+    pct_default:parseFloat(document.getElementById('nc-pdef')?.value)||5,
+    pct_max:    parseFloat(document.getElementById('nc-pmax')?.value)||10,
+    esRacion: document.getElementById('nc-tipo')?.value==='cria',
+    componentes: comps
+  };
+  await saveCalcCustom();
+  document.getElementById('new-calc-modal')?.remove();
+  renderNutricionCalcScreen();
+  toast('✓ Calculadora guardada');
+}
+function editCalcFormula(id) {
+  if (CALC_CUSTOM[id]) { openNewCalcModal(id); return; }
+  // Para fórmulas predefinidas: copiar a custom para editar
+  const formula = CALC_FORMULAS[id];
+  if (!formula) return;
+  CALC_CUSTOM[id] = JSON.parse(JSON.stringify(formula));
+  openNewCalcModal(id);
+}
+
+
 
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault(); deferredPrompt=e;
