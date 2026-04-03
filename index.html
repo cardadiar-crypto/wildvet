@@ -9435,6 +9435,277 @@ async function confirmDeleteGroup(gi) {
   toast('Grupo eliminado');
 }
 
+// ═══════════════════════════════════════════════════════════
+// ENRIQUECIMIENTOS — FUNCIONES CRUD COMPLETAS
+// ═══════════════════════════════════════════════════════════
+
+let _enriqFotosNew = [];
+
+function renderEnriquecimientoScreen(filter='todos') {
+  const el = document.getElementById('enriq-list');
+  const adminBtns = document.getElementById('enriq-admin-btns');
+  if (adminBtns) adminBtns.style.display = currentUser?.role==='admin' ? 'flex' : 'none';
+  if (!el) return;
+  const isAdmin = currentUser?.role === 'admin';
+  const items = filter === 'todos'
+    ? ENRIQUECIMIENTOS_DB
+    : ENRIQUECIMIENTOS_DB.filter(e => (e.categorias||[e.categoria||'alimenticio']).includes(filter));
+  if (!items.length) {
+    el.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--txt3)">
+      <p style="font-size:.9rem">Sin enriquecimientos registrados.</p>
+      ${isAdmin ? '<p style="font-size:.8rem">Toca + Agregar para crear el primero.</p>' : ''}
+    </div>`;
+    return;
+  }
+  el.innerHTML = items.map((enr) => {
+    const realIdx = ENRIQUECIMIENTOS_DB.indexOf(enr);
+    const cat = ENRIQ_CATS.find(c => (enr.categorias||[enr.categoria]).includes(c.id)) || ENRIQ_CATS[0];
+    const foto = enr.fotos?.[0]?.data || '';
+    return `
+    <div class="enriq-card" style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.6rem;overflow:hidden">
+      <div class="enriq-card-header" style="display:flex;gap:.6rem;align-items:center;padding:.7rem .85rem;cursor:pointer" onclick="toggleEnriqCard(${realIdx})">
+        ${foto
+          ? `<img src="${foto}" style="width:64px;height:50px;object-fit:cover;border-radius:var(--rxs);flex-shrink:0">`
+          : `<div style="width:64px;height:50px;background:${cat.color}20;border-radius:var(--rxs);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">${cat.icon}</div>`}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.9rem;color:var(--txt)">${enr.nombre||'Sin nombre'}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.15rem">
+            ${(enr.categorias||[enr.categoria]).map(cid=>{const ct=ENRIQ_CATS.find(cc=>cc.id===cid)||ENRIQ_CATS[0];return `<span style="font-size:.65rem;background:${ct.color}20;color:${ct.color};border-radius:20px;padding:.1rem .4rem;font-weight:600">${ct.icon} ${ct.label}</span>`;}).join('')}
+            ${(enr.especies||[{especie:enr.especie,sci:enr.sci}]).filter(e=>e?.especie||e?.sp).map(e=>`<span style="font-size:.65rem;color:var(--txt3)">🐾 ${e.especie||e.sp}${(e.sci)?' ('+e.sci+')':''}</span>`).join('')}
+          </div>
+        </div>
+        ${isAdmin ? `<div style="display:flex;gap:.3rem;flex-shrink:0">
+          <button onclick="event.stopPropagation();openEditEnriquecimiento(${realIdx})" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);cursor:pointer;font-size:.75rem;padding:.2rem .4rem">✏️</button>
+          <button onclick="event.stopPropagation();removeEnriquecimiento(${realIdx})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.75rem;padding:.2rem .4rem">✕</button>
+        </div>` : ''}
+      </div>
+      <div id="enriq-detail-${realIdx}" style="display:none;border-top:1px solid var(--bor);padding:.6rem .85rem">
+        ${enr.descripcion?`<p style="font-size:.82rem;color:var(--txt2);margin-bottom:.3rem">${enr.descripcion}</p>`:''}
+        ${enr.objetivo?`<p style="font-size:.8rem;color:var(--txt3);margin-bottom:.3rem"><strong>Objetivo:</strong> ${enr.objetivo}</p>`:''}
+        ${enr.materiales?.length?`<p style="font-size:.8rem;color:var(--txt3)"><strong>Materiales:</strong> ${enr.materiales.join(', ')}</p>`:''}
+        ${(enr.fotos||[]).length>1?`<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.4rem">${enr.fotos.slice(1).map(f=>`<img src="${f.data}" style="height:60px;width:auto;border-radius:var(--rxs);object-fit:cover;border:1px solid var(--bor)">`).join('')}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleEnriqCard(idx) {
+  const el = document.getElementById('enriq-detail-'+idx);
+  if (el) el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+
+function filterEnriq(filter, btn) {
+  document.querySelectorAll('#enriq-tabs .tab-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderEnriquecimientoScreen(filter);
+}
+
+function filterEnriqBySpecies(query) {
+  const q = query.toLowerCase().trim();
+  if (!q) { renderEnriquecimientoScreen(); return; }
+  const el = document.getElementById('enriq-list');
+  if (!el) return;
+  const isAdmin = currentUser?.role === 'admin';
+  const filtered = ENRIQUECIMIENTOS_DB.filter(e => {
+    const especies = e.especies?.length ? e.especies : (e.especie?[{especie:e.especie,sci:e.sci}]:[]);
+    return e.nombre?.toLowerCase().includes(q) ||
+      especies.some(ep => (ep?.especie||ep?.sp||'').toLowerCase().includes(q) || (ep?.sci||'').toLowerCase().includes(q));
+  });
+  if (!filtered.length) { el.innerHTML='<p style="text-align:center;color:var(--txt3);padding:1.5rem">Sin resultados</p>'; return; }
+  const isAdmin2 = currentUser?.role==='admin';
+  el.innerHTML = filtered.map(enr => {
+    const realIdx = ENRIQUECIMIENTOS_DB.indexOf(enr);
+    const cat = ENRIQ_CATS.find(c=>(enr.categorias||[enr.categoria]).includes(c.id))||ENRIQ_CATS[0];
+    const foto = enr.fotos?.[0]?.data||'';
+    return `<div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.5rem;padding:.65rem .85rem;display:flex;gap:.5rem;align-items:center">
+      ${foto?`<img src="${foto}" style="width:56px;height:44px;object-fit:cover;border-radius:var(--rxs);flex-shrink:0">`:`<div style="width:56px;height:44px;background:${cat.color}20;border-radius:var(--rxs);display:flex;align-items:center;justify-content:center;font-size:1.2rem">${cat.icon}</div>`}
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:.88rem">${enr.nombre}</div>
+        ${enr.descripcion?`<div style="font-size:.75rem;color:var(--txt3)">${enr.descripcion.substring(0,80)}</div>`:''}
+      </div>
+      ${isAdmin2?`<div style="display:flex;gap:.3rem">
+        <button onclick="openEditEnriquecimiento(${realIdx})" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);cursor:pointer;font-size:.75rem;padding:.2rem .4rem">✏️</button>
+        <button onclick="removeEnriquecimiento(${realIdx})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.75rem;padding:.2rem .4rem">✕</button>
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function openAddEnriquecimiento(editIdx=-1) {
+  const existing = editIdx >= 0 ? ENRIQUECIMIENTOS_DB[editIdx] : null;
+  _enriqFotosNew = [];
+  document.getElementById('enriq-modal')?.remove();
+  buildSpeciesDatalist('sp-hist-dl');
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="enriq-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${editIdx>=0?'✏️ Editar':'+'} Enriquecimiento</div>
+
+        <div class="form-group">
+          <label>Nombre *</label>
+          <input id="enriq-nombre" class="form-control" value="${existing?.nombre||''}" placeholder="Ej: Caja de búsqueda alimentaria">
+        </div>
+
+        <!-- Categorías -->
+        <div class="form-group">
+          <label>Categorías <span style="font-weight:400;color:var(--txt3);font-size:.72rem">(selecciona las que apliquen)</span></label>
+          <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.25rem">
+            ${ENRIQ_CATS.map(cat=>`
+            <label style="display:inline-flex;align-items:center;gap:.3rem;padding:.25rem .55rem;border:1px solid var(--bor);border-radius:20px;cursor:pointer;font-size:.78rem;background:var(--sur)">
+              <input type="checkbox" value="${cat.id}" ${(existing?.categorias||[existing?.categoria||'alimenticio']).includes(cat.id)?'checked':''} style="accent-color:var(--g5)">
+              ${cat.icon} ${cat.label}
+            </label>`).join('')}
+          </div>
+        </div>
+
+        <!-- Especies con botones de grupo -->
+        <div class="form-group">
+          <label>Especies <span style="font-weight:400;color:var(--txt3);font-size:.72rem">(puede aplicar a varias)</span></label>
+          ${SPECIES_GROUPS.length ? `<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.35rem;align-items:center">
+            <span style="font-size:.7rem;color:var(--txt3);font-weight:600">Agregar grupo:</span>
+            ${SPECIES_GROUPS.map((g,gi)=>`<button type="button" onclick="addGroupSpeciesToEnriq(${gi})" style="font-size:.7rem;padding:.15rem .5rem;border-radius:20px;border:1px solid var(--bor);background:var(--sur2);cursor:pointer;display:inline-flex;align-items:center;gap:.25rem">${g.iconImg?`<img src="${g.iconImg}" style="width:14px;height:14px;object-fit:cover;border-radius:2px">`:(g.icon||'🐾')} ${g.nombre} (${g.especies?.length||0})</button>`).join('')}
+          </div>` : ''}
+          <div id="enriq-sp-list" style="margin-top:.25rem">
+            ${(existing?.especies||((existing?.especie)?[{sp:existing.especie,sci:existing.sci||''}]:[])).map((e)=>`
+            <div style="display:flex;gap:.3rem;margin-bottom:.25rem" class="enriq-sp-row">
+              <input class="form-control enriq-sp-inp" value="${e.sp||e.especie||''}" placeholder="Nombre común" style="flex:1;font-size:.8rem" list="sp-hist-dl" oninput="autofillSciInRow(this)" onchange="autofillSciInRow(this)">
+              <input class="form-control enriq-sci-inp" value="${e.sci||''}" placeholder="Nombre científico" style="flex:1;font-size:.8rem">
+              <button onclick="this.closest('.enriq-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem;flex-shrink:0">✕</button>
+            </div>`).join('')}
+          </div>
+          <button type="button" onclick="addEnriqSpRow()" class="btn btn-secondary btn-sm" style="margin-top:.2rem">+ Agregar especie</button>
+        </div>
+
+        <div class="form-group">
+          <label>Descripción</label>
+          <textarea id="enriq-desc" class="form-control" style="min-height:70px" placeholder="Describe el enriquecimiento...">${existing?.descripcion||''}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Objetivo</label>
+          <textarea id="enriq-obj" class="form-control" style="min-height:50px" placeholder="Qué se busca estimular...">${existing?.objetivo||''}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Materiales (uno por línea)</label>
+          <textarea id="enriq-mat" class="form-control" style="min-height:70px" placeholder="Tronco hueco&#10;Semillas&#10;Paja...">${(existing?.materiales||[]).join('\n')}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Fotos</label>
+          <label for="enriq-fotos-up" class="btn btn-secondary btn-sm" style="cursor:pointer">📷 Agregar fotos</label>
+          <input type="file" id="enriq-fotos-up" accept="image/*" multiple style="display:none" onchange="previewEnriqFotos(this)">
+          <div id="enriq-fotos-preview" style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.3rem">
+            ${(existing?.fotos||[]).map(f=>`<img src="${f.data}" style="height:60px;width:auto;border-radius:var(--rxs);border:1px solid var(--bor);object-fit:cover">`).join('')}
+          </div>
+        </div>
+
+        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('enriq-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveEnriquecimiento(${editIdx})">💾 Guardar</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+function openEditEnriquecimiento(idx) { openAddEnriquecimiento(idx); }
+
+function addEnriqSpRow() {
+  const list = document.getElementById('enriq-sp-list');
+  if (!list) return;
+  buildSpeciesDatalist('sp-hist-dl');
+  list.insertAdjacentHTML('beforeend', `
+    <div style="display:flex;gap:.3rem;margin-bottom:.25rem" class="enriq-sp-row">
+      <input class="form-control enriq-sp-inp" value="" placeholder="Nombre común" style="flex:1;font-size:.8rem" list="sp-hist-dl" oninput="autofillSciInRow(this)" onchange="autofillSciInRow(this)">
+      <input class="form-control enriq-sci-inp" value="" placeholder="Nombre científico" style="flex:1;font-size:.8rem">
+      <button onclick="this.closest('.enriq-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem;flex-shrink:0">✕</button>
+    </div>`);
+}
+
+async function previewEnriqFotos(input) {
+  if (!input.files?.length) return;
+  const preview = document.getElementById('enriq-fotos-preview');
+  for (const file of Array.from(input.files)) {
+    const data = await compressImage(file, 1400, 0.94);
+    _enriqFotosNew.push({ id: Date.now()+'_'+Math.random().toString(36).slice(2,5), data });
+    if (preview) preview.insertAdjacentHTML('beforeend', `<img src="${data}" style="height:60px;width:auto;border-radius:var(--rxs);border:1px solid var(--g5);object-fit:cover">`);
+  }
+}
+
+async function saveEnriquecimiento(editIdx=-1) {
+  const nombre = document.getElementById('enriq-nombre')?.value.trim();
+  if (!nombre) { toast('⚠ El nombre es obligatorio'); return; }
+  const materiales = (document.getElementById('enriq-mat')?.value||'').split('\n').map(m=>m.trim()).filter(Boolean);
+  const existing = editIdx >= 0 ? ENRIQUECIMIENTOS_DB[editIdx] : null;
+  const fotos = [...(existing?.fotos||[]), ..._enriqFotosNew];
+  _enriqFotosNew = [];
+  const categoriasChecks = Array.from(document.querySelectorAll('#enriq-modal input[type=checkbox]:checked')).map(el=>el.value);
+  const categorias = categoriasChecks.length ? categoriasChecks : ['alimenticio'];
+  const _spContainer = document.getElementById('enriq-sp-list');
+  const especiesRows = _spContainer ? _spContainer.querySelectorAll(':scope > div.enriq-sp-row') : [];
+  const especies = Array.from(especiesRows).map(row=>({
+    sp:  (row.querySelector('.enriq-sp-inp')||row.querySelector('.enriq-sp'))?.value.trim()||'',
+    sci: row.querySelector('.enriq-sci-inp')?.value.trim()||'',
+    especie: (row.querySelector('.enriq-sp-inp')||row.querySelector('.enriq-sp'))?.value.trim()||''
+  })).filter(e=>e.sp||e.especie);
+  const enr = {
+    nombre,
+    categorias,
+    categoria:   categorias[0]||'alimenticio',
+    especie:     especies[0]?.sp||'',
+    sci:         especies[0]?.sci||'',
+    especies,
+    descripcion: document.getElementById('enriq-desc')?.value||'',
+    objetivo:    document.getElementById('enriq-obj')?.value||'',
+    materiales,
+    fotos
+  };
+  if (editIdx >= 0) ENRIQUECIMIENTOS_DB[editIdx] = enr;
+  else ENRIQUECIMIENTOS_DB.push(enr);
+  await saveEnriquecimientos();
+  document.getElementById('enriq-modal')?.remove();
+  renderEnriquecimientoScreen();
+  toast('✓ Enriquecimiento guardado');
+}
+
+async function removeEnriquecimiento(i) {
+  const ok = await confirmDelete('¿Eliminar enriquecimiento?', `Se eliminará "${ENRIQUECIMIENTOS_DB[i]?.nombre||''}".`);
+  if (!ok) return;
+  ENRIQUECIMIENTOS_DB.splice(i, 1);
+  await saveEnriquecimientos();
+  renderEnriquecimientoScreen();
+  toast('Enriquecimiento eliminado');
+}
+
+function openSpeciesHistoryManager() {
+  document.getElementById('sp-hist-modal')?.remove();
+  const seen = new Set();
+  const allItems = [];
+  ENRIQUECIMIENTOS_DB.forEach((enr, enrIdx) => {
+    const lista = enr.especies?.length ? enr.especies : (enr.especie ? [{sp:enr.especie, sci:enr.sci||''}] : []);
+    lista.forEach((e, spIdx) => {
+      const key = (e.sp||e.especie||'').toLowerCase();
+      if (key && !seen.has(key)) { seen.add(key); allItems.push({ nombre:e.sp||e.especie, sci:e.sci||'', enrIdx, spIdx }); }
+    });
+  });
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="sp-hist-modal" style="position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:88vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.92rem;margin-bottom:.5rem">📋 Historial de especies</div>
+        <p style="font-size:.78rem;color:var(--txt3);margin-bottom:.75rem">Especies registradas en enriquecimientos.</p>
+        <div id="sp-hist-list">
+          ${allItems.length ? allItems.map(item=>`
+          <div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;border:1px solid var(--bor);border-radius:var(--rsm);margin-bottom:.3rem;background:var(--sur2)">
+            <div style="flex:1">
+              <div style="font-size:.85rem;font-weight:600">${item.nombre}</div>
+              ${item.sci?`<div style="font-size:.72rem;color:var(--txt3);font-style:italic">${item.sci}</div>`:''}
+            </div>
+          </div>`).join('')
+          : '<p style="text-align:center;color:var(--txt3);font-size:.82rem;padding:1rem">Sin especies registradas</p>'}
+        </div>
+        <button class="btn btn-secondary btn-block" style="margin-top:.75rem" onclick="document.getElementById('sp-hist-modal').remove()">Cerrar</button>
+      </div>
+    </div>`);
+}
+
+
 function addGroupSpeciesToEnriq(groupIdx) {
   const grp = SPECIES_GROUPS[groupIdx];
   if (!grp?.especies?.length) { toast('⚠ Este grupo no tiene especies'); return; }
