@@ -10428,7 +10428,7 @@ function openCalcFormula(fid, ev) {
         <td id="calc-val-rac-${comp.id}" style="padding:.3rem .4rem;font-family:var(--mono);font-size:.78rem;color:var(--g6);text-align:center">—</td>
         <td style="padding:.2rem .3rem">
           <div id="ing-list-${comp.id}"></div>
-          <button onclick="addIngrediente('${comp.id}','${fid}')" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.7rem;padding:.1rem 0;white-space:nowrap">+ ingrediente</button>
+          <div style="display:flex;gap:.4rem;align-items:center"><button onclick="addIngrediente('${comp.id}','${fid}')" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.7rem;padding:.1rem 0;white-space:nowrap">+ ingrediente</button><button onclick="openHistorialManager()" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:.65rem;padding:.1rem 0" title="Gestionar historial">📚</button></div>
         </td>
       </tr>${subRows}`;
     }).join('');
@@ -10597,20 +10597,66 @@ function addIngrediente(compId, fid) {
 function renderIngredientesComp(compId, fid) {
   const listEl = document.getElementById('ing-list-'+compId);
   if (!listEl) return;
-  listEl.innerHTML = (_ingredientes[compId]||[]).map((ing,i)=>`
-    <div style="display:flex;gap:.25rem;margin-bottom:.2rem;align-items:center">
-      <input type="text" value="${ing.nombre}" placeholder="Ingrediente"
-        style="flex:2;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .3rem;font-size:.73rem;outline:none"
-        onchange="_ingredientes['${compId}'][${i}].nombre=this.value">
-      <input type="number" value="${ing.gramos||''}" placeholder="g"
-        style="width:45px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .25rem;font-size:.73rem;text-align:center;font-family:var(--mono);outline:none"
-        onchange="_ingredientes['${compId}'][${i}].gramos=parseFloat(this.value)||0">
-      <input type="text" value="${ing.tamano}" placeholder="Tamaño"
-        style="flex:1;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .3rem;font-size:.73rem;outline:none"
-        onchange="_ingredientes['${compId}'][${i}].tamano=this.value">
-      <button onclick="_ingredientes['${compId}'].splice(${i},1);renderIngredientesComp('${compId}','${fid}')"
-        style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.7rem;flex-shrink:0">✕</button>
-    </div>`).join('');
+  // Calcular el valor total del componente (en g/ml) para auto-calcular peso por %
+  const valEl = document.getElementById('calc-val-'+compId) || document.getElementById('calc-val-rac-'+compId);
+  const totalComp = parseFloat(valEl?.textContent) || 0;
+  listEl.innerHTML = '';
+  (_ingredientes[compId]||[]).forEach((ing, i) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:.25rem;margin-bottom:.2rem;align-items:center';
+    // Nombre
+    const inN = document.createElement('input');
+    inN.style.cssText = 'flex:2;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .3rem;font-size:.73rem;outline:none';
+    inN.placeholder = 'Ingrediente'; inN.value = ing.nombre || '';
+    inN.setAttribute('list','ing-hist-dl-'+compId);
+    inN.onkeydown = (e) => { if (e.key==='Enter') { e.preventDefault(); addIngrediente(compId, fid); } };
+    inN.onblur = () => {
+      const v = inN.value.trim();
+      _ingredientes[compId][i].nombre = v;
+      if (v) { _ingHistorial.add(v); _actualizarDatalistsRac(); }
+    };
+    // % del componente
+    const inPct = document.createElement('input');
+    inPct.type = 'number'; inPct.min = '0'; inPct.max = '100'; inPct.step = '0.1';
+    inPct.style.cssText = 'width:48px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .25rem;font-size:.73rem;text-align:center;font-family:var(--mono);outline:none';
+    inPct.placeholder = '%'; inPct.value = ing.pct != null ? ing.pct : '';
+    inPct.title = 'Porcentaje del componente';
+    inPct.oninput = () => {
+      const pv = parseFloat(inPct.value) || 0;
+      _ingredientes[compId][i].pct = pv;
+      const peso = totalComp > 0 ? (totalComp * pv / 100).toFixed(2) : 0;
+      _ingredientes[compId][i].gramos = parseFloat(peso);
+      inPeso.value = peso > 0 ? peso : '';
+    };
+    // Peso calculado (solo lectura)
+    const inPeso = document.createElement('input');
+    inPeso.type = 'number'; inPeso.readOnly = true;
+    inPeso.style.cssText = 'width:52px;background:var(--g0);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .25rem;font-size:.73rem;text-align:center;font-family:var(--mono);color:var(--g6);outline:none';
+    inPeso.placeholder = 'g'; inPeso.title = 'Peso calculado automáticamente';
+    const pesoPre = totalComp > 0 && ing.pct ? (totalComp * ing.pct / 100).toFixed(2) : (ing.gramos || '');
+    inPeso.value = pesoPre;
+    // Tamaño
+    const inT = document.createElement('input');
+    inT.style.cssText = 'flex:1;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .3rem;font-size:.73rem;outline:none';
+    inT.placeholder = 'Tamaño'; inT.value = ing.tamano || '';
+    inT.setAttribute('list','tam-hist-dl');
+    inT.oninput = () => { if (inT.value.trim()) { _tamHistorial.add(inT.value.trim()); _actualizarDatalistsRac(); } };
+    inT.onblur = () => { _ingredientes[compId][i].tamano = inT.value.trim(); };
+    // Botón eliminar
+    const btn = document.createElement('button');
+    btn.style.cssText = 'background:none;border:none;color:var(--r5);cursor:pointer;font-size:.7rem;flex-shrink:0';
+    btn.textContent = '✕';
+    btn.onclick = () => { _ingredientes[compId].splice(i,1); renderIngredientesComp(compId, fid); };
+    row.appendChild(inN); row.appendChild(inPct); row.appendChild(inPeso); row.appendChild(inT); row.appendChild(btn);
+    listEl.appendChild(row);
+    // Datalist para historial
+    let dl = document.getElementById('ing-hist-dl-'+compId);
+    if (!dl) { dl = document.createElement('datalist'); dl.id = 'ing-hist-dl-'+compId; document.body.appendChild(dl); }
+    dl.innerHTML = [..._ingHistorial].sort().map(s=>'<option value="'+s+'">').join('');
+    let dlT = document.getElementById('tam-hist-dl');
+    if (!dlT) { dlT = document.createElement('datalist'); dlT.id = 'tam-hist-dl'; document.body.appendChild(dlT); }
+    dlT.innerHTML = [..._tamHistorial].sort().map(s=>'<option value="'+s+'">').join('');
+  });
 }
 
 function addCalcComponente(fid) {
@@ -11053,6 +11099,7 @@ function editarDietaGuardada(id) {
     + '<div class="form-group"><label>Nombre científico</label><input id="ed-sci" class="form-control" value="' + (d.sci||'') + '"></div></div>'
     + '<div class="form-row"><div class="form-group"><label>N° dieta</label><input id="ed-num" class="form-control" type="number" min="1" value="' + (d.num||1) + '" style="width:70px"></div>'
     + '<div class="form-group"><label>Nombre</label><input id="ed-nombre" class="form-control" value="' + (d.nombre||'') + '"></div></div>'
+    + '<div class="form-row"><div class="form-group"><label>Peso animal (kg)</label><input id="ed-pesoKg" class="form-control" type="number" step="0.1" value="' + (d.pesoKg||0) + '"></div><div class="form-group"><label>% ración</label><input id="ed-pct" class="form-control" type="number" step="0.1" value="' + (d.pct||5) + '"></div><div class="form-group"><label>Multiplicador</label><input id="ed-mult" class="form-control" type="number" step="0.1" value="' + (d.mult||1) + '"></div></div>'
     + '<div class="form-group"><label>Notas</label><textarea id="ed-notas" class="form-control" style="min-height:50px">' + (d.notas||'') + '</textarea></div>'
     + compHtml
     + '<div style="display:flex;gap:.5rem;margin-top:.75rem">'
@@ -11083,6 +11130,9 @@ async function guardarEdicionDieta(id) {
   d.num     = parseInt(document.getElementById('ed-num')?.value) || 1;
   d.nombre  = document.getElementById('ed-nombre')?.value.trim();
   d.notas   = document.getElementById('ed-notas')?.value || '';
+  if (document.getElementById('ed-pesoKg')) d.pesoKg = parseFloat(document.getElementById('ed-pesoKg').value) || d.pesoKg;
+  if (document.getElementById('ed-pct'))    d.pct    = parseFloat(document.getElementById('ed-pct').value)    || d.pct;
+  if (document.getElementById('ed-mult'))   d.mult   = parseFloat(document.getElementById('ed-mult').value)   || d.mult;
   const newIngs = {};
   Object.keys(d.componentes || {}).forEach(compId => {
     const cont = document.getElementById('ed-ing-' + compId);
@@ -11972,8 +12022,12 @@ function _renderRacIngRows(container, ri, compId, fid) {
     inNombre.placeholder = 'Ingrediente';
     inNombre.value = ing.nombre || '';
     inNombre.setAttribute('list','rac-ing-hist-dl');
-    inNombre.oninput = () => { if (inNombre.value.trim()) _ingHistorial.add(inNombre.value.trim()); _actualizarDatalistsRac(); };
-    inNombre.onchange = () => { _ingredientes[key][ii].nombre = inNombre.value.trim(); };
+    inNombre.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addRacIng(ri, compId, fid); } };
+    inNombre.onblur = () => {
+      const v = inNombre.value.trim();
+      _ingredientes[key][ii].nombre = v;
+      if (v) { _ingHistorial.add(v); _actualizarDatalistsRac(); }
+    };
     // Input gramos
     const inG = document.createElement('input');
     inG.className = 'form-control';
@@ -11986,8 +12040,11 @@ function _renderRacIngRows(container, ri, compId, fid) {
     inT.style.cssText = 'flex:1;font-size:.72rem';
     inT.placeholder = 'Tamaño'; inT.value = ing.tamano || '';
     inT.setAttribute('list','rac-tam-hist-dl');
-    inT.oninput = () => { if (inT.value.trim()) _tamHistorial.add(inT.value.trim()); _actualizarDatalistsRac(); };
-    inT.onchange = () => { _ingredientes[key][ii].tamano = inT.value.trim(); };
+    inT.onblur = () => {
+      const tv = inT.value.trim();
+      _ingredientes[key][ii].tamano = tv;
+      if (tv) { _tamHistorial.add(tv); _actualizarDatalistsRac(); }
+    };
     // Botón eliminar
     const btn = document.createElement('button');
     btn.style.cssText = 'background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.1rem .3rem;font-size:.65rem;flex-shrink:0';
@@ -12004,6 +12061,46 @@ function addRacIng(ri, compId, fid) {
   _ingredientes[key].push({ nombre: '', gramos: 0, tamano: '' });
   const cont = document.getElementById('rac-ing-cont-' + ri + '-' + compId);
   if (cont) _renderRacIngRows(cont, ri, compId, fid);
+}
+
+function openHistorialManager() {
+  document.getElementById('hist-modal')?.remove();
+  const ingList = [..._ingHistorial].sort();
+  const tamList = [..._tamHistorial].sort();
+  document.body.insertAdjacentHTML('beforeend',
+    '<div id="hist-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:1rem">'
+    + '<div style="background:var(--sur);border-radius:var(--r);padding:1.25rem;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:var(--shl)">'
+    + '<div style="font-weight:700;font-size:.92rem;margin-bottom:.75rem">📚 Historial de ingredientes</div>'
+    + '<div style="margin-bottom:.75rem">'
+    + '<div style="font-size:.75rem;font-weight:600;color:var(--g6);margin-bottom:.3rem">Ingredientes</div>'
+    + '<div id="hist-ing-list">'
+    + ingList.map(s => '<div style="display:flex;justify-content:space-between;align-items:center;padding:.2rem .4rem;border-radius:var(--rxs);margin-bottom:.15rem;background:var(--sur2)">'
+        + '<span style="font-size:.82rem">' + s + '</span>'
+        + '<button onclick="_ingHistorial.delete(\'' + s.replace(/'/g,"\\'") + '\');openHistorialManager()" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>'
+        + '</div>').join('')
+    + (ingList.length ? '' : '<p style="font-size:.75rem;color:var(--txt3);font-style:italic">Sin ingredientes en historial</p>')
+    + '</div>'
+    + '<div style="display:flex;gap:.3rem;margin-top:.35rem">'
+    + '<input id="hist-ing-new" class="form-control" placeholder="Agregar ingrediente al historial..." style="flex:1;font-size:.8rem">'
+    + '<button class="btn btn-secondary btn-sm" onclick="const v=document.getElementById(\'hist-ing-new\').value.trim();if(v){_ingHistorial.add(v);openHistorialManager()}">+ Agregar</button>'
+    + '</div></div>'
+    + '<div>'
+    + '<div style="font-size:.75rem;font-weight:600;color:var(--g6);margin-bottom:.3rem">Tamaños</div>'
+    + '<div id="hist-tam-list">'
+    + tamList.map(s => '<div style="display:flex;justify-content:space-between;align-items:center;padding:.2rem .4rem;border-radius:var(--rxs);margin-bottom:.15rem;background:var(--sur2)">'
+        + '<span style="font-size:.82rem">' + s + '</span>'
+        + '<button onclick="_tamHistorial.delete(\'' + s.replace(/'/g,"\\'") + '\');openHistorialManager()" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>'
+        + '</div>').join('')
+    + (tamList.length ? '' : '<p style="font-size:.75rem;color:var(--txt3);font-style:italic">Sin tamaños en historial</p>')
+    + '</div>'
+    + '<div style="display:flex;gap:.3rem;margin-top:.35rem">'
+    + '<input id="hist-tam-new" class="form-control" placeholder="Agregar tamaño al historial..." style="flex:1;font-size:.8rem">'
+    + '<button class="btn btn-secondary btn-sm" onclick="const v=document.getElementById(\'hist-tam-new\').value.trim();if(v){_tamHistorial.add(v);openHistorialManager()}">+ Agregar</button>'
+    + '</div></div>'
+    + '<div style="display:flex;gap:.5rem;margin-top:.75rem">'
+    + '<button class="btn btn-secondary" style="flex:1" onclick="document.getElementById(\'hist-modal\').remove()">Cerrar</button>'
+    + '</div></div></div>'
+  );
 }
 
 let navHistory = [];
@@ -12133,10 +12230,6 @@ async function init() {
   if (!navigator.onLine) document.getElementById('offline-badge')?.classList.add('show');
   pushNav({ type: 'screen', name: 'home' });
 }
-init();
-</script>
-</body>
-</html>
 function renderDietasEnEspecie(sp, isAdmin) {
   const dietasEsp = (DIETAS_GUARDADAS || []).filter(d =>
     d.especie?.toLowerCase() === (sp.name||'').toLowerCase() ||
@@ -12187,3 +12280,8 @@ function renderDietasEnEspecie(sp, isAdmin) {
     + '</div>' + rows + '</div>';
 }
 
+init();
+
+</script>
+</body>
+</html>
