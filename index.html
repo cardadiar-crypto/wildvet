@@ -3357,38 +3357,9 @@ function renderNutricion(el, sp) {
     : (s[field]||'—');
 
   // ── Sección dietas calculadas vinculadas ──
-  const dietasEspecie = (DIETAS_GUARDADAS||[]).filter(d =>
-    d.especie?.toLowerCase() === (sp.name||'').toLowerCase() ||
-    (d.sci && sp.sci && d.sci.toLowerCase() === sp.sci.toLowerCase())
-  );
-
-  function renderDietasEnEspecie() {
-    if (!dietasEspecie.length) return '';
-    const all = getAllCalcFormulas();
-    const rows = dietasEspecie.map(d => {
-      const f = all[d.fid]||{label:d.fid,icon:'🧮'};
-      const comps = Object.entries(d.componentes||{});
-      const compTable = comps.length ? '<div style="margin-top:.4rem;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.75rem"><thead><tr style="background:var(--g0)"><th style="padding:.2rem .4rem;text-align:left;color:var(--txt3)">Componente</th><th style="padding:.2rem .4rem;text-align:center;color:var(--g6)">Cantidad</th><th style="padding:.2rem .4rem;text-align:center;color:var(--txt3)">%</th></tr></thead><tbody>' +
-        comps.map(([id,v]) => '<tr style="border-bottom:1px solid var(--bor)"><td style="padding:.2rem .4rem">'+id+'</td><td style="padding:.2rem .4rem;text-align:center;font-family:var(--mono);font-weight:700;color:var(--g5)">'+(v.val||'—')+'</td><td style="padding:.2rem .4rem;text-align:center;color:var(--txt3)">'+(v.pct||0)+'%</td></tr>').join('') +
-        '</tbody></table></div>' : '';
-      const delBtn = isAdmin ? '<button onclick="eliminarDietaGuardada(&quot;'+d.id+'&quot;);renderTab(&quot;nutricion&quot;)" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem;flex-shrink:0">✕</button>' : '';
-      const notasHtml = d.notas ? '<div style="font-size:.72rem;color:var(--txt3);font-style:italic;margin-top:.3rem">📋 '+d.notas+'</div>' : '';
-      return '<div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.55rem .7rem;margin-bottom:.4rem;background:var(--sur)">' +
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
-        '<div><div style="font-size:.85rem;font-weight:700">'+f.icon+' '+d.especie+(d.num>1?' #'+d.num:'')+(d.nombre?' · '+d.nombre:'')+'</div>' +
-        '<div style="font-size:.72rem;color:var(--txt3)">'+f.label+' · '+d.pesoKg+' kg · '+d.pct+'% ración</div>' +
-        '<div style="font-size:.68rem;color:var(--txt3);font-style:italic">'+new Date(d.fecha).toLocaleDateString('es-CO')+'</div></div>' +
-        delBtn + '</div>' + compTable + notasHtml + '</div>';
-    }).join('');
-    return '<div class="info-card" style="border-left:3px solid var(--g5)">' +
-      '<div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">' +
-      '<span>🥗 Dietas formuladas ('+dietasEspecie.length+')</span>' +
-      (isAdmin ? '<button onclick="showScreen(&quot;nutricion-calc&quot;)" class="btn btn-admin btn-sm" style="font-size:.7rem">+ Nueva dieta</button>' : '') +
-      '</div>' + rows + '</div>';
-  }
 
   el.innerHTML =
-    renderDietasEnEspecie() +
+    renderDietasEnEspecie(sp, isAdmin) +
     `<!-- DIETA EN VIDA SILVESTRE -->
     <div class="info-card">
       <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
@@ -3874,10 +3845,6 @@ async function editReqEnergetico(i, field, value) {
   currentSpecies.req_energetico[i][field] = value;
   await dbPutSync('species', currentSpecies);
 }
-async function removeReqEnergetico(i) {
-  currentSpecies.req_energetico.splice(i,1);
-  await dbPutSync('species', currentSpecies); renderTab('nutricion');
-}
 function calcReqTotal(input, kcalStr, resultId) {
   const w = parseFloat(input.value);
   const el = document.getElementById(resultId);
@@ -3913,15 +3880,6 @@ async function editSuplemento(i, field, value) {
   if (!currentSpecies.suplementos?.[i]) return;
   currentSpecies.suplementos[i][field] = value;
   await dbPutSync('species', currentSpecies);
-}
-// addSuplemento ya definida abajo
-async function saveReqEnergetico() {
-  const cat = document.getElementById('req-cat')?.value.trim();
-  if (!cat) { toast('⚠ Ingresa la categoría'); return; }
-  if (!currentSpecies.req_energetico) currentSpecies.req_energetico = [];
-  currentSpecies.req_energetico.push({ cat, kcal: document.getElementById('req-kcal')?.value||'', notes: document.getElementById('req-notes')?.value||'' });
-  await dbPutSync('species', currentSpecies);
-  renderTab('nutricion'); toast('✓ Requerimiento energético agregado');
 }
 async function removeReqEnergetico(i) {
   const ok = await confirmDelete('¿Eliminar categoría?','Se eliminará este requerimiento energético.');
@@ -6834,30 +6792,35 @@ function searchVadForDrug(q) {
 }
 
 function importVadDrug(vadId) {
-  const d = VADEMECUM_DB.find(v=>v.id===vadId);
+  const d = VADEMECUM_DB.find(v => v.id === vadId);
   if (!d) return;
-  const set = (id, val) => { const el = document.getElementById(id); if(el && val!=null && val!=='') el.value = val; };
-  // Campos del formulario de especie
-  set('sdrug-name',    d.drug||d.nombres?.[0]||'');
-  set('sdrug-active',  d.active||'');
-  set('sdrug-conc',    d.conc||'');
-  set('sdrug-indic',   d.indic||'');
-  set('sdrug-contra',  d.contraindications||'');
-  set('sdrug-effects', d.info||'');
-  set('sdrug-cat-esp', d.cat_esp||'');
-  // Marcar checkboxes de categorías
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && val !== undefined && val !== null && val !== '') el.value = val;
+  };
+  setVal('sdrug-name',    d.drug || d.nombres?.[0] || '');
+  setVal('sdrug-active',  d.active || '');
+  setVal('sdrug-conc',    d.conc || '');
+  setVal('sdrug-cat-esp', d.cat_esp || '');
+  setVal('sdrug-indic',   d.indic || '');
+  setVal('sdrug-contra',  d.contraindications || '');
+  setVal('sdrug-effects', d.info || '');
+  // Vía de administración
+  const routeEl = document.getElementById('sdrug-route');
+  if (routeEl && d.route) routeEl.value = d.route;
+  // Categorías — checkboxes múltiples
   const cats = d.cats?.length ? d.cats : (d.category ? [d.category] : []);
   document.querySelectorAll('.sdrug-cat-chk').forEach(chk => {
     chk.checked = cats.includes(chk.value);
   });
-  // Vía
-  const routeEl = document.getElementById('sdrug-route');
-  if (routeEl && d.route) routeEl.value = d.route;
   // Limpiar buscador
-  document.getElementById('vad-search-results').innerHTML = '';
-  document.getElementById('vad-search-drug').value = '';
-  toast('✓ Datos del vademécum importados — ajusta la dosis para ' + currentSpecies?.name);
+  const res = document.getElementById('vad-search-results');
+  const inp = document.getElementById('vad-search-drug');
+  if (res) res.innerHTML = '';
+  if (inp) inp.value = '';
+  toast('✓ Datos del vademécum importados — ajusta la dosis para ' + (currentSpecies?.name || ''));
 }
+
 function openAddSpeciesDrug() {
   const f = document.getElementById('modal-species-drug-form');
   f.innerHTML = `
@@ -9136,62 +9099,6 @@ async function saveRefGeneral() {
 
 
 
-
-function openEditRefGeneral(idx) {
-  // Abrir modal con datos existentes para editar referencia general
-  const ref = BIBLIOTECA_GENERAL[idx];
-  if (!ref) return;
-  _refPDFData = ref.pdf || null;
-  document.getElementById('ref-modal')?.remove();
-  const { provider, key } = getActiveAIKey();
-  document.body.insertAdjacentHTML('beforeend', `
-    <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
-      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
-        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">✏️ Editar referencia general</div>
-        ${buildRefFormHTML(key, provider)}
-        <div style="display:flex;gap:.5rem;margin-top:.75rem">
-          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
-          <button class="btn btn-primary" style="flex:2" onclick="updateRefGeneral(${idx})">💾 Guardar cambios</button>
-        </div>
-      </div>
-    </div>`);
-  // Pre-llenar campos
-  setTimeout(() => {
-    const set = (id, v) => { const el=document.getElementById(id); if(el&&v) el.value=v; };
-    set('ref-titulo', ref.titulo);
-    set('ref-autores', ref.autores);
-    set('ref-año', ref.año);
-    set('ref-url', ref.url);
-    set('ref-notas', ref.notas);
-    if (ref.tipo) {
-      const sel = document.getElementById('ref-tipo');
-      if (sel) for (const o of sel.options) if (o.value===ref.tipo) { o.selected=true; break; }
-    }
-    if (ref.pdf?.name) {
-      const nameEl = document.getElementById('ref-pdf-name');
-      if (nameEl) nameEl.textContent = '📎 ' + ref.pdf.name + ' (guardado)';
-    }
-  }, 50);
-}
-
-async function updateRefGeneral(idx) {
-  const titulo = document.getElementById('ref-titulo')?.value.trim();
-  if (!titulo) { toast('⚠ El título es obligatorio'); return; }
-  BIBLIOTECA_GENERAL[idx] = {
-    ...BIBLIOTECA_GENERAL[idx],
-    titulo,
-    autores: document.getElementById('ref-autores')?.value.trim()||'',
-    año:     document.getElementById('ref-año')?.value||'',
-    tipo:    document.getElementById('ref-tipo')?.value||'Libro',
-    url:     document.getElementById('ref-url')?.value.trim()||'',
-    notas:   document.getElementById('ref-notas')?.value.trim()||'',
-    pdf:     _refPDFData || BIBLIOTECA_GENERAL[idx].pdf || null
-  };
-  await saveBibliotecaGeneral();
-  document.getElementById('ref-modal')?.remove();
-  renderBiblioteca();
-  toast('✓ Referencia actualizada');
-}
 async function removeRefGeneral(i) {
   const ok = await confirmDelete('¿Eliminar referencia?', `Se eliminará "${BIBLIOTECA_GENERAL[i]?.titulo||''}".`);
   if (!ok) return;
@@ -9451,7 +9358,15 @@ async function loadSpeciesGroups() {
 async function saveSpeciesGroups() {
   await dbPut('settings', { key: 'species_groups', value: SPECIES_GROUPS });
   if (firestore && fbUid()) {
-    try { await firestore.collection('settings').doc('species_groups').set({ value: SPECIES_GROUPS }); } catch(e) {}
+    try {
+      const fsGroups = await Promise.all(SPECIES_GROUPS.map(async g => {
+        if (!g.iconImg) return g;
+        const img = g.iconImg.length > 50000
+          ? await compressForFirestore(g.iconImg) : g.iconImg;
+        return { ...g, iconImg: img };
+      }));
+      await firestore.collection('settings').doc('species_groups').set({ value: fsGroups });
+    } catch(e) { console.warn('saveSpeciesGroups Firestore:', e.message); }
   }
 }
 
@@ -9589,8 +9504,8 @@ async function saveGroup(gi) {
   else SPECIES_GROUPS.push(grp);
   await saveSpeciesGroups();
   document.getElementById('group-edit-modal')?.remove();
-  renderGroupsList();
-  toast('✓ Grupo guardado');
+  if (document.getElementById('groups-list')) renderGroupsList();
+  toast('✓ Grupo "' + nombre + '" guardado (' + especies.length + ' especies)');
 }
 
 async function confirmDeleteGroup(gi) {
@@ -10574,7 +10489,8 @@ function openCalcFormula(fid, ev) {
         <label style="font-size:.78rem;color:var(--txt2);flex:1">Raciones diarias (se divide la ración total):</label>
         <input type="number" id="calc-nraciones" value="1" min="1" max="10" step="1"
           style="width:55px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.25rem;font-family:var(--mono);font-size:.88rem;text-align:center;outline:none"
-          oninput="runCalc('${fid}')">
+          oninput="runCalc('${fid}');buildRacionesPanels('${fid}')">
+        <div id="calc-raciones-panels" style="margin-top:.4rem"></div>
       </div>` : ''}
 
       <!-- Tabla principal -->
@@ -10954,6 +10870,21 @@ async function confirmarGuardarDieta(fid, pesoKg, pct, mult, notas) {
       notas,
       componentes: compState,
       ingredientes: JSON.parse(JSON.stringify(_ingredientes)),
+      raciones: (() => {
+        const nRac = parseInt(document.getElementById('calc-nraciones')?.value) || 1;
+        if (nRac <= 1) return null;
+        const racs = [];
+        for (let ri = 0; ri < nRac; ri++) {
+          const total = parseFloat(document.getElementById('rac-total-' + ri)?.value) || 0;
+          const ings = {};
+          Object.keys(_ingredientes).filter(k => k.startsWith('__rac_' + ri + '__')).forEach(k => {
+            const compId = k.replace('__rac_' + ri + '__', '');
+            ings[compId] = _ingredientes[k];
+          });
+          racs.push({ num: ri + 1, total, ingredientes: ings });
+        }
+        return racs;
+      })(),
       fecha: new Date().toISOString()
     };
     DIETAS_GUARDADAS.push(dieta);
@@ -11005,35 +10936,173 @@ function renderDietasGuardadas() {
     el.innerHTML = '<p style="font-size:.8rem;color:var(--txt3);font-style:italic;text-align:center;padding:1rem">Sin dietas guardadas</p>';
     return;
   }
-  // Agrupar por fid
   const all = getAllCalcFormulas();
   const groups = {};
-  DIETAS_GUARDADAS.forEach(d => {
-    if (!groups[d.fid]) groups[d.fid] = [];
-    groups[d.fid].push(d);
-  });
+  DIETAS_GUARDADAS.forEach(d => { if (!groups[d.fid]) groups[d.fid]=[]; groups[d.fid].push(d); });
   el.innerHTML = Object.entries(groups).map(([fid, dietas]) => {
-    const f = all[fid] || { label: fid, icon:'🧮' };
-    return `<div style="margin-bottom:.75rem">
-      <div style="font-size:.72rem;font-weight:700;color:var(--g6);text-transform:uppercase;letter-spacing:.06em;padding:.25rem 0;border-bottom:1px solid var(--bor);margin-bottom:.3rem">
-        ${f.icon} ${f.label}
-      </div>
-      ${dietas.map(d=>`
-      <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--rsm);padding:.5rem .75rem;margin-bottom:.3rem">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div>
-            <div style="font-size:.85rem;font-weight:600">${d.especie}${d.num>1?' #'+d.num:''} ${d.nombre?'· '+d.nombre:''}</div>
-            <div style="font-size:.72rem;color:var(--txt3);font-style:italic">${d.sci||''}</div>
-            <div style="font-size:.72rem;color:var(--txt3)">Peso: ${d.pesoKg} kg · ${d.pct}% ración · ${new Date(d.fecha).toLocaleDateString('es-CO')}</div>
-            ${d.notas?`<div style="font-size:.7rem;color:var(--txt3);font-style:italic;margin-top:.2rem">📋 ${d.notas.substring(0,80)}${d.notas.length>80?'…':''}</div>`:''}
-          </div>
-          <button onclick="eliminarDietaGuardada('${d.id}')"
-            style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.8rem;flex-shrink:0">✕</button>
-        </div>
-      </div>`).join('')}
-    </div>`;
+    const f = all[fid] || { label: fid, icon: '🧮' };
+    return '<div style="margin-bottom:.75rem">'
+      + '<div style="font-size:.72rem;font-weight:700;color:var(--g6);text-transform:uppercase;padding:.25rem 0;border-bottom:1px solid var(--bor);margin-bottom:.3rem">'
+      + f.icon + ' ' + f.label + '</div>'
+      + dietas.map(d => {
+          const comps = Object.entries(d.componentes || {});
+          const ings  = d.ingredientes || {};
+          const compRows = comps.map(([id, v]) => {
+            const ingList = (ings[id] || []).filter(i => i.nombre)
+              .map(i => i.nombre + (i.gramos ? ' ' + i.gramos + 'g' : '') + (i.tamano ? ' ' + i.tamano : '')).join(', ');
+            return '<tr style="border-bottom:1px solid var(--bor)">'
+              + '<td style="padding:.2rem .35rem;font-size:.75rem">' + id + '</td>'
+              + '<td style="padding:.2rem .35rem;font-family:var(--mono);font-weight:700;color:var(--g5)">' + (v.val||'—') + '</td>'
+              + '<td style="padding:.2rem .35rem;font-size:.7rem;color:var(--txt3)">' + (v.pct||0) + '%</td>'
+              + '<td style="padding:.2rem .35rem;font-size:.7rem;color:var(--txt3)">' + ingList + '</td></tr>';
+          }).join('');
+          return '<div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--rsm);margin-bottom:.3rem;overflow:hidden">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;padding:.45rem .65rem;cursor:pointer" onclick="toggleDietaCard(' + "'" + d.id + "'" + ')">'
+            + '<div>'
+            + '<div style="font-size:.83rem;font-weight:600">' + d.especie + (d.num>1 ? ' #'+d.num : '') + (d.nombre ? ' · '+d.nombre : '') + '</div>'
+            + '<div style="font-size:.7rem;color:var(--txt3)">' + d.pesoKg + ' kg · ' + d.pct + '% · ' + new Date(d.fecha).toLocaleDateString('es-CO') + '</div>'
+            + '</div>'
+            + '<div style="display:flex;gap:.3rem;align-items:center">'
+            + '<svg id="dchev-' + d.id + '" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>'
+            + '<button onclick="event.stopPropagation();editarDietaGuardada(' + "'" + d.id + "'" + ')" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem" title="Editar">✏️</button>'
+            + '<button onclick="event.stopPropagation();eliminarDietaGuardada(' + "'" + d.id + "'" + ')" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem" title="Eliminar">✕</button>'
+            + '</div></div>'
+            + '<div id="dpanel-' + d.id + '" style="display:none;border-top:1px solid var(--bor);padding:.35rem .65rem">'
+            + (d.notas ? '<div style="font-size:.73rem;color:var(--txt3);font-style:italic;margin-bottom:.3rem;background:var(--g0);border-radius:var(--rxs);padding:.15rem .3rem">📋 ' + d.notas + '</div>' : '')
+            + (() => {
+                if (!d.raciones?.length) return '';
+                return '<div style="margin-top:.35rem">'  
+                  + '<div style="font-size:.68rem;font-weight:700;color:var(--g6);text-transform:uppercase;margin-bottom:.2rem">Raciones diarias (' + d.raciones.length + ')</div>'
+                  + d.raciones.map(rac => {
+                      const racIngRows = Object.entries(rac.ingredientes||{}).flatMap(([compId, ings]) =>
+                        (ings||[]).filter(i=>i.nombre).map(i =>
+                          '<tr><td style="padding:.15rem .3rem;font-size:.7rem;color:var(--txt3)">' + compId + '</td>'
+                          + '<td style="padding:.15rem .3rem;font-size:.72rem">' + i.nombre + '</td>'
+                          + '<td style="padding:.15rem .3rem;font-size:.72rem;text-align:center;font-family:var(--mono)">' + (i.gramos||'') + '</td>'
+                          + '<td style="padding:.15rem .3rem;font-size:.72rem;color:var(--txt3)">' + (i.tamano||'') + '</td></tr>'
+                        )
+                      ).join('');
+                      return '<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.3rem .4rem;margin-bottom:.2rem">'
+                        + '<div style="font-size:.75rem;font-weight:600;color:var(--g6);margin-bottom:.15rem">Ración ' + rac.num + ' — ' + (rac.total||'—') + ' g/ml</div>'
+                        + (racIngRows ? '<table style="width:100%;border-collapse:collapse"><thead><tr>'
+                            + '<th style="font-size:.65rem;padding:.1rem .3rem;text-align:left;color:var(--txt3)">Comp.</th>'
+                            + '<th style="font-size:.65rem;padding:.1rem .3rem;text-align:left;color:var(--txt3)">Ingrediente</th>'
+                            + '<th style="font-size:.65rem;padding:.1rem .3rem;color:var(--txt3)">g/ml</th>'
+                            + '<th style="font-size:.65rem;padding:.1rem .3rem;text-align:left;color:var(--txt3)">Tamaño</th>'
+                            + '</tr></thead><tbody>' + racIngRows + '</tbody></table>' : '<em style="font-size:.7rem;color:var(--txt3)">Sin ingredientes</em>')
+                        + '</div>';
+                    }).join('')
+                  + '</div>';
+              })()
+            + (compRows ? '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">'
+                + '<thead><tr style="background:var(--g0)">'
+                + '<th style="padding:.2rem .35rem;font-size:.68rem;text-align:left;color:var(--txt3)">Comp.</th>'
+                + '<th style="padding:.2rem .35rem;font-size:.68rem;color:var(--g6)">Cant.</th>'
+                + '<th style="padding:.2rem .35rem;font-size:.68rem;color:var(--txt3)">%</th>'
+                + '<th style="padding:.2rem .35rem;font-size:.68rem;text-align:left;color:var(--txt3)">Ingredientes</th>'
+                + '</tr></thead><tbody>' + compRows + '</tbody></table></div>'
+              : '<p style="font-size:.75rem;color:var(--txt3)">Sin componentes guardados</p>')
+            + '</div>'
+            + '</div>';
+        }).join('')
+      + '</div>';
   }).join('');
 }
+
+function toggleDietaCard(id) {
+  const panel = document.getElementById('dpanel-' + id);
+  const chev  = document.getElementById('dchev-' + id);
+  if (!panel) return;
+  const open = panel.style.display === 'none';
+  panel.style.display = open ? 'block' : 'none';
+  if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
+}
+
+function editarDietaGuardada(id) {
+  const d = DIETAS_GUARDADAS.find(x => x.id === id);
+  if (!d) return;
+  const all = getAllCalcFormulas();
+  const f = all[d.fid] || { label: d.fid, icon: '🧮' };
+  const comps = Object.entries(d.componentes || {});
+  const ings  = d.ingredientes || {};
+  document.getElementById('editar-dieta-modal')?.remove();
+  const compHtml = comps.map(([id, v]) => {
+    const ingArr = ings[id] || [];
+    const ingRows = ingArr.map((ing, ii) =>
+      '<div style="display:flex;gap:.2rem;margin-bottom:.15rem" class="ed-ing-row">'
+      + '<input class="form-control ed-ing-nombre" value="' + (ing.nombre||'') + '" placeholder="Ingrediente" style="flex:2;font-size:.73rem">'
+      + '<input class="form-control ed-ing-gramos" type="number" value="' + (ing.gramos||'') + '" placeholder="g" style="width:48px;font-size:.73rem;text-align:center">'
+      + '<input class="form-control ed-ing-tamano" value="' + (ing.tamano||'') + '" placeholder="Tamaño" style="flex:1;font-size:.73rem">'
+      + '<button onclick="this.closest(\'.ed-ing-row\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.1rem .3rem;font-size:.65rem;flex-shrink:0">✕</button>'
+      + '</div>'
+    ).join('');
+    return '<div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem .5rem;margin-bottom:.3rem;background:var(--sur2)">'
+      + '<div style="display:flex;justify-content:space-between;margin-bottom:.2rem">'
+      + '<span style="font-size:.78rem;font-weight:600">' + id + '</span>'
+      + '<span style="font-size:.72rem;color:var(--g5);font-family:var(--mono)">' + (v.val||'—') + '</span>'
+      + '</div>'
+      + '<div id="ed-ing-' + id + '">' + ingRows + '</div>'
+      + '<button onclick="addEdIng(\'' + id + '\')" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.72rem;margin-top:.1rem">+ ingrediente</button>'
+      + '</div>';
+  }).join('');
+  document.body.insertAdjacentHTML('beforeend',
+    '<div id="editar-dieta-modal" style="position:fixed;inset:0;z-index:1300;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center">'
+    + '<div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">'
+    + '<div style="font-weight:700;font-size:.9rem;margin-bottom:.5rem">✏️ Editar — ' + f.icon + ' ' + f.label + '</div>'
+    + '<div class="form-row"><div class="form-group"><label>Especie</label><input id="ed-especie" class="form-control" value="' + d.especie + '"></div>'
+    + '<div class="form-group"><label>Nombre científico</label><input id="ed-sci" class="form-control" value="' + (d.sci||'') + '"></div></div>'
+    + '<div class="form-row"><div class="form-group"><label>N° dieta</label><input id="ed-num" class="form-control" type="number" min="1" value="' + (d.num||1) + '" style="width:70px"></div>'
+    + '<div class="form-group"><label>Nombre</label><input id="ed-nombre" class="form-control" value="' + (d.nombre||'') + '"></div></div>'
+    + '<div class="form-group"><label>Notas</label><textarea id="ed-notas" class="form-control" style="min-height:50px">' + (d.notas||'') + '</textarea></div>'
+    + compHtml
+    + '<div style="display:flex;gap:.5rem;margin-top:.75rem">'
+    + '<button class="btn btn-secondary" style="flex:1" onclick="document.getElementById(\'editar-dieta-modal\').remove()">Cancelar</button>'
+    + '<button class="btn btn-primary" style="flex:2" onclick="guardarEdicionDieta(\'' + id + '\')">💾 Guardar cambios</button>'
+    + '</div></div></div>'
+  );
+}
+
+function addEdIng(compId) {
+  const list = document.getElementById('ed-ing-' + compId);
+  if (!list) return;
+  const div = document.createElement('div');
+  div.className = 'ed-ing-row';
+  div.style.cssText = 'display:flex;gap:.2rem;margin-bottom:.15rem';
+  div.innerHTML = '<input class="form-control ed-ing-nombre" value="" placeholder="Ingrediente" style="flex:2;font-size:.73rem">'
+    + '<input class="form-control ed-ing-gramos" type="number" value="" placeholder="g" style="width:48px;font-size:.73rem;text-align:center">'
+    + '<input class="form-control ed-ing-tamano" value="" placeholder="Tamaño" style="flex:1;font-size:.73rem">'
+    + '<button onclick="this.closest(\'.ed-ing-row\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.1rem .3rem;font-size:.65rem;flex-shrink:0">✕</button>';
+  list.appendChild(div);
+}
+
+async function guardarEdicionDieta(id) {
+  const d = DIETAS_GUARDADAS.find(x => x.id === id);
+  if (!d) return;
+  d.especie = document.getElementById('ed-especie')?.value.trim() || d.especie;
+  d.sci     = document.getElementById('ed-sci')?.value.trim() || '';
+  d.num     = parseInt(document.getElementById('ed-num')?.value) || 1;
+  d.nombre  = document.getElementById('ed-nombre')?.value.trim();
+  d.notas   = document.getElementById('ed-notas')?.value || '';
+  const newIngs = {};
+  Object.keys(d.componentes || {}).forEach(compId => {
+    const cont = document.getElementById('ed-ing-' + compId);
+    if (!cont) return;
+    newIngs[compId] = Array.from(cont.querySelectorAll('.ed-ing-row')).map(row => ({
+      nombre: row.querySelector('.ed-ing-nombre')?.value.trim() || '',
+      gramos: parseFloat(row.querySelector('.ed-ing-gramos')?.value) || 0,
+      tamano: row.querySelector('.ed-ing-tamano')?.value.trim() || ''
+    })).filter(i => i.nombre);
+  });
+  d.ingredientes = newIngs;
+  const f = getAllCalcFormulas()[d.fid];
+  d.label = (f?.label || d.fid) + ' — ' + d.especie + (d.num > 1 ? ' #' + d.num : '') + (d.nombre ? ' (' + d.nombre + ')' : '');
+  await saveDietasGuardadas();
+  document.getElementById('editar-dieta-modal')?.remove();
+  renderDietasGuardadas();
+  if (currentSpecies && currentSpecies.name?.toLowerCase() === d.especie.toLowerCase()) renderTab('nutricion');
+  toast('✓ Dieta actualizada');
+}
+
 
 async function eliminarDietaGuardada(id) {
   const ok = await confirmDelete('¿Eliminar dieta?', 'Esta acción no se puede deshacer.');
@@ -11818,6 +11887,125 @@ async function saveEditEnfermedad(sistId, enfIdx) {
 // ═══════════════════════════════════
 // NAVEGACIÓN — historial interno
 // ═══════════════════════════════════
+// ══ Historial ingredientes y tamaños ══
+const _ingHistorial = new Set();
+const _tamHistorial = new Set();
+
+function _actualizarDatalistsRac() {
+  let dl1 = document.getElementById('rac-ing-hist-dl');
+  if (!dl1) { dl1 = document.createElement('datalist'); dl1.id = 'rac-ing-hist-dl'; document.body.appendChild(dl1); }
+  dl1.innerHTML = [..._ingHistorial].sort().map(s => '<option value="' + s + '">').join('');
+  let dl2 = document.getElementById('rac-tam-hist-dl');
+  if (!dl2) { dl2 = document.createElement('datalist'); dl2.id = 'rac-tam-hist-dl'; document.body.appendChild(dl2); }
+  dl2.innerHTML = [..._tamHistorial].sort().map(s => '<option value="' + s + '">').join('');
+}
+
+// Clave en _ingredientes para una ración específica
+function _racKey(ri, compId) { return '__rac_' + ri + '__' + compId; }
+
+function buildRacionesPanels(fid) {
+  const container = document.getElementById('calc-raciones-panels');
+  if (!container) return;
+  const nRac = parseInt(document.getElementById('calc-nraciones')?.value) || 1;
+  if (nRac <= 1) { container.innerHTML = ''; return; }
+  const all = getAllCalcFormulas();
+  const formula = all[fid]; if (!formula) return;
+  const totalGlobal = parseFloat(document.getElementById('calc-total')?.textContent) || 0;
+  const unidad = formula.unidad || 'g';
+  _actualizarDatalistsRac();
+  container.innerHTML = '';
+  for (let ri = 0; ri < nRac; ri++) {
+    const panel = document.createElement('div');
+    panel.style.cssText = 'border:1px solid var(--g4);border-radius:var(--rsm);padding:.5rem;margin-bottom:.35rem;background:var(--g0)';
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem';
+    header.innerHTML = '<span style="font-size:.78rem;font-weight:700;color:var(--g6)">Ración ' + (ri+1) + ' de ' + nRac + '</span>'
+      + '<div style="display:flex;align-items:center;gap:.3rem;font-size:.75rem;color:var(--txt3)">Total ración: '
+      + '<input id="rac-total-' + ri + '" type="number" value="' + (totalGlobal/nRac).toFixed(2) + '" min="0" step="0.01" '
+      + 'style="width:70px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.15rem .25rem;font-family:var(--mono);font-size:.82rem;font-weight:700;color:var(--g5);text-align:center;outline:none" '
+      + 'oninput="_syncRacTotales(this,' + ri + ',' + nRac + ',' + totalGlobal + ')"> ' + unidad + '</div>';
+    panel.appendChild(header);
+    formula.componentes.forEach(comp => {
+      const key = _racKey(ri, comp.id);
+      if (!_ingredientes[key]) _ingredientes[key] = [];
+      const compDiv = document.createElement('div');
+      compDiv.style.cssText = 'border:1px solid var(--bor);border-radius:var(--rxs);padding:.3rem .4rem;margin-bottom:.2rem;background:var(--sur)';
+      const pctComp = parseFloat(document.getElementById('calc-pct-' + comp.id)?.value) || comp.pct;
+      const valComp = (totalGlobal * pctComp / 100 / nRac).toFixed(2);
+      compDiv.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.2rem">'
+        + '<span style="font-size:.75rem;font-weight:600">' + comp.label + '</span>'
+        + '<span style="font-size:.75rem;font-family:var(--mono);color:var(--g5)">' + valComp + ' ' + unidad + '</span>'
+        + '</div>';
+      const ingContainer = document.createElement('div');
+      ingContainer.id = 'rac-ing-cont-' + ri + '-' + comp.id;
+      _renderRacIngRows(ingContainer, ri, comp.id, fid);
+      compDiv.appendChild(ingContainer);
+      const addBtn = document.createElement('button');
+      addBtn.style.cssText = 'background:none;border:none;color:var(--g6);cursor:pointer;font-size:.72rem;margin-top:.1rem';
+      addBtn.textContent = '+ ingrediente';
+      addBtn.onclick = () => { addRacIng(ri, comp.id, fid); };
+      compDiv.appendChild(addBtn);
+      panel.appendChild(compDiv);
+    });
+    container.appendChild(panel);
+  }
+}
+
+function _syncRacTotales(input, ri, nRac, totalGlobal) {
+  if (nRac !== 2) return;
+  const val = parseFloat(input.value) || 0;
+  const otroIdx = ri === 0 ? 1 : 0;
+  const otro = document.getElementById('rac-total-' + otroIdx);
+  if (otro) otro.value = (totalGlobal - val).toFixed(2);
+}
+
+function _renderRacIngRows(container, ri, compId, fid) {
+  const key = _racKey(ri, compId);
+  container.innerHTML = '';
+  (_ingredientes[key] || []).forEach((ing, ii) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:.2rem;margin-bottom:.15rem;align-items:center';
+    // Input nombre
+    const inNombre = document.createElement('input');
+    inNombre.className = 'form-control';
+    inNombre.style.cssText = 'flex:2;font-size:.72rem';
+    inNombre.placeholder = 'Ingrediente';
+    inNombre.value = ing.nombre || '';
+    inNombre.setAttribute('list','rac-ing-hist-dl');
+    inNombre.oninput = () => { if (inNombre.value.trim()) _ingHistorial.add(inNombre.value.trim()); _actualizarDatalistsRac(); };
+    inNombre.onchange = () => { _ingredientes[key][ii].nombre = inNombre.value.trim(); };
+    // Input gramos
+    const inG = document.createElement('input');
+    inG.className = 'form-control';
+    inG.type = 'number'; inG.style.cssText = 'width:52px;font-size:.72rem;text-align:center';
+    inG.placeholder = 'g'; inG.value = ing.gramos || '';
+    inG.onchange = () => { _ingredientes[key][ii].gramos = parseFloat(inG.value) || 0; };
+    // Input tamaño
+    const inT = document.createElement('input');
+    inT.className = 'form-control';
+    inT.style.cssText = 'flex:1;font-size:.72rem';
+    inT.placeholder = 'Tamaño'; inT.value = ing.tamano || '';
+    inT.setAttribute('list','rac-tam-hist-dl');
+    inT.oninput = () => { if (inT.value.trim()) _tamHistorial.add(inT.value.trim()); _actualizarDatalistsRac(); };
+    inT.onchange = () => { _ingredientes[key][ii].tamano = inT.value.trim(); };
+    // Botón eliminar
+    const btn = document.createElement('button');
+    btn.style.cssText = 'background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.1rem .3rem;font-size:.65rem;flex-shrink:0';
+    btn.textContent = '✕';
+    btn.onclick = () => { _ingredientes[key].splice(ii, 1); _renderRacIngRows(container, ri, compId, fid); };
+    row.appendChild(inNombre); row.appendChild(inG); row.appendChild(inT); row.appendChild(btn);
+    container.appendChild(row);
+  });
+}
+
+function addRacIng(ri, compId, fid) {
+  const key = _racKey(ri, compId);
+  if (!_ingredientes[key]) _ingredientes[key] = [];
+  _ingredientes[key].push({ nombre: '', gramos: 0, tamano: '' });
+  const cont = document.getElementById('rac-ing-cont-' + ri + '-' + compId);
+  if (cont) _renderRacIngRows(cont, ri, compId, fid);
+}
+
 let navHistory = [];
 
 function pushNav(state) {
@@ -11949,3 +12137,53 @@ init();
 </script>
 </body>
 </html>
+function renderDietasEnEspecie(sp, isAdmin) {
+  const dietasEsp = (DIETAS_GUARDADAS || []).filter(d =>
+    d.especie?.toLowerCase() === (sp.name||'').toLowerCase() ||
+    (d.sci && sp.sci && d.sci.toLowerCase() === sp.sci.toLowerCase())
+  );
+  if (!dietasEsp.length) return '';
+  const all = getAllCalcFormulas();
+  const rows = dietasEsp.map(d => {
+    const f = all[d.fid] || { label: d.fid, icon: '🧮' };
+    const comps = Object.entries(d.componentes || {});
+    const ings  = d.ingredientes || {};
+    let compTable = '';
+    if (comps.length) {
+      const compRows = comps.map(([id, v]) => {
+        const ingList = (ings[id] || []).filter(i => i.nombre)
+          .map(i => i.nombre + (i.gramos ? ' ' + i.gramos + 'g' : '') + (i.tamano ? ' ' + i.tamano : '')).join(', ');
+        return '<tr style="border-bottom:1px solid var(--bor)">'
+          + '<td style="padding:.2rem .35rem;font-size:.75rem">' + id + '</td>'
+          + '<td style="padding:.2rem .35rem;text-align:center;font-family:var(--mono);font-weight:700;color:var(--g5)">' + (v.val||'—') + '</td>'
+          + '<td style="padding:.2rem .35rem;text-align:center;font-size:.7rem;color:var(--txt3)">' + (v.pct||0) + '%</td>'
+          + '<td style="padding:.2rem .35rem;font-size:.7rem;color:var(--txt3)">' + ingList + '</td></tr>';
+      }).join('');
+      compTable = '<div style="overflow-x:auto;margin-top:.3rem"><table style="width:100%;border-collapse:collapse;font-size:.75rem">'
+        + '<thead><tr style="background:var(--g0)"><th style="padding:.2rem .35rem;text-align:left;color:var(--txt3)">Componente</th>'
+        + '<th style="color:var(--g6)">Cant.</th><th style="color:var(--txt3)">%</th>'
+        + '<th style="text-align:left;color:var(--txt3)">Ingredientes</th></tr></thead>'
+        + '<tbody>' + compRows + '</tbody></table></div>';
+    }
+    return '<div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.5rem .65rem;margin-bottom:.35rem;background:var(--sur)">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+      + '<div>'
+      + '<div style="font-size:.83rem;font-weight:700">' + f.icon + ' ' + d.especie + (d.num>1?' #'+d.num:'') + (d.nombre?' · '+d.nombre:'') + '</div>'
+      + '<div style="font-size:.7rem;color:var(--txt3)">' + f.label + ' · ' + d.pesoKg + ' kg · ' + d.pct + '% ración</div>'
+      + '<div style="font-size:.65rem;color:var(--txt3)">' + new Date(d.fecha).toLocaleDateString('es-CO') + '</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:.25rem">'
+      + (isAdmin ? '<button onclick="editarDietaGuardada(\'' + d.id + '\')" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem" title="Editar">✏️</button>' : '')
+      + (isAdmin ? '<button onclick="eliminarDietaGuardada(\'' + d.id + '\');renderTab(\'nutricion\')" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem" title="Eliminar">✕</button>' : '')
+      + '</div></div>'
+      + compTable
+      + (d.notas ? '<div style="font-size:.72rem;color:var(--txt3);font-style:italic;margin-top:.25rem;background:var(--g0);border-radius:var(--rxs);padding:.15rem .3rem">📋 ' + d.notas + '</div>' : '')
+      + '</div>';
+  }).join('');
+  return '<div class="info-card" style="border-left:3px solid var(--g5)">'
+    + '<div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">'
+    + '<span>🥗 Dietas formuladas (' + dietasEsp.length + ')</span>'
+    + (isAdmin ? '<button onclick="showScreen(\'nutricion-calc\')" class="btn btn-admin btn-sm" style="font-size:.7rem">+ Nueva</button>' : '')
+    + '</div>' + rows + '</div>';
+}
+
