@@ -348,6 +348,7 @@ textarea.form-control{resize:vertical;min-height:70px}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 
 <div id="login-screen">
   <div class="login-logo">🦜</div>
@@ -645,13 +646,17 @@ textarea.form-control{resize:vertical;min-height:70px}
         Uso de espacio — Firestore
       </div>
       <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.75rem">
-        Plan gratuito (Spark): <strong>1 GB</strong> total · máx <strong>1 MB por documento</strong> · 50K lecturas/día · 20K escrituras/día
+        <strong>Firestore</strong> (datos): 1 GB total · máx 1 MB/doc · 50K lecturas/día · 20K escrituras/día<br>
+        <strong>Firebase Storage</strong> (fotos): <span style="color:var(--g6);font-weight:700">5 GB total</span> · sin límite por archivo · Las fotos se guardan aquí automáticamente
       </div>
       <div id="storage-usage-panel">
         <p style="font-size:.8rem;color:var(--txt3);font-style:italic">Toca "Calcular" para ver el uso actual.</p>
       </div>
       <button class="btn btn-secondary btn-sm" style="width:100%;margin-top:.5rem" onclick="calcStorageUsage()">
         🔍 Calcular uso de espacio
+      </button>
+      <button class="btn btn-secondary btn-sm" style="width:100%;margin-top:.4rem;background:var(--g1);color:var(--g7);border-color:var(--g4)" onclick="migrarFotosAStorage()">
+        📤 Migrar fotos existentes a Storage
       </button>
     </div>
   </div>
@@ -1194,7 +1199,8 @@ async function saveNewPIN() {
 // ═══════════════════════════════════
 let firebaseApp  = null;
 let firebaseAuth = null;
-let firestore    = null; // Firestore DB
+let firestore    = null;
+let storage      = null;  // Firebase Storage // Firestore DB
 
 // ═══════════════════════════════════
 // FIREBASE — config incrustada
@@ -1239,6 +1245,7 @@ function initFirebase(config) {
     catch(_) { firebaseApp = firebase.initializeApp(config); }
     firebaseAuth = firebase.auth();
     firestore    = firebase.firestore();
+    if (typeof firebase.storage === 'function') storage = firebase.storage();
     // Cache offline para cuando no hay internet
     firestore.enablePersistentCacheIndexAutoCreation?.();
     firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
@@ -1305,34 +1312,55 @@ async function fsGetRecords() {
 
 // Wrapper: guardar en IndexedDB LOCAL + Firestore
 async function dbPutSync(store, obj) {
-  // Siempre guardar completo (alta calidad) en IndexedDB local
+  // Siempre guardar completo (con dataUrls) en IndexedDB local
   await dbPut(store, obj);
   if (!firestore || !fbUid()) return;
   try {
-    let fsObj = obj;
-    // Si el doc tiene imágenes grandes, comprimir solo la copia de Firestore
-    const json = JSON.stringify(obj);
-    const sizeKB = new Blob([json]).size / 1024;
-    if (sizeKB > 600) {
-      fsObj = JSON.parse(json); // copia profunda
+    let fsObj = JSON.parse(JSON.stringify(obj)); // copia profunda
+    const uid = fbUid();
+
+    // ── Subir fotos a Firebase Storage si está disponible ──
+    if (storage) {
+      const basePath = store + '/' + uid + '/' + (obj.id || obj.key || Date.now());
+
+      // Campos imagen individual (string dataUrl)
       const imgFields = ['cover_photo'];
-      const arrFields = ['cover_photos','dental_fotos','dimorfismo_fotos','dist_maps','fotos'];
       for (const f of imgFields) {
-        if (fsObj[f] && typeof fsObj[f]==='string' && fsObj[f].length > 5000)
-          fsObj[f] = await compressForFirestore(fsObj[f]);
+        if (fsObj[f] && !isStorageUrl(fsObj[f]) && fsObj[f].startsWith('data:')) {
+          fsObj[f] = await uploadToStorage(fsObj[f], basePath + '/' + f);
+        }
       }
+      // Campos arrays de fotos [{data, id}]
+      const arrFields = ['cover_photos','dental_fotos','dimorfismo_fotos','dist_maps','fotos'];
       for (const f of arrFields) {
-        if (Array.isArray(fsObj[f])) {
-          fsObj[f] = await Promise.all(fsObj[f].map(async item =>
-            item?.data && item.data.length > 5000
-              ? {...item, data: await compressForFirestore(item.data)}
-              : item
-          ));
+        if (Array.isArray(fsObj[f]) && fsObj[f].length > 0) {
+          fsObj[f] = await uploadFotosArray(fsObj[f], basePath + '/' + f);
+        }
+      }
+    } else {
+      // Sin Storage: comprimir para cumplir el límite de 1MB de Firestore
+      const sizeKB = new Blob([JSON.stringify(fsObj)]).size / 1024;
+      if (sizeKB > 600) {
+        const imgFields = ['cover_photo'];
+        const arrFields = ['cover_photos','dental_fotos','dimorfismo_fotos','dist_maps','fotos'];
+        for (const f of imgFields) {
+          if (fsObj[f] && typeof fsObj[f]==='string' && fsObj[f].length > 5000)
+            fsObj[f] = await compressForFirestore(fsObj[f]);
+        }
+        for (const f of arrFields) {
+          if (Array.isArray(fsObj[f])) {
+            fsObj[f] = await Promise.all(fsObj[f].map(async item =>
+              item?.data && item.data.length > 5000
+                ? {...item, data: await compressForFirestore(item.data)}
+                : item
+            ));
+          }
         }
       }
     }
+
     if (store === 'records') {
-      await fsPut(store, { ...fsObj, uid: fbUid() });
+      await fsPut(store, { ...fsObj, uid });
     } else {
       await fsPut(store, fsObj);
     }
@@ -9148,24 +9176,28 @@ async function loadEnriquecimientos() {
 }
 
 async function saveEnriquecimientos() {
-  // Guardar en IndexedDB local (con fotos completas)
+  // Guardar en IndexedDB local con fotos originales (alta calidad)
   await dbPut('settings', { key: 'enriquecimientos', value: ENRIQUECIMIENTOS_DB });
-  if (firestore && fbUid()) {
-    try {
-      // Comprimir fotos agresivamente para Firestore (500px / 60%)
-      const fsData = await Promise.all(ENRIQUECIMIENTOS_DB.map(async enr => {
-        const fotos = await Promise.all((enr.fotos||[]).map(async f => {
-          if (!f?.data) return f;
-          // Comprimir a 500px máx, calidad 60% para cumplir límite 1MB Firestore
+  if (!firestore || !fbUid()) return;
+  try {
+    const uid = fbUid();
+    const fsData = await Promise.all(ENRIQUECIMIENTOS_DB.map(async (enr, ei) => {
+      let fotos = enr.fotos || [];
+      if (storage) {
+        // Subir cada foto a Firebase Storage — guardar solo URL en Firestore
+        fotos = await uploadFotosArray(fotos, 'enriquecimientos/' + uid + '/' + (enr.nombre?.replace(/\s/g,'_')||ei));
+      } else {
+        // Sin Storage: comprimir a 500px/60% para caber en 1MB de Firestore
+        fotos = await Promise.all(fotos.map(async f => {
+          if (!f?.data || isStorageUrl(f.data)) return f;
           const compressed = await new Promise(res => {
             const img = new Image();
             img.onload = () => {
               const MAX = 500;
-              const scale = img.width > MAX ? MAX/img.width : (img.height > MAX ? MAX/img.height : 1);
+              const sc = Math.min(1, MAX/img.width, MAX/img.height);
               const cv = document.createElement('canvas');
-              cv.width  = Math.round(img.width  * scale);
-              cv.height = Math.round(img.height * scale);
-              cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+              cv.width = Math.round(img.width*sc); cv.height = Math.round(img.height*sc);
+              cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
               res(cv.toDataURL('image/jpeg', 0.60));
             };
             img.onerror = () => res(f.data);
@@ -9173,23 +9205,14 @@ async function saveEnriquecimientos() {
           });
           return { ...f, data: compressed };
         }));
-        return { ...enr, fotos };
-      }));
-      // Verificar tamaño antes de subir
-      const sizeKB = new Blob([JSON.stringify(fsData)]).size / 1024;
-      if (sizeKB > 900) {
-        // Si aún es muy grande, subir sin fotos y avisar
-        const sinFotos = fsData.map(e => ({ ...e, fotos: [] }));
-        await firestore.collection('settings').doc('enriquecimientos').set({ value: sinFotos });
-        console.warn('Enriquecimientos: fotos omitidas en Firestore por tamaño (' + Math.round(sizeKB) + 'KB). Disponibles en local.');
-      } else {
-        await firestore.collection('settings').doc('enriquecimientos').set({ value: fsData });
+        // Si sigue siendo muy grande, subir sin fotos
+        const sz = new Blob([JSON.stringify(fotos)]).size / 1024;
+        if (sz > 800) { fotos = []; console.warn('Enriquecimientos: fotos omitidas ('+Math.round(sz)+'KB > 800KB)'); }
       }
-    } catch(e) {
-      console.warn('Firestore enriq error:', e.message);
-      // No bloquear — los datos ya están en IndexedDB
-    }
-  }
+      return { ...enr, fotos };
+    }));
+    await firestore.collection('settings').doc('enriquecimientos').set({ value: fsData });
+  } catch(e) { console.warn('Firestore enriq error:', e.message); }
 }
 
 function renderEnriquecimientoScreen(filter='todos') {
@@ -12220,7 +12243,8 @@ async function calcStorageUsage() {
   };
 
   const MAX_DOC_KB  = 1024;      // 1MB por documento Firestore
-  const MAX_TOTAL_MB = 1024;     // 1GB total plan Spark
+  const MAX_TOTAL_MB = 1024;     // 1GB total Firestore plan Spark
+  // Firebase Storage Spark: 5GB total, sin límite por archivo
 
   // Medir cada fuente de datos
   const sources = [
@@ -12291,7 +12315,16 @@ async function calcStorageUsage() {
       + '</div>';
   }
 
-  html += '<div style="margin-top:.5rem;font-size:.68rem;color:var(--txt3)">* Estimación basada en datos locales. El tamaño real en Firestore puede variar por compresión.</div>';
+  // Info de Firebase Storage
+  html += '<div style="margin-top:.6rem;background:var(--g0);border-radius:var(--rsm);border-left:3px solid var(--g5);padding:.5rem .6rem">'
+    + '<div style="font-size:.78rem;font-weight:700;color:var(--g6);margin-bottom:.25rem">📦 Firebase Storage (fotos)</div>'
+    + '<div style="font-size:.75rem;color:var(--txt2)">Las fotos de especies, enriquecimientos y recintos se guardan en Firebase Storage (5 GB gratis), <strong>no</strong> en Firestore.</div>'
+    + '<div style="font-size:.73rem;color:var(--txt3);margin-top:.2rem">Solo las URLs de las fotos quedan en Firestore (≈ 100 bytes c/u en lugar de ≈ 50–200 KB).</div>'
+    + (storage ? '<div style="font-size:.72rem;color:var(--g5);margin-top:.2rem;font-style:italic">✅ Firebase Storage activo — las fotos se suben automáticamente.</div>'
+               : '<div style="font-size:.72rem;color:var(--am);margin-top:.2rem;font-style:italic">⚠ Firebase Storage no inicializado. Las fotos se guardan comprimidas en Firestore.</div>')
+    + '</div>';
+
+  html += '<div style="margin-top:.5rem;font-size:.68rem;color:var(--txt3)">* Estimación basada en datos locales. El tamaño real en Firestore puede variar.</div>';
 
   panel.innerHTML = html;
 }
@@ -12314,6 +12347,130 @@ function _recalcEdPeso(pctInput) {
   const gInput = row.querySelector('.ed-ing-gramos');
   if (gInput && totalComp > 0) {
     gInput.value = (totalComp * pct / 100).toFixed(2);
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// FIREBASE STORAGE — helpers
+// ════════════════════════════════════════════════════════
+
+// Detectar si un valor ya es URL de Storage (no dataUrl en base64)
+function isStorageUrl(val) {
+  return typeof val === 'string' && (
+    val.startsWith('https://firebasestorage.googleapis.com') ||
+    val.startsWith('https://storage.googleapis.com')
+  );
+}
+
+// Subir imagen (dataUrl) a Firebase Storage, devuelve URL pública
+// path: ej. 'species/sp_123/cover_photo.jpg'
+async function uploadToStorage(dataUrl, path) {
+  if (!storage || !fbUid()) return dataUrl; // fallback: devuelve dataUrl si no hay Storage
+  if (isStorageUrl(dataUrl)) return dataUrl; // ya está en Storage
+  if (!dataUrl || !dataUrl.startsWith('data:')) return dataUrl;
+  try {
+    // Convertir dataUrl a Blob
+    const res  = await fetch(dataUrl);
+    const blob = await res.blob();
+    const ext  = blob.type.includes('png') ? 'png' : 'jpg';
+    const fullPath = path.endsWith('.jpg') || path.endsWith('.png') ? path : path + '.' + ext;
+    const ref  = storage.ref(fullPath);
+    await ref.put(blob);
+    const url = await ref.getDownloadURL();
+    return url;
+  } catch(e) {
+    console.warn('uploadToStorage error:', e.message);
+    return dataUrl; // fallback: devuelve dataUrl original
+  }
+}
+
+// Eliminar archivo de Storage por su URL
+async function deleteFromStorage(url) {
+  if (!storage || !isStorageUrl(url)) return;
+  try {
+    const ref = storage.refFromURL(url);
+    await ref.delete();
+  } catch(e) { console.warn('deleteFromStorage:', e.message); }
+}
+
+// Subir múltiples imágenes de un array de objetos {data, id, ...}
+// Devuelve el array con las URLs reemplazando los dataUrls
+async function uploadFotosArray(fotosArr, basePath) {
+  if (!storage || !fbUid()) return fotosArr;
+  return Promise.all(fotosArr.map(async (f) => {
+    if (!f?.data || isStorageUrl(f.data)) return f;
+    const url = await uploadToStorage(f.data, basePath + '/' + (f.id || Date.now()));
+    return { ...f, data: url };
+  }));
+}
+
+// Migrar fotos existentes de dataUrl a Firebase Storage
+// Se llama desde Admin si quieres mover las fotos ya guardadas
+async function migrarFotosAStorage() {
+  if (!storage || !fbUid()) {
+    toast('⚠ Firebase Storage no disponible. Conecta primero con Google.');
+    return;
+  }
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Migrando...'; }
+  const uid = fbUid();
+  let migradas = 0; let errores = 0;
+
+  try {
+    // 1. Migrar fotos de fichas de especies
+    for (const sp of SPECIES_DB) {
+      let changed = false;
+      const basePath = 'species/' + uid + '/' + sp.id;
+
+      // cover_photo
+      if (sp.cover_photo && !isStorageUrl(sp.cover_photo) && sp.cover_photo.startsWith('data:')) {
+        sp.cover_photo = await uploadToStorage(sp.cover_photo, basePath + '/cover_photo');
+        migradas++; changed = true;
+      }
+      // Arrays de fotos
+      for (const field of ['cover_photos','dental_fotos','dimorfismo_fotos','dist_maps']) {
+        if (sp[field]?.length) {
+          sp[field] = await uploadFotosArray(sp[field], basePath + '/' + field);
+          migradas += sp[field].filter(f => isStorageUrl(f.data)).length;
+          changed = true;
+        }
+      }
+      if (changed) await dbPutSync('species', sp);
+    }
+
+    // 2. Migrar fotos de enriquecimientos
+    let enriqChanged = false;
+    for (let i = 0; i < ENRIQUECIMIENTOS_DB.length; i++) {
+      const enr = ENRIQUECIMIENTOS_DB[i];
+      if (enr.fotos?.length) {
+        const path = 'enriquecimientos/' + uid + '/' + (enr.nombre?.replace(/\s/g,'_')||i);
+        ENRIQUECIMIENTOS_DB[i] = { ...enr, fotos: await uploadFotosArray(enr.fotos, path) };
+        migradas += ENRIQUECIMIENTOS_DB[i].fotos.filter(f => isStorageUrl(f.data)).length;
+        enriqChanged = true;
+      }
+    }
+    if (enriqChanged) await saveEnriquecimientos();
+
+    // 3. Migrar fotos de recintos
+    let recintosChanged = false;
+    for (let i = 0; i < RECINTOS_DB.length; i++) {
+      const rec = RECINTOS_DB[i];
+      if (rec.fotos?.length) {
+        const path = 'recintos/' + uid + '/' + (rec.nombre?.replace(/\s/g,'_')||i);
+        RECINTOS_DB[i] = { ...rec, fotos: await uploadFotosArray(rec.fotos, path) };
+        migradas += RECINTOS_DB[i].fotos.filter(f => isStorageUrl(f.data)).length;
+        recintosChanged = true;
+      }
+    }
+    if (recintosChanged) await saveRecintos();
+
+    toast('✓ Migración completada: ' + migradas + ' fotos subidas a Firebase Storage');
+  } catch(e) {
+    errores++;
+    toast('⚠ Error durante la migración: ' + e.message);
+    console.error('migrarFotosAStorage:', e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📤 Migrar fotos a Storage'; }
   }
 }
 
