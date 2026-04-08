@@ -9135,6 +9135,14 @@ async function saveRefGeneral() {
     notas:   document.getElementById('ref-notas')?.value.trim()||'',
     pdf:     _refPDFData || null
   });
+  if (storage && _refPDFData?.data && !isStorageUrl(_refPDFData.data)) {
+    try {
+      const lastRef = BIBLIOTECA_GENERAL[BIBLIOTECA_GENERAL.length-1];
+      const safeName = (_refPDFData.name||'doc').replace(/[^a-zA-Z0-9._-]/g,'_');
+      const url = await uploadToStorage(_refPDFData.data, 'biblioteca/' + fbUid() + '/general/' + Date.now() + '_' + safeName);
+      lastRef.pdf = { name: _refPDFData.name, url, inStorage: true };
+    } catch(e) { console.warn('PDF upload:', e.message); }
+  }
   _refPDFData = null;
   await saveBibliotecaGeneral();
   document.getElementById('ref-modal')?.remove();
@@ -9343,7 +9351,7 @@ function openAddEnriquecimiento(editIdx=-1) {
           <label>Especies <span style="font-weight:400;color:var(--txt3);font-size:.72rem">(puede aplicar a varias o ninguna)</span></label>
           ${SPECIES_GROUPS.length ? `<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.4rem;align-items:center">
             <span style="font-size:.7rem;color:var(--txt3);font-weight:600">Agregar grupo:</span>
-            ${SPECIES_GROUPS.map((g,gi)=>`<button onclick="addGroupSpeciesToEnriq(${gi})" style="font-size:.7rem;padding:.15rem .5rem;border-radius:20px;border:1px solid var(--bor);background:var(--sur2);cursor:pointer;font-family:var(--sans);display:inline-flex;align-items:center;gap:.25rem">${g.iconImg?`<img src="${g.iconImg}" style="width:14px;height:14px;object-fit:cover;border-radius:2px">`:(g.icon||'🐾')} ${g.nombre} (${g.especies?.length||0})</button>`).join('')}
+            ${SPECIES_GROUPS.map((g,gi)=>`<button onclick="addGroupSpeciesToEnriq(${gi})" style="font-size:.7rem;padding:.15rem .5rem;border-radius:20px;border:1px solid var(--bor);background:var(--sur2);cursor:pointer;font-family:var(--sans);display:inline-flex;align-items:center;gap:.25rem">${g.iconImg?`<img src="${g.iconImg}" style="width:14px;height:14px;object-fit:contain;border-radius:0">`:(g.icon||'🐾')} ${g.nombre} (${g.especies?.length||0})</button>`).join('')}
           </div>` : ''}
           <div id="enriq-sp-list" style="margin-top:.25rem">
             ${(existing?.especies||((existing?.especie)?[{sp:existing.especie,sci:existing.sci||''}]:[])).map((e,i)=>`
@@ -9393,6 +9401,7 @@ async function previewEnriqFotos(input) {
 // ─── Historial de especies en enriquecimientos / recintos ───
 function getSpeciesHistory() {
   const map = {};
+  // Desde enriquecimientos
   ENRIQUECIMIENTOS_DB.forEach(enr => {
     const lista = enr.especies?.length ? enr.especies : (enr.especie ? [{sp:enr.especie,sci:enr.sci||''}] : []);
     lista.forEach(e => {
@@ -9400,9 +9409,18 @@ function getSpeciesHistory() {
       if (key) map[key] = { nombre: e.sp||e.especie, sci: e.sci||'' };
     });
   });
+  // Desde recintos
   RECINTOS_DB.forEach(r => {
     if (r.especie) map[r.especie.toLowerCase()] = { nombre: r.especie, sci: r.sci||'' };
   });
+  // Desde grupos de especies (SPECIES_GROUPS) ← FIX: ahora incluido
+  (SPECIES_GROUPS||[]).forEach(grp => {
+    (grp.especies||[]).forEach(e => {
+      const key = (e.sp||'').toLowerCase();
+      if (key) map[key] = { nombre: e.sp, sci: e.sci||'' };
+    });
+  });
+  // Desde fichas de especies (SPECIES_DB)
   SPECIES_DB.forEach(sp => {
     if (sp.name) map[sp.name.toLowerCase()] = { nombre: sp.name, sci: sp.sci||'' };
   });
@@ -9467,7 +9485,7 @@ function renderGroupsList() {
   el.innerHTML = SPECIES_GROUPS.map((g, gi) => `
     <div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.65rem .75rem;margin-bottom:.5rem;background:var(--sur2)">
       <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
-        ${g.iconImg?`<img src="${g.iconImg}" style="width:20px;height:20px;object-fit:cover;border-radius:4px;vertical-align:middle">`:`<span style="font-size:1rem">${g.icon||'🐾'}</span>`}
+        ${g.iconImg?`<img src="${g.iconImg}" style="width:20px;height:20px;object-fit:contain;border-radius:0;vertical-align:middle">`:`<span style="font-size:1rem">${g.icon||'🐾'}</span>`}
         <span style="font-weight:700;font-size:.9rem;flex:1">${g.nombre}</span>
         <button onclick="openEditGroup(${gi})" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);cursor:pointer;font-size:.72rem;padding:.15rem .4rem">✏️ Editar</button>
         <button onclick="confirmDeleteGroup(${gi})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.72rem;padding:.15rem .4rem">✕</button>
@@ -9494,10 +9512,10 @@ function openEditGroup(gi) {
           <div class="form-group" style="flex:0 0 80px">
             <label style="font-size:.72rem">Ícono / Imagen</label>
             <div style="display:flex;flex-direction:column;gap:.2rem;align-items:center">
-              <div id="grp-icon-preview" style="width:44px;height:44px;border-radius:8px;border:1px solid var(--bor);display:flex;align-items:center;justify-content:center;font-size:1.4rem;overflow:hidden;background:var(--sur2)">
+              <div id="grp-icon-preview" style="width:44px;height:44px;border-radius:8px;border:1px solid var(--bor);display:flex;align-items:center;justify-content:center;font-size:1.4rem;overflow:hidden;background:repeating-conic-gradient(#ccc 0% 25%,white 0% 50%) 0 0/12px 12px">
                 ${existing?.iconImg?`<img src="${existing.iconImg}" style="width:100%;height:100%;object-fit:cover">`:(existing?.icon||'🐾')}
               </div>
-              <label for="grp-icon-upload" style="font-size:.6rem;color:var(--g6);cursor:pointer;text-align:center">📷 PNG</label>
+              <label for="grp-icon-upload" style="font-size:.6rem;color:var(--g6);cursor:pointer;text-align:center">📷 PNG</label><button onclick="const p=document.getElementById('grp-icon-preview');if(p){p.innerHTML='🐾'};const u=document.getElementById('grp-icon-upload');if(u){u._dataUrl='';u.value=''}" style="font-size:.55rem;color:var(--r5);background:none;border:none;cursor:pointer;padding:0;text-align:center">✕ Quitar</button>
               <input type="file" id="grp-icon-upload" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="display:none" onchange="previewGrpIcon(this)">
             </div>
             <input id="grp-icon" class="form-control" value="${existing?.icon||''}" placeholder="o emoji" style="font-size:1rem;text-align:center;margin-top:.2rem">
@@ -9567,7 +9585,12 @@ async function saveGroup(gi) {
     sp:  row.querySelector('.grp-sp-inp')?.value.trim() || '',
     sci: row.querySelector('.grp-sci-inp')?.value.trim() || ''
   })).filter(e => e.sp);
-  const grp = { nombre, icon: icon || (iconImg ? '' : '🐾'), iconImg, especies };
+  // Subir iconImg a Storage si es un dataUrl
+  let finalIconImg = iconImg;
+  if (iconImg && !isStorageUrl(iconImg) && iconImg.startsWith('data:')) {
+    finalIconImg = await uploadToStorage(iconImg, 'icons/groups/' + nombre.replace(/\s/g,'_') + '_' + Date.now());
+  }
+  const grp = { nombre, icon: icon || (finalIconImg ? '' : '🐾'), iconImg: finalIconImg, especies };
   if (gi >= 0) SPECIES_GROUPS[gi] = grp;
   else SPECIES_GROUPS.push(grp);
   await saveSpeciesGroups();
@@ -10438,7 +10461,7 @@ function renderNutricionCalcScreen() {
       onclick="openCalcFormula('${id}',event)"
       style="position:relative">
       <div style="margin-bottom:.2rem">
-        ${f.iconImg ? `<img src="${f.iconImg}" style="width:32px;height:32px;object-fit:cover;border-radius:6px">` : `<span style="font-size:1.3rem">${f.icon||'🧮'}</span>`}
+        ${f.iconImg ? `<img src="${f.iconImg}" style="width:32px;height:32px;object-fit:contain;border-radius:0;background:repeating-conic-gradient(#ccc 0% 25%,white 0% 50%) 0 0/12px 12px">` : `<span style="font-size:1.3rem">${f.icon||'🧮'}</span>`}
       </div>
       <div style="font-size:.72rem;font-weight:600;line-height:1.3">${f.label}</div>
       ${isAdmin?`<button onclick="event.stopPropagation();editCalcFormula('${id}')"
@@ -10454,7 +10477,7 @@ function renderNutricionCalcScreen() {
       onclick="openCalcFormula('${id}',event)"
       style="position:relative">
       <div style="margin-bottom:.2rem">
-        ${f.iconImg ? `<img src="${f.iconImg}" style="width:32px;height:32px;object-fit:cover;border-radius:6px">` : `<span style="font-size:1.3rem">${f.icon||'🧮'}</span>`}
+        ${f.iconImg ? `<img src="${f.iconImg}" style="width:32px;height:32px;object-fit:contain;border-radius:0;background:repeating-conic-gradient(#ccc 0% 25%,white 0% 50%) 0 0/12px 12px">` : `<span style="font-size:1.3rem">${f.icon||'🧮'}</span>`}
       </div>
       <div style="font-size:.72rem;font-weight:600;line-height:1.3">${f.label}</div>
       ${isAdmin?`<button onclick="event.stopPropagation();editCalcFormula('${id}')"
@@ -10681,7 +10704,7 @@ function renderIngredientesComp(compId, fid) {
     inN.onblur = () => {
       const v = inN.value.trim();
       _ingredientes[compId][i].nombre = v;
-      if (v) { _ingHistorial.add(v); _actualizarDatalistsRac(); }
+      if (v) { _ingHistorial.add(v); _guardarHistoriales(); _actualizarDatalistsRac(); }
     };
     // % del componente
     const inPct = document.createElement('input');
@@ -11324,10 +11347,10 @@ function openNewCalcModal(editId=null) {
           <div class="form-group"><label>Emoji / Icono PNG</label>
           <div style="display:flex;gap:.4rem;align-items:center">
             <input id="nc-icon" class="form-control" value="${existing?.icon||''}" placeholder="🦘" style="width:55px;text-align:center;font-size:1.2rem">
-            <label class="btn btn-secondary btn-sm" for="nc-icon-png" style="cursor:pointer;white-space:nowrap">📷 PNG</label>
+            <label class="btn btn-secondary btn-sm" for="nc-icon-png" style="cursor:pointer;white-space:nowrap">📷 PNG</label><button onclick="const pv=document.getElementById('nc-icon-png-preview');if(pv){pv.style.display='none';pv.innerHTML=''};const inp=document.getElementById('nc-icon-png');if(inp){inp._dataUrl='';inp.value=''}" style="background:none;border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.7rem;padding:.2rem .4rem">✕</button>
             <input type="file" id="nc-icon-png" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none"
               onchange="previewNcIconPng(this)">
-            <div id="nc-icon-png-preview" style="width:36px;height:36px;border-radius:6px;overflow:hidden;display:${existing?.iconImg?'block':'none'}">
+            <div id="nc-icon-png-preview" style="width:36px;height:36px;border-radius:6px;overflow:hidden;background:repeating-conic-gradient(#ccc 0% 25%,white 0% 50%) 0 0/12px 12px;display:${existing?.iconImg?'block':'none'};background:repeating-conic-gradient(#ccc 0% 25%,white 0% 50%) 0 0/12px 12px">
               ${existing?.iconImg ? '<img src="'+existing.iconImg+'" style="width:100%;height:100%;object-fit:cover">' : ''}
             </div>
           </div>
@@ -11392,7 +11415,10 @@ async function saveCustomCalc(editId) {
     if (lbl) comps.push({ id:'c'+i, label:lbl, pct });
   });
   const ncPngInput = document.getElementById('nc-icon-png');
-  const ncIconImg = ncPngInput?._dataUrl || (CALC_CUSTOM[id]?.iconImg) || '';
+  let ncIconImg = ncPngInput?._dataUrl || (CALC_CUSTOM[id]?.iconImg) || '';
+  if (ncIconImg && !isStorageUrl(ncIconImg) && ncIconImg.startsWith('data:')) {
+    ncIconImg = await uploadToStorage(ncIconImg, 'icons/calc/' + id + '_' + Date.now());
+  }
   CALC_CUSTOM[id] = {
     label,
     icon:    ncIconImg ? '' : (document.getElementById('nc-icon')?.value.trim()||'🧮'),
@@ -11902,6 +11928,15 @@ async function saveRef(spId) {
     notas:   document.getElementById('ref-notas')?.value.trim() || '',
     pdf:     _refPDFData || null
   });
+  // Si hay Storage disponible, subir PDF y guardar solo la URL
+  if (storage && _refPDFData?.data && !isStorageUrl(_refPDFData.data)) {
+    try {
+      const lastRef = BIBLIOTECA_DB[spId][BIBLIOTECA_DB[spId].length-1];
+      const safeName = (_refPDFData.name||'doc').replace(/[^a-zA-Z0-9._-]/g,'_');
+      const url = await uploadToStorage(_refPDFData.data, 'biblioteca/' + fbUid() + '/' + spId + '/' + Date.now() + '_' + safeName);
+      lastRef.pdf = { name: _refPDFData.name, url, inStorage: true };
+    } catch(e) { console.warn('PDF upload:', e.message); }
+  }
   _refPDFData = null;
   await saveBiblioteca();
   document.getElementById('ref-modal')?.remove();
@@ -11972,7 +12007,7 @@ function editCategoria(sistId) {
             <label class="btn btn-secondary btn-sm" for="edit-cat-png-input" style="cursor:pointer">📷 PNG</label>
             <input type="file" id="edit-cat-png-input" accept="image/*" style="display:none"
               onchange="previewEditCatPng(this,'${sistId}')">
-            ${sist.iconImg ? '<img src="'+sist.iconImg+'" id="edit-cat-png-preview" style="width:32px;height:32px;object-fit:cover;border-radius:4px">' :
+            ${sist.iconImg ? '<img src="'+sist.iconImg+'" id="edit-cat-png-preview" style="width:32px;height:32px;object-fit:cover;border-radius:4px;background:repeating-conic-gradient(#ccc 0% 25%,white 0% 50%) 0 0/12px 12px">' :
               '<div id="edit-cat-png-preview" style="display:none"></div>'}
           </div>
         </div>
@@ -12010,7 +12045,10 @@ async function saveEditCategoria(sistId) {
   if (!nombre) { toast('⚠ Ingresa el nombre'); return; }
   const icono   = document.getElementById('edit-cat-icon')?.value.trim();
   const pngInp  = document.getElementById('edit-cat-png-input');
-  const iconImg = pngInp?._dataUrl || '';
+  let iconImg = pngInp?._dataUrl || '';
+  if (iconImg && !isStorageUrl(iconImg) && iconImg.startsWith('data:')) {
+    iconImg = await uploadToStorage(iconImg, 'icons/enfermedades/' + sistId + '_' + Date.now());
+  }
   const data = { label: nombre, icon: iconImg?'':icono, iconImg };
 
   if (SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)) {
@@ -12067,10 +12105,18 @@ async function saveEditEnfermedad(sistId, enfIdx) {
 // NAVEGACIÓN — historial interno
 // ═══════════════════════════════════
 // ══ Historial ingredientes y tamaños ══
-const _ingHistorial = new Set();
-const _tamHistorial = new Set();
+// Historial de ingredientes y tamaños — persistido en localStorage
+const _ingHistorial = new Set(JSON.parse(localStorage.getItem('wv_ing_hist')||'[]'));
+const _tamHistorial = new Set(JSON.parse(localStorage.getItem('wv_tam_hist')||'[]'));
+
+function _guardarHistoriales() {
+  localStorage.setItem('wv_ing_hist', JSON.stringify([..._ingHistorial]));
+  localStorage.setItem('wv_tam_hist', JSON.stringify([..._tamHistorial]));
+}
 
 function _actualizarDatalistsRac() {
+  // Persistir en localStorage
+  _guardarHistoriales();
   let dl1 = document.getElementById('rac-ing-hist-dl');
   if (!dl1) { dl1 = document.createElement('datalist'); dl1.id = 'rac-ing-hist-dl'; document.body.appendChild(dl1); }
   dl1.innerHTML = [..._ingHistorial].sort().map(s => '<option value="' + s + '">').join('');
@@ -12172,7 +12218,7 @@ function _renderRacIngRows(container, ri, compId, fid) {
     inT.onblur = () => {
       const tv = inT.value.trim();
       _ingredientes[key][ii].tamano = tv;
-      if (tv) { _tamHistorial.add(tv); _actualizarDatalistsRac(); }
+      if (tv) { _tamHistorial.add(tv); _guardarHistoriales(); _actualizarDatalistsRac(); }
     };
     // Botón eliminar
     const btn = document.createElement('button');
@@ -12255,6 +12301,7 @@ async function calcStorageUsage() {
     { label: '🧮 Calculadoras custom',    data: CALC_CUSTOM,         color: '#0891b2', multi: false },
     { label: '🥗 Dietas guardadas',       data: DIETAS_GUARDADAS,    color: '#db2777', multi: false },
     { label: '🗂 Grupos de especies',     data: SPECIES_GROUPS,      color: '#65a30d', multi: false },
+    { label: '📚 Biblioteca (metadatos)',  data: BIBLIOTECA_DB,       color: '#6366f1', multi: false },
   ];
 
   let totalBytes = 0;
