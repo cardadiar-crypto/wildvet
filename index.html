@@ -130,7 +130,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .quick-card span{display:block;font-size:.72rem;font-weight:500;color:var(--txt2)}
 
 /* DETAIL */
-#species-detail{display:none;padding-top:152px;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
+#species-detail{display:none;padding-top:160px;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
 .detail-header{background:var(--g9);padding:.5rem .75rem;display:flex;align-items:center;gap:.5rem;position:fixed;top:56px;left:0;right:0;z-index:90;box-shadow:0 1px 0 rgba(78,180,110,.2);flex-wrap:nowrap;min-height:48px}
 .back-btn{background:rgba(78,180,110,.2);border:none;color:var(--g3);width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .detail-name{color:white;font-size:.95rem;font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2665,22 +2665,27 @@ function openSpecies(id, trackNav=true) {
   document.body.scrollTop = 0;
   // Ajustar posición de tabs: actualiza el padding-top del species-detail
   function adjustTabsPosition() {
-    const header = document.getElementById('detail-header');
+    const header    = document.getElementById('detail-header');
     const tabsScroll = document.querySelector('.tabs-scroll');
-    const detail = document.getElementById('species-detail');
+    const detail    = document.getElementById('species-detail');
     if (!header || !tabsScroll || !detail) return;
     const topbarH = 56;
-    const headerH = header.getBoundingClientRect().height || 48;
+    // Usar clientHeight si getBoundingClientRect devuelve 0
+    const headerH = header.getBoundingClientRect().height || header.clientHeight || 48;
     const tabsTop = topbarH + headerH;
     tabsScroll.style.top = tabsTop + 'px';
-    const tabsH = tabsScroll.getBoundingClientRect().height || 40;
-    // El padding-top del contenedor = total de headers fijos + pequeño margen
-    detail.style.paddingTop = (tabsTop + tabsH + 4) + 'px';
+    const tabsH = tabsScroll.getBoundingClientRect().height || tabsScroll.clientHeight || 40;
+    const totalPad = tabsTop + tabsH + 8;
+    detail.style.paddingTop = totalPad + 'px';
   }
-  // Calcular inmediatamente (sin delay visual)
+  // Ejecutar inmediatamente
   adjustTabsPosition();
-  // Y refinar una vez que el DOM esté completamente pintado
-  requestAnimationFrame(adjustTabsPosition);
+  // Refinar tras el primer repaint
+  requestAnimationFrame(() => {
+    adjustTabsPosition();
+    // Y una vez más tras posibles reflows de imágenes
+    setTimeout(adjustTabsPosition, 150);
+  });
 }
 function showTab(tab) {
   const tabs = ['general','fisiologia','nutricion','enfermedades','comportamiento','medicamentos','protocolos','fluidoterapia','enriquecimiento'];
@@ -2691,17 +2696,28 @@ function showTab(tab) {
   window.scrollTo({top:0, behavior:'instant'});
   // Mantener el padding-top correcto al cambiar de tab
   requestAnimationFrame(() => {
-    const header = document.getElementById('detail-header');
+    const header    = document.getElementById('detail-header');
     const tabsScroll = document.querySelector('.tabs-scroll');
-    const detail = document.getElementById('species-detail');
+    const detail    = document.getElementById('species-detail');
     if (header && tabsScroll && detail) {
       const topbarH = 56;
-      const headerH = header.getBoundingClientRect().height || 48;
+      const headerH = header.getBoundingClientRect().height || header.clientHeight || 48;
       const tabsTop = topbarH + headerH;
       tabsScroll.style.top = tabsTop + 'px';
-      const tabsH = tabsScroll.getBoundingClientRect().height || 40;
-      detail.style.paddingTop = (tabsTop + tabsH + 4) + 'px';
+      const tabsH = tabsScroll.getBoundingClientRect().height || tabsScroll.clientHeight || 40;
+      detail.style.paddingTop = (tabsTop + tabsH + 8) + 'px';
     }
+    setTimeout(() => {
+      const header2    = document.getElementById('detail-header');
+      const tabsScroll2 = document.querySelector('.tabs-scroll');
+      const detail2    = document.getElementById('species-detail');
+      if (!header2 || !tabsScroll2 || !detail2) return;
+      const hH = header2.getBoundingClientRect().height || header2.clientHeight || 48;
+      const tT = 56 + hH;
+      tabsScroll2.style.top = tT + 'px';
+      const tH = tabsScroll2.getBoundingClientRect().height || tabsScroll2.clientHeight || 40;
+      detail2.style.paddingTop = (tT + tH + 8) + 'px';
+    }, 200);
   });
 }
 function renderTab(tab) {
@@ -3383,7 +3399,6 @@ async function migrarDietasAEspecie(sp) {
 function renderNutricion(el, sp) {
   const n = sp.nutrition||{};
   const isAdmin = currentUser?.role==='admin';
-  const suplementos = sp.suplementos || [];
   const toxicos = sp.toxicos_lista || [];
   const denticion = sp.denticion || [];
   const reqEnerg = sp.req_energetico || [];
@@ -3525,162 +3540,6 @@ function renderNutricion(el, sp) {
       </div>` : ''}
     </div>
 
-    <!-- SUPLEMENTOS -->
-    <div class="info-card">
-      <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
-        Suplementos
-        ${isAdmin?`<button onclick="addSuplemento()" class="btn btn-admin btn-sm">+ Suplemento</button>`:''}
-      </div>
-      ${suplementos.length ? `
-        ${suplementos.map((s,i)=>`
-        <div id="sup-card-${i}" style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.65rem .75rem;margin-bottom:.6rem;background:var(--sur)">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
-            <div>
-              <span style="font-weight:700;font-size:.88rem;color:var(--txt)">${s.nombre}</span>
-              <span style="font-weight:400;font-size:.75rem;color:var(--txt3);margin-left:.35rem">${s.cat||''}</span>
-              ${s.cat2?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);border-radius:20px;padding:.05rem .35rem;margin-left:.3rem">${s.cat2}</span>`:''}
-            </div>
-            ${isAdmin?`<button onclick="removeSuplemento(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.8rem;padding:.1rem .3rem">✕</button>`:''}
-          </div>
-
-          <!-- RANGO DE DOSIS (visual) -->
-          ${(s.dose_min||s.dose_max)?`
-          <div style="background:var(--g0);border-radius:var(--rxs);padding:.3rem .5rem;margin-bottom:.4rem;font-size:.75rem;color:var(--g7)">
-            <strong>Rango:</strong> ${s.dose_min||'—'} – ${s.dose_max||'—'} ${s.unitB||s.unit?.split('/')[0]||''} / ${s.unitA||s.unit?.split('/')[1]||'kg'}
-          </div>`:''}
-
-          <!-- FILA A: unidad del denominador de dosis -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.3rem">
-            <div>
-              <label style="font-size:.62rem;color:var(--txt3);display:block">Tipo de A (denominador dosis)</label>
-              <select id="sup-unitA-${i}"
-                style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .2rem;font-size:.75rem;color:var(--txt);outline:none"
-                onchange="onSupUnitAChange(${i})">
-                ${[['kg(pv)','kg pv (peso animal)'],['kg(al)','kg al (peso alimento)'],['día','/día (sin peso)'],['otra','Otra (sin peso)']].map(([v,l])=>`<option value="${v}" ${(s.unitA||'kg(pv)')===v?'selected':''}>${l}</option>`).join('')}
-              </select>
-            </div>
-            <div id="sup-peso-wrap-${i}" style="${(s.unitA||'kg(pv)')!=='día' && (s.unitA||'kg(pv)')!=='otra'?'':'display:none'}">
-              <label style="font-size:.62rem;color:var(--txt3);display:block" id="sup-peso-lbl-${i}">${(s.unitA||'kg(pv)')!=='kg(al)'?'Peso animal (kg)':'Peso alimento (kg)'}</label>
-              <input type="number" id="sup-peso-${i}" value="${currentWeight}" min="0.001" max="9999" step="0.1"
-                style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .3rem;font-family:var(--mono);font-size:.88rem;font-weight:700;color:var(--g3);outline:none;text-align:center"
-                oninput="calcSupI(${i})">
-            </div>
-            <div id="sup-palim-wrap-${i}" style="display:none">
-              <label style="font-size:.62rem;color:var(--txt3);display:block">Peso alimento (kg)</label>
-              <input type="number" id="sup-palim-${i}" value="1" min="0.001" max="9999" step="0.1"
-                style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .3rem;font-family:var(--mono);font-size:.88rem;font-weight:700;color:var(--bl);outline:none;text-align:center"
-                oninput="calcSupI(${i})">
-            </div>
-          </div>
-
-          <!-- FILA B (numerador dosis) y dosis -->
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;margin-bottom:.3rem">
-            <div>
-              <label style="font-size:.62rem;color:var(--txt3);display:block">Unidad B (num. dosis)</label>
-              <select id="sup-unitB-${i}"
-                style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .2rem;font-size:.75rem;color:var(--txt);outline:none"
-                onchange="updateSupConcUnits(${i});calcSupI(${i})">
-                ${['mg','UI','g','mcg','mmol','mEq','%','kcal','mL','L','otra'].map(u=>`<option ${(s.unitB||s.unit?.split('/')[0]||'mg')===u?'selected':''}>${u}</option>`).join('')}
-              </select>
-            </div>
-            <div>
-              <label style="font-size:.62rem;color:var(--txt3);display:block">Dosis mín → rec → máx</label>
-              <div style="display:flex;gap:.2rem;align-items:center">
-                <input type="number" id="sup-dmin-${i}" value="${s.dose_min||''}" min="0" step="0.001" placeholder="mín"
-                  style="width:33%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .15rem;font-family:var(--mono);font-size:.78rem;text-align:center;outline:none"
-                  oninput="calcSupI(${i})">
-                <input type="number" id="sup-dosis-${i}" value="${s.dosis||s.dose_min||0}" min="0" step="0.001" placeholder="rec"
-                  style="width:34%;background:var(--g0);border:2px solid var(--g4);border-radius:var(--rxs);padding:.22rem .15rem;font-family:var(--mono);font-size:.88rem;font-weight:700;color:var(--g6);text-align:center;outline:none"
-                  oninput="calcSupI(${i})">
-                <input type="number" id="sup-dmax-${i}" value="${s.dose_max||''}" min="0" step="0.001" placeholder="máx"
-                  style="width:33%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .15rem;font-family:var(--mono);font-size:.78rem;text-align:center;outline:none"
-                  oninput="calcSupI(${i})">
-              </div>
-            </div>
-            <div>
-              <label style="font-size:.62rem;color:var(--txt3);display:block">Conc. (B/C)</label>
-              <input type="number" id="sup-conc-${i}" value="${s.conc||0}" min="0" step="0.01"
-                style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .3rem;font-family:var(--mono);font-size:.88rem;color:var(--txt);outline:none;text-align:center"
-                oninput="calcSupI(${i})">
-            </div>
-          </div>
-
-          <!-- FILA C: unidad de concentración (resultado) -->
-          <div style="display:grid;grid-template-columns:1fr 2fr;gap:.35rem;align-items:center">
-            <div>
-              <label style="font-size:.62rem;color:var(--txt3);display:block">Unidad C (resultado)</label>
-              <select id="sup-unitC-${i}"
-                style="width:100%;background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--rxs);padding:.22rem .2rem;font-size:.75rem;color:var(--txt);outline:none"
-                onchange="calcSupI(${i})">
-                <option value="ml" ${(s.unitC||'ml')==='ml'?'selected':''}>ml</option>
-                <option value="tab" ${(s.unitC)==='tab'?'selected':''}>tab</option>
-                <option value="cáp" ${(s.unitC)==='cáp'?'selected':''}>cáp</option>
-                <option value="g" ${(s.unitC)==='g'?'selected':''}>g</option>
-                <option value="mg" ${(s.unitC)==='mg'?'selected':''}>mg</option>
-                <option value="UI" ${(s.unitC)==='UI'?'selected':''}>UI</option>
-                <option value="mcg" ${(s.unitC)==='mcg'?'selected':''}>mcg</option>
-                <option value="%" ${(s.unitC)==='%'?'selected':''}>%</option>
-                <option value="kcal" ${(s.unitC)==='kcal'?'selected':''}>kcal</option>
-              </select>
-            </div>
-            <div style="text-align:right">
-              <div style="font-size:.62rem;color:var(--txt3);margin-bottom:.15rem">Resultado</div>
-              <div id="sup-res-${i}" style="font-family:var(--mono);font-size:1.15rem;font-weight:700;color:var(--g5)">—</div>
-              ${(s.dose_min||s.dose_max)?`
-              <div style="font-size:.72rem;color:var(--txt3);margin-top:.1rem">
-                Rango: <span id="sup-res-min-${i}" style="color:var(--g4)">—</span>
-                <span style="margin:0 .3rem">–</span>
-                <span id="sup-res-max-${i}" style="color:var(--r5)">—</span>
-              </div>`:
-              `<div id="sup-res-min-${i}" style="display:none"></div><div id="sup-res-max-${i}" style="display:none"></div>`}
-            </div>
-          </div>
-          ${s.notas?`<div style="font-size:.73rem;color:var(--txt3);margin-top:.35rem;font-style:italic">📋 ${s.notas}</div>`:''}
-        </div>`).join('')}
-      ` : `<p style="font-size:.8rem;color:var(--txt3);font-style:italic">Sin suplementos registrados.${isAdmin?' Toca + Suplemento.':''}</p>`}
-      ${isAdmin ? `
-      <div id="sup-form" style="display:none;background:var(--sur2);border-radius:var(--rsm);padding:.6rem;margin-top:.4rem">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:.4rem">
-          <div><label style="font-size:.7rem;color:var(--txt3)">Nombre *</label><input id="sup-nombre" class="form-control" placeholder="Vit. D3, Carbonato Ca..." style="font-size:.82rem"></div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">Categoría general</label>
-            <input id="sup-cat" class="form-control" placeholder="Vitamina, Mineral, Aminoácido..." style="font-size:.82rem">
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:.4rem">
-          <div><label style="font-size:.7rem;color:var(--txt3)">A: tipo denominador dosis</label>
-            <select id="sup-unitA" class="form-control" style="font-size:.82rem">
-              <option value="kg(pv)">kg pv (peso animal)</option>
-              <option value="kg(al)">kg al (peso alimento)</option>
-              <option value="día">/día (total sin peso)</option>
-              <option value="otra">Otra</option>
-            </select>
-          </div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">B: numerador dosis</label>
-            <select id="sup-unitB" class="form-control" style="font-size:.82rem">
-              <option>mg</option><option>UI</option><option>g</option><option>mcg</option><option>mmol</option><option>mEq</option>
-            </select>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.4rem">
-          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis mínima</label><input id="sup-dmin" class="form-control" type="number" step="0.001" placeholder="1" style="font-size:.82rem"></div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis recomendada *</label><input id="sup-dosis" class="form-control" type="number" step="0.001" placeholder="5" style="font-size:.82rem"></div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">Dosis máxima</label><input id="sup-dmax" class="form-control" type="number" step="0.001" placeholder="10" style="font-size:.82rem"></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.4rem">
-          <div><label style="font-size:.7rem;color:var(--txt3)">Concentración (B/C)</label><input id="sup-conc" class="form-control" type="number" step="0.01" placeholder="100" style="font-size:.82rem"></div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">C: unidad resultado</label>
-            <select id="sup-conc-unit" class="form-control" style="font-size:.82rem">
-              <option value="ml">ml</option><option value="tab">tab</option><option value="cáp">cáp</option><option value="g">g</option>
-            </select>
-          </div>
-          <div><label style="font-size:.7rem;color:var(--txt3)">Notas</label><input id="sup-notas" class="form-control" placeholder="Indicaciones..." style="font-size:.82rem"></div>
-        </div>
-        <div style="display:flex;gap:.4rem">
-          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('sup-form').style.display='none'">Cancelar</button>
-          <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveSuplemento()">Guardar suplemento</button>
-        </div>
-      </div>` : ''}
-    </div>
     <!-- TÓXICOS -->
     <div class="info-card" style="border-color:var(--r5)">
       <div class="info-card-title" style="color:var(--r5);display:flex;justify-content:space-between;align-items:center">
@@ -12563,7 +12422,7 @@ async function migrarFotosAStorage() {
 // Reconstruir historiales desde datos ya guardados
 // Se llama después de cargar todos los datos al iniciar sesión
 function _reconstruirHistoriales() {
-  // Ingredientes y tamaños desde DIETAS_GUARDADAS
+  // 1. Ingredientes y tamaños desde DIETAS_GUARDADAS
   (DIETAS_GUARDADAS || []).forEach(d => {
     const ings = d.ingredientes || {};
     Object.values(ings).forEach(arr => {
@@ -12572,7 +12431,6 @@ function _reconstruirHistoriales() {
         if (ing.tamano?.trim()) _tamHistorial.add(ing.tamano.trim());
       });
     });
-    // También desde raciones
     (d.raciones || []).forEach(rac => {
       Object.values(rac.ingredientes || {}).forEach(arr => {
         (arr || []).forEach(ing => {
@@ -12582,6 +12440,18 @@ function _reconstruirHistoriales() {
       });
     });
   });
+
+  // 2. Especies desde ENRIQUECIMIENTOS_DB (materiales como tamaños)
+  (ENRIQUECIMIENTOS_DB || []).forEach(enr => {
+    // Los materiales son tamaños/tipos de objeto
+    (enr.materiales || []).forEach(m => {
+      if (m?.trim()) _tamHistorial.add(m.trim());
+    });
+  });
+
+  // 3. Especies desde SPECIES_GROUPS → getSpeciesHistory las incluye
+  // (ya manejado por buildSpeciesDatalist y getSpeciesHistory)
+
   // Guardar en localStorage
   _guardarHistoriales();
 }
