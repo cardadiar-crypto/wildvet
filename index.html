@@ -2179,6 +2179,7 @@ async function loadData() {
   // Cargar dietas calculadas y calculadoras personalizadas
   await loadCalcCustom();
   await loadDietasGuardadas();
+  _reconstruirHistoriales(); // Reconstruir historiales desde datos existentes
 }
 function updateUserUI() {
   if (!currentUser) return;
@@ -8667,6 +8668,7 @@ async function syncAndRenderVademecum() {
   // Calculadoras y dietas personalizadas
   await loadCalcCustom();
   await loadDietasGuardadas();
+  _reconstruirHistoriales();
 }
 
 function filterVademecum(val) { renderVademecum(val.toLowerCase()); }
@@ -11044,6 +11046,7 @@ async function confirmarGuardarDieta(fid, pesoKg, pct, mult, notas) {
   }
 
   await saveDietasGuardadas();
+  _reconstruirHistoriales(); // Actualizar historial con los ingredientes recién guardados
   document.getElementById('guardar-dieta-modal')?.remove();
   renderDietasGuardadas();
 
@@ -12283,9 +12286,21 @@ async function calcStorageUsage() {
   if (!panel) return;
   panel.innerHTML = '<p style="font-size:.8rem;color:var(--txt3)">⏳ Calculando...</p>';
 
-  // Calcular tamaño estimado de cada colección (datos locales como proxy)
+  // Calcular tamaño estimado SOLO de los datos que van a Firestore
+  // (excluye dataUrls de fotos — esas van a Storage, no a Firestore)
+  const stripDataUrls = (obj) => {
+    if (!obj) return obj;
+    const json = JSON.stringify(obj, (key, val) => {
+      if (typeof val === 'string') {
+        // Reemplazar dataUrl por placeholder corto
+        if (val.startsWith('data:image/') || val.startsWith('data:application/pdf')) return '[storage_url]';
+      }
+      return val;
+    });
+    return json;
+  };
   const calcSize = (obj) => {
-    try { return new Blob([JSON.stringify(obj)]).size; } catch(e) { return 0; }
+    try { return new Blob([stripDataUrls(obj)]).size; } catch(e) { return 0; }
   };
 
   const MAX_DOC_KB  = 1024;      // 1MB por documento Firestore
@@ -12511,7 +12526,31 @@ async function migrarFotosAStorage() {
     }
     if (recintosChanged) await saveRecintos();
 
-    toast('✓ Migración completada: ' + migradas + ' fotos subidas a Firebase Storage');
+    // 4. Migrar iconImgs de grupos de especies
+    let gruposChanged = false;
+    for (let i = 0; i < SPECIES_GROUPS.length; i++) {
+      const grp = SPECIES_GROUPS[i];
+      if (grp.iconImg && !isStorageUrl(grp.iconImg) && grp.iconImg.startsWith('data:')) {
+        const safeName = (grp.nombre||'grp').replace(/[^a-zA-Z0-9_-]/g,'_');
+        SPECIES_GROUPS[i] = { ...grp, iconImg: await uploadToStorage(grp.iconImg, 'icons/groups/' + uid + '/' + safeName) };
+        migradas++;
+        gruposChanged = true;
+      }
+    }
+    if (gruposChanged) await saveSpeciesGroups();
+
+    // 5. Migrar iconImgs de calculadoras custom
+    let calcChanged = false;
+    for (const [id, f] of Object.entries(CALC_CUSTOM)) {
+      if (f.iconImg && !isStorageUrl(f.iconImg) && f.iconImg.startsWith('data:')) {
+        CALC_CUSTOM[id] = { ...f, iconImg: await uploadToStorage(f.iconImg, 'icons/calc/' + uid + '/' + id) };
+        migradas++;
+        calcChanged = true;
+      }
+    }
+    if (calcChanged) await saveCalcCustom();
+
+    toast('✓ Migración completada: ' + migradas + ' archivos subidos a Firebase Storage');
   } catch(e) {
     errores++;
     toast('⚠ Error durante la migración: ' + e.message);
@@ -12519,6 +12558,32 @@ async function migrarFotosAStorage() {
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '📤 Migrar fotos a Storage'; }
   }
+}
+
+// Reconstruir historiales desde datos ya guardados
+// Se llama después de cargar todos los datos al iniciar sesión
+function _reconstruirHistoriales() {
+  // Ingredientes y tamaños desde DIETAS_GUARDADAS
+  (DIETAS_GUARDADAS || []).forEach(d => {
+    const ings = d.ingredientes || {};
+    Object.values(ings).forEach(arr => {
+      (arr || []).forEach(ing => {
+        if (ing.nombre?.trim()) _ingHistorial.add(ing.nombre.trim());
+        if (ing.tamano?.trim()) _tamHistorial.add(ing.tamano.trim());
+      });
+    });
+    // También desde raciones
+    (d.raciones || []).forEach(rac => {
+      Object.values(rac.ingredientes || {}).forEach(arr => {
+        (arr || []).forEach(ing => {
+          if (ing.nombre?.trim()) _ingHistorial.add(ing.nombre.trim());
+          if (ing.tamano?.trim()) _tamHistorial.add(ing.tamano.trim());
+        });
+      });
+    });
+  });
+  // Guardar en localStorage
+  _guardarHistoriales();
 }
 
 let navHistory = [];
