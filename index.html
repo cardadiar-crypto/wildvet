@@ -8758,7 +8758,10 @@ function renderBiblioteca() {
   let html = `<div class="info-card" style="margin-bottom:1rem;border-left:3px solid var(--g5)">
     <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>📖 Referencias Generales</span>
-      ${isAdmin?`<button onclick="openAddRefGeneral()" class="btn btn-admin btn-sm">+ Agregar</button>`:''}
+      <div style="display:flex;gap:.3rem">
+        ${isAdmin?`<button onclick="openBulkPdfImport(null)" class="btn btn-secondary btn-sm" style="font-size:.7rem" title="Importar varios PDFs a la vez">📥 Importar PDFs</button>`:''}
+        ${isAdmin?`<button onclick="openAddRefGeneral()" class="btn btn-admin btn-sm">+ Agregar</button>`:''}
+      </div>
     </div>
     <p style="font-size:.75rem;color:var(--txt3);margin-bottom:.5rem">Libros de fármacos, guías, radiología y documentos para múltiples especies</p>
     ${BIBLIOTECA_GENERAL.length ? BIBLIOTECA_GENERAL.map((r,i)=>`
@@ -8804,6 +8807,7 @@ function renderBiblioteca() {
           </div>
           <span style="font-size:.7rem;background:${refs.length?'var(--g5)':'var(--sur2)'};color:${refs.length?'white':'var(--txt3)'};border-radius:20px;padding:.1rem .45rem;margin-right:.3rem">${refs.length}</span>
           ${isAdmin?`<button onclick="event.stopPropagation();openAddRef('${sp.id}')" class="btn btn-admin btn-sm" style="font-size:.68rem;padding:.15rem .4rem">+ Agregar</button>`:''}
+          ${isAdmin?`<button onclick="event.stopPropagation();openBulkPdfImport('${sp.id}')" class="btn btn-secondary btn-sm" style="font-size:.65rem;padding:.15rem .35rem" title="Importar varios PDFs">📥</button>`:''}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="bib-chev-${sp.id}" style="flex-shrink:0;transition:transform .2s;transform:${isOpen?'rotate(180deg)':'rotate(0deg)'}"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
         <div id="bib-body-${sp.id}" style="display:${isOpen?'block':'none'};margin-top:.4rem">
@@ -12800,6 +12804,210 @@ async function saveEditEnfGen(sistId, enfIdx) {
   toast('✓ Enfermedad actualizada');
 }
 
+// ══════════════════════════════════════════════════════
+// IMPORTACIÓN MASIVA DE PDFs — Biblioteca
+// ══════════════════════════════════════════════════════
+
+function openBulkPdfImport(spId) {
+  // spId: id de especie específica, o null para General
+  document.getElementById('bulk-pdf-modal')?.remove();
+  const destLabel = spId
+    ? (SPECIES_DB.find(s=>s.id===spId)?.name || 'especie')
+    : 'Referencias Generales';
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="bulk-pdf-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.3rem">📥 Importar PDFs masivamente</div>
+        <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.85rem">Destino: <strong>${destLabel}</strong> · Los archivos se suben directamente sin necesidad de llenar título ni autores.</div>
+
+        <!-- Zona de soltar archivos -->
+        <div id="bulk-dropzone"
+          style="border:2px dashed var(--g4);border-radius:var(--r);padding:1.5rem;text-align:center;background:var(--sur2);cursor:pointer;transition:background .15s;margin-bottom:.75rem"
+          onclick="document.getElementById('bulk-file-input').click()"
+          ondragover="event.preventDefault();this.style.background='var(--g0)';this.style.borderColor='var(--g5)'"
+          ondragleave="this.style.background='var(--sur2)';this.style.borderColor='var(--g4)'"
+          ondrop="event.preventDefault();this.style.background='var(--sur2)';this.style.borderColor='var(--g4)';handleBulkDrop(event,'${spId||''}')">
+          <div style="font-size:1.8rem;margin-bottom:.4rem">📄</div>
+          <div style="font-size:.85rem;font-weight:600;color:var(--g6)">Toca para seleccionar PDFs</div>
+          <div style="font-size:.73rem;color:var(--txt3);margin-top:.2rem">o arrastra los archivos aquí · Puedes seleccionar varios a la vez</div>
+        </div>
+
+        <input id="bulk-file-input" type="file" accept=".pdf,application/pdf" multiple
+          style="display:none"
+          onchange="handleBulkFileSelect(this,'${spId||''}')">
+
+        <!-- Lista de archivos seleccionados -->
+        <div id="bulk-file-list" style="margin-bottom:.75rem"></div>
+
+        <!-- Barra de progreso -->
+        <div id="bulk-progress-wrap" style="display:none;margin-bottom:.75rem">
+          <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.3rem" id="bulk-progress-label">Subiendo...</div>
+          <div style="background:var(--bor);border-radius:20px;height:8px;overflow:hidden">
+            <div id="bulk-progress-bar" style="height:100%;background:var(--g5);width:0%;transition:width .3s;border-radius:20px"></div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('bulk-pdf-modal').remove()">Cancelar</button>
+          <button id="bulk-upload-btn" class="btn btn-primary" style="flex:2;display:none" onclick="startBulkUpload('${spId||''}')">
+            📤 Subir todos
+          </button>
+        </div>
+      </div>
+    </div>`);
+}
+
+// Archivos seleccionados para importar masivo
+let _bulkFiles = [];
+
+function handleBulkDrop(event, spId) {
+  const files = Array.from(event.dataTransfer.files).filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'));
+  if (!files.length) { toast('⚠ Solo se aceptan archivos PDF'); return; }
+  _bulkFiles = files;
+  _renderBulkFileList(spId);
+}
+
+function handleBulkFileSelect(input, spId) {
+  const files = Array.from(input.files).filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'));
+  if (!files.length) { toast('⚠ Solo se aceptan archivos PDF'); return; }
+  _bulkFiles = files;
+  _renderBulkFileList(spId);
+}
+
+function _renderBulkFileList(spId) {
+  const listEl = document.getElementById('bulk-file-list');
+  const uploadBtn = document.getElementById('bulk-upload-btn');
+  if (!listEl) return;
+  if (!_bulkFiles.length) {
+    listEl.innerHTML = '';
+    if (uploadBtn) uploadBtn.style.display = 'none';
+    return;
+  }
+  const totalMB = (_bulkFiles.reduce((sum,f) => sum + f.size, 0) / 1024 / 1024).toFixed(1);
+  listEl.innerHTML = `
+    <div style="font-size:.78rem;font-weight:600;color:var(--g6);margin-bottom:.35rem">
+      ${_bulkFiles.length} archivo(s) seleccionado(s) · ${totalMB} MB total
+    </div>
+    <div style="max-height:180px;overflow-y:auto;border:1px solid var(--bor);border-radius:var(--rsm);padding:.3rem">
+      ${_bulkFiles.map((f,i) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:.25rem .4rem;font-size:.78rem;border-bottom:1px solid var(--bor)" id="bulk-item-${i}">
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📄 ${f.name}</span>
+          <span style="font-size:.68rem;color:var(--txt3);flex-shrink:0;margin-left:.5rem">${(f.size/1024).toFixed(0)} KB</span>
+          <button onclick="_bulkRemoveFile(${i},'${spId}')" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem;flex-shrink:0;padding:0 .2rem">✕</button>
+        </div>`).join('')}
+    </div>
+    ${!storage ? '<div style="font-size:.72rem;color:var(--am);margin-top:.3rem">⚠ Firebase Storage no activo — los PDFs se guardarán solo localmente en este dispositivo.</div>' : ''}
+  `;
+  if (uploadBtn) uploadBtn.style.display = 'flex';
+}
+
+function _bulkRemoveFile(idx, spId) {
+  _bulkFiles.splice(idx, 1);
+  _renderBulkFileList(spId);
+}
+
+async function startBulkUpload(spId) {
+  if (!_bulkFiles.length) return;
+  const btn = document.getElementById('bulk-upload-btn');
+  const progressWrap = document.getElementById('bulk-progress-wrap');
+  const progressBar  = document.getElementById('bulk-progress-bar');
+  const progressLbl  = document.getElementById('bulk-progress-label');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Subiendo...'; }
+  if (progressWrap) progressWrap.style.display = 'block';
+
+  const uid = fbUid();
+  const total = _bulkFiles.length;
+  let done = 0; let errors = 0;
+
+  for (const file of _bulkFiles) {
+    try {
+      if (progressLbl) progressLbl.textContent = `Subiendo ${done+1} de ${total}: ${file.name}`;
+
+      // Leer el archivo como base64
+      const base64 = await new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onload = e => res(e.target.result);
+        reader.onerror = rej;
+        reader.readAsDataURL(file);
+      });
+
+      // Nombre limpio para Storage
+      const safeName = file.name.replace(/[^a-zA-Z0-9._\-() ]/g, '_');
+      const timestamp = Date.now();
+
+      // Intentar subir a Storage
+      let pdfObj = { name: file.name, data: base64 };
+      if (storage && uid) {
+        try {
+          const path = spId
+            ? `biblioteca/${uid}/${spId}/${timestamp}_${safeName}`
+            : `biblioteca/${uid}/general/${timestamp}_${safeName}`;
+          const url = await uploadToStorage(base64, path);
+          pdfObj = { name: file.name, url, inStorage: true };
+        } catch(e) {
+          console.warn('Storage upload error:', e.message);
+          // Fallback: guardar base64 localmente
+        }
+      }
+
+      // Crear registro con nombre del archivo como título
+      const nameWithoutExt = file.name.replace(/\.pdf$/i, '');
+      const ref = {
+        titulo:  nameWithoutExt,
+        autores: '',
+        año:     '',
+        tipo:    'Paper',
+        url:     '',
+        notas:   '',
+        pdf:     pdfObj,
+        importado: true,
+        fechaImport: new Date().toISOString()
+      };
+
+      // Guardar en la colección correspondiente
+      if (spId) {
+        if (!BIBLIOTECA_DB[spId]) BIBLIOTECA_DB[spId] = [];
+        BIBLIOTECA_DB[spId].push(ref);
+      } else {
+        BIBLIOTECA_GENERAL.push(ref);
+      }
+
+      done++;
+      if (progressBar) progressBar.style.width = Math.round(done/total*100) + '%';
+
+      // Actualizar el ítem en la lista visual
+      const itemEl = document.getElementById(`bulk-item-${_bulkFiles.indexOf(file)}`);
+      if (itemEl) {
+        itemEl.style.background = 'var(--g1)';
+        itemEl.querySelector('span').textContent = '✅ ' + file.name;
+      }
+
+    } catch(e) {
+      errors++;
+      console.error('Error importando', file.name, e);
+    }
+  }
+
+  // Guardar todo de una vez al final
+  if (spId) {
+    await saveBiblioteca();
+  } else {
+    await saveBibliotecaGeneral();
+  }
+
+  if (progressLbl) progressLbl.textContent = `✓ ${done} archivo(s) importado(s)${errors ? ` · ${errors} error(es)` : ''}`;
+  if (progressBar) progressBar.style.background = 'var(--g5)';
+
+  // Esperar un momento para que el usuario vea el resultado
+  await new Promise(r => setTimeout(r, 1200));
+
+  document.getElementById('bulk-pdf-modal')?.remove();
+  renderBiblioteca();
+  toast(`✓ ${done} PDF(s) importados a la biblioteca`);
+  _bulkFiles = [];
+}
+
 let navHistory = [];
 
 function pushNav(state) {
@@ -12813,7 +13021,7 @@ function _cerrarModalesAbiertos() {
     'guardar-dieta-modal','editar-dieta-modal','clonar-dieta-modal',
     'hist-modal','edit-cat-modal','modal-add-drug','ref-modal','enf-modal',
     'enfgen-add-modal','enfgen-edit-modal','importenf-modal',
-    'sp-hist-modal','new-calc-modal','liquido-modal','cat-modal'
+    'sp-hist-modal','new-calc-modal','liquido-modal','cat-modal','bulk-pdf-modal'
   ];
   let alguno = false;
   floatingModals.forEach(id => {
@@ -13058,7 +13266,7 @@ document.addEventListener('click', (e) => {
     'guardar-dieta-modal','editar-dieta-modal','clonar-dieta-modal',
     'hist-modal','edit-cat-modal','modal-add-drug','ref-modal','enf-modal',
     'enfgen-add-modal','enfgen-edit-modal','importenf-modal',
-    'sp-hist-modal','new-calc-modal','liquido-modal','cat-modal'
+    'sp-hist-modal','new-calc-modal','liquido-modal','cat-modal','bulk-pdf-modal'
   ];
   for (const id of floatingIds) {
     const modal = document.getElementById(id);
