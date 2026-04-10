@@ -82,7 +82,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 
 /* MAIN */
 #main{margin-top:56px;min-height:calc(100vh - 56px)}
-.screen{display:none;padding:1rem;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
+.screen{display:none;padding:1rem;padding-bottom:calc(env(safe-area-inset-bottom,16px) + 1.5rem)}
 .screen.active{display:block}
 
 /* HERO */
@@ -130,7 +130,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .quick-card span{display:block;font-size:.72rem;font-weight:500;color:var(--txt2)}
 
 /* DETAIL */
-#species-detail{display:none;padding-top:160px;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
+#species-detail{display:none;padding-top:160px;padding-bottom:calc(env(safe-area-inset-bottom,16px) + 1.5rem)}
 .detail-header{background:var(--g9);padding:.4rem .75rem;display:flex;align-items:center;gap:.35rem;position:fixed;top:56px;left:0;right:0;z-index:90;box-shadow:0 1px 0 rgba(78,180,110,.2);flex-wrap:nowrap;min-height:44px;max-height:56px;overflow:hidden}
 .back-btn{background:rgba(78,180,110,.2);border:none;color:var(--g3);width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .detail-name{color:white;font-size:.95rem;font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -144,7 +144,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .tab-btn.active{color:var(--g6);border-bottom-color:var(--g5)}
 /* spacer: 56px topbar + 48px detail-header + 40px tabs = 144px */
 .tab-content-spacer{height:0;min-height:0;display:none}
-.tab-content{display:none;padding:1rem;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
+.tab-content{display:none;padding:1rem;padding-bottom:calc(env(safe-area-inset-bottom,16px) + 1.5rem)}
 .tab-content.active{display:block}
 
 /* CARDS */
@@ -459,6 +459,10 @@ textarea.form-control{resize:vertical;min-height:70px}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
         <span>Recintos</span>
       </div>
+      <div class="quick-card" onclick="showScreen('enfermedades-gen')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        <span>Enfermedades</span>
+      </div>
       <div class="quick-card" onclick="showScreen('nutricion-calc')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M8 12h8M12 8v8"/></svg>
         <span>Calculadoras</span>
@@ -706,28 +710,7 @@ textarea.form-control{resize:vertical;min-height:70px}
 </div>
 
 <!-- BOTTOM NAV -->
-<nav id="bottom-nav">
-  <button class="bnav-btn active" id="bnav-home" onclick="showScreen('home')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-    Inicio
-  </button>
-  <button class="bnav-btn" id="bnav-historias" onclick="showScreen('historias')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-    Historias
-  </button>
-  <button class="bnav-btn" id="bnav-inventario" onclick="showScreen('inventario')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-    Inventario
-  </button>
-  <button class="bnav-btn" id="bnav-vademecum" onclick="showScreen('vademecum')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-    Vademécum
-  </button>
-  <button class="bnav-btn" id="bnav-enfermedades-gen" onclick="showScreen('enfermedades-gen')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-    Enfermedades
-  </button>
-</nav>
+
 
 <!-- SCREEN ENFERMEDADES GENERALES -->
 <div id="screen-enfermedades-gen" class="screen">
@@ -8833,7 +8816,14 @@ function renderBiblioteca() {
                 <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
                   ${r.tipo?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>`:''}
                   ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
-                  ${r.pdf?`<span style="display:inline-flex;gap:.25rem">${r.pdf.data?`<a href="${r.pdf.data}" target="_blank" style="font-size:.65rem;color:var(--g6)">👁 Ver</a><a href="${r.pdf.data}" download="${r.pdf.name||'ref.pdf'}" style="font-size:.65rem;color:var(--bl)">⬇ ${r.pdf.name||'PDF'}</a>`:`<span style='font-size:.65rem;color:var(--txt3)'>📄 ${r.pdf.name} (local)</span>`}</span>`:''}
+                  ${r.pdf?`<span style="display:inline-flex;gap:.3rem;align-items:center;flex-wrap:wrap">${
+  (r.pdf.url||r.pdf.data)
+    ? `<a href="${r.pdf.url||r.pdf.data}" target="_blank" rel="noopener"
+         style="font-size:.7rem;color:var(--g6);background:var(--g0);border:1px solid var(--g4);border-radius:var(--rxs);padding:.15rem .45rem;text-decoration:none;display:inline-flex;align-items:center;gap:.2rem">👁 Ver PDF</a>
+       <a href="${r.pdf.url||r.pdf.data}" download="${r.pdf.name||'documento.pdf'}"
+         style="font-size:.7rem;color:var(--bl);background:var(--b0,#eff6ff);border:1px solid var(--bl);border-radius:var(--rxs);padding:.15rem .45rem;text-decoration:none;display:inline-flex;align-items:center;gap:.2rem">⬇ Descargar</a>`
+    : `<span style="font-size:.68rem;color:var(--txt3);font-style:italic">📄 ${r.pdf.name||'PDF'} — solo en este dispositivo</span>`
+}</span>`:''}
                 </div>
               </div>
               ${isAdmin?`<div style="display:flex;gap:.3rem">
@@ -9127,6 +9117,7 @@ async function saveEnriquecimientos() {
 }
 
 function renderEnriquecimientoScreen(filter='todos') {
+  buildSpeciesDatalist('sp-hist-dl'); // Actualizar historial siempre
   const el = document.getElementById('enriq-list');
   const adminBtns = document.getElementById('enriq-admin-btns');
   if (adminBtns) adminBtns.style.display = currentUser?.role==='admin' ? 'block' : 'none';
