@@ -131,7 +131,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 
 /* DETAIL */
 #species-detail{display:none;padding-top:160px;padding-bottom:calc(80px + env(safe-area-inset-bottom,16px) + 2rem)}
-.detail-header{background:var(--g9);padding:.5rem .75rem;display:flex;align-items:center;gap:.5rem;position:fixed;top:56px;left:0;right:0;z-index:90;box-shadow:0 1px 0 rgba(78,180,110,.2);flex-wrap:nowrap;min-height:48px}
+.detail-header{background:var(--g9);padding:.4rem .75rem;display:flex;align-items:center;gap:.35rem;position:fixed;top:56px;left:0;right:0;z-index:90;box-shadow:0 1px 0 rgba(78,180,110,.2);flex-wrap:nowrap;min-height:44px;max-height:56px;overflow:hidden}
 .back-btn{background:rgba(78,180,110,.2);border:none;color:var(--g3);width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .detail-name{color:white;font-size:.95rem;font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .detail-sci{color:var(--g2);font-size:.7rem;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -723,7 +723,32 @@ textarea.form-control{resize:vertical;min-height:70px}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
     Vademécum
   </button>
+  <button class="bnav-btn" id="bnav-enfermedades-gen" onclick="showScreen('enfermedades-gen')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    Enfermedades
+  </button>
 </nav>
+
+<!-- SCREEN ENFERMEDADES GENERALES -->
+<div id="screen-enfermedades-gen" class="screen">
+  <div class="flex-between mb-2">
+    <h2 style="font-size:1.1rem;font-weight:700">🦠 Enfermedades</h2>
+    <div id="enfgen-admin-btns" style="display:none;gap:.35rem">
+      <button class="btn btn-admin btn-sm" onclick="openAddCategoriaGen()">+ Categoría</button>
+    </div>
+  </div>
+  <!-- Subsecciones por clase taxonómica -->
+  <div id="enfgen-tabs" style="overflow-x:auto;white-space:nowrap;margin-bottom:1rem;padding-bottom:.3rem">
+    <button class="tab-filter-btn active" onclick="filterEnfGen('general',this)">🌍 General</button>
+    <button class="tab-filter-btn" onclick="filterEnfGen('mammalia',this)">🐾 Mamíferos</button>
+    <button class="tab-filter-btn" onclick="filterEnfGen('reptilia',this)">🦎 Reptiles</button>
+    <button class="tab-filter-btn" onclick="filterEnfGen('aves',this)">🦅 Aves</button>
+    <button class="tab-filter-btn" onclick="filterEnfGen('amphibia',this)">🐸 Anfibios</button>
+    <button class="tab-filter-btn" onclick="filterEnfGen('peces',this)">🐟 Peces</button>
+  </div>
+  <div id="enfgen-content"></div>
+</div>
+
 
 <!-- MODAL RECORD -->
 <div class="modal-overlay" id="modal-record">
@@ -2179,6 +2204,7 @@ async function loadData() {
   // Cargar dietas calculadas y calculadoras personalizadas
   await loadCalcCustom();
   await loadDietasGuardadas();
+  await loadEnfermedadesGenerales();
   _reconstruirHistoriales(); // Reconstruir historiales desde datos existentes
 }
 function updateUserUI() {
@@ -2314,6 +2340,7 @@ function showScreen(name, trackNav=true) {
   if (name==='home') document.getElementById('bnav-home').classList.add('active');
   if (name==='admin') { renderAdminSpeciesList(); loadAdminEmails().then(renderAdminEmailsList); }
   if (name==='biblioteca') { loadBibliotecaGeneral().then(renderBiblioteca); }
+  if (name==='enfermedades-gen') { loadEnfermedadesGenerales().then(renderEnfGenContent); }
   if (name==='enriquecimiento') { renderEnriquecimientoScreen(); }
   if (name==='recintos') { renderRecintosScreen(); }
   if (name==='nutricion-calc') { renderNutricionCalcScreen(); }
@@ -2678,14 +2705,22 @@ function openSpecies(id, trackNav=true) {
     const totalPad = tabsTop + tabsH + 8;
     detail.style.paddingTop = totalPad + 'px';
   }
-  // Ejecutar inmediatamente
-  adjustTabsPosition();
-  // Refinar tras el primer repaint
+  // Ejecutar en secuencia garantizada
   requestAnimationFrame(() => {
     adjustTabsPosition();
-    // Y una vez más tras posibles reflows de imágenes
-    setTimeout(adjustTabsPosition, 150);
+    requestAnimationFrame(() => {
+      adjustTabsPosition();
+      setTimeout(adjustTabsPosition, 100);
+      setTimeout(adjustTabsPosition, 300);
+    });
   });
+  // ResizeObserver para recalcular cuando el header cambie de altura
+  if (window._headerResizeObs) window._headerResizeObs.disconnect();
+  const headerEl = document.getElementById('detail-header');
+  if (headerEl && typeof ResizeObserver !== 'undefined') {
+    window._headerResizeObs = new ResizeObserver(() => adjustTabsPosition());
+    window._headerResizeObs.observe(headerEl);
+  }
 }
 function showTab(tab) {
   const tabs = ['general','fisiologia','nutricion','enfermedades','comportamiento','medicamentos','protocolos','fluidoterapia','enriquecimiento'];
@@ -8752,7 +8787,14 @@ function renderBiblioteca() {
           <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
             ${r.tipo?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>`:''}
             ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
-            ${r.pdf?`<span style="display:inline-flex;gap:.25rem">${r.pdf.data?`<a href="${r.pdf.data}" target="_blank" style="font-size:.65rem;color:var(--g6)">👁 Ver</a><a href="${r.pdf.data}" download="${r.pdf.name||'ref.pdf'}" style="font-size:.65rem;color:var(--bl)">⬇ ${r.pdf.name||'PDF'}</a>`:`<span style='font-size:.65rem;color:var(--txt3)'>📄 ${r.pdf.name} (local)</span>`}</span>`:''}
+            ${r.pdf?`<span style="display:inline-flex;gap:.3rem;align-items:center;flex-wrap:wrap">${
+  (r.pdf.url||r.pdf.data)
+    ? `<a href="${r.pdf.url||r.pdf.data}" target="_blank" rel="noopener"
+         style="font-size:.7rem;color:var(--g6);background:var(--g0);border:1px solid var(--g4);border-radius:var(--rxs);padding:.15rem .45rem;text-decoration:none;display:inline-flex;align-items:center;gap:.2rem">👁 Ver PDF</a>
+       <a href="${r.pdf.url||r.pdf.data}" download="${r.pdf.name||'documento.pdf'}"
+         style="font-size:.7rem;color:var(--bl);background:var(--b0,#eff6ff);border:1px solid var(--bl);border-radius:var(--rxs);padding:.15rem .45rem;text-decoration:none;display:inline-flex;align-items:center;gap:.2rem">⬇ Descargar</a>`
+    : `<span style="font-size:.68rem;color:var(--txt3);font-style:italic">📄 ${r.pdf.name||'PDF'} — solo en este dispositivo</span>`
+}</span>`:''}
           </div>
         </div>
         ${isAdmin?`<div style="display:flex;gap:.3rem">
@@ -9192,7 +9234,7 @@ function openAddEnriquecimiento(editIdx=-1) {
   const existing = editIdx >= 0 ? ENRIQUECIMIENTOS_DB[editIdx] : null;
   document.getElementById('enriq-modal')?.remove();
   document.body.insertAdjacentHTML('beforeend', `
-    <div id="enriq-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+    <div id="enriq-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${editIdx>=0?'✏️ Editar':'+'} Enriquecimiento</div>
         <div class="form-group"><label>Nombre *</label><input id="enriq-nombre" class="form-control" value="${existing?.nombre||''}" placeholder="Ej: Caja de búsqueda alimentaria"></div>
@@ -9244,6 +9286,7 @@ function openAddEnriquecimiento(editIdx=-1) {
         </div>
       </div>
     </div>`);
+  buildSpeciesDatalist('sp-hist-dl'); // Actualizar historial con grupos
 }
 
 let _enriqFotosNew = [];
@@ -12456,15 +12499,328 @@ function _reconstruirHistoriales() {
   _guardarHistoriales();
 }
 
+// ════════════════════════════════════════════════════════
+// ENFERMEDADES GENERALES — pantalla de acceso rápido
+// ════════════════════════════════════════════════════════
+let ENFERMEDADES_GENERALES = {};
+// Estructura: { clase: { sistemas: { sistId: { enfermedades: [...] } } } }
+// clases: general, mammalia, reptilia, aves, amphibia, peces
+
+const ENFGEN_CLASES = [
+  { id:'general',   label:'General (todas las especies)', icon:'🌍' },
+  { id:'mammalia',  label:'Mamíferos',   icon:'🐾' },
+  { id:'reptilia',  label:'Reptiles',    icon:'🦎' },
+  { id:'aves',      label:'Aves',        icon:'🦅' },
+  { id:'amphibia',  label:'Anfibios',    icon:'🐸' },
+  { id:'peces',     label:'Peces',       icon:'🐟' },
+];
+
+let _enfGenClaseActiva = 'general';
+
+async function loadEnfermedadesGenerales() {
+  const saved = await dbGet('settings','enfermedades_generales');
+  ENFERMEDADES_GENERALES = saved?.value || {};
+  if (firestore && fbUid()) {
+    try {
+      const snap = await firestore.collection('settings').doc('enfermedades_generales').get();
+      if (snap.exists) ENFERMEDADES_GENERALES = snap.data().value || {};
+    } catch(e) {}
+  }
+}
+
+async function saveEnfermedadesGenerales() {
+  await dbPut('settings',{key:'enfermedades_generales', value:ENFERMEDADES_GENERALES});
+  if (firestore && fbUid()) {
+    try { await firestore.collection('settings').doc('enfermedades_generales').set({value:ENFERMEDADES_GENERALES}); } catch(e){}
+  }
+}
+
+function filterEnfGen(claseId, btn) {
+  _enfGenClaseActiva = claseId;
+  document.querySelectorAll('#enfgen-tabs .tab-filter-btn').forEach(b=>b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderEnfGenContent();
+}
+
+function renderEnfGenContent() {
+  const el = document.getElementById('enfgen-content');
+  if (!el) return;
+  const isAdmin = currentUser?.role === 'admin';
+  if (isAdmin) {
+    const ab = document.getElementById('enfgen-admin-btns');
+    if (ab) ab.style.display = 'flex';
+  }
+  const claseData = ENFERMEDADES_GENERALES[_enfGenClaseActiva] || {};
+  const sistemas = claseData.sistemas || {};
+  // Usar los sistemas base + los custom de esta clase
+  const basesSistemas = SISTEMAS_ENFERMEDAD;
+  const customSistemas = claseData.categorias_extra || [];
+  const todosSistemas = [...basesSistemas, ...customSistemas];
+
+  el.innerHTML = `
+    <!-- Buscador -->
+    <div style="display:flex;gap:.3rem;margin-bottom:.6rem">
+      <input id="enfgen-search" class="form-control" placeholder="Buscar enfermedad, signos, agente..."
+        oninput="buscarEnfGen(this.value)" style="flex:1;font-size:.82rem">
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('enfgen-search').value='';renderEnfGenContent()">✕</button>
+    </div>
+    <div id="enfgen-results"></div>
+    ${todosSistemas.map(sist => {
+      const enfs = sistemas[sist.id]?.enfermedades || [];
+      return `
+      <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.5rem;overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.55rem .75rem;background:var(--sur2);cursor:pointer"
+          onclick="toggleEnfGenSist('${sist.id}')">
+          <div style="display:flex;align-items:center;gap:.4rem">
+            ${sist.iconImg?`<img src="${sist.iconImg}" style="width:18px;height:18px;object-fit:contain">`:sist.icon}
+            <span style="font-size:.85rem;font-weight:600">${sist.label}</span>
+            <span style="font-size:.7rem;color:var(--txt3)">(${enfs.length})</span>
+          </div>
+          <div style="display:flex;gap:.3rem;align-items:center">
+            ${isAdmin?`<button onclick="event.stopPropagation();openAddEnfGen('${sist.id}')"
+              class="btn btn-admin btn-sm" style="font-size:.7rem">+ Enfermedad</button>`:''}
+            <svg id="enfgen-chev-${sist.id}" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </div>
+        <div id="enfgen-panel-${sist.id}" style="display:none;padding:.4rem .75rem">
+          ${enfs.length ? enfs.map((enf,ei) => `
+            <div style="border-bottom:1px solid var(--bor);padding:.4rem 0">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div>
+                  <div style="font-weight:600;font-size:.85rem">${enf.nombre}</div>
+                  ${enf.agente?`<div style="font-size:.73rem;color:var(--txt3)">Agente: ${enf.agente}</div>`:''}
+                </div>
+                <div style="display:flex;gap:.2rem">
+                  ${isAdmin?`<button onclick="openEditEnfGen('${sist.id}',${ei})" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem">✏️</button>`:''}
+                  ${isAdmin?`<button onclick="importarEnfAFichas('${sist.id}',${ei})" title="Importar a fichas de especie"
+                    style="background:var(--g1);border:1px solid var(--g4);border-radius:var(--rxs);color:var(--g6);cursor:pointer;font-size:.7rem;padding:.1rem .3rem">📋 Importar</button>`:''}
+                </div>
+              </div>
+              ${enf.signos?`<div style="font-size:.75rem;color:var(--txt2);margin-top:.15rem">${enf.signos}</div>`:''}
+            </div>`).join('')
+          : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic;padding:.3rem 0">Sin enfermedades. ${isAdmin?'Toca + Enfermedad.':''}</p>`}
+        </div>
+      </div>`;
+    }).join('')}
+    ${isAdmin?`<button class="btn btn-secondary btn-sm" style="width:100%;margin-top:.3rem" onclick="openAddCategoriaGen()">
+      + Nueva categoría para ${ENFGEN_CLASES.find(c=>c.id===_enfGenClaseActiva)?.label||_enfGenClaseActiva}
+    </button>`:''}
+  `;
+}
+
+function toggleEnfGenSist(sistId) {
+  const panel = document.getElementById('enfgen-panel-'+sistId);
+  const chev  = document.getElementById('enfgen-chev-'+sistId);
+  if (!panel) return;
+  const open = panel.style.display==='none';
+  panel.style.display = open?'block':'none';
+  if (chev) chev.style.transform = open?'rotate(180deg)':'';
+}
+
+function openAddEnfGen(sistId) {
+  document.getElementById('enfgen-add-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend',
+    '<div id="enfgen-add-modal" style="position:fixed;inset:0;z-index:1300;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">'
+    + '<div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">'
+    + '<div style="font-weight:700;font-size:.9rem;margin-bottom:.75rem">+ Agregar enfermedad</div>'
+    + '<div class="form-group"><label>Nombre *</label><input id="enfgen-nombre" class="form-control" placeholder="Rabia, Leptospirosis..."></div>'
+    + '<div class="form-group"><label>Agente / Causa</label><input id="enfgen-agente" class="form-control" placeholder="Virus, bacteria, hongo..."></div>'
+    + '<div class="form-group"><label>Signos clínicos</label><textarea id="enfgen-signos" class="form-control" style="min-height:70px" placeholder="Signos principales..."></textarea></div>'
+    + '<div class="form-group"><label>Diagnóstico</label><input id="enfgen-dx" class="form-control" placeholder="Método diagnóstico..."></div>'
+    + '<div class="form-group"><label>Tratamiento</label><textarea id="enfgen-tx" class="form-control" style="min-height:60px" placeholder="Protocolo de tratamiento..."></textarea></div>'
+    + '<div class="form-group"><label>Notas</label><textarea id="enfgen-notas" class="form-control" style="min-height:40px"></textarea></div>'
+    + '<div style="display:flex;gap:.5rem;margin-top:.75rem">'
+    + '<button class="btn btn-secondary" style="flex:1" onclick="document.getElementById(\'enfgen-add-modal\').remove()">Cancelar</button>'
+    + '<button class="btn btn-primary" style="flex:2" onclick="saveEnfGen(\''+sistId+'\')">💾 Guardar</button>'
+    + '</div></div></div>'
+  );
+  document.getElementById('enfgen-nombre')?.focus();
+}
+
+async function saveEnfGen(sistId) {
+  const nombre = document.getElementById('enfgen-nombre')?.value.trim();
+  if (!nombre) { toast('⚠ El nombre es obligatorio'); return; }
+  if (!ENFERMEDADES_GENERALES[_enfGenClaseActiva]) ENFERMEDADES_GENERALES[_enfGenClaseActiva] = { sistemas:{} };
+  if (!ENFERMEDADES_GENERALES[_enfGenClaseActiva].sistemas[sistId]) {
+    ENFERMEDADES_GENERALES[_enfGenClaseActiva].sistemas[sistId] = { enfermedades:[] };
+  }
+  ENFERMEDADES_GENERALES[_enfGenClaseActiva].sistemas[sistId].enfermedades.push({
+    nombre,
+    agente:  document.getElementById('enfgen-agente')?.value.trim()||'',
+    signos:  document.getElementById('enfgen-signos')?.value.trim()||'',
+    dx:      document.getElementById('enfgen-dx')?.value.trim()||'',
+    tx:      document.getElementById('enfgen-tx')?.value.trim()||'',
+    notas:   document.getElementById('enfgen-notas')?.value.trim()||'',
+  });
+  await saveEnfermedadesGenerales();
+  document.getElementById('enfgen-add-modal')?.remove();
+  renderEnfGenContent();
+  toast('✓ Enfermedad guardada');
+}
+
+// Importar enfermedad a fichas de especie
+function importarEnfAFichas(sistId, enfIdx) {
+  const enf = ENFERMEDADES_GENERALES[_enfGenClaseActiva]?.sistemas[sistId]?.enfermedades[enfIdx];
+  if (!enf) return;
+  document.getElementById('importenf-modal')?.remove();
+  // Mostrar selector de especie
+  const spOpts = SPECIES_DB.map(sp =>
+    `<label style="display:flex;align-items:center;gap:.4rem;padding:.3rem .4rem;border-radius:var(--rxs);cursor:pointer;font-size:.82rem;border-bottom:1px solid var(--bor)">
+      <input type="checkbox" value="${sp.id}" style="accent-color:var(--g5)">
+      ${sp.name} <span style="font-size:.7rem;color:var(--txt3);font-style:italic">${sp.sci}</span>
+    </label>`
+  ).join('');
+  document.body.insertAdjacentHTML('beforeend',
+    '<div id="importenf-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">'
+    + '<div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">'
+    + '<div style="font-weight:700;font-size:.9rem;margin-bottom:.25rem">📋 Importar a fichas de especie</div>'
+    + '<div style="font-size:.78rem;color:var(--g6);margin-bottom:.6rem">Enfermedad: <strong>' + enf.nombre + '</strong></div>'
+    + '<div style="font-size:.75rem;color:var(--txt3);margin-bottom:.4rem">Selecciona las especies donde quieres agregar esta enfermedad:</div>'
+    + '<div style="max-height:50vh;overflow-y:auto;border:1px solid var(--bor);border-radius:var(--rsm);padding:.25rem">' + spOpts + '</div>'
+    + '<div style="display:flex;gap:.5rem;margin-top:.75rem">'
+    + '<button class="btn btn-secondary" style="flex:1" onclick="document.getElementById(\'importenf-modal\').remove()">Cancelar</button>'
+    + '<button class="btn btn-primary" style="flex:2" onclick="confirmarImportarEnf(\''+sistId+'\','+enfIdx+')">📋 Importar a seleccionadas</button>'
+    + '</div></div></div>'
+  );
+}
+
+async function confirmarImportarEnf(sistId, enfIdx) {
+  const enf = ENFERMEDADES_GENERALES[_enfGenClaseActiva]?.sistemas[sistId]?.enfermedades[enfIdx];
+  if (!enf) return;
+  const checks = document.querySelectorAll('#importenf-modal input[type=checkbox]:checked');
+  if (!checks.length) { toast('⚠ Selecciona al menos una especie'); return; }
+  let importadas = 0;
+  for (const chk of checks) {
+    const sp = SPECIES_DB.find(s=>s.id===chk.value);
+    if (!sp) continue;
+    if (!sp.enfermedades_sistemas) sp.enfermedades_sistemas = {};
+    if (!sp.enfermedades_sistemas[sistId]) sp.enfermedades_sistemas[sistId] = { enfermedades:[] };
+    // No duplicar si ya existe
+    const existe = sp.enfermedades_sistemas[sistId].enfermedades.some(e => e.nombre===enf.nombre);
+    if (!existe) {
+      sp.enfermedades_sistemas[sistId].enfermedades.push({ ...enf });
+      await dbPutSync('species', sp);
+      importadas++;
+    }
+  }
+  document.getElementById('importenf-modal')?.remove();
+  toast('✓ Enfermedad importada a ' + importadas + ' ficha(s)');
+}
+
+function buscarEnfGen(q) {
+  const el = document.getElementById('enfgen-results');
+  if (!el) return;
+  if (!q.trim()) { el.innerHTML=''; return; }
+  const term = q.toLowerCase();
+  const resultados = [];
+  const claseData = ENFERMEDADES_GENERALES[_enfGenClaseActiva]||{};
+  const sistemas = claseData.sistemas||{};
+  [...SISTEMAS_ENFERMEDAD,...(claseData.categorias_extra||[])].forEach(sist=>{
+    (sistemas[sist.id]?.enfermedades||[]).forEach((enf,ei)=>{
+      if ((enf.nombre||'').toLowerCase().includes(term) ||
+          (enf.agente||'').toLowerCase().includes(term) ||
+          (enf.signos||'').toLowerCase().includes(term)) {
+        resultados.push({sist, enf, ei});
+      }
+    });
+  });
+  if (!resultados.length) { el.innerHTML='<p style="font-size:.78rem;color:var(--txt3);padding:.4rem">Sin resultados.</p>'; return; }
+  el.innerHTML = '<div style="background:var(--sur2);border-radius:var(--rsm);padding:.4rem .6rem;margin-bottom:.5rem">'
+    + '<div style="font-size:.7rem;font-weight:600;color:var(--g6);margin-bottom:.3rem">Resultados (' + resultados.length + ')</div>'
+    + resultados.map(({sist,enf,ei})=>'<div style="border-bottom:1px solid var(--bor);padding:.3rem 0"><span style="font-size:.75rem;font-weight:600">' + enf.nombre + '</span> <span style="font-size:.68rem;color:var(--txt3)">' + sist.icon + ' ' + sist.label + '</span></div>').join('')
+    + '</div>';
+}
+
+function openAddCategoriaGen() {
+  const nombre = prompt('Nombre de la nueva categoría de enfermedad:');
+  if (!nombre?.trim()) return;
+  const icono = prompt('Emoji para la categoría:', '🔬') || '🔬';
+  const id = 'custom_' + Date.now();
+  if (!ENFERMEDADES_GENERALES[_enfGenClaseActiva]) ENFERMEDADES_GENERALES[_enfGenClaseActiva] = { sistemas:{} };
+  if (!ENFERMEDADES_GENERALES[_enfGenClaseActiva].categorias_extra) {
+    ENFERMEDADES_GENERALES[_enfGenClaseActiva].categorias_extra = [];
+  }
+  ENFERMEDADES_GENERALES[_enfGenClaseActiva].categorias_extra.push({id, label:nombre.trim(), icon:icono});
+  saveEnfermedadesGenerales();
+  renderEnfGenContent();
+  toast('✓ Categoría creada');
+}
+
+function openEditEnfGen(sistId, enfIdx) {
+  const enf = ENFERMEDADES_GENERALES[_enfGenClaseActiva]?.sistemas[sistId]?.enfermedades[enfIdx];
+  if (!enf) return;
+  document.getElementById('enfgen-edit-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend',
+    '<div id="enfgen-edit-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">'
+    + '<div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">'
+    + '<div style="font-weight:700;font-size:.9rem;margin-bottom:.75rem">✏️ Editar enfermedad</div>'
+    + '<div class="form-group"><label>Nombre *</label><input id="enfgen-edit-nombre" class="form-control" value="' + (enf.nombre||'') + '"></div>'
+    + '<div class="form-group"><label>Agente</label><input id="enfgen-edit-agente" class="form-control" value="' + (enf.agente||'') + '"></div>'
+    + '<div class="form-group"><label>Signos clínicos</label><textarea id="enfgen-edit-signos" class="form-control" style="min-height:70px">' + (enf.signos||'') + '</textarea></div>'
+    + '<div class="form-group"><label>Diagnóstico</label><input id="enfgen-edit-dx" class="form-control" value="' + (enf.dx||'') + '"></div>'
+    + '<div class="form-group"><label>Tratamiento</label><textarea id="enfgen-edit-tx" class="form-control" style="min-height:60px">' + (enf.tx||'') + '</textarea></div>'
+    + '<div class="form-group"><label>Notas</label><textarea id="enfgen-edit-notas" class="form-control" style="min-height:40px">' + (enf.notas||'') + '</textarea></div>'
+    + '<div style="display:flex;gap:.5rem;margin-top:.75rem">'
+    + '<button class="btn btn-secondary" style="flex:1" onclick="document.getElementById(\'enfgen-edit-modal\').remove()">Cancelar</button>'
+    + '<button class="btn btn-primary" style="flex:2" onclick="saveEditEnfGen(\''+sistId+'\','+enfIdx+')">💾 Guardar cambios</button>'
+    + '</div></div></div>'
+  );
+}
+
+async function saveEditEnfGen(sistId, enfIdx) {
+  const enfs = ENFERMEDADES_GENERALES[_enfGenClaseActiva]?.sistemas[sistId]?.enfermedades;
+  if (!enfs?.[enfIdx]) return;
+  enfs[enfIdx] = {
+    nombre: document.getElementById('enfgen-edit-nombre')?.value.trim()||enfs[enfIdx].nombre,
+    agente: document.getElementById('enfgen-edit-agente')?.value.trim()||'',
+    signos: document.getElementById('enfgen-edit-signos')?.value.trim()||'',
+    dx:     document.getElementById('enfgen-edit-dx')?.value.trim()||'',
+    tx:     document.getElementById('enfgen-edit-tx')?.value.trim()||'',
+    notas:  document.getElementById('enfgen-edit-notas')?.value.trim()||'',
+  };
+  await saveEnfermedadesGenerales();
+  document.getElementById('enfgen-edit-modal')?.remove();
+  renderEnfGenContent();
+  toast('✓ Enfermedad actualizada');
+}
+
 let navHistory = [];
 
 function pushNav(state) {
   navHistory.push(state);
 }
 
+function _cerrarModalesAbiertos() {
+  // Cerrar cualquier modal/panel flotante que esté abierto
+  const floatingModals = [
+    'enriq-modal','recinto-modal','group-edit-modal','groups-modal',
+    'guardar-dieta-modal','editar-dieta-modal','clonar-dieta-modal',
+    'hist-modal','edit-cat-modal','editar-dieta-modal',
+    'modal-add-drug','ref-modal','enf-modal'
+  ];
+  let alguno = false;
+  floatingModals.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.remove(); alguno = true; }
+  });
+  // Cerrar modales con clase .open
+  document.querySelectorAll('.modal.open').forEach(m => {
+    m.classList.remove('open');
+    alguno = true;
+  });
+  // Cerrar paneles de edición inline activos
+  document.querySelectorAll('.field-edit-panel:not([style*="display:none"])').forEach(p => {
+    p.style.display = 'none';
+    alguno = true;
+  });
+  return alguno;
+}
+
 function handleBackNav() {
+  // Primero intentar cerrar cualquier modal abierto
+  if (_cerrarModalesAbiertos()) return;
   if (navHistory.length > 1) {
-    navHistory.pop(); // quitar estado actual
+    navHistory.pop();
     const prev = navHistory[navHistory.length - 1];
     if (prev.type === 'screen') {
       showScreen(prev.name, false);
@@ -12474,7 +12830,6 @@ function handleBackNav() {
       showTab(prev.tab, false);
     }
   } else {
-    // Confirmar salida de sesión
     confirmDelete('¿Cerrar sesión?', 'Si sales perderás la sesión actual. ¿Deseas continuar?', '🚪').then(ok => {
       if (ok) logout();
     });
@@ -12659,6 +13014,24 @@ function renderDietasEnEspecie(sp, isAdmin) {
     + (isAdmin ? '<button onclick="showScreen(\'nutricion-calc\')" class="btn btn-admin btn-sm" style="font-size:.7rem">+ Nueva</button>' : '')
     + '</div>' + rows + '</div>';
 }
+
+
+// Cerrar modales al hacer click en el overlay oscuro
+document.addEventListener('click', (e) => {
+  const floatingIds = [
+    'enriq-modal','recinto-modal','group-edit-modal',
+    'guardar-dieta-modal','editar-dieta-modal','clonar-dieta-modal',
+    'hist-modal','edit-cat-modal','modal-add-drug','ref-modal','enf-modal',
+    'enfgen-add-modal','enfgen-edit-modal','importenf-modal'
+  ];
+  for (const id of floatingIds) {
+    const modal = document.getElementById(id);
+    if (modal && e.target === modal) {
+      modal.remove();
+      break;
+    }
+  }
+});
 
 
 init();
