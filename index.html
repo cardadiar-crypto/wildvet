@@ -4773,7 +4773,7 @@ async function commitNotasSistema(sistId) {
 // Nueva categoría de enfermedades
 function openAddCategoria() {
   document.body.insertAdjacentHTML('beforeend', `
-    <div id="cat-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+    <div id="cat-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:480px">
         <div style="font-weight:700;margin-bottom:.75rem">Nueva categoría de enfermedades</div>
         <div class="form-row">
@@ -5688,7 +5688,7 @@ function openLiquidoModal(idx) {
   const COLORES = ['#2563eb','#0891b2','#d97706','#7c3aed','#dc2626','#059669','#0d9488','#b45309','#475569'];
   document.getElementById('liquido-modal')?.remove();
   document.body.insertAdjacentHTML('beforeend', `
-    <div id="liquido-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+    <div id="liquido-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${idx<0?'Agregar':'Editar'} líquido IV</div>
         <div class="form-group"><label>Nombre del líquido *</label><input id="liq-nombre" class="form-control" value="${l.nombre||''}" placeholder="Ej: Lactato de Ringer"></div>
@@ -9355,7 +9355,7 @@ function openGroupsManager() {
   document.getElementById('groups-modal')?.remove();
   const history = getSpeciesHistory();
   document.body.insertAdjacentHTML('beforeend', `
-    <div id="groups-modal" style="position:fixed;inset:0;z-index:1300;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center">
+    <div id="groups-modal" style="position:fixed;inset:0;z-index:1300;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:580px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
           <div style="font-weight:700;font-size:.95rem">🗂 Grupos taxonómicos</div>
@@ -9400,7 +9400,7 @@ function openEditGroup(gi) {
   const history = getSpeciesHistory();
   document.getElementById('group-edit-modal')?.remove();
   document.body.insertAdjacentHTML('beforeend', `
-    <div id="group-edit-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center">
+    <div id="group-edit-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:580px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.92rem;margin-bottom:.75rem">${existing?'✏️ Editar':'+ Nuevo'} grupo taxonómico</div>
         <div class="form-row">
@@ -9561,9 +9561,31 @@ function addEnriqSpRow() {
 
 function openSpeciesHistoryManager() {
   document.getElementById('sp-hist-modal')?.remove();
-  // Obtener solo las que vienen de enriquecimientos (editables), sin duplicar por nombre
+  // Obtener especies de TODAS las fuentes, sin duplicar por nombre
   const seen = new Set();
   const allItems = [];
+
+  // 1. Desde SPECIES_GROUPS (todas las especies de todos los grupos)
+  (SPECIES_GROUPS||[]).forEach(grp => {
+    (grp.especies||[]).forEach(e => {
+      const key = (e.sp||'').toLowerCase().trim() + '|' + (e.sci||'').toLowerCase().trim();
+      if ((e.sp||e.sci) && !seen.has(key)) {
+        seen.add(key);
+        allItems.push({ source: 'group', sp: e.sp||'', sci: e.sci||'', enrName: '📂 Grupo: ' + grp.nombre });
+      }
+    });
+  });
+
+  // 2. Desde SPECIES_DB (fichas de especie)
+  SPECIES_DB.forEach(sp => {
+    const key = (sp.name||'').toLowerCase().trim() + '|' + (sp.sci||'').toLowerCase().trim();
+    if (sp.name && !seen.has(key)) {
+      seen.add(key);
+      allItems.push({ source: 'species', sp: sp.name, sci: sp.sci||'', enrName: '📋 Ficha de especie' });
+    }
+  });
+
+  // 3. Desde ENRIQUECIMIENTOS_DB (editables directamente)
   ENRIQUECIMIENTOS_DB.forEach((enr, enrIdx) => {
     const lista = enr.especies?.length ? enr.especies : (enr.especie ? [{sp:enr.especie, sci:enr.sci||''}] : []);
     lista.forEach((e, spIdx) => {
@@ -9574,8 +9596,11 @@ function openSpeciesHistoryManager() {
       }
     });
   });
+
+  // Ordenar alfabéticamente
+  allItems.sort((a,b) => (a.sp||'').localeCompare(b.sp||''));
   document.body.insertAdjacentHTML('beforeend', `
-    <div id="sp-hist-modal" style="position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center">
+    <div id="sp-hist-modal" style="position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:85vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">📋 Historial de especies (${allItems.length})</div>
         <p style="font-size:.78rem;color:var(--txt3);margin-bottom:.75rem">Edita o elimina entradas del historial. Los cambios se aplican al enriquecimiento correspondiente.</p>
@@ -10702,7 +10727,7 @@ function openGuardarDietaModal(fid) {
     : '';
 
   document.body.insertAdjacentHTML('beforeend', `
-    <div id="guardar-dieta-modal" style="position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+    <div id="guardar-dieta-modal" style="position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.25rem">💾 Guardar dieta</div>
         <div style="font-size:.78rem;color:var(--g6);margin-bottom:.75rem">${formula.icon||'🧮'} ${formula.label}</div>
@@ -11068,7 +11093,7 @@ function clonarDietaGuardada(id) {
   if (!d) return;
   document.getElementById('clonar-dieta-modal')?.remove();
   document.body.insertAdjacentHTML('beforeend',
-    '<div id="clonar-dieta-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:1rem">'
+    '<div id="clonar-dieta-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:1rem" onclick="if(event.target===this)this.remove()">'
     + '<div style="background:var(--sur);border-radius:var(--r);padding:1.25rem;width:100%;max-width:380px;box-shadow:var(--shl)">'
     + '<div style="font-weight:700;font-size:.9rem;margin-bottom:.75rem">📋 Guardar como nueva dieta</div>'
     + '<div style="font-size:.8rem;color:var(--txt3);margin-bottom:.5rem">Base: <strong>' + d.especie + (d.nombre ? ' — ' + d.nombre : '') + '</strong></div>'
@@ -11138,7 +11163,7 @@ function editarDietaGuardada(id) {
       + '</div>';
   }).join('');
   document.body.insertAdjacentHTML('beforeend',
-    '<div id="editar-dieta-modal" style="position:fixed;inset:0;z-index:1300;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center">'
+    '<div id="editar-dieta-modal" style="position:fixed;inset:0;z-index:1300;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">'
     + '<div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">'
     + '<div style="font-weight:700;font-size:.9rem;margin-bottom:.5rem">✏️ Editar — ' + f.icon + ' ' + f.label + '</div>'
     + '<div class="form-row"><div class="form-group"><label>Especie</label><input id="ed-especie" class="form-control" value="' + d.especie + '"></div>'
@@ -11235,7 +11260,7 @@ function openNewCalcModal(editId=null) {
   const existing = editId ? all[editId] : null;
   document.getElementById('new-calc-modal')?.remove();
   document.body.insertAdjacentHTML('beforeend', `
-    <div id="new-calc-modal" style="position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center">
+    <div id="new-calc-modal" style="position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${editId?'Editar':'Nueva'} calculadora</div>
         <div class="form-row">
@@ -12139,7 +12164,7 @@ function openHistorialManager() {
   const ingList = [..._ingHistorial].sort();
   const tamList = [..._tamHistorial].sort();
   document.body.insertAdjacentHTML('beforeend',
-    '<div id="hist-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:1rem">'
+    '<div id="hist-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:1rem" onclick="if(event.target===this)this.remove()">'
     + '<div style="background:var(--sur);border-radius:var(--r);padding:1.25rem;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:var(--shl)">'
     + '<div style="font-weight:700;font-size:.92rem;margin-bottom:.75rem">📚 Historial de ingredientes</div>'
     + '<div style="margin-bottom:.75rem">'
@@ -12782,24 +12807,33 @@ function pushNav(state) {
 }
 
 function _cerrarModalesAbiertos() {
-  // Cerrar cualquier modal/panel flotante que esté abierto
+  // Lista explícita de todos los modales flotantes
   const floatingModals = [
     'enriq-modal','recinto-modal','group-edit-modal','groups-modal',
     'guardar-dieta-modal','editar-dieta-modal','clonar-dieta-modal',
-    'hist-modal','edit-cat-modal','editar-dieta-modal',
-    'modal-add-drug','ref-modal','enf-modal'
+    'hist-modal','edit-cat-modal','modal-add-drug','ref-modal','enf-modal',
+    'enfgen-add-modal','enfgen-edit-modal','importenf-modal',
+    'sp-hist-modal','new-calc-modal','liquido-modal','cat-modal'
   ];
   let alguno = false;
   floatingModals.forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.remove(); alguno = true; }
   });
-  // Cerrar modales con clase .open
+  // Estrategia genérica: cerrar cualquier div de overlay fijo en z-index alto
+  document.querySelectorAll(
+    'div[style*="position:fixed"][style*="z-index:1"][style*="rgba(0,0,0"]'
+  ).forEach(el => {
+    if (!['confirm-modal','pin-overlay'].includes(el.id)) {
+      el.remove(); alguno = true;
+    }
+  });
+  // Cerrar modales HTML con clase .open
   document.querySelectorAll('.modal.open').forEach(m => {
     m.classList.remove('open');
     alguno = true;
   });
-  // Cerrar paneles de edición inline activos
+  // Cerrar paneles de edición inline
   document.querySelectorAll('.field-edit-panel:not([style*="display:none"])').forEach(p => {
     p.style.display = 'none';
     alguno = true;
@@ -13009,11 +13043,22 @@ function renderDietasEnEspecie(sp, isAdmin) {
 
 // Cerrar modales al hacer click en el overlay oscuro
 document.addEventListener('click', (e) => {
+  // Si el click fue directamente en un div overlay (no en su contenido interior)
+  const el = e.target;
+  if (el.tagName === 'DIV'
+      && el.style.position === 'fixed'
+      && el.style.inset === '0'
+      && !['confirm-modal','pin-overlay'].includes(el.id)) {
+    el.remove();
+    return;
+  }
+  // También comprobar lista explícita (compatibilidad con overlays sin inset:0)
   const floatingIds = [
-    'enriq-modal','recinto-modal','group-edit-modal',
+    'enriq-modal','recinto-modal','group-edit-modal','groups-modal',
     'guardar-dieta-modal','editar-dieta-modal','clonar-dieta-modal',
     'hist-modal','edit-cat-modal','modal-add-drug','ref-modal','enf-modal',
-    'enfgen-add-modal','enfgen-edit-modal','importenf-modal'
+    'enfgen-add-modal','enfgen-edit-modal','importenf-modal',
+    'sp-hist-modal','new-calc-modal','liquido-modal','cat-modal'
   ];
   for (const id of floatingIds) {
     const modal = document.getElementById(id);
