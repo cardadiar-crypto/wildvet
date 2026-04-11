@@ -8758,7 +8758,10 @@ function renderBiblioteca() {
   let html = `<div class="info-card" style="margin-bottom:1rem;border-left:3px solid var(--g5)">
     <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>📖 Referencias Generales</span>
-      ${isAdmin?`<button onclick="openAddRefGeneral()" class="btn btn-admin btn-sm">+ Agregar</button>`:''}
+      <div style="display:flex;gap:.3rem">
+        ${isAdmin?`<button onclick="openBulkPdfImport(null)" class="btn btn-secondary btn-sm" style="font-size:.7rem" title="Importar varios PDFs a la vez">📥 Importar PDFs</button>`:''}
+        ${isAdmin?`<button onclick="openAddRefGeneral()" class="btn btn-admin btn-sm">+ Agregar</button>`:''}
+      </div>
     </div>
     <p style="font-size:.75rem;color:var(--txt3);margin-bottom:.5rem">Libros de fármacos, guías, radiología y documentos para múltiples especies</p>
     ${BIBLIOTECA_GENERAL.length ? BIBLIOTECA_GENERAL.map((r,i)=>`
@@ -8804,6 +8807,7 @@ function renderBiblioteca() {
           </div>
           <span style="font-size:.7rem;background:${refs.length?'var(--g5)':'var(--sur2)'};color:${refs.length?'white':'var(--txt3)'};border-radius:20px;padding:.1rem .45rem;margin-right:.3rem">${refs.length}</span>
           ${isAdmin?`<button onclick="event.stopPropagation();openAddRef('${sp.id}')" class="btn btn-admin btn-sm" style="font-size:.68rem;padding:.15rem .4rem">+ Agregar</button>`:''}
+          ${isAdmin?`<button onclick="event.stopPropagation();openBulkPdfImport('${sp.id}')" class="btn btn-secondary btn-sm" style="font-size:.65rem;padding:.15rem .35rem" title="Importar varios PDFs">📥</button>`:''}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="bib-chev-${sp.id}" style="flex-shrink:0;transition:transform .2s;transform:${isOpen?'rotate(180deg)':'rotate(0deg)'}"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
         <div id="bib-body-${sp.id}" style="display:${isOpen?'block':'none'};margin-top:.4rem">
@@ -12633,46 +12637,9 @@ function toggleEnfGenSist(sistId) {
   if (chev) chev.style.transform = open?'rotate(180deg)':'';
 }
 
-function openAddEnfGen(sistId) {
-  document.getElementById('enfgen-add-modal')?.remove();
-  document.body.insertAdjacentHTML('beforeend',
-    '<div id="enfgen-add-modal" style="position:fixed;inset:0;z-index:1300;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">'
-    + '<div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">'
-    + '<div style="font-weight:700;font-size:.9rem;margin-bottom:.75rem">+ Agregar enfermedad</div>'
-    + '<div class="form-group"><label>Nombre *</label><input id="enfgen-nombre" class="form-control" placeholder="Rabia, Leptospirosis..."></div>'
-    + '<div class="form-group"><label>Agente / Causa</label><input id="enfgen-agente" class="form-control" placeholder="Virus, bacteria, hongo..."></div>'
-    + '<div class="form-group"><label>Signos clínicos</label><textarea id="enfgen-signos" class="form-control" style="min-height:70px" placeholder="Signos principales..."></textarea></div>'
-    + '<div class="form-group"><label>Diagnóstico</label><input id="enfgen-dx" class="form-control" placeholder="Método diagnóstico..."></div>'
-    + '<div class="form-group"><label>Tratamiento</label><textarea id="enfgen-tx" class="form-control" style="min-height:60px" placeholder="Protocolo de tratamiento..."></textarea></div>'
-    + '<div class="form-group"><label>Notas</label><textarea id="enfgen-notas" class="form-control" style="min-height:40px"></textarea></div>'
-    + '<div style="display:flex;gap:.5rem;margin-top:.75rem">'
-    + '<button class="btn btn-secondary" style="flex:1" onclick="document.getElementById(\'enfgen-add-modal\').remove()">Cancelar</button>'
-    + '<button class="btn btn-primary" style="flex:2" onclick="saveEnfGen(\''+sistId+'\')">💾 Guardar</button>'
-    + '</div></div></div>'
-  );
-  document.getElementById('enfgen-nombre')?.focus();
-}
 
-async function saveEnfGen(sistId) {
-  const nombre = document.getElementById('enfgen-nombre')?.value.trim();
-  if (!nombre) { toast('⚠ El nombre es obligatorio'); return; }
-  if (!ENFERMEDADES_GENERALES[_enfGenClaseActiva]) ENFERMEDADES_GENERALES[_enfGenClaseActiva] = { sistemas:{} };
-  if (!ENFERMEDADES_GENERALES[_enfGenClaseActiva].sistemas[sistId]) {
-    ENFERMEDADES_GENERALES[_enfGenClaseActiva].sistemas[sistId] = { enfermedades:[] };
-  }
-  ENFERMEDADES_GENERALES[_enfGenClaseActiva].sistemas[sistId].enfermedades.push({
-    nombre,
-    agente:  document.getElementById('enfgen-agente')?.value.trim()||'',
-    signos:  document.getElementById('enfgen-signos')?.value.trim()||'',
-    dx:      document.getElementById('enfgen-dx')?.value.trim()||'',
-    tx:      document.getElementById('enfgen-tx')?.value.trim()||'',
-    notas:   document.getElementById('enfgen-notas')?.value.trim()||'',
-  });
-  await saveEnfermedadesGenerales();
-  document.getElementById('enfgen-add-modal')?.remove();
-  renderEnfGenContent();
-  toast('✓ Enfermedad guardada');
-}
+
+async 
 
 // Importar enfermedad a fichas de especie
 function importarEnfAFichas(sistId, enfIdx) {
@@ -12706,21 +12673,22 @@ async function confirmarImportarEnf(sistId, enfIdx) {
   const checks = document.querySelectorAll('#importenf-modal input[type=checkbox]:checked');
   if (!checks.length) { toast('⚠ Selecciona al menos una especie'); return; }
   let importadas = 0;
+  const sistTarget = enf.sistemas_afectados?.length ? enf.sistemas_afectados : [sistId];
   for (const chk of checks) {
     const sp = SPECIES_DB.find(s=>s.id===chk.value);
     if (!sp) continue;
     if (!sp.enfermedades_sistemas) sp.enfermedades_sistemas = {};
-    if (!sp.enfermedades_sistemas[sistId]) sp.enfermedades_sistemas[sistId] = { enfermedades:[] };
-    // No duplicar si ya existe
-    const existe = sp.enfermedades_sistemas[sistId].enfermedades.some(e => e.nombre===enf.nombre);
-    if (!existe) {
-      sp.enfermedades_sistemas[sistId].enfermedades.push({ ...enf });
-      await dbPutSync('species', sp);
-      importadas++;
-    }
+    // Importar a todos los sistemas afectados
+    sistTarget.forEach(sid => {
+      if (!sp.enfermedades_sistemas[sid]) sp.enfermedades_sistemas[sid] = { notas:'', enfermedades:[] };
+      const existe = sp.enfermedades_sistemas[sid].enfermedades.some(e => e.nombre===enf.nombre);
+      if (!existe) sp.enfermedades_sistemas[sid].enfermedades.push(JSON.parse(JSON.stringify(enf)));
+    });
+    await dbPutSync('species', sp);
+    importadas++;
   }
   document.getElementById('importenf-modal')?.remove();
-  toast('✓ Enfermedad importada a ' + importadas + ' ficha(s)');
+  toast('✓ Enfermedad importada a ' + importadas + ' ficha(s)' + (sistTarget.length>1 ? ' en '+sistTarget.length+' sistemas':''));
 }
 
 function buscarEnfGen(q) {
@@ -12762,42 +12730,561 @@ function openAddCategoriaGen() {
   toast('✓ Categoría creada');
 }
 
+
+
+async 
+
+// ══════════════════════════════════════════════════════
+// IMPORTACIÓN MASIVA DE PDFs — Biblioteca
+// ══════════════════════════════════════════════════════
+
+function openBulkPdfImport(spId) {
+  // spId: id de especie específica, o null para General
+  document.getElementById('bulk-pdf-modal')?.remove();
+  const destLabel = spId
+    ? (SPECIES_DB.find(s=>s.id===spId)?.name || 'especie')
+    : 'Referencias Generales';
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="bulk-pdf-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.3rem">📥 Importar PDFs masivamente</div>
+        <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.85rem">Destino: <strong>${destLabel}</strong> · Los archivos se suben directamente sin necesidad de llenar título ni autores.</div>
+
+        <!-- Zona de soltar archivos -->
+        <div id="bulk-dropzone"
+          style="border:2px dashed var(--g4);border-radius:var(--r);padding:1.5rem;text-align:center;background:var(--sur2);cursor:pointer;transition:background .15s;margin-bottom:.75rem"
+          onclick="document.getElementById('bulk-file-input').click()"
+          ondragover="event.preventDefault();this.style.background='var(--g0)';this.style.borderColor='var(--g5)'"
+          ondragleave="this.style.background='var(--sur2)';this.style.borderColor='var(--g4)'"
+          ondrop="event.preventDefault();this.style.background='var(--sur2)';this.style.borderColor='var(--g4)';handleBulkDrop(event,'${spId||''}')">
+          <div style="font-size:1.8rem;margin-bottom:.4rem">📄</div>
+          <div style="font-size:.85rem;font-weight:600;color:var(--g6)">Toca para seleccionar PDFs</div>
+          <div style="font-size:.73rem;color:var(--txt3);margin-top:.2rem">o arrastra los archivos aquí · Puedes seleccionar varios a la vez</div>
+        </div>
+
+        <input id="bulk-file-input" type="file" accept=".pdf,application/pdf" multiple
+          style="display:none"
+          onchange="handleBulkFileSelect(this,'${spId||''}')">
+
+        <!-- Lista de archivos seleccionados -->
+        <div id="bulk-file-list" style="margin-bottom:.75rem"></div>
+
+        <!-- Barra de progreso -->
+        <div id="bulk-progress-wrap" style="display:none;margin-bottom:.75rem">
+          <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.3rem" id="bulk-progress-label">Subiendo...</div>
+          <div style="background:var(--bor);border-radius:20px;height:8px;overflow:hidden">
+            <div id="bulk-progress-bar" style="height:100%;background:var(--g5);width:0%;transition:width .3s;border-radius:20px"></div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('bulk-pdf-modal').remove()">Cancelar</button>
+          <button id="bulk-upload-btn" class="btn btn-primary" style="flex:2;display:none" onclick="startBulkUpload('${spId||''}')">
+            📤 Subir todos
+          </button>
+        </div>
+      </div>
+    </div>`);
+}
+
+// Archivos seleccionados para importar masivo
+let _bulkFiles = [];
+
+function handleBulkDrop(event, spId) {
+  const files = Array.from(event.dataTransfer.files).filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'));
+  if (!files.length) { toast('⚠ Solo se aceptan archivos PDF'); return; }
+  _bulkFiles = files;
+  _renderBulkFileList(spId);
+}
+
+function handleBulkFileSelect(input, spId) {
+  const files = Array.from(input.files).filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'));
+  if (!files.length) { toast('⚠ Solo se aceptan archivos PDF'); return; }
+  _bulkFiles = files;
+  _renderBulkFileList(spId);
+}
+
+function _renderBulkFileList(spId) {
+  const listEl = document.getElementById('bulk-file-list');
+  const uploadBtn = document.getElementById('bulk-upload-btn');
+  if (!listEl) return;
+  if (!_bulkFiles.length) {
+    listEl.innerHTML = '';
+    if (uploadBtn) uploadBtn.style.display = 'none';
+    return;
+  }
+  const totalMB = (_bulkFiles.reduce((sum,f) => sum + f.size, 0) / 1024 / 1024).toFixed(1);
+  listEl.innerHTML = `
+    <div style="font-size:.78rem;font-weight:600;color:var(--g6);margin-bottom:.35rem">
+      ${_bulkFiles.length} archivo(s) seleccionado(s) · ${totalMB} MB total
+    </div>
+    <div style="max-height:180px;overflow-y:auto;border:1px solid var(--bor);border-radius:var(--rsm);padding:.3rem">
+      ${_bulkFiles.map((f,i) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:.25rem .4rem;font-size:.78rem;border-bottom:1px solid var(--bor)" id="bulk-item-${i}">
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📄 ${f.name}</span>
+          <span style="font-size:.68rem;color:var(--txt3);flex-shrink:0;margin-left:.5rem">${(f.size/1024).toFixed(0)} KB</span>
+          <button onclick="_bulkRemoveFile(${i},'${spId}')" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem;flex-shrink:0;padding:0 .2rem">✕</button>
+        </div>`).join('')}
+    </div>
+    ${!storage ? '<div style="font-size:.72rem;color:var(--am);margin-top:.3rem">⚠ Firebase Storage no activo — los PDFs se guardarán solo localmente en este dispositivo.</div>' : ''}
+  `;
+  if (uploadBtn) uploadBtn.style.display = 'flex';
+}
+
+function _bulkRemoveFile(idx, spId) {
+  _bulkFiles.splice(idx, 1);
+  _renderBulkFileList(spId);
+}
+
+async function startBulkUpload(spId) {
+  if (!_bulkFiles.length) return;
+  const btn = document.getElementById('bulk-upload-btn');
+  const progressWrap = document.getElementById('bulk-progress-wrap');
+  const progressBar  = document.getElementById('bulk-progress-bar');
+  const progressLbl  = document.getElementById('bulk-progress-label');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Subiendo...'; }
+  if (progressWrap) progressWrap.style.display = 'block';
+
+  const uid = fbUid();
+  const total = _bulkFiles.length;
+  let done = 0; let errors = 0;
+
+  for (const file of _bulkFiles) {
+    try {
+      if (progressLbl) progressLbl.textContent = `Subiendo ${done+1} de ${total}: ${file.name}`;
+
+      // Leer el archivo como base64
+      const base64 = await new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onload = e => res(e.target.result);
+        reader.onerror = rej;
+        reader.readAsDataURL(file);
+      });
+
+      // Nombre limpio para Storage
+      const safeName = file.name.replace(/[^a-zA-Z0-9._\-() ]/g, '_');
+      const timestamp = Date.now();
+
+      // Intentar subir a Storage
+      let pdfObj = { name: file.name, data: base64 };
+      if (storage && uid) {
+        try {
+          const path = spId
+            ? `biblioteca/${uid}/${spId}/${timestamp}_${safeName}`
+            : `biblioteca/${uid}/general/${timestamp}_${safeName}`;
+          const url = await uploadToStorage(base64, path);
+          pdfObj = { name: file.name, url, inStorage: true };
+        } catch(e) {
+          console.warn('Storage upload error:', e.message);
+          // Fallback: guardar base64 localmente
+        }
+      }
+
+      // Crear registro con nombre del archivo como título
+      const nameWithoutExt = file.name.replace(/\.pdf$/i, '');
+      const ref = {
+        titulo:  nameWithoutExt,
+        autores: '',
+        año:     '',
+        tipo:    'Paper',
+        url:     '',
+        notas:   '',
+        pdf:     pdfObj,
+        importado: true,
+        fechaImport: new Date().toISOString()
+      };
+
+      // Guardar en la colección correspondiente
+      if (spId) {
+        if (!BIBLIOTECA_DB[spId]) BIBLIOTECA_DB[spId] = [];
+        BIBLIOTECA_DB[spId].push(ref);
+      } else {
+        BIBLIOTECA_GENERAL.push(ref);
+      }
+
+      done++;
+      if (progressBar) progressBar.style.width = Math.round(done/total*100) + '%';
+
+      // Actualizar el ítem en la lista visual
+      const itemEl = document.getElementById(`bulk-item-${_bulkFiles.indexOf(file)}`);
+      if (itemEl) {
+        itemEl.style.background = 'var(--g1)';
+        itemEl.querySelector('span').textContent = '✅ ' + file.name;
+      }
+
+    } catch(e) {
+      errors++;
+      console.error('Error importando', file.name, e);
+    }
+  }
+
+  // Guardar todo de una vez al final
+  if (spId) {
+    await saveBiblioteca();
+  } else {
+    await saveBibliotecaGeneral();
+  }
+
+  if (progressLbl) progressLbl.textContent = `✓ ${done} archivo(s) importado(s)${errors ? ` · ${errors} error(es)` : ''}`;
+  if (progressBar) progressBar.style.background = 'var(--g5)';
+
+  // Esperar un momento para que el usuario vea el resultado
+  await new Promise(r => setTimeout(r, 1200));
+
+  document.getElementById('bulk-pdf-modal')?.remove();
+  renderBiblioteca();
+  toast(`✓ ${done} PDF(s) importados a la biblioteca`);
+  _bulkFiles = [];
+}
+
+// ── Helpers del formulario openAddEnfGen ──────────────────
+function _enfGenAddSignosBulk() {
+  const bulk = document.getElementById('enfgen-signos-bulk');
+  if (!bulk?.value.trim()) return;
+  const list = document.getElementById('enfgen-signos-list');
+  if (!list) return;
+  bulk.value.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean).forEach(s => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:.3rem;margin-bottom:.25rem';
+    row.innerHTML = '<input class="form-control enfgen-signo-item" value="'
+      + s.replace(/"/g,'&quot;') + '" placeholder="Signo clínico..."'
+      + ' style="flex:1;font-size:.82rem" list="signos-hist-dl">'
+      + '<button onclick="this.closest(\'div\').remove()"'
+      + ' style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>';
+    list.appendChild(row);
+  });
+  bulk.value = '';
+}
+
+function _enfGenAddSignoFromHistory() {
+  const list = document.getElementById('enfgen-signos-list');
+  if (!list) return;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:.3rem;margin-bottom:.25rem';
+  row.innerHTML = '<input class="form-control enfgen-signo-item" placeholder="Signo clínico..."'
+    + ' style="flex:1;font-size:.82rem" list="signos-hist-dl">'
+    + '<button onclick="this.closest(\'div\').remove()"'
+    + ' style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>';
+  list.appendChild(row);
+  row.querySelector('input').focus();
+}
+
+function _enfGenAddDxItem() {
+  const list = document.getElementById('enfgen-dx-list');
+  if (!list) return;
+  const row = document.createElement('div');
+  row.className = 'enfgen-dx-row';
+  row.style.cssText = 'border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem;margin-bottom:.4rem;background:var(--sur2)';
+  row.innerHTML = '<div style="display:flex;gap:.3rem;margin-bottom:.25rem">'
+    + '<input class="form-control enfgen-dx-item" placeholder="Método (Rx, ecografía, PCR...)" style="flex:1;font-size:.82rem">'
+    + '<input class="form-control enfgen-dx-expect-item" placeholder="Hallazgo esperado..." style="flex:1;font-size:.82rem">'
+    + '<button onclick="this.closest(\'.enfgen-dx-row\').remove()"'
+    + ' style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>'
+    + '</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.2rem" class="enfgen-dx-img-preview"></div>'
+    + '<label class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.68rem;margin-top:.1rem">'
+    + '📷 Imagen hallazgo'
+    + '<input type="file" accept="image/*" style="display:none" onchange="_enfGenAddDxImage(this)"></label>';
+  list.appendChild(row);
+}
+
+function _enfGenAddTxItem() {
+  const list = document.getElementById('enfgen-tx-list');
+  if (!list) return;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:.3rem;margin-bottom:.3rem';
+  row.innerHTML = '<input class="form-control enfgen-tx-item" placeholder="Tratamiento..." style="flex:1;font-size:.82rem">'
+    + '<button onclick="this.closest(\'div\').remove()"'
+    + ' style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>';
+  list.appendChild(row);
+}
+
+function _enfGenAddDxImage(input) {
+  if (!input.files?.[0]) return;
+  const preview = input.closest('.enfgen-dx-row')?.querySelector('.enfgen-dx-img-preview');
+  if (!preview) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wrapper = document.createElement('div');
+    wrapper.style.position = 'relative';
+    const img = document.createElement('img');
+    img.src = e.target.result;
+    img.style.cssText = 'height:55px;width:auto;border-radius:var(--rxs);cursor:pointer';
+    img.onclick = () => openImageFull(e.target.result);
+    wrapper.appendChild(img);
+    preview.appendChild(wrapper);
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function openAddEnfGen(sistId, editIdx=-1) {
+  document.getElementById('enfgen-add-modal')?.remove();
+  const claseData = ENFERMEDADES_GENERALES[_enfGenClaseActiva] || {};
+  const editEnf = editIdx >= 0 ? claseData.sistemas?.[sistId]?.enfermedades?.[editIdx] : null;
+  const allSists = [...SISTEMAS_ENFERMEDAD, ...(claseData.categorias_extra||[])];
+  const sName = allSists.find(s=>s.id===sistId)?.label || sistId;
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="enfgen-add-modal" style="position:fixed;inset:0;z-index:1300;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${editEnf?'✏️ Editar':'+'} enfermedad — ${sName}</div>
+
+        <!-- Importar con IA -->
+        ${editIdx<0?`<div style="background:var(--g0);border:1.5px dashed var(--g4);border-radius:var(--rsm);padding:.5rem .6rem;margin-bottom:.75rem">
+          <div style="font-size:.68rem;color:var(--g7);font-weight:600;margin-bottom:.3rem">🤖 Importar con IA — PDF, Word o Excel</div>
+          <div style="display:flex;gap:.3rem;align-items:center">
+            <label for="enfgen-file-import" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem;white-space:nowrap">📂 Seleccionar archivo</label>
+            <input type="file" id="enfgen-file-import" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importEnfGenFile(this,'${sistId}')">
+            <span id="enfgen-import-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
+          </div>
+          <div style="margin-top:.3rem">
+            <button onclick="togglePasteBox('enfgen-import-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
+            <div id="paste-box-enfgen-import-status" style="display:none;margin-top:.25rem">
+              <textarea id="paste-text-enfgen-import-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical"
+                placeholder="Pega aquí la información sobre la enfermedad..."></textarea>
+              <button onclick="processEnfGenTextInput('${sistId}')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
+            </div>
+          </div>
+        </div>`:``}
+
+        <div class="form-group"><label>Nombre de la enfermedad *</label>
+          <input id="enfgen-nombre" class="form-control" value="${editEnf?.nombre||''}" placeholder="Ej: Panleucopenia felina">
+        </div>
+        <div class="form-group"><label>Agente / Causa</label>
+          <input id="enfgen-agente" class="form-control" value="${editEnf?.agente||''}" placeholder="Parvovirus felino, Bacteriana...">
+        </div>
+
+        <!-- Sistemas afectados -->
+        <div class="form-group">
+          <label>Sistemas afectados <span style="font-size:.7rem;color:var(--txt3)">(puede seleccionar varios)</span></label>
+          <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.25rem">
+            ${allSists.map(sist=>`
+            <label style="display:inline-flex;align-items:center;gap:.2rem;cursor:pointer;font-size:.75rem;padding:.15rem .4rem;border-radius:20px;border:1px solid var(--bor);background:${(editEnf?.sistemas_afectados||[sistId]).includes(sist.id)?'var(--g1)':'var(--sur)'}">
+              <input type="checkbox" value="${sist.id}" class="enfgen-sistema-chk"
+                ${(editEnf?.sistemas_afectados||[sistId]).includes(sist.id)?'checked':''} style="accent-color:var(--g5)">
+              ${sist.iconImg?`<img src="${sist.iconImg}" style="width:18px;height:18px;object-fit:cover;border-radius:3px;vertical-align:middle;margin-right:.25rem">`:sist.icon} ${sist.label}
+            </label>`).join('')}
+          </div>
+        </div>
+
+        <!-- Vías de transmisión -->
+        <div class="form-group">
+          <label>Vías de transmisión</label>
+          <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.3rem">
+            ${['Contacto directo','Fecal-oral','Aerosol/Gotas','Vector','Vertical','Fomites','Agua/Alimento','N/A'].map(v=>`
+            <label style="display:inline-flex;align-items:center;gap:.25rem;font-size:.75rem;cursor:pointer">
+              <input type="checkbox" class="enfgen-vias-chk" value="${v}"
+                ${(editEnf?.vias||[]).includes(v)?'checked':''} style="accent-color:var(--g5)"> ${v}
+            </label>`).join('')}
+          </div>
+          <input id="enfgen-vias-extra" class="form-control" value="${editEnf?.vias_extra||''}" placeholder="Otras vías...">
+        </div>
+
+        <!-- Signos clínicos con entrada masiva -->
+        <div class="form-group">
+          <label>Signos clínicos <span style="font-size:.7rem;color:var(--txt3)">(uno por línea, o separados por coma)</span></label>
+          <div id="enfgen-signos-list" style="margin-bottom:.35rem">
+            ${(editEnf?.signos_lista||[editEnf?.signos||'']).filter(Boolean).map(s=>`
+            <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
+              <input class="form-control enfgen-signo-item" value="${s}" placeholder="Signo clínico..." style="flex:1;font-size:.82rem" list="signos-hist-dl">
+              <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+            </div>`).join('')}
+          </div>
+          <div style="background:var(--sur2);border-radius:var(--rsm);padding:.45rem;margin-bottom:.3rem">
+            <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.2rem">💡 Pegar lista completa:</div>
+            <textarea id="enfgen-signos-bulk" class="form-control" style="min-height:60px;font-size:.8rem"
+              placeholder="Ej: Letargia, Anorexia, Vómito bilioso&#10;Fiebre > 39.5°C"></textarea>
+            <button class="btn btn-primary btn-sm" style="margin-top:.3rem;width:100%" onclick="_enfGenAddSignosBulk()">+ Agregar todos</button>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="_enfGenAddSignoFromHistory()">+ Desde historial</button>
+        </div>
+
+        <!-- Diagnóstico con imágenes de hallazgo -->
+        <div class="form-group"><label>Diagnóstico</label>
+          <div id="enfgen-dx-list">
+            ${(editEnf?.dx_lista||[editEnf?.dx||'']).filter(Boolean).map(d=>`
+            <div class="enfgen-dx-row" style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem;margin-bottom:.4rem;background:var(--sur2)">
+              <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
+                <input class="form-control enfgen-dx-item" value="${typeof d==='object'?d.metodo||'':d}" placeholder="Método (Rx, ecografía, PCR...)" style="flex:1;font-size:.82rem">
+                <input class="form-control enfgen-dx-expect-item" value="${typeof d==='object'?d.esperado||'':''}" placeholder="Hallazgo esperado..." style="flex:1;font-size:.82rem">
+                <button onclick="this.closest('.enfgen-dx-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.2rem" class="enfgen-dx-img-preview">
+                ${(typeof d==='object'&&d.imagenes||[]).map(img=>`
+                <div style="position:relative"><img src="${img.data||img.url}" style="height:55px;width:auto;border-radius:var(--rxs);cursor:pointer" onclick="openImageFull('${img.data||img.url}')">
+                </div>`).join('')}
+              </div>
+              <label class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.68rem;margin-top:.1rem">
+                📷 Imagen hallazgo
+                <input type="file" accept="image/*" style="display:none" onchange="_enfGenAddDxImage(this)">
+              </label>
+            </div>`).join('')}
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="_enfGenAddDxItem()">+ Agregar diagnóstico</button>
+        </div>
+
+        <!-- Tratamiento -->
+        <div class="form-group"><label>Tratamiento</label>
+          <div id="enfgen-tx-list">
+            ${(editEnf?.tx_lista||[editEnf?.tx||'']).filter(Boolean).map(t=>`
+            <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
+              <input class="form-control enfgen-tx-item" value="${t}" placeholder="Tratamiento..." style="flex:1;font-size:.82rem">
+              <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+            </div>`).join('')}
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="_enfGenAddTxItem()">+ Agregar tratamiento</button>
+        </div>
+
+        <!-- Notas -->
+        <div class="form-group"><label>Notas clínicas relevantes</label>
+          <textarea id="enfgen-notas" class="form-control" style="min-height:60px"
+            placeholder="Tipo de bacteria/virus, predisposición, observaciones...">${editEnf?.notas||''}</textarea>
+        </div>
+
+        <div style="display:flex;gap:.5rem;margin-top:.5rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('enfgen-add-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveEnfGen('${sistId}',${editIdx})">💾 ${editIdx>=0?'Guardar cambios':'Agregar'}</button>
+        </div>
+      </div>
+    </div>`);
+  setTimeout(() => { updateModalAIStatus?.(); buildSignosHistory?.(); }, 50);
+}
+
+
+// Helpers para el modal de enfgen
+function _addEnfGenSignosBulk() {
+  const bulk = document.getElementById('enfgen-signos-bulk');
+  if (!bulk?.value.trim()) return;
+  const list = document.getElementById('enfgen-signos-list');
+  if (!list) return;
+  const items = bulk.value.split(/[\n,]/).map(s=>s.trim()).filter(Boolean);
+  items.forEach(s => {
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;gap:.3rem;margin-bottom:.25rem';
+    div.innerHTML = `<input class="form-control enfgen-signo-item" value="${s}" style="flex:1;font-size:.82rem" list="signos-hist-dl">
+      <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>`;
+    list.appendChild(div);
+  });
+  bulk.value = '';
+}
+
+function _addEnfGenDxItem() {
+  const list = document.getElementById('enfgen-dx-list');
+  if (!list) return;
+  const div = document.createElement('div');
+  div.className = 'enfgen-dx-row';
+  div.style.cssText = 'border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem;margin-bottom:.4rem;background:var(--sur2)';
+  div.innerHTML = `<div style="display:flex;gap:.3rem">
+    <input class="form-control enfgen-dx-item" placeholder="Método (PCR, ecografía...)" style="flex:1;font-size:.82rem">
+    <input class="form-control enfgen-dx-expect-item" placeholder="Hallazgo esperado..." style="flex:1;font-size:.82rem">
+    <button onclick="this.closest('.enfgen-dx-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+  </div>`;
+  list.appendChild(div);
+}
+
+function _addEnfGenTxItem() {
+  const list = document.getElementById('enfgen-tx-list');
+  if (!list) return;
+  const div = document.createElement('div');
+  div.style.cssText = 'display:flex;gap:.3rem;margin-bottom:.3rem';
+  div.innerHTML = `<input class="form-control enfgen-tx-item" placeholder="Tratamiento..." style="flex:1;font-size:.82rem">
+    <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>`;
+  list.appendChild(div);
+}
+
+function importEnfGenFile(input, sistId) {
+  // Reusar la misma lógica de importación de la ficha de especie si existe
+  if (typeof importEnfermedadesFile === 'function') {
+    importEnfermedadesFile(input, sistId, true); // true = modo enfgen
+  }
+}
+
+function processEnfGenTextInput(sistId) {
+  const textarea = document.getElementById('paste-text-enfgen-import-status');
+  if (!textarea?.value.trim()) return;
+  // Rellenar campos del modal con el texto pegado
+  const text = textarea.value.trim();
+  const nombreEl = document.getElementById('enfgen-nombre');
+  if (nombreEl && !nombreEl.value) {
+    const firstLine = text.split('\n')[0].trim();
+    if (firstLine.length < 80) nombreEl.value = firstLine;
+  }
+  document.getElementById('paste-box-enfgen-import-status').style.display = 'none';
+  toast('💡 Completa los campos manualmente o usa IA si tienes API key configurada');
+}
+
+async function saveEnfGen(sistId, editIdx=-1) {
+  const nombre = document.getElementById('enfgen-nombre')?.value.trim();
+  if (!nombre) { toast('⚠ El nombre es obligatorio'); return; }
+
+  // Recopilar signos
+  const signosEls = document.querySelectorAll('#enfgen-add-modal .enfgen-signo-item');
+  const signosList = Array.from(signosEls).map(el=>el.value.trim()).filter(Boolean);
+
+  // Recopilar dx
+  const dxRows = document.querySelectorAll('#enfgen-add-modal .enfgen-dx-row');
+  const dxLista = Array.from(dxRows).map(row => ({
+    metodo:   row.querySelector('.enfgen-dx-item')?.value.trim()||'',
+    esperado: row.querySelector('.enfgen-dx-expect-item')?.value.trim()||''
+  })).filter(d=>d.metodo);
+
+  // Recopilar tx
+  const txEls = document.querySelectorAll('#enfgen-add-modal .enfgen-tx-item');
+  const txLista = Array.from(txEls).map(el=>el.value.trim()).filter(Boolean);
+
+  // Vías
+  const vias = Array.from(document.querySelectorAll('#enfgen-add-modal .enfgen-vias-chk:checked')).map(el=>el.value);
+  const viasExtra = document.getElementById('enfgen-vias-extra')?.value.trim()||'';
+
+  // Sistemas afectados
+  const sistemasAfectados = Array.from(document.querySelectorAll('#enfgen-add-modal .enfgen-sistema-chk:checked')).map(el=>el.value);
+
+  const enf = {
+    nombre,
+    agente:           document.getElementById('enfgen-agente')?.value.trim()||'',
+    signos:           signosList.join(', '),
+    signos_lista:     signosList,
+    dx:               dxLista.map(d=>d.metodo).join(', '),
+    dx_lista:         dxLista,
+    tx:               txLista.join(', '),
+    tx_lista:         txLista,
+    vias,
+    vias_extra:       viasExtra,
+    sistemas_afectados: sistemasAfectados.length ? sistemasAfectados : [sistId],
+    notas:            document.getElementById('enfgen-notas')?.value.trim()||'',
+  };
+
+  // Inicializar la estructura si no existe
+  if (!ENFERMEDADES_GENERALES[_enfGenClaseActiva]) ENFERMEDADES_GENERALES[_enfGenClaseActiva] = { sistemas:{} };
+  const sistTarget = enf.sistemas_afectados;
+
+  sistTarget.forEach(sid => {
+    if (!ENFERMEDADES_GENERALES[_enfGenClaseActiva].sistemas[sid]) {
+      ENFERMEDADES_GENERALES[_enfGenClaseActiva].sistemas[sid] = { enfermedades:[] };
+    }
+    const existing = ENFERMEDADES_GENERALES[_enfGenClaseActiva].sistemas[sid].enfermedades;
+    if (sid === sistId && editIdx >= 0) {
+      existing[editIdx] = enf;
+    } else {
+      const dupIdx = existing.findIndex(e => e.nombre === enf.nombre);
+      if (dupIdx >= 0) existing[dupIdx] = enf;
+      else existing.push(enf);
+    }
+  });
+
+  await saveEnfermedadesGenerales();
+  document.getElementById('enfgen-add-modal')?.remove();
+  renderEnfGenContent();
+  toast('✓ Enfermedad ' + (editIdx>=0?'actualizada':'guardada') + (sistTarget.length>1?' en '+sistTarget.length+' sistemas':''));
+}
+
 function openEditEnfGen(sistId, enfIdx) {
-  const enf = ENFERMEDADES_GENERALES[_enfGenClaseActiva]?.sistemas[sistId]?.enfermedades[enfIdx];
-  if (!enf) return;
-  document.getElementById('enfgen-edit-modal')?.remove();
-  document.body.insertAdjacentHTML('beforeend',
-    '<div id="enfgen-edit-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">'
-    + '<div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">'
-    + '<div style="font-weight:700;font-size:.9rem;margin-bottom:.75rem">✏️ Editar enfermedad</div>'
-    + '<div class="form-group"><label>Nombre *</label><input id="enfgen-edit-nombre" class="form-control" value="' + (enf.nombre||'') + '"></div>'
-    + '<div class="form-group"><label>Agente</label><input id="enfgen-edit-agente" class="form-control" value="' + (enf.agente||'') + '"></div>'
-    + '<div class="form-group"><label>Signos clínicos</label><textarea id="enfgen-edit-signos" class="form-control" style="min-height:70px">' + (enf.signos||'') + '</textarea></div>'
-    + '<div class="form-group"><label>Diagnóstico</label><input id="enfgen-edit-dx" class="form-control" value="' + (enf.dx||'') + '"></div>'
-    + '<div class="form-group"><label>Tratamiento</label><textarea id="enfgen-edit-tx" class="form-control" style="min-height:60px">' + (enf.tx||'') + '</textarea></div>'
-    + '<div class="form-group"><label>Notas</label><textarea id="enfgen-edit-notas" class="form-control" style="min-height:40px">' + (enf.notas||'') + '</textarea></div>'
-    + '<div style="display:flex;gap:.5rem;margin-top:.75rem">'
-    + '<button class="btn btn-secondary" style="flex:1" onclick="document.getElementById(\'enfgen-edit-modal\').remove()">Cancelar</button>'
-    + '<button class="btn btn-primary" style="flex:2" onclick="saveEditEnfGen(\''+sistId+'\','+enfIdx+')">💾 Guardar cambios</button>'
-    + '</div></div></div>'
-  );
+  openAddEnfGen(sistId, enfIdx);
 }
 
 async function saveEditEnfGen(sistId, enfIdx) {
-  const enfs = ENFERMEDADES_GENERALES[_enfGenClaseActiva]?.sistemas[sistId]?.enfermedades;
-  if (!enfs?.[enfIdx]) return;
-  enfs[enfIdx] = {
-    nombre: document.getElementById('enfgen-edit-nombre')?.value.trim()||enfs[enfIdx].nombre,
-    agente: document.getElementById('enfgen-edit-agente')?.value.trim()||'',
-    signos: document.getElementById('enfgen-edit-signos')?.value.trim()||'',
-    dx:     document.getElementById('enfgen-edit-dx')?.value.trim()||'',
-    tx:     document.getElementById('enfgen-edit-tx')?.value.trim()||'',
-    notas:  document.getElementById('enfgen-edit-notas')?.value.trim()||'',
-  };
-  await saveEnfermedadesGenerales();
-  document.getElementById('enfgen-edit-modal')?.remove();
-  renderEnfGenContent();
-  toast('✓ Enfermedad actualizada');
+  await saveEnfGen(sistId, enfIdx);
 }
 
 let navHistory = [];
@@ -12813,7 +13300,7 @@ function _cerrarModalesAbiertos() {
     'guardar-dieta-modal','editar-dieta-modal','clonar-dieta-modal',
     'hist-modal','edit-cat-modal','modal-add-drug','ref-modal','enf-modal',
     'enfgen-add-modal','enfgen-edit-modal','importenf-modal',
-    'sp-hist-modal','new-calc-modal','liquido-modal','cat-modal'
+    'sp-hist-modal','new-calc-modal','liquido-modal','cat-modal','bulk-pdf-modal'
   ];
   let alguno = false;
   floatingModals.forEach(id => {
@@ -13058,7 +13545,7 @@ document.addEventListener('click', (e) => {
     'guardar-dieta-modal','editar-dieta-modal','clonar-dieta-modal',
     'hist-modal','edit-cat-modal','modal-add-drug','ref-modal','enf-modal',
     'enfgen-add-modal','enfgen-edit-modal','importenf-modal',
-    'sp-hist-modal','new-calc-modal','liquido-modal','cat-modal'
+    'sp-hist-modal','new-calc-modal','liquido-modal','cat-modal','bulk-pdf-modal'
   ];
   for (const id of floatingIds) {
     const modal = document.getElementById(id);
