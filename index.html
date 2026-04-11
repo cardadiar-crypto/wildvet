@@ -1238,7 +1238,7 @@ async function saveFirebaseConfig() {
     await dbPut('settings', { key: 'firebase_config', value: config });
     errEl.textContent = '';
     initFirebase(config);
-    document.getElementById('firebase-config-panel').style.display = 'none';
+    document.getElementById('firebase-config-panel')?.remove?.(); // Panel legacy - ya no existe
     const st = document.getElementById('login-status');
     if (st) { st.textContent = '✓ Firebase conectado — ya puedes entrar con Google'; st.style.color = 'var(--g3)'; }
   } catch(e) {
@@ -1385,8 +1385,10 @@ async function loginWithGoogle() {
   const statusEl = document.getElementById('login-status');
   const btn = document.getElementById('google-btn');
   if (!firebaseAuth) {
-    document.getElementById('firebase-config-panel').style.display = 'block';
-    document.getElementById('firebase-config-panel').scrollIntoView({ behavior: 'smooth' });
+    // El panel de configuración de Firebase ya no está en el HTML (config incorporada)
+    // Firebase debería estar siempre inicializado con la config incorporada
+    console.warn('Firebase Auth no disponible — verificar configuración');
+    if (typeof statusEl !== 'undefined' && statusEl) statusEl.textContent = '⚠ Error de Firebase. Recarga la página.';
     return;
   }
   try {
@@ -13506,3 +13508,4 @@ init();
 </script>
 </body>
 </html>
+v
