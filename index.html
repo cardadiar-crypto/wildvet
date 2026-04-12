@@ -12938,96 +12938,34 @@ async function startBulkUpload(spId) {
   _bulkFiles = [];
 }
 
-function _eg_addSignosBulk() {
-  const bulk = document.getElementById('enfgen-signos-bulk');
-  if (!bulk?.value.trim()) return;
-  const list = document.getElementById('enfgen-signos-list');
-  if (!list) return;
-  bulk.value.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean).forEach(s => {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:.3rem;margin-bottom:.25rem';
-    row.innerHTML = '<input class="form-control enfgen-signo-item" value="'
-      + s.replace(/"/g,'&quot;') + '" placeholder="Signo clínico..." style="flex:1;font-size:.82rem" list="signos-hist-dl">'
-      + '<button onclick="this.closest(\'div\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>';
-    list.appendChild(row);
-  });
-  bulk.value = '';
-}
-function _eg_addSignoHistory() {
-  const list = document.getElementById('enfgen-signos-list');
-  if (!list) return;
-  const row = document.createElement('div');
-  row.style.cssText = 'display:flex;gap:.3rem;margin-bottom:.25rem';
-  row.innerHTML = '<input class="form-control enfgen-signo-item" placeholder="Signo clínico..." style="flex:1;font-size:.82rem" list="signos-hist-dl">'
-    + '<button onclick="this.closest(\'div\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>';
-  list.appendChild(row);
-  row.querySelector('input').focus();
-}
-function _eg_addDxItem() {
-  const list = document.getElementById('enfgen-dx-list');
-  if (!list) return;
-  const row = document.createElement('div');
-  row.className = 'enfgen-dx-row';
-  row.style.cssText = 'border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem;margin-bottom:.4rem;background:var(--sur2)';
-  row.innerHTML = '<div style="display:flex;gap:.3rem;margin-bottom:.25rem">'
-    + '<input class="form-control enfgen-dx-item" placeholder="Método (Rx, ecografía, PCR...)" style="flex:1;font-size:.82rem">'
-    + '<input class="form-control enfgen-dx-expect-item" placeholder="Hallazgo esperado..." style="flex:1;font-size:.82rem">'
-    + '<button onclick="this.closest(\'.enfgen-dx-row\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>'
-    + '</div><div class="enfgen-dx-img-preview" style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.2rem"></div>'
-    + '<label class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.68rem;margin-top:.1rem">📷 Imagen hallazgo'
-    + '<input type="file" accept="image/*" style="display:none" onchange="_eg_addDxImage(this)"></label>';
-  list.appendChild(row);
-}
-function _eg_addTxItem() {
-  const list = document.getElementById('enfgen-tx-list');
-  if (!list) return;
-  const row = document.createElement('div');
-  row.style.cssText = 'display:flex;gap:.3rem;margin-bottom:.3rem';
-  row.innerHTML = '<input class="form-control enfgen-tx-item" placeholder="Tratamiento..." style="flex:1;font-size:.82rem">'
-    + '<button onclick="this.closest(\'div\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>';
-  list.appendChild(row);
-}
-function _eg_addDxImage(input) {
-  if (!input.files?.[0]) return;
-  const preview = input.closest('.enfgen-dx-row')?.querySelector('.enfgen-dx-img-preview');
-  if (!preview) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const w = document.createElement('div');
-    const img = document.createElement('img');
-    img.src = e.target.result;
-    img.style.cssText = 'height:55px;width:auto;border-radius:var(--rxs);cursor:pointer';
-    img.onclick = () => openImageFull(e.target.result);
-    w.appendChild(img);
-    preview.appendChild(w);
-  };
-  reader.readAsDataURL(input.files[0]);
-}
-
 function openAddEnfGen(sistId, editIdx=-1) {
   document.getElementById('enfgen-add-modal')?.remove();
   const claseData = ENFERMEDADES_GENERALES[_enfGenClaseActiva] || {};
   const editEnf = editIdx >= 0 ? claseData.sistemas?.[sistId]?.enfermedades?.[editIdx] : null;
   const allSists = [...SISTEMAS_ENFERMEDAD, ...(claseData.categorias_extra||[])];
   const sName = allSists.find(s=>s.id===sistId)?.label || sistId;
+
   document.body.insertAdjacentHTML('beforeend', `
     <div id="enfgen-add-modal" style="position:fixed;inset:0;z-index:1300;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${editEnf?'✏️ Editar':'+'} enfermedad — ${sName}</div>
 
+        <!-- Importar desde archivo con IA -->
         ${editIdx<0?`<div style="background:var(--g0);border:1.5px dashed var(--g4);border-radius:var(--rsm);padding:.5rem .6rem;margin-bottom:.75rem">
           <div style="font-size:.68rem;color:var(--g7);font-weight:600;margin-bottom:.3rem">🤖 Importar con IA — PDF, Word o Excel</div>
           <div style="display:flex;gap:.3rem;align-items:center">
             <label for="enfgen-file-import" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem;white-space:nowrap">📂 Seleccionar archivo</label>
-            <input type="file" id="enfgen-file-import" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importEnfGenFile(this,'${sistId}')">
+            <input type="file" id="enfgen-file-import" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none"
+              onchange="importEnfGenFile(this,'${sistId}')">
             <span id="enfgen-import-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
+          </div>
           <div style="margin-top:.3rem">
             <button onclick="togglePasteBox('enfgen-import-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
             <div id="paste-box-enfgen-import-status" style="display:none;margin-top:.25rem">
-              <textarea id="paste-text-enfgen-import-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí la información sobre la enfermedad..."></textarea>
+              <textarea id="paste-text-enfgen-import-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical"
+                placeholder="Pega aquí la información sobre la enfermedad..."></textarea>
               <button onclick="processEnfGenTextInput('${sistId}')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
             </div>
-          </div>
           </div>
         </div>`:``}
 
@@ -13038,6 +12976,7 @@ function openAddEnfGen(sistId, editIdx=-1) {
           <input id="enfgen-agente" class="form-control" value="${editEnf?.agente||''}" placeholder="Parvovirus felino, Bacteriana...">
         </div>
 
+        <!-- Sistemas afectados (multi-selección) -->
         <div class="form-group">
           <label>Sistemas afectados <span style="font-size:.7rem;color:var(--txt3)">(puede seleccionar varios)</span></label>
           <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.25rem">
@@ -13045,22 +12984,25 @@ function openAddEnfGen(sistId, editIdx=-1) {
             <label style="display:inline-flex;align-items:center;gap:.2rem;cursor:pointer;font-size:.75rem;padding:.15rem .4rem;border-radius:20px;border:1px solid var(--bor);background:${(editEnf?.sistemas_afectados||[sistId]).includes(sist.id)?'var(--g1)':'var(--sur)'}">
               <input type="checkbox" value="${sist.id}" class="enfgen-sistema-chk"
                 ${(editEnf?.sistemas_afectados||[sistId]).includes(sist.id)?'checked':''} style="accent-color:var(--g5)">
-              ${sist.iconImg?`<img src="${sist.iconImg}" style="width:18px;height:18px;object-fit:cover;border-radius:3px;vertical-align:middle;margin-right:.25rem">`:sist.icon} ${sist.label}
+              ${sist.iconImg?`<img src="${sist.iconImg}" style="width:18px;height:18px;object-fit:contain;vertical-align:middle">`:sist.icon} ${sist.label}
             </label>`).join('')}
           </div>
         </div>
 
+        <!-- Vías de transmisión -->
         <div class="form-group">
           <label>Vías de transmisión</label>
           <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.3rem">
             ${['Contacto directo','Fecal-oral','Aerosol/Gotas','Vector','Vertical','Fomites','Agua/Alimento','N/A'].map(v=>`
             <label style="display:inline-flex;align-items:center;gap:.25rem;font-size:.75rem;cursor:pointer">
-              <input type="checkbox" class="enfgen-vias-chk" value="${v}" ${(editEnf?.vias||[]).includes(v)?'checked':''} style="accent-color:var(--g5)"> ${v}
+              <input type="checkbox" class="enfgen-vias-chk" value="${v}"
+                ${(editEnf?.vias||[]).includes(v)?'checked':''} style="accent-color:var(--g5)"> ${v}
             </label>`).join('')}
           </div>
           <input id="enfgen-vias-extra" class="form-control" value="${editEnf?.vias_extra||''}" placeholder="Otras vías...">
         </div>
 
+        <!-- Signos clínicos con entrada masiva -->
         <div class="form-group">
           <label>Signos clínicos <span style="font-size:.7rem;color:var(--txt3)">(uno por línea, o separados por coma)</span></label>
           <div id="enfgen-signos-list" style="margin-bottom:.35rem">
@@ -13074,33 +13016,26 @@ function openAddEnfGen(sistId, editIdx=-1) {
             <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.2rem">💡 Pegar lista completa:</div>
             <textarea id="enfgen-signos-bulk" class="form-control" style="min-height:60px;font-size:.8rem"
               placeholder="Ej: Letargia, Anorexia, Vómito bilioso&#10;Fiebre > 39.5°C"></textarea>
-            <button class="btn btn-primary btn-sm" style="margin-top:.3rem;width:100%" onclick="_eg_addSignosBulk()">+ Agregar todos</button>
+            <button class="btn btn-primary btn-sm" style="margin-top:.3rem;width:100%" onclick="_addEnfGenSignosBulk()">+ Agregar todos</button>
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="_eg_addSignoHistory()">+ Desde historial</button>
         </div>
 
+        <!-- Diagnóstico -->
         <div class="form-group"><label>Diagnóstico</label>
           <div id="enfgen-dx-list">
             ${(editEnf?.dx_lista||[editEnf?.dx||'']).filter(Boolean).map(d=>`
             <div class="enfgen-dx-row" style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem;margin-bottom:.4rem;background:var(--sur2)">
-              <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
-                <input class="form-control enfgen-dx-item" value="${typeof d==='object'?d.metodo||'':d}" placeholder="Método (Rx, ecografía, PCR...)" style="flex:1;font-size:.82rem">
+              <div style="display:flex;gap:.3rem;margin-bottom:.2rem">
+                <input class="form-control enfgen-dx-item" value="${typeof d==='object'?d.metodo||'':d}" placeholder="Método (PCR, ecografía...)" style="flex:1;font-size:.82rem">
                 <input class="form-control enfgen-dx-expect-item" value="${typeof d==='object'?d.esperado||'':''}" placeholder="Hallazgo esperado..." style="flex:1;font-size:.82rem">
                 <button onclick="this.closest('.enfgen-dx-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
               </div>
-              <div class="enfgen-dx-img-preview" style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.2rem">
-                ${(typeof d==='object'&&d.imagenes||[]).map(img=>`
-                <div><img src="${img.data||img.url}" style="height:55px;width:auto;border-radius:var(--rxs);cursor:pointer" onclick="openImageFull('${img.data||img.url}')"></div>`).join('')}
-              </div>
-              <label class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.68rem;margin-top:.1rem">
-                📷 Imagen hallazgo
-                <input type="file" accept="image/*" style="display:none" onchange="_eg_addDxImage(this)">
-              </label>
             </div>`).join('')}
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="_eg_addDxItem()">+ Agregar diagnóstico</button>
+          <button class="btn btn-secondary btn-sm" onclick="_addEnfGenDxItem()">+ Agregar diagnóstico</button>
         </div>
 
+        <!-- Tratamiento -->
         <div class="form-group"><label>Tratamiento</label>
           <div id="enfgen-tx-list">
             ${(editEnf?.tx_lista||[editEnf?.tx||'']).filter(Boolean).map(t=>`
@@ -13109,11 +13044,13 @@ function openAddEnfGen(sistId, editIdx=-1) {
               <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
             </div>`).join('')}
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="_eg_addTxItem()">+ Agregar tratamiento</button>
+          <button class="btn btn-secondary btn-sm" onclick="_addEnfGenTxItem()">+ Agregar tratamiento</button>
         </div>
 
+        <!-- Notas -->
         <div class="form-group"><label>Notas clínicas relevantes</label>
-          <textarea id="enfgen-notas" class="form-control" style="min-height:60px" placeholder="Tipo de bacteria/virus, predisposición, observaciones...">${editEnf?.notas||''}</textarea>
+          <textarea id="enfgen-notas" class="form-control" style="min-height:60px"
+            placeholder="Tipo de bacteria/virus, predisposición, observaciones...">${editEnf?.notas||''}</textarea>
         </div>
 
         <div style="display:flex;gap:.5rem;margin-top:.5rem">
@@ -13122,9 +13059,7 @@ function openAddEnfGen(sistId, editIdx=-1) {
         </div>
       </div>
     </div>`);
-  setTimeout(() => { updateModalAIStatus?.(); buildSignosHistory?.(); }, 50);
 }
-
 
 // Helpers para el modal de enfgen
 function _addEnfGenSignosBulk() {
