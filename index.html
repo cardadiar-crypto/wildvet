@@ -3373,10 +3373,11 @@ async function saveHemoRow(field, idx) {
   const d = document.getElementById('hd_'+field+'_'+idx)?.value.trim()||'';
   if (!p) { toast('⚠ Ingresa el nombre del parámetro'); return; }
   if (!currentSpecies[field]) currentSpecies[field] = [];
-  currentSpecies[field].push([p, v||'N/D', u||'', d]);
+  // SET en el índice en lugar de PUSH para evitar duplicados
+  currentSpecies[field][idx] = [p, v||'N/D', u||'', d];
   await dbPutSync('species', currentSpecies);
   renderTab('fisiologia');
-  toast('✓ Parámetro guardado en la nube');
+  toast('✓ Parámetro guardado');
 }
 async function editHemoRow(i, field, col, value) {
   if (!currentSpecies[field]?.[i]) return;
@@ -4785,7 +4786,7 @@ function _enfSpRenderList(enfs, isAdmin, sp) {
     return;
   }
   container.innerHTML = enfs.map(({ enf, sistId, enfIdx }) => {
-    const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)||{icon:'📋',label:sistId};
+    const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)||{icon:'📋',label:_getAllSistsLabel(sistId)};
     const badges = [
       enf.tipo ? `<span style="background:${enf.tipo==='infecciosa'?'var(--r1)':'var(--g0)'};color:${enf.tipo==='infecciosa'?'var(--r5)':'var(--g6)'};border:1px solid ${enf.tipo==='infecciosa'?'var(--r5)':'var(--g4)'};border-radius:20px;padding:.1rem .4rem;font-size:.65rem">${enf.subtipo||enf.tipo}</span>` : '',
       enf.zoonosis==='si'?'<span style="background:#fef9c3;color:#854d0e;border:1px solid #fde68a;border-radius:20px;padding:.1rem .4rem;font-size:.65rem">🦠 Zoonótica</span>':'',
@@ -4817,14 +4818,14 @@ function _enfSpVerDetalle(sistId, enfIdx) {
   const enf = sp.enfermedades_sistemas?.[sistId]?.enfermedades?.[enfIdx];
   if (!enf) return;
   document.getElementById('enf-detail-modal')?.remove();
-  const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)||{icon:'📋',label:sistId};
+  const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)||{icon:'📋',label:_getAllSistsLabel(sistId)};
   document.body.insertAdjacentHTML('beforeend', `
     <div id="enf-detail-modal" style="position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.25rem">${enf.nombre}</div>
         <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.75rem">${sist.icon} ${sist.label}${enf.subtipo?' · '+enf.subtipo:''}</div>
         ${_enfDetRow('Agente', enf.agente+(enf.agente_tipo?' ('+enf.agente_tipo+')':''))}
-        ${_enfDetRow('Sistemas afectados', (enf.sistemas_afectados||[]).map(s=>SISTEMAS_ENFERMEDAD.find(x=>x.id===s)?.label||s).join(', '))}
+        ${_enfDetRow('Sistemas afectados', (enf.sistemas_afectados||[]).map(s=>_getAllSistsLabel(s)).join(', '))}
         ${_enfDetRow('Órganos', (enf.organos||[]).join(', '))}
         ${_enfDetRow('Vías de transmisión', [...(enf.vias||[]),enf.vias_extra].filter(Boolean).join(', '))}
         ${_enfDetRow('Patogénesis', enf.patogenesis)}
@@ -13109,7 +13110,7 @@ function _enfGenVerDetalle(sistId, enfIdx) {
   const enf = ENFERMEDADES_GENERALES[_enfGenClaseActiva]?.sistemas[sistId]?.enfermedades[enfIdx];
   if (!enf) return;
   document.getElementById('enfgen-detail-modal')?.remove();
-  const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)||{icon:'📋',label:sistId};
+  const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)||{icon:'📋',label:_getAllSistsLabel(sistId)};
   document.body.insertAdjacentHTML('beforeend', `
     <div id="enfgen-detail-modal" style="position:fixed;inset:0;z-index:1300;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
@@ -13117,7 +13118,7 @@ function _enfGenVerDetalle(sistId, enfIdx) {
         <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.75rem">${sist.icon} ${sist.label}${enf.subtipo?' · '+enf.subtipo:''}</div>
         ${_enfDetRow('Sinónimos', enf.sinonimos)}
         ${_enfDetRow('Agente', enf.agente + (enf.agente_tipo?' ('+enf.agente_tipo+')':''))}
-        ${_enfDetRow('Sistemas afectados', (enf.sistemas_afectados||[]).map(s=>SISTEMAS_ENFERMEDAD.find(x=>x.id===s)?.label||s).join(', '))}
+        ${_enfDetRow('Sistemas afectados', (enf.sistemas_afectados||[]).map(s=>_getAllSistsLabel(s)).join(', '))}
         ${_enfDetRow('Órganos', (enf.organos||[]).join(', '))}
         ${_enfDetRow('Vías de transmisión', [...(enf.vias||[]), enf.vias_extra].filter(Boolean).join(', '))}
         ${_enfDetRow('Patogénesis', enf.patogenesis)}
@@ -13870,6 +13871,23 @@ async function startBulkUpload(spId) {
   renderBiblioteca();
   toast(`✓ ${done} PDF(s) importados a la biblioteca`);
   _bulkFiles = [];
+}
+
+function _getAllSistsLabel(sistId) {
+  // Buscar en sistemas base
+  const base = SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId);
+  if (base) return base.label;
+  // Buscar en categorias_extra de enfermedades generales
+  for (const claseData of Object.values(ENFERMEDADES_GENERALES)) {
+    const found = (claseData.categorias_extra||[]).find(s=>s.id===sistId);
+    if (found) return found.label;
+  }
+  // Buscar en categorias de la especie actual
+  const spExtra = currentSpecies?.enfermedades_categorias || [];
+  const spFound = spExtra.find(s=>s.id===sistId);
+  if (spFound) return spFound.label;
+  // Fallback: limpiar el ID
+  return sistId.replace(/^custom_\d+$/, 'Categoría personalizada').replace(/_/g,' ');
 }
 
 let navHistory = [];
