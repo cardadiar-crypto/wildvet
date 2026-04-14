@@ -3287,7 +3287,7 @@ function renderFisiologia(el, sp) {
             <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:right;font-family:var(--mono)">
               ${isAdmin?`<input type="text" value="${h[1]||''}" placeholder="rango" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.82rem;color:var(--txt);text-align:right" onchange="editHemoRow(${i},'hematology',1,this.value)">`:h[1]}
             </td>
-            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-size:.75rem;color:var(--txt3)">${isAdmin?`<input type="text" value="${h[3]||''}" placeholder="Para qué se mide..." style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-size:.75rem;color:var(--txt3)" onchange="editHemoRow(${i},'hematology',3,this.value)">`:h[3]||''}</td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-size:.75rem;color:var(--txt3);min-width:120px">${isAdmin?`<textarea style="width:100%;background:transparent;border:1px solid var(--bor2);border-radius:var(--rxs);outline:none;font-size:.75rem;color:var(--txt3);resize:vertical;min-height:32px;padding:.2rem .3rem;font-family:var(--sans)" onchange="editHemoRow(${i},'hematology',3,this.value)">${h[3]||''}</textarea>`:`<span style="font-size:.75rem;color:var(--txt3)">${h[3]||''}</span>`}</td>
             ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button class="icon-btn danger" style="width:22px;height:22px;font-size:.65rem" onclick="removeHemoRow(${i},'hematology')">✕</button></td>`:''}
           </tr>`).join('')}
           ${!hem.length?`<tr><td colspan="4" style="padding:.5rem;color:var(--txt3);font-size:.8rem;text-align:center">Sin datos registrados</td></tr>`:''}
@@ -3335,7 +3335,7 @@ function renderFisiologia(el, sp) {
             <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);text-align:right;font-family:var(--mono)">
               ${isAdmin?`<input type="text" value="${b[1]||''}" placeholder="rango" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-family:var(--mono);font-size:.82rem;color:var(--txt);text-align:right" onchange="editHemoRow(${i},'biochem',1,this.value)">`:b[1]}
             </td>
-            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-size:.75rem;color:var(--txt3)">${isAdmin?`<input type="text" value="${b[3]||''}" placeholder="Para qué se mide..." style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--bor2);outline:none;font-size:.75rem;color:var(--txt3)" onchange="editHemoRow(${i},'biochem',3,this.value)">`:b[3]||''}</td>
+            <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);font-size:.75rem;color:var(--txt3);min-width:120px">${isAdmin?`<textarea style="width:100%;background:transparent;border:1px solid var(--bor2);border-radius:var(--rxs);outline:none;font-size:.75rem;color:var(--txt3);resize:vertical;min-height:32px;padding:.2rem .3rem;font-family:var(--sans)" onchange="editHemoRow(${i},'biochem',3,this.value)">${b[3]||''}</textarea>`:`<span style="font-size:.75rem;color:var(--txt3)">${b[3]||''}</span>`}</td>
             ${isAdmin?`<td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)"><button class="icon-btn danger" style="width:22px;height:22px;font-size:.65rem" onclick="removeHemoRow(${i},'biochem')">✕</button></td>`:''}
           </tr>`).join('')}
           ${!bio.length?`<tr><td colspan="4" style="padding:.5rem;color:var(--txt3);font-size:.8rem;text-align:center">Sin datos registrados</td></tr>`:''}
@@ -3358,8 +3358,8 @@ function addHemoRow(tableId, field) {
       <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
         <input style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--g4);outline:none;font-family:var(--mono);font-size:.82rem;color:var(--txt);text-align:right" placeholder="Rango normal" id="hv_${field}_${idx}">
       </td>
-      <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
-        <input style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--g4);outline:none;font-size:.75rem;color:var(--txt3)" placeholder="Definición" id="hd_${field}_${idx}">
+      <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor);min-width:120px">
+        <textarea id="hd_${field}_${idx}" style="width:100%;background:transparent;border:1px solid var(--bor2);border-radius:var(--rxs);outline:none;font-size:.75rem;color:var(--txt3);resize:vertical;min-height:32px;padding:.2rem .3rem;font-family:var(--sans)" placeholder="Definición / descripción del parámetro..."></textarea>
       </td>
       <td style="padding:.2rem .3rem;border-bottom:1px solid var(--bor)">
         <button class="btn btn-primary btn-sm" style="padding:.2rem .4rem;font-size:.7rem" onclick="saveHemoRow('${field}',${idx})">✓</button>
@@ -5403,84 +5403,80 @@ async function addDxImage(input) {
 async function saveEnfermedadModal(sistId, editIdx=-1) {
   const nombre = document.getElementById('enf-nombre')?.value.trim();
   if (!nombre) { toast('⚠ El nombre es obligatorio'); return; }
-  // Recopilar signos como lista
-  const signosEls = document.querySelectorAll('#signos-list .signo-item');
-  const signosList = Array.from(signosEls).map(el=>el.value.trim()).filter(Boolean);
-  // Recopilar dx como lista de objetos {metodo, esperado}
-  const dxRows = document.querySelectorAll('#dx-list .dx-row');
-  const dxLista = Array.from(dxRows).map(row => {
-    const metodo   = row.querySelector('.dx-item')?.value.trim()||'';
-    const esperado = row.querySelector('.dx-expect-item')?.value.trim()||'';
-    const imgEls   = row.querySelectorAll('.dx-img-preview img');
-    const imagenes = Array.from(imgEls).map(img => ({ data: img.src }));
-    return { metodo, esperado, imagenes };
-  }).filter(d => d.metodo);
-  // Recopilar tx como lista
-  const txEls = document.querySelectorAll('#tx-list .tx-item');
-  const txLista = Array.from(txEls).map(el=>el.value.trim()).filter(Boolean);
-  // Vías de transmisión
-  const vias = Array.from(document.querySelectorAll('#enf-modal .vias-chk:checked')).map(el=>el.value);
-  const sistemasAfectados = Array.from(document.querySelectorAll('#enf-modal .enf-sistema-chk:checked')).map(el=>el.value);
-  const viasExtra = document.getElementById('enf-vias-extra')?.value.trim()||'';
+
+  const modal = document.getElementById('enf-modal');
+  const qsC = sel => [...(modal?.querySelectorAll(sel+':checked')||[])].map(el=>el.value);
+  const qsV = sel => [...(modal?.querySelectorAll(sel)||[])].map(el=>el.value.trim()).filter(Boolean);
+
+  // Recopilar todos los campos
+  const signosList = qsV('#signos-list .signo-item');
+  const dxLista    = [...(modal?.querySelectorAll('#dx-list .dx-row')||[])].map(row=>({
+    metodo:   row.querySelector('.dx-item')?.value.trim()||'',
+    esperado: row.querySelector('.dx-expect-item')?.value.trim()||'',
+    imagenes: [...(row.querySelectorAll('.dx-img-preview img')||[])].map(img=>({data:img.src}))
+  })).filter(d=>d.metodo);
+  const txLista  = qsV('#tx-list .tx-item');
+  const sistAfect = qsC('.enf-sistema-chk');
+  const vias      = qsC('.vias-chk');
+  const organos   = qsC('.enf-organo-chk');
+  const tags      = qsC('.enf-tag-chk');
 
   const enf = {
     nombre,
-    agente:      document.getElementById('enf-agente')?.value||'',
-    signos:      signosList.join(', '),
-    signos_lista:signosList,
-    dx:          dxLista.map(d=>d.metodo).join(', '),
-    dx_lista:    dxLista,
-    tx:          txLista.join(', '),
-    tx_lista:    txLista,
-    vias,
-    vias_extra:  viasExtra,
-    sistemas_afectados: sistemasAfectados.length ? sistemasAfectados : [sistId],
-    notas:       document.getElementById('enf-notas')?.value||''
+    sinonimos:    document.getElementById('enf-sinonimos')?.value.trim()||'',
+    tipo:         modal?.querySelector('[name="enf-tipo"]:checked')?.value||'infecciosa',
+    subtipo:      document.getElementById('enf-subtipo')?.value||'',
+    agente:       document.getElementById('enf-agente')?.value.trim()||'',
+    agente_tipo:  document.getElementById('enf-agente-tipo')?.value||'',
+    sistemas_afectados: sistAfect.length ? sistAfect : (sistId ? [sistId] : []),
+    organos, vias,
+    vias_extra:   document.getElementById('enf-vias-extra')?.value.trim()||'',
+    patogenesis:  document.getElementById('enf-patogenesis')?.value.trim()||'',
+    signos_lista: signosList,
+    signos:       signosList.join(', '),
+    dx_lista:     dxLista,
+    dx:           dxLista.map(d=>d.metodo).join(', '),
+    tx_lista:     txLista,
+    tx:           txLista.join(', '),
+    epidemiologia: document.getElementById('enf-epidemiologia')?.value.trim()||'',
+    tags,
+    zoonosis:     modal?.querySelector('[name="enf-zoonosis"]:checked')?.value||'no',
+    notas:        document.getElementById('enf-notas')?.value.trim()||'',
   };
 
   if (!currentSpecies.enfermedades_sistemas) currentSpecies.enfermedades_sistemas = {};
-  const targetSistemas = enf.sistemas_afectados?.length ? enf.sistemas_afectados : [sistId];
-  targetSistemas.forEach(sid => {
-    if (!currentSpecies.enfermedades_sistemas[sid]) currentSpecies.enfermedades_sistemas[sid] = { notas:'', enfermedades:[] };
-    const existing = currentSpecies.enfermedades_sistemas[sid].enfermedades;
-    if (sid === sistId && editIdx >= 0) {
-      existing[editIdx] = enf;
-    } else {
-      // Verificar si ya existe (por si se edita y se agregan más sistemas)
-      const dupIdx = existing.findIndex(e => e.nombre === enf.nombre);
-      if (dupIdx >= 0) existing[dupIdx] = enf;
-      else existing.push(enf);
-    }
-  });
-  // Guardar en todos los sistemas seleccionados
-  const sistChecks = Array.from(document.querySelectorAll('#enf-modal input[type=checkbox]')).filter(el=>el.value&&!el.value.includes('|')).filter(el=>el.checked).map(el=>el.value);
-  const sistAfect = sistChecks.length ? sistChecks : [sistId];
-  enf.sistemas_afectados = sistAfect;
+  const targets = enf.sistemas_afectados.length ? enf.sistemas_afectados : (sistId ? [sistId] : ['otro']);
 
-  if (!currentSpecies.enfermedades_sistemas) currentSpecies.enfermedades_sistemas = {};
-  if (editIdx >= 0) {
-    // Si edita, actualizar en el sistema original
+  if (editIdx >= 0 && sistId) {
+    // Edición: actualizar en el sistema original
+    if (!currentSpecies.enfermedades_sistemas[sistId])
+      currentSpecies.enfermedades_sistemas[sistId] = { enfermedades:[] };
     currentSpecies.enfermedades_sistemas[sistId].enfermedades[editIdx] = enf;
-    // Sincronizar con otros sistemas si cambió
-    sistAfect.filter(s=>s!==sistId).forEach(s => {
-      if (!currentSpecies.enfermedades_sistemas[s]) currentSpecies.enfermedades_sistemas[s] = { notas:'', enfermedades:[] };
-      const existIdx = currentSpecies.enfermedades_sistemas[s].enfermedades.findIndex(e=>e.nombre===enf.nombre);
-      if (existIdx>=0) currentSpecies.enfermedades_sistemas[s].enfermedades[existIdx] = enf;
+    // Sincronizar en otros sistemas seleccionados
+    targets.filter(s=>s!==sistId).forEach(s => {
+      if (!currentSpecies.enfermedades_sistemas[s])
+        currentSpecies.enfermedades_sistemas[s] = { enfermedades:[] };
+      const ei = currentSpecies.enfermedades_sistemas[s].enfermedades.findIndex(e=>e.nombre===enf.nombre);
+      if (ei>=0) currentSpecies.enfermedades_sistemas[s].enfermedades[ei] = enf;
       else currentSpecies.enfermedades_sistemas[s].enfermedades.push(enf);
     });
   } else {
-    // Agregar a todos los sistemas seleccionados
-    sistAfect.forEach(s => {
-      if (!currentSpecies.enfermedades_sistemas[s]) currentSpecies.enfermedades_sistemas[s] = { notas:'', enfermedades:[] };
-      currentSpecies.enfermedades_sistemas[s].enfermedades.push(enf);
+    // Nueva: agregar en todos los sistemas seleccionados
+    targets.forEach(s => {
+      if (!currentSpecies.enfermedades_sistemas[s])
+        currentSpecies.enfermedades_sistemas[s] = { enfermedades:[] };
+      const ei = currentSpecies.enfermedades_sistemas[s].enfermedades.findIndex(e=>e.nombre===enf.nombre);
+      if (ei>=0) currentSpecies.enfermedades_sistemas[s].enfermedades[ei] = enf;
+      else currentSpecies.enfermedades_sistemas[s].enfermedades.push(enf);
     });
   }
 
   await dbPutSync('species', currentSpecies);
   document.getElementById('enf-modal')?.remove();
   renderTab('enfermedades');
-  toast('✓ Enfermedad ' + (editIdx>=0?'actualizada':'agregada') + (sistAfect.length>1?' en '+sistAfect.length+' sistemas':''));
+  toast('✓ Enfermedad '+(editIdx>=0?'actualizada':'agregada')+(targets.length>1?' en '+targets.length+' sistemas':''));
 }
+
 
 async function importEnfermedadesFile(input, sistId) {
   if (!input.files?.[0]) return;
