@@ -716,8 +716,9 @@ textarea.form-control{resize:vertical;min-height:70px}
 <div id="screen-enfermedades-gen" class="screen">
   <div class="flex-between mb-2">
     <h2 style="font-size:1.1rem;font-weight:700">🦠 Enfermedades</h2>
-    <div id="enfgen-admin-btns" style="display:none;gap:.35rem">
-      <button class="btn btn-admin btn-sm" onclick="openAddCategoriaGen()">+ Categoría</button>
+    <div id="enfgen-admin-btns" style="display:none;gap:.35rem;flex-wrap:wrap">
+      <button class="btn btn-admin btn-sm" onclick="openNuevaEnfGen()">+ Nueva enfermedad</button>
+      <button class="btn btn-secondary btn-sm" onclick="openAddCategoriaGen()">+ Categoría</button>
     </div>
   </div>
   <!-- Subsecciones por clase taxonómica -->
@@ -4640,18 +4641,18 @@ const SISTEMAS_ENFERMEDAD = [
 ];
 
 const ENF_ORGANOS = {
-  digestivo:      ['Cavidad oral','Dientes','Lengua','Glándulas salivales','Faringe','Esófago','Estómago','Proventrículo (aves)','Molleja (aves)','Intestino delgado','Intestino grueso','Cloaca','Hígado','Vesícula biliar','Páncreas'],
-  respiratorio:   ['Cavidad nasal','Senos paranasales','Laringe','Tráquea','Bronquios','Pulmones','Sacos aéreos (aves)'],
-  nervioso:       ['Cerebro','Cerebelo','Tronco encefálico','Médula espinal','Nervios periféricos','Ganglios'],
-  tegumentario:   ['Piel','Epidermis','Dermis','Tejido subcutáneo','Pelo','Plumas','Escamas','Glándulas cutáneas','Uñas / garras / cascos'],
-  cardiovascular: ['Corazón','Pericardio','Arterias','Venas','Capilares'],
-  urinario:       ['Riñones','Uréteres','Vejiga urinaria','Uretra'],
-  reproductivo:   ['Testículos','Epidídimo','Conducto deferente','Glándulas accesorias','Pene / hemipenes','Ovarios','Oviducto / trompas','Útero','Cérvix','Vagina','Glándula mamaria'],
-  endocrino:      ['Hipotálamo','Hipófisis','Tiroides','Paratiroides','Glándulas suprarrenales','Páncreas endocrino','Gónadas (endocrino)'],
-  hematolinf:     ['Médula ósea','Bazo','Timo','Ganglios linfáticos','MALT'],
-  musculo:        ['Huesos','Articulaciones','Cartílago','Músculo esquelético','Tendones','Ligamentos'],
-  inmunologico:   ['Sistema inmune (general)','Células inmunes','Órganos linfoides'],
-  sentidos:       ['Ojo','Oído','Nariz (sensorial)','Lengua (gusto)'],
+  digestivo:      ['General (sistema completo)', 'Cavidad oral','Dientes','Lengua','Glándulas salivales','Faringe','Esófago','Estómago','Proventrículo (aves)','Molleja (aves)','Intestino delgado','Intestino grueso','Cloaca','Hígado','Vesícula biliar','Páncreas'],
+  respiratorio:   ['General (sistema completo)', 'Cavidad nasal','Senos paranasales','Laringe','Tráquea','Bronquios','Pulmones','Sacos aéreos (aves)'],
+  nervioso:       ['General (sistema completo)', 'Cerebro','Cerebelo','Tronco encefálico','Médula espinal','Nervios periféricos','Ganglios'],
+  tegumentario:   ['General (sistema completo)', 'Piel','Epidermis','Dermis','Tejido subcutáneo','Pelo','Plumas','Escamas','Glándulas cutáneas','Uñas / garras / cascos'],
+  cardiovascular: ['General (sistema completo)', 'Corazón','Pericardio','Arterias','Venas','Capilares'],
+  urinario:       ['General (sistema completo)', 'Riñones','Uréteres','Vejiga urinaria','Uretra'],
+  reproductivo:   ['General (sistema completo)', 'Testículos','Epidídimo','Conducto deferente','Glándulas accesorias','Pene / hemipenes','Ovarios','Oviducto / trompas','Útero','Cérvix','Vagina','Glándula mamaria'],
+  endocrino:      ['General (sistema completo)', 'Hipotálamo','Hipófisis','Tiroides','Paratiroides','Glándulas suprarrenales','Páncreas endocrino','Gónadas (endocrino)'],
+  hematolinf:     ['General (sistema completo)', 'Médula ósea','Bazo','Timo','Ganglios linfáticos','MALT'],
+  musculo:        ['General (sistema completo)', 'Huesos','Articulaciones','Cartílago','Músculo esquelético','Tendones','Ligamentos'],
+  inmunologico:   ['General (sistema completo)', 'Sistema inmune (general)','Células inmunes','Órganos linfoides'],
+  sentidos:       ['General (sistema completo)', 'Ojo','Oído','Nariz (sensorial)','Lengua (gusto)'],
 };
 
 const ENF_TIPOS = {
@@ -4659,7 +4660,33 @@ const ENF_TIPOS = {
   no_infecciosa:  ['Metabólica','Nutricional','Tóxica','Traumática','Degenerativa','Neoplásica','Hormonal / Endocrina','Neurológica (no infecciosa)','Congénita','Iatrogénica'],
 };
 
-const ENF_VIAS = ['Contacto directo','Fecal-oral','Aerógena','Vectorial','Vertical','Fómites','Alimentaria','Iatrogénica','Ambiental'];
+const ENF_VIAS = [
+  { cat:'1. Transmisión directa', subs:[
+    'Contacto directo (piel a piel)','Contacto con mucosas','Mordeduras','Arañazos',
+    'Transmisión venérea (sexual)','Lactogénica (leche materna)'] },
+  { cat:'2. Transmisión indirecta — Fómites', subs:[
+    'Instrumental contaminado','Superficies contaminadas','Ropa / guantes','Jaulas / recintos'] },
+  { cat:'2. Transmisión indirecta — Ambiental', subs:[
+    'Suelo contaminado','Agua contaminada','Material orgánico en descomposición','Sustratos'] },
+  { cat:'3. Transmisión fecal-oral', subs:[
+    'Ingestión de heces contaminadas','Ingestión de agua contaminada','Ingestión de alimento contaminado'] },
+  { cat:'4. Transmisión aerógena', subs:[
+    'Aerosoles (partículas finas suspendidas)','Gotas respiratorias (gotas grandes)','Polvo contaminado'] },
+  { cat:'5. Transmisión vectorial — Vector mecánico', subs:[
+    'Moscas (mecánico)','Cucarachas (mecánico)','Otros vectores mecánicos'] },
+  { cat:'5. Transmisión vectorial — Vector biológico', subs:[
+    'Mosquitos','Garrapatas','Pulgas','Otros vectores biológicos'] },
+  { cat:'6. Transmisión vertical', subs:[
+    'Transplacentaria','Transovárica (en huevos)','Durante el parto','Lactogénica'] },
+  { cat:'7. Transmisión alimentaria', subs:[
+    'Ingestión de presas infectadas','Ingestión de tejidos infectados','Ingestión de vísceras contaminadas'] },
+  { cat:'8. Transmisión iatrogénica', subs:[
+    'Uso de agujas contaminadas','Cirugías','Transfusiones','Manejo clínico inadecuado'] },
+  { cat:'9. Contacto con fluidos biológicos', subs:[
+    'Sangre','Saliva','Orina','Secreciones nasales','Secreciones genitales','Exudados'] },
+  { cat:'10. Transmisión por heridas', subs:[
+    'Entrada a través de lesiones cutáneas','Heridas abiertas','Ulceraciones'] },
+];
 
 const ENF_TAGS = ['Alta mortalidad','Alta morbilidad','Crónico','Agudo','Subagudo','Emergente','Endémico','Epidémico','Zoonótico relevante','Importante en cautiverio','Importante en vida silvestre'];
 
@@ -5092,14 +5119,11 @@ function openAddEnfermedad(sistId, editIdx=-1) {
         <div id="enf-organos-section">${orgSelector()}</div>
 
         <div class="form-group">
-          <label>Vías de transmisión</label>
-          <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.3rem">
-            ${ENF_VIAS.map(v=>`
-            <label style="display:inline-flex;align-items:center;gap:.25rem;font-size:.75rem;cursor:pointer">
-              <input type="checkbox" class="vias-chk" value="${v}" ${(editEnf?.vias||[]).includes(v)?'checked':''} style="accent-color:var(--g5)"> ${v}
-            </label>`).join('')}
+          <label>Vías de transmisión <span style="font-size:.7rem;color:var(--txt3)">(selecciona categoría o subcategorías)</span></label>
+          <div id="enf-vias-widget" style="max-height:250px;overflow-y:auto;border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem">
+            ${_buildViasWidget('enf', editEnf?.vias||[])}
           </div>
-          <input id="enf-vias-extra" class="form-control" value="${editEnf?.vias_extra||''}" placeholder="Detalles de transmisión...">
+          <input id="enf-vias-extra" class="form-control" style="margin-top:.35rem" value="${editEnf?.vias_extra||''}" placeholder="Detalles adicionales de transmisión...">
         </div>
 
         <div class="form-group"><label>Ciclo de la enfermedad / Patogénesis</label>
@@ -5417,7 +5441,7 @@ async function saveEnfermedadModal(sistId, editIdx=-1) {
   })).filter(d=>d.metodo);
   const txLista  = qsV('#tx-list .tx-item');
   const sistAfect = qsC('.enf-sistema-chk');
-  const vias      = qsC('.vias-chk');
+  const vias      = _getSelectedVias('enf');
   const organos   = qsC('.enf-organo-chk');
   const tags      = qsC('.enf-tag-chk');
 
@@ -13249,6 +13273,96 @@ function _eg_addDxImage(input) {
   reader.readAsDataURL(input.files[0]);
 }
 
+function _buildViasWidget(prefix, selectedVias) {
+  // prefix = 'enfgen' | 'enf'
+  // selectedVias = array de strings ya guardados
+  const sel = selectedVias || [];
+  let html = '';
+  ENF_VIAS.forEach((grupo, gi) => {
+    const catKey = prefix + '-via-cat-' + gi;
+    const catChecked = grupo.subs.every(s => sel.includes(s));
+    const catPartial = !catChecked && grupo.subs.some(s => sel.includes(s));
+    html += `<div style="margin-bottom:.4rem;border:1px solid var(--bor);border-radius:var(--rsm);overflow:hidden">
+      <div style="background:var(--sur2);padding:.3rem .5rem;cursor:pointer;display:flex;align-items:center;gap:.4rem"
+        onclick="_toggleViasGrupo('${prefix}','${gi}')">
+        <input type="checkbox" id="${catKey}" data-prefix="${prefix}" data-gi="${gi}"
+          ${catChecked?'checked':''} style="accent-color:var(--g5)"
+          onclick="event.stopPropagation();_toggleViasCategoria('${prefix}','${gi}',this.checked)">
+        <label for="${catKey}" style="font-size:.75rem;font-weight:600;cursor:pointer;flex:1" onclick="event.stopPropagation();document.getElementById('${catKey}').click()">${grupo.cat}</label>
+        <span id="${prefix}-via-chev-${gi}" style="font-size:.7rem;color:var(--txt3)">▼</span>
+      </div>
+      <div id="${prefix}-via-subs-${gi}" style="display:none;padding:.3rem .5rem .4rem 1rem;display:flex;flex-wrap:wrap;gap:.25rem">
+        ${grupo.subs.map(sub=>`
+        <label style="display:inline-flex;align-items:center;gap:.2rem;font-size:.73rem;padding:.1rem .35rem;border-radius:20px;border:1px solid var(--bor);cursor:pointer;background:${sel.includes(sub)?'var(--g1)':'var(--sur)'}">
+          <input type="checkbox" class="${prefix}-via-sub-chk" value="${sub}"
+            data-gi="${gi}" data-prefix="${prefix}"
+            ${sel.includes(sub)?'checked':''}
+            style="accent-color:var(--g5)"
+            onchange="_onViasSubChange('${prefix}','${gi}')">
+          ${sub}
+        </label>`).join('')}
+      </div>
+    </div>`;
+  });
+  return html;
+}
+
+function _toggleViasGrupo(prefix, gi) {
+  const panel = document.getElementById(prefix+'-via-subs-'+gi);
+  const chev  = document.getElementById(prefix+'-via-chev-'+gi);
+  if (!panel) return;
+  const open = panel.style.display === 'none' || panel.style.display === '';
+  panel.style.display = open ? 'flex' : 'none';
+  if (chev) chev.textContent = open ? '▲' : '▼';
+}
+
+function _toggleViasCategoria(prefix, gi, checked) {
+  const subs = document.querySelectorAll('.'+prefix+'-via-sub-chk[data-gi="'+gi+'"]');
+  subs.forEach(chk => {
+    chk.checked = checked;
+    chk.closest('label').style.background = checked ? 'var(--g1)' : 'var(--sur)';
+  });
+}
+
+function _onViasSubChange(prefix, gi) {
+  const subs = [...document.querySelectorAll('.'+prefix+'-via-sub-chk[data-gi="'+gi+'"]')];
+  const catChk = document.getElementById(prefix+'-via-cat-'+gi);
+  if (!catChk) return;
+  const allChecked = subs.every(s=>s.checked);
+  catChk.checked = allChecked;
+  // Actualizar colores
+  subs.forEach(s => {
+    s.closest('label').style.background = s.checked ? 'var(--g1)' : 'var(--sur)';
+  });
+}
+
+function _getSelectedVias(prefix) {
+  return [...document.querySelectorAll('.'+prefix+'-via-sub-chk:checked')].map(el=>el.value);
+}
+
+function openNuevaEnfGen() {
+  const claseData = ENFERMEDADES_GENERALES[_enfGenClaseActiva] || {};
+  const allSists  = [...SISTEMAS_ENFERMEDAD, ...(claseData.categorias_extra||[])];
+  document.getElementById('nueva-enfgen-modal')?.remove();
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="nueva-enfgen-modal" style="position:fixed;inset:0;z-index:1350;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:1rem" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--sur);border-radius:var(--r);padding:1.25rem;width:100%;max-width:420px;max-height:85vh;overflow-y:auto">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">+ Nueva enfermedad</div>
+        <div style="font-size:.82rem;color:var(--txt3);margin-bottom:.5rem">¿En qué sistema se clasificará principalmente?</div>
+        <div style="display:flex;flex-direction:column;gap:.25rem;max-height:55vh;overflow-y:auto">
+          ${allSists.map(s=>`
+          <button onclick="document.getElementById('nueva-enfgen-modal').remove();openAddEnfGen('${s.id}',-1)"
+            style="display:flex;align-items:center;gap:.5rem;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rsm);padding:.5rem .75rem;cursor:pointer;font-size:.85rem;text-align:left;width:100%">
+            <span style="font-size:1.1rem">${s.iconImg?'':''}${s.icon||'📋'}</span>
+            <span>${s.label}</span>
+          </button>`).join('')}
+        </div>
+        <button class="btn btn-secondary" style="width:100%;margin-top:.75rem" onclick="document.getElementById('nueva-enfgen-modal').remove()">Cancelar</button>
+      </div>
+    </div>`);
+}
+
 function openAddEnfGen(sistId, editIdx=-1) {
   document.getElementById('enfgen-add-modal')?.remove();
   const claseData = ENFERMEDADES_GENERALES[_enfGenClaseActiva] || {};
@@ -13339,16 +13453,13 @@ function openAddEnfGen(sistId, editIdx=-1) {
         <!-- Órganos (dinámico) -->
         <div id="enfgen-organos-section">${orgSelector()}</div>
 
-        <!-- Vías de transmisión -->
+        <!-- Vías de transmisión jerárquicas -->
         <div class="form-group">
-          <label>Vías de transmisión</label>
-          <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.3rem">
-            ${ENF_VIAS.map(v=>`
-            <label style="display:inline-flex;align-items:center;gap:.25rem;font-size:.75rem;cursor:pointer">
-              <input type="checkbox" class="enfgen-vias-chk" value="${v}" ${(editEnf?.vias||[]).includes(v)?'checked':''} style="accent-color:var(--g5)"> ${v}
-            </label>`).join('')}
+          <label>Vías de transmisión <span style="font-size:.7rem;color:var(--txt3)">(selecciona categoría o subcategorías)</span></label>
+          <div id="enfgen-vias-widget" style="max-height:250px;overflow-y:auto;border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem">
+            ${_buildViasWidget('enfgen', editEnf?.vias||[])}
           </div>
-          <input id="enfgen-vias-extra" class="form-control" value="${editEnf?.vias_extra||''}" placeholder="Detalles de transmisión...">
+          <input id="enfgen-vias-extra" class="form-control" style="margin-top:.35rem" value="${editEnf?.vias_extra||''}" placeholder="Detalles adicionales de transmisión...">
         </div>
 
         <!-- Ciclo / Patogénesis -->
@@ -13483,7 +13594,7 @@ async function saveEnfGen(sistId, editIdx=-1) {
 
   const sistemas_afectados = qsChecked('.enfgen-sistema-chk');
   const organos    = qsChecked('.enfgen-organo-chk');
-  const vias       = qsChecked('.enfgen-vias-chk');
+  const vias       = _getSelectedVias('enfgen');
   const tags       = qsChecked('.enfgen-tag-chk');
   const signos_lista = qs('.enfgen-signo-item').map(v=>v.trim()).filter(Boolean);
   const dx_lista   = [...(modal?.querySelectorAll('.enfgen-dx-row')||[])].map(row=>({
