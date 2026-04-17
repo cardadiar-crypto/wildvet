@@ -4644,20 +4644,20 @@ const SISTEMAS_ENFERMEDAD = [
 ];
 
 const ENF_ORGANOS = {
-  digestivo:      ['General (sistema completo)', 'Cavidad oral','Paladar duro','Paladar blando','Dientes','Lengua','Glándulas salivales','Faringe','Esófago','Estómago','Proventrículo (aves)','Molleja (aves)','Intestino delgado','Intestino grueso','Cloaca','Hígado','Vesícula biliar','Páncreas'],
-  respiratorio:   ['General (sistema completo)', 'Cavidad nasal','Senos paranasales','Laringe','Tráquea','Bronquios','Pulmones','Sacos aéreos (aves)'],
-  nervioso:       ['General (sistema completo)', 'Cerebro','Cerebelo','Tronco encefálico','Médula espinal','Nervios periféricos','Ganglios'],
-  tegumentario:   ['General (sistema completo)', 'Piel','Epidermis','Dermis','Tejido subcutáneo','Pelo','Plumas','Escamas','Glándulas cutáneas','Uñas / garras / cascos'],
-  cardiovascular: ['General (sistema completo)', 'Corazón','Pericardio','Arterias','Venas','Capilares'],
-  urinario:       ['General (sistema completo)', 'Riñones','Uréteres','Vejiga urinaria','Uretra'],
-  reproductivo:   ['General (sistema completo)', 'Testículos','Epidídimo','Conducto deferente','Glándulas accesorias','Pene / hemipenes','Ovarios','Oviducto / trompas','Útero','Cérvix','Vagina','Glándula mamaria'],
-  endocrino:      ['General (sistema completo)', 'Hipotálamo','Hipófisis','Tiroides','Paratiroides','Glándulas suprarrenales','Páncreas endocrino','Gónadas (endocrino)'],
-  hematolinf:     ['General (sistema completo)', 'Médula ósea','Bazo','Timo','Ganglios linfáticos','MALT'],
-  musculo:        ['General (sistema completo)', 'Huesos','Articulaciones','Cartílago','Músculo esquelético','Tendones','Ligamentos'],
-  inmunologico:   ['General (sistema completo)', 'Sistema inmune (general)','Células inmunes','Órganos linfoides'],
-  vision:         ['General (sistema completo)', 'Ojo','Córnea','Cristalino','Retina','Nervio óptico','Párpados','Conjuntiva'],
-  audicion:       ['General (sistema completo)', 'Oído externo','Oído medio','Oído interno','Tímpano','Cóclea','Nervio auditivo'],
-  olfato:         ['General (sistema completo)', 'Nariz','Mucosa olfatoria','Nervio olfatorio','Bulbo olfatorio'],
+  digestivo:      ['General (sistema completo)','Cavidad oral','Paladar duro','Paladar blando','Dientes','Lengua','Glándulas salivales','Faringe','Esófago','Estómago','Proventrículo (aves)','Molleja (aves)','Intestino delgado','Intestino grueso','Cloaca','Hígado','Vesícula biliar','Páncreas'],
+  respiratorio:   ['General (sistema completo)','Cavidad nasal','Senos paranasales','Laringe','Tráquea','Bronquios','Pulmones','Sacos aéreos (aves)'],
+  nervioso:       ['General (sistema completo)','Cerebro','Cerebelo','Tronco encefálico','Médula espinal','Nervios periféricos','Ganglios'],
+  tegumentario:   ['General (sistema completo)','Piel','Epidermis','Dermis','Tejido subcutáneo','Pelo','Plumas','Escamas','Glándulas cutáneas','Uñas / garras / cascos'],
+  cardiovascular: ['General (sistema completo)','Corazón','Pericardio','Arterias','Venas','Capilares'],
+  urinario:       ['General (sistema completo)','Riñones','Uréteres','Vejiga urinaria','Uretra'],
+  reproductivo:   ['General (sistema completo)','Testículos','Epidídimo','Conducto deferente','Glándulas accesorias','Pene / hemipenes','Ovarios','Oviducto / trompas','Útero','Cérvix','Vagina','Glándula mamaria'],
+  endocrino:      ['General (sistema completo)','Hipotálamo','Hipófisis','Tiroides','Paratiroides','Glándulas suprarrenales','Páncreas endocrino','Gónadas (endocrino)'],
+  hematolinf:     ['General (sistema completo)','Médula ósea','Bazo','Timo','Ganglios linfáticos','MALT'],
+  musculo:        ['General (sistema completo)','Huesos','Articulaciones','Cartílago','Músculo esquelético','Tendones','Ligamentos'],
+  inmunologico:   ['General (sistema completo)','Sistema inmune (general)','Células inmunes','Órganos linfoides'],
+  vision:         ['General (sistema completo)','Párpados','Conjuntiva','Glándula lagrimal','Aparato nasolagrimal','Esclerótica','Córnea','Iris','Cuerpo ciliar','Coroides','Retina','Humor acuoso','Cristalino','Humor vítreo','Nervio óptico','Músculos extraoculares'],
+  audicion:       ['General (sistema completo)','Pabellón auricular','Conducto auditivo externo','Membrana timpánica','Cavidad timpánica','Martillo','Yunque','Estribo','Trompa de Eustaquio','Cóclea','Vestíbulo','Utrículo','Sáculo','Canales semicirculares','Nervio vestibulococlear'],
+  olfato:         ['General (sistema completo)','Narinas','Cornetes nasales','Meatos nasales','Tabique nasal','Epitelio olfatorio','Receptores olfatorios','Bulbo olfatorio','Nervio olfatorio'],
 };
 
 const ENF_TIPOS = {
@@ -5221,6 +5221,15 @@ function openAddEnfermedad(sistId, editIdx=-1) {
               <input id="enf-dx-gold-std" class="form-control" value="${editEnf?.dx_gold_std||''}" placeholder="Prueba más precisa (PCR, histopatología...)" style="flex:2;font-size:.82rem">
               <input id="enf-dx-gold-hallazgo" class="form-control" value="${editEnf?.dx_gold_hallazgo||''}" placeholder="Hallazgo esperado..." style="flex:1;font-size:.82rem">
             </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.3rem">
+              <input id="enf-dx-gold-muestra" class="form-control" value="${editEnf?.dx_gold_muestra||''}" placeholder="Muestra (sangre, tejido...)" style="font-size:.8rem">
+              <input id="enf-dx-gold-sensibilidad" class="form-control" value="${editEnf?.dx_gold_sensibilidad||''}" placeholder="Sensibilidad (%)" style="font-size:.8rem">
+              <input id="enf-dx-gold-especificidad" class="form-control" value="${editEnf?.dx_gold_especificidad||''}" placeholder="Especificidad (%)" style="font-size:.8rem">
+            </div>
+            <textarea id="enf-dx-gold-descripcion" class="form-control" style="min-height:45px;resize:vertical;font-size:.8rem;margin-bottom:.3rem"
+              placeholder="Descripción del procedimiento, interpretación...">${editEnf?.dx_gold_descripcion||''}</textarea>
+            <textarea id="enf-dx-gold-utilidad" class="form-control" style="min-height:35px;resize:vertical;font-size:.8rem;margin-bottom:.3rem"
+              placeholder="Utilidad clínica, cuándo usar esta prueba...">${editEnf?.dx_gold_utilidad||''}</textarea>
             <div id="enf-dx-gold-imgs" style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.25rem">
               ${(editEnf?.dx_gold_imagenes||[]).map(img=>`<div style="position:relative"><img src="${img.data||img.url}" style="height:55px;width:auto;border-radius:var(--rxs);cursor:pointer" onclick="openImageFull('${img.data||img.url}')"><button onclick="this.closest('div').remove()" style="position:absolute;top:0;right:0;background:var(--r5);color:white;border:none;border-radius:50%;width:16px;height:16px;font-size:.6rem;cursor:pointer;line-height:1">✕</button></div>`).join('')}
             </div>
@@ -5347,7 +5356,10 @@ function openAddEnfermedad(sistId, editIdx=-1) {
         <div class="form-group" style="border:1px solid var(--g4);border-radius:var(--rsm);padding:.6rem;margin-bottom:.5rem">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
             <label style="margin:0;color:var(--g6)">✅ Especies confirmadas</label>
-            <button onclick="_enfAddEspecieConfRow()" class="btn btn-secondary btn-sm" style="font-size:.72rem">+ Agregar</button>
+            <div style="display:flex;gap:.3rem">
+            <button onclick="_enfAddEspecieConfRow()" class="btn btn-secondary btn-sm" style="font-size:.72rem">+ Individual</button>
+            <button onclick="_enfOpenGruposSelector('enf','conf')" class="btn btn-secondary btn-sm" style="font-size:.72rem">📂 Desde grupos</button>
+          </div>
           </div>
           <p style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem">Especies en las que la enfermedad ha sido detectada y confirmada.</p>
           <div id="enf-especies-conf-list">
@@ -5364,7 +5376,10 @@ function openAddEnfermedad(sistId, editIdx=-1) {
         <div class="form-group" style="border:2px dashed #f59e0b;border-radius:var(--rsm);padding:.6rem;margin-bottom:.5rem">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
             <label style="margin:0;color:#d97706">⚠️ Especies vulnerables</label>
-            <button onclick="_enfAddEspecieVulRow()" class="btn btn-secondary btn-sm" style="font-size:.72rem">+ Agregar</button>
+            <div style="display:flex;gap:.3rem">
+            <button onclick="_enfAddEspecieVulRow()" class="btn btn-secondary btn-sm" style="font-size:.72rem">+ Individual</button>
+            <button onclick="_enfOpenGruposSelector('enf','vul')" class="btn btn-secondary btn-sm" style="font-size:.72rem">📂 Desde grupos</button>
+          </div>
           </div>
           <p style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem">En riesgo por taxonomía, exposición u otros factores. Se asignarán a sus fichas automáticamente.</p>
           <div id="enf-especies-vul-list">
@@ -5703,6 +5718,11 @@ async function saveEnfermedadModal(sistId, editIdx=-1) {
     fases,
     dx_gold_std:      document.getElementById('enf-dx-gold-std')?.value.trim()||'',
     dx_gold_hallazgo: document.getElementById('enf-dx-gold-hallazgo')?.value.trim()||'',
+    dx_gold_muestra:  document.getElementById('enf-dx-gold-muestra')?.value.trim()||'',
+    dx_gold_sensibilidad: document.getElementById('enf-dx-gold-sensibilidad')?.value.trim()||'',
+    dx_gold_especificidad: document.getElementById('enf-dx-gold-especificidad')?.value.trim()||'',
+    dx_gold_descripcion: document.getElementById('enf-dx-gold-descripcion')?.value.trim()||'',
+    dx_gold_utilidad: document.getElementById('enf-dx-gold-utilidad')?.value.trim()||'',
     dx_gold_imagenes: goldImgs,
     dx_lista, dx: dx_lista.map(d=>d.metodo).join(', '),
     tx_posibles, tx_lista, tx: tx_lista.map(t=>t.nombre).join(', '),
@@ -9918,8 +9938,8 @@ function openAddEnriquecimiento(editIdx=-1) {
         <div class="form-group"><label>Descripción</label><textarea id="enriq-desc" class="form-control" style="min-height:70px" placeholder="Describe el enriquecimiento...">${existing?.descripcion||''}</textarea></div>
         <div class="form-group"><label>Objetivo</label><textarea id="enriq-obj" class="form-control" style="min-height:50px" placeholder="Qué se busca estimular...">${existing?.objetivo||''}</textarea></div>
         <div class="form-group">
-          <label>Materiales (uno por línea)</label>
-          <textarea id="enriq-mat" class="form-control" style="min-height:70px" placeholder="Tronco hueco&#10;Semillas&#10;Paja...">${(existing?.materiales||[]).join('\n')}</textarea>
+          <label>Materiales <span style="font-size:.72rem;color:var(--txt3)">(separa por coma o por línea, se organizan automáticamente)</span></label>
+          <textarea id="enriq-mat" class="form-control" style="min-height:70px" oninput="_autoOrganizarMateriales(this)" placeholder="Tronco hueco, Semillas, Paja&#10;o uno por línea">${(existing?.materiales||[]).join('\n')}</textarea>
         </div>
         <div class="form-group">
           <label>Fotos</label>
@@ -10350,7 +10370,7 @@ function openEditEnriquecimiento(idx) { openAddEnriquecimiento(idx); }
 async function saveEnriquecimiento(editIdx=-1) {
   const nombre = document.getElementById('enriq-nombre')?.value.trim();
   if (!nombre) { toast('⚠ El nombre es obligatorio'); return; }
-  const materiales = (document.getElementById('enriq-mat')?.value||'').split('\n').map(m=>m.trim()).filter(Boolean);
+  const materiales = (document.getElementById('enriq-mat')?.value||'').split(/[\n,]+/).map(m=>m.trim()).filter(Boolean);
   const existing = editIdx >= 0 ? ENRIQUECIMIENTOS_DB[editIdx] : null;
   const fotos = [...(existing?.fotos||[]), ..._enriqFotosNew];
   _enriqFotosNew = [];
@@ -14186,6 +14206,81 @@ function _enf_addTxItem() {
   row.querySelector('input').focus();
 }
 
+function _enfOpenGruposSelector(prefix, tipo) {
+  // tipo = 'conf' (confirmadas) o 'vul' (vulnerables)
+  if (!SPECIES_GROUPS?.length) { toast('⚠ No hay grupos de especies cargados'); return; }
+  document.getElementById('grupos-enf-sel-modal')?.remove();
+
+  const grpOpts = SPECIES_GROUPS.map((grp, gi) => `
+    <div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem .6rem;margin-bottom:.3rem;background:var(--sur2)">
+      <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-weight:600;font-size:.84rem;margin-bottom:.2rem">
+        <input type="checkbox" class="grp-sel-chk" value="${gi}" style="accent-color:var(--g5)"> ${grp.nombre||grp.name||'Grupo '+gi}
+      </label>
+      <div style="font-size:.72rem;color:var(--txt3);padding-left:1.4rem">
+        ${(grp.especies||[]).slice(0,4).map(e=>e.sp||e).join(', ')}${(grp.especies||[]).length>4?' y '+(grp.especies.length-4)+' más':''}
+      </div>
+    </div>`).join('');
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="grupos-enf-sel-modal" style="position:fixed;inset:0;z-index:1600;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:1rem" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--sur);border-radius:var(--r);padding:1.25rem;width:100%;max-width:420px;max-height:85vh;overflow-y:auto">
+        <div style="font-weight:700;font-size:.9rem;margin-bottom:.5rem">📂 Seleccionar grupos de especies</div>
+        <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.6rem">Las especies del grupo se agregarán como <strong>${tipo==='conf'?'confirmadas':'vulnerables'}</strong>.</div>
+        <div style="max-height:55vh;overflow-y:auto">${grpOpts}</div>
+        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('grupos-enf-sel-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="_enfAgregarDesdeGrupos('${prefix}','${tipo}')">✓ Agregar especies</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+function _enfAgregarDesdeGrupos(prefix, tipo) {
+  const checks = document.querySelectorAll('#grupos-enf-sel-modal .grp-sel-chk:checked');
+  if (!checks.length) { toast('⚠ Selecciona al menos un grupo'); return; }
+  const listId = prefix + '-especies-' + tipo + '-list';
+  const itemClass = prefix + '-especie-' + tipo + '-item';
+  const sciClass  = prefix + '-especie-' + tipo + '-sci';
+  const list = document.getElementById(listId);
+  if (!list) return;
+  let added = 0;
+  for (const chk of checks) {
+    const grp = SPECIES_GROUPS[parseInt(chk.value)];
+    (grp?.especies||[]).forEach(esp => {
+      const nombre = esp.sp || esp;
+      const sci    = esp.sci || '';
+      if (!nombre) return;
+      // Evitar duplicados
+      const existing = [...list.querySelectorAll('.'+itemClass)].some(el=>el.value.toLowerCase()===nombre.toLowerCase());
+      if (existing) return;
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:.3rem;margin-bottom:.25rem;align-items:center';
+      row.innerHTML = '<input class="form-control '+itemClass+'" value="'+nombre.replace(/"/g,'&quot;')+'" style="flex:2;font-size:.82rem" list="species-hist-dl">'
+        + '<input class="form-control '+sciClass+'" value="'+(sci).replace(/"/g,'&quot;')+'" style="flex:2;font-size:.78rem">'
+        + '<button onclick="this.closest(\'div\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>';
+      list.appendChild(row);
+      added++;
+    });
+  }
+  document.getElementById('grupos-enf-sel-modal').remove();
+  toast('✓ ' + added + ' especie(s) agregada(s) desde grupos');
+}
+
+function _autoOrganizarMateriales(el) {
+  // No reorganizar mientras el usuario escribe normalmente
+  // Solo reorganizar si hay comas (convertir a líneas)
+  const val = el.value;
+  if (!val.includes(',')) return;
+  const cursor = el.selectionStart;
+  const lines = val.split(/[,\n]+/).map(m=>m.trim()).filter(Boolean);
+  const newVal = lines.join('\n');
+  if (newVal !== val) {
+    el.value = newVal;
+    // Colocar cursor al final de la última línea modificada
+    el.selectionStart = el.selectionEnd = newVal.length;
+  }
+}
+
 function openNuevaEnfGen() {
   // Abrir formulario directamente con el primer sistema como default
   const claseData = ENFERMEDADES_GENERALES[_enfGenClaseActiva] || {};
@@ -14376,6 +14471,15 @@ function openAddEnfGen(sistId, editIdx=-1) {
               <input id="enfgen-dx-gold-std" class="form-control" value="${editEnf?.dx_gold_std||''}" placeholder="Prueba más precisa (PCR, histopatología...)" style="flex:2;font-size:.82rem">
               <input id="enfgen-dx-gold-hallazgo" class="form-control" value="${editEnf?.dx_gold_hallazgo||''}" placeholder="Hallazgo esperado..." style="flex:1;font-size:.82rem">
             </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.3rem">
+              <input id="enfgen-dx-gold-muestra" class="form-control" value="${editEnf?.dx_gold_muestra||''}" placeholder="Muestra (sangre, tejido...)" style="font-size:.8rem">
+              <input id="enfgen-dx-gold-sensibilidad" class="form-control" value="${editEnf?.dx_gold_sensibilidad||''}" placeholder="Sensibilidad (%)" style="font-size:.8rem">
+              <input id="enfgen-dx-gold-especificidad" class="form-control" value="${editEnf?.dx_gold_especificidad||''}" placeholder="Especificidad (%)" style="font-size:.8rem">
+            </div>
+            <textarea id="enfgen-dx-gold-descripcion" class="form-control" style="min-height:45px;resize:vertical;font-size:.8rem;margin-bottom:.3rem"
+              placeholder="Descripción del procedimiento, interpretación...">${editEnf?.dx_gold_descripcion||''}</textarea>
+            <textarea id="enfgen-dx-gold-utilidad" class="form-control" style="min-height:35px;resize:vertical;font-size:.8rem;margin-bottom:.3rem"
+              placeholder="Utilidad clínica, cuándo usar esta prueba...">${editEnf?.dx_gold_utilidad||''}</textarea>
             <div id="enfgen-dx-gold-imgs" style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.25rem">
               ${(editEnf?.dx_gold_imagenes||[]).map(img=>`<div style="position:relative"><img src="${img.data||img.url}" style="height:55px;width:auto;border-radius:var(--rxs);cursor:pointer" onclick="openImageFull('${img.data||img.url}')"><button onclick="this.closest('div').remove()" style="position:absolute;top:0;right:0;background:var(--r5);color:white;border:none;border-radius:50%;width:16px;height:16px;font-size:.6rem;cursor:pointer;line-height:1">✕</button></div>`).join('')}
             </div>
@@ -14502,7 +14606,10 @@ function openAddEnfGen(sistId, editIdx=-1) {
         <div class="form-group" style="border:1px solid var(--g4);border-radius:var(--rsm);padding:.6rem;margin-bottom:.5rem">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
             <label style="margin:0;color:var(--g6)">✅ Especies confirmadas</label>
-            <button onclick="_enfgenAddEspecieConfRow()" class="btn btn-secondary btn-sm" style="font-size:.72rem">+ Agregar</button>
+            <div style="display:flex;gap:.3rem">
+            <button onclick="_enfgenAddEspecieConfRow()" class="btn btn-secondary btn-sm" style="font-size:.72rem">+ Individual</button>
+            <button onclick="_enfOpenGruposSelector('enfgen','conf')" class="btn btn-secondary btn-sm" style="font-size:.72rem">📂 Desde grupos</button>
+          </div>
           </div>
           <p style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem">Especies en las que la enfermedad ha sido detectada y confirmada.</p>
           <div id="enfgen-especies-conf-list">
@@ -14519,7 +14626,10 @@ function openAddEnfGen(sistId, editIdx=-1) {
         <div class="form-group" style="border:2px dashed #f59e0b;border-radius:var(--rsm);padding:.6rem;margin-bottom:.5rem">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
             <label style="margin:0;color:#d97706">⚠️ Especies vulnerables</label>
-            <button onclick="_enfgenAddEspecieVulRow()" class="btn btn-secondary btn-sm" style="font-size:.72rem">+ Agregar</button>
+            <div style="display:flex;gap:.3rem">
+            <button onclick="_enfgenAddEspecieVulRow()" class="btn btn-secondary btn-sm" style="font-size:.72rem">+ Individual</button>
+            <button onclick="_enfOpenGruposSelector('enfgen','vul')" class="btn btn-secondary btn-sm" style="font-size:.72rem">📂 Desde grupos</button>
+          </div>
           </div>
           <p style="font-size:.72rem;color:var(--txt3);margin-bottom:.4rem">En riesgo por taxonomía, exposición u otros factores. Se asignarán a sus fichas automáticamente.</p>
           <div id="enfgen-especies-vul-list">
@@ -14629,6 +14739,11 @@ async function saveEnfGen(sistId, editIdx=-1) {
     fases,
     dx_gold_std:      document.getElementById('enfgen-dx-gold-std')?.value.trim()||'',
     dx_gold_hallazgo: document.getElementById('enfgen-dx-gold-hallazgo')?.value.trim()||'',
+    dx_gold_muestra:  document.getElementById('enfgen-dx-gold-muestra')?.value.trim()||'',
+    dx_gold_sensibilidad: document.getElementById('enfgen-dx-gold-sensibilidad')?.value.trim()||'',
+    dx_gold_especificidad: document.getElementById('enfgen-dx-gold-especificidad')?.value.trim()||'',
+    dx_gold_descripcion: document.getElementById('enfgen-dx-gold-descripcion')?.value.trim()||'',
+    dx_gold_utilidad: document.getElementById('enfgen-dx-gold-utilidad')?.value.trim()||'',
     dx_gold_imagenes: goldImgs,
     dx_lista, dx: dx_lista.map(d=>d.metodo).join(', '),
     tx_posibles, tx_lista,
