@@ -4831,7 +4831,7 @@ function _enfSpRenderList(enfs, isAdmin, sp) {
           <div style="font-weight:700;font-size:.88rem;margin-bottom:.2rem">${enf.nombre}</div>
           <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.25rem">${sist.icon} ${sist.label}${enf.agente?' · '+enf.agente:''}</div>
           ${badges?`<div style="display:flex;flex-wrap:wrap;gap:.2rem;margin-bottom:.25rem">${badges}</div>`:''}
-          ${enf.signos?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.15rem"><strong>Signos:</strong> ${enf.signos_lista?.slice(0,4).join(', ')||enf.signos}${(enf.signos_lista?.length||0)>4?'…':''}</div>`:''}
+          ${enf.signos||enf.signos_lista?.length?`<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.15rem"><strong>Signos:</strong> ${(enf.signos_lista||[]).slice(0,4).map(s=>typeof s==='object'?s.signo:s).join(', ')||enf.signos}${(enf.signos_lista?.length||0)>4?'…':''}</div>`:''}
           ${enf.dx?`<div style="font-size:.75rem;color:var(--txt2)"><strong>Dx:</strong> ${enf.dx}</div>`:''}
         </div>
         <div style="display:flex;flex-direction:column;gap:.25rem;flex-shrink:0">
@@ -4851,25 +4851,121 @@ function _enfSpVerDetalle(sistId, enfIdx) {
   if (!enf) return;
   document.getElementById('enf-detail-modal')?.remove();
   const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)||{icon:'📋',label:_getAllSistsLabel(sistId)};
+
+  const _detRow = (label, val) => val ? `<div style="margin-bottom:.4rem"><div style="font-size:.7rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.1rem">${label}</div><div style="font-size:.83rem">${val}</div></div>` : '';
+  const _listSection = (title, items, renderFn) => items?.length
+    ? `<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.25rem">${title}</div>${items.map(renderFn).join('')}</div>` : '';
+  const _signoHtml = s => { const txt=typeof s==='object'?s.signo:s; const pat=typeof s==='object'&&s.patognomonico; return `<div style="display:flex;align-items:center;gap:.3rem;padding:.15rem 0;font-size:.82rem">${pat?'<span style="color:var(--g6);font-size:.9rem">⭐</span>':'<span style="color:var(--bor);font-size:.9rem">·</span>'}<span${pat?' style="font-weight:600"':''}>${txt}</span></div>`; };
+
+  const infoBadges = `
+    ${enf.tipo?`<span style="font-size:.7rem;padding:.1rem .4rem;border-radius:20px;background:${enf.tipo==='infecciosa'?'var(--g0)':'var(--sur2)'};border:1px solid var(--bor);margin-right:.25rem">${enf.tipo==='infecciosa'?'🦠':'🔬'} ${enf.tipo}</span>`:''}
+    ${enf.subtipo?`<span style="font-size:.7rem;padding:.1rem .4rem;border-radius:20px;background:var(--sur2);border:1px solid var(--bor)">${enf.subtipo}</span>`:''}
+    ${enf.zoonosis==='si'?'<span style="font-size:.7rem;padding:.1rem .4rem;border-radius:20px;background:var(--r1);border:1px solid var(--r5);color:var(--r5);margin-left:.25rem">⚠️ Zoonosis</span>':''}
+  `;
+
+  const html = `
+    <div style="margin-bottom:.4rem;display:flex;flex-wrap:wrap;gap:.2rem">${infoBadges}</div>
+
+    ${enf.agente||enf.agente_tipo||enf.agente_info ? `<div style="background:var(--sur2);border-radius:var(--rsm);padding:.4rem .6rem;margin-bottom:.5rem">
+      <div style="font-size:.7rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Agente causal</div>
+      ${enf.agente?`<div style="font-size:.85rem;font-weight:600">${enf.agente}${enf.agente_tipo?' <span style="font-size:.75rem;font-weight:400;color:var(--txt3)">('+enf.agente_tipo+')</span>':''}</div>`:''}
+      ${enf.agente_info?`<div style="font-size:.8rem;color:var(--txt3);margin-top:.2rem">${enf.agente_info}</div>`:''}
+    </div>` : ''}
+
+    ${_detRow('Sistemas afectados', (enf.sistemas_afectados||[]).map(s=>_getAllSistsLabel(s)).join(', '))}
+    ${_detRow('Órganos afectados', (enf.organos||[]).map(o=>o.includes('__general')?'General — '+_getAllSistsLabel(o.replace('__general','')):o).join(', '))}
+    ${enf.organos_notas?_detRow('Notas de órganos',enf.organos_notas):''}
+    ${_detRow('Vías de transmisión', [...(enf.vias||[]),enf.vias_extra].filter(Boolean).join(' · '))}
+    ${_detRow('Patogénesis', enf.patogenesis)}
+
+    ${enf.signos_lista?.filter(s=>(typeof s==='object'?s.signo:s)).length
+      ? `<div style="margin-bottom:.5rem">
+          <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Signos clínicos generales</div>
+          ${(enf.signos_lista||[]).map(_signoHtml).join('')}
+        </div>` : ''}
+
+    ${(enf.fases||[]).filter(f=>f.nombre||f.signos?.length).length
+      ? `<div style="margin-bottom:.5rem">
+          <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.25rem">Signos por fase</div>
+          ${(enf.fases||[]).map(fase=>`
+          <div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem .5rem;margin-bottom:.3rem">
+            <div style="font-size:.8rem;font-weight:700;margin-bottom:.2rem">${fase.nombre||'Fase'}</div>
+            ${(fase.signos||[]).map(_signoHtml).join('')}
+          </div>`).join('')}
+        </div>` : ''}
+
+    ${enf.dx_gold_std ? `<div style="background:var(--g0);border:1.5px solid var(--g4);border-radius:var(--rsm);padding:.45rem .55rem;margin-bottom:.5rem">
+      <div style="font-size:.7rem;font-weight:700;color:var(--g6);margin-bottom:.25rem">⭐ Gold Standard</div>
+      <div style="font-size:.84rem;font-weight:600">${enf.dx_gold_std}</div>
+      ${enf.dx_gold_hallazgo?`<div style="font-size:.8rem;color:var(--txt3)">Hallazgo: ${enf.dx_gold_hallazgo}</div>`:''}
+      ${enf.dx_gold_muestra?`<div style="font-size:.78rem;color:var(--txt3)">Muestra: ${enf.dx_gold_muestra}</div>`:''}
+      ${(enf.dx_gold_sensibilidad||enf.dx_gold_especificidad)?`<div style="font-size:.75rem;color:var(--txt3)">${enf.dx_gold_sensibilidad?'Sensibilidad: '+enf.dx_gold_sensibilidad+'%  ':''}${enf.dx_gold_especificidad?'Especificidad: '+enf.dx_gold_especificidad+'%':''}</div>`:''}
+      ${enf.dx_gold_descripcion?`<div style="font-size:.78rem;margin-top:.2rem">${enf.dx_gold_descripcion}</div>`:''}
+      ${enf.dx_gold_utilidad?`<div style="font-size:.75rem;color:var(--txt3);margin-top:.15rem;font-style:italic">${enf.dx_gold_utilidad}</div>`:''}
+    </div>` : ''}
+
+    ${enf.dx_lista?.length ? `<div style="margin-bottom:.5rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Métodos diagnósticos</div>
+      ${enf.dx_lista.map(d=>`<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.35rem .5rem;margin-bottom:.3rem">
+        <div style="font-size:.83rem;font-weight:600">${d.metodo}</div>
+        ${d.esperado?`<div style="font-size:.78rem;color:var(--txt3)">Hallazgo: ${d.esperado}</div>`:''}
+        ${d.muestra?`<div style="font-size:.75rem;color:var(--txt3)">Muestra: ${d.muestra}</div>`:''}
+        ${(d.sensibilidad||d.especificidad)?`<div style="font-size:.73rem;color:var(--txt3)">${d.sensibilidad?'Sens: '+d.sensibilidad+'%  ':''}${d.especificidad?'Esp: '+d.especificidad+'%':''}</div>`:''}
+        ${d.descripcion?`<div style="font-size:.78rem;margin-top:.15rem">${d.descripcion}</div>`:''}
+        ${d.utilidad?`<div style="font-size:.73rem;color:var(--txt3);font-style:italic">${d.utilidad}</div>`:''}
+      </div>`).join('')}
+    </div>` : ''}
+
+    ${(enf.tx_posibles||[]).length ? `<div style="margin-bottom:.5rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Posibles tratamientos</div>
+      ${enf.tx_posibles.map(t=>`<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.35rem .5rem;margin-bottom:.3rem">
+        <div style="font-size:.83rem;font-weight:600">${t.nombre||''}</div>
+        ${t.objetivo?`<div style="font-size:.78rem;color:var(--txt3)">Objetivo: ${t.objetivo}</div>`:''}
+        ${t.descripcion?`<div style="font-size:.8rem;margin-top:.15rem">${t.descripcion}</div>`:''}
+        ${t.mas_info?`<a href="${t.mas_info.startsWith('http')?t.mas_info:'#'}" target="_blank" style="font-size:.73rem;color:var(--g6)">Más info ↗</a>`:''}
+      </div>`).join('')}
+    </div>` : ''}
+
+    ${enf.tx_lista?.length ? `<div style="margin-bottom:.5rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Tratamientos específicos</div>
+      ${enf.tx_lista.map(t=>{const n=typeof t==='object'?t.nombre:t; const d=typeof t==='object'?t.descripcion:''; const dur=typeof t==='object'?t.duracion:''; return `<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.35rem .5rem;margin-bottom:.3rem"><div style="font-size:.83rem;font-weight:600">${n}</div>${d?'<div style="font-size:.8rem;margin-top:.1rem">'+d+'</div>':''}${dur?'<div style="font-size:.75rem;color:var(--txt3)">Duración: '+dur+'</div>':''}</div>`;}).join('')}
+    </div>` : ''}
+
+    ${_detRow('Epidemiología', enf.epidemiologia)}
+    ${enf.tags?.length?_detRow('Tags', enf.tags.join(', ')):''}
+    ${_detRow('Notas clínicas', enf.notas)}
+
+    ${enf.especies_confirmadas?.length ? `<div style="margin-bottom:.5rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--g6);text-transform:uppercase;margin-bottom:.2rem">✅ Especies confirmadas</div>
+      <div style="display:flex;flex-wrap:wrap;gap:.25rem">
+        ${enf.especies_confirmadas.map(sp=>`<span style="font-size:.75rem;padding:.1rem .4rem;border-radius:20px;background:var(--g0);border:1px solid var(--g4)">${sp.nombre||sp}${sp.sci?' <em style="opacity:.7">'+sp.sci+'</em>':''}</span>`).join('')}
+      </div>
+    </div>` : ''}
+
+    ${enf.especies_vulnerables?.length ? `<div style="margin-bottom:.5rem">
+      <div style="font-size:.72rem;font-weight:700;color:#d97706;text-transform:uppercase;margin-bottom:.2rem">⚠️ Especies vulnerables</div>
+      <div style="display:flex;flex-wrap:wrap;gap:.25rem">
+        ${enf.especies_vulnerables.map(sp=>`<span style="font-size:.75rem;padding:.1rem .4rem;border-radius:20px;background:#fffbeb;border:1px dashed #f59e0b">${sp.nombre||sp}${sp.sci?' <em style="opacity:.7">'+sp.sci+'</em>':''}</span>`).join('')}
+      </div>
+    </div>` : ''}
+
+    ${enf.referencias?.length ? `<div style="margin-bottom:.5rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">📚 Referencias</div>
+      ${enf.referencias.map(r=>`<div style="display:flex;align-items:center;gap:.4rem;padding:.2rem 0;border-bottom:1px solid var(--bor)">
+        <span>${r.tipo==='pdf'?'📄':'🔗'}</span>
+        <span style="flex:1;font-size:.78rem">${r.titulo||r.url||'Referencia'}</span>
+        ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.72rem;color:var(--g6)">Abrir ↗</a>`:''}
+      </div>`).join('')}
+    </div>` : ''}
+  `;
+  return html;
+
   document.body.insertAdjacentHTML('beforeend', `
     <div id="enf-detail-modal" style="position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
-        <div style="font-weight:700;font-size:.95rem;margin-bottom:.25rem">${enf.nombre}</div>
-        <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.75rem">${sist.icon} ${sist.label}${enf.subtipo?' · '+enf.subtipo:''}</div>
-        ${_enfDetRow('Agente', enf.agente+(enf.agente_tipo?' ('+enf.agente_tipo+')':''))}
-        ${_enfDetRow('Sistemas afectados', (enf.sistemas_afectados||[]).map(s=>_getAllSistsLabel(s)).join(', '))}
-        ${_enfDetRow('Órganos', (enf.organos||[]).join(', '))}
-        ${_enfDetRow('Vías de transmisión', [...(enf.vias||[]),enf.vias_extra].filter(Boolean).join(', '))}
-        ${_enfDetRow('Patogénesis', enf.patogenesis)}
-        ${enf.signos_lista?.length?'<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Signos clínicos</div><ul style="margin:0;padding-left:1.1rem;font-size:.82rem">'+enf.signos_lista.map(s=>'<li>'+s+'</li>').join('')+'</ul></div>':''}
-        ${(enf.dx_gold_std)?'<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--g6);background:var(--g0);padding:.3rem .5rem;border-radius:var(--rxs);margin-bottom:.2rem">⭐ Gold Standard</div><div style="font-size:.82rem"><strong>'+enf.dx_gold_std+'</strong>'+(enf.dx_gold_hallazgo?' — '+enf.dx_gold_hallazgo:'')+'</div></div>':''}
-        ${enf.dx_lista?.length?'<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Diagnóstico</div>'+enf.dx_lista.map(d=>'<div style="font-size:.82rem;padding:.2rem 0;border-bottom:1px solid var(--bor)"><strong>'+d.metodo+'</strong>'+(d.esperado?' — '+d.esperado:'')+'</div>').join('')+'</div>':''}
-        ${enf.tx_lista?.length?'<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Tratamiento</div><ul style="margin:0;padding-left:1.1rem;font-size:.82rem">'+enf.tx_lista.map(t=>'<li>'+t+'</li>').join('')+'</ul></div>':''}
-        ${_enfDetRow('Epidemiología', enf.epidemiologia)}
-        ${enf.tags?.length?_enfDetRow('Tags', enf.tags.join(', ')):''}
-        ${_enfDetRow('Zoonosis', enf.zoonosis==='si'?'🦠 Sí':'No')}
-        ${_enfDetRow('Notas clínicas', enf.notas)}
-        ${enf.referencias?.length?`<div style="margin-bottom:.75rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.3rem">📚 Referencias</div>${enf.referencias.map(r=>`<div style="display:flex;align-items:center;gap:.4rem;padding:.2rem 0;border-bottom:1px solid var(--bor)"><span>${r.tipo==='pdf'?'📄':'🔗'}</span><span style="flex:1;font-size:.78rem">${r.titulo||r.url||'Referencia'}</span>${r.url?`<a href="${r.url}" target="_blank" style="font-size:.72rem;color:var(--g6)">Abrir ↗</a>`:''}</div>`).join('')}</div>`:''}
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.15rem">${enf.nombre}</div>
+        <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.5rem">${sist.icon} ${sist.label}</div>
+        ${html}
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
           <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('enf-detail-modal').remove()">Cerrar</button>
           ${currentUser?.role==='admin'?`<button class="btn btn-primary" style="flex:1" onclick="document.getElementById('enf-detail-modal').remove();openAddEnfermedad('${sistId}',${enfIdx})">✏️ Editar</button>`:''}
@@ -4877,6 +4973,7 @@ function _enfSpVerDetalle(sistId, enfIdx) {
       </div>
     </div>`);
 }
+
 
 async function _enfSpEliminar(sistId, enfIdx) {
   const enf = currentSpecies?.enfermedades_sistemas?.[sistId]?.enfermedades?.[enfIdx];
@@ -5168,6 +5265,7 @@ function openAddEnfermedad(sistId, editIdx=-1) {
           <label>Signos clínicos</label>
           <div style="display:flex;gap:.3rem;margin-bottom:.5rem;flex-wrap:wrap">
             <button class="btn btn-secondary btn-sm" style="font-size:.72rem" onclick="_enf_addSignoGeneral()">+ Signo general</button>
+            <button class="btn btn-secondary btn-sm" style="font-size:.72rem;color:var(--txt3)" onclick="openSignosHistorialManager()" title="Editar historial de signos">📋 Historial signos</button>
             <button class="btn btn-secondary btn-sm" style="font-size:.72rem;background:var(--g0);border-color:var(--g4)" onclick="_enf_addFase()">📋 + Nueva fase</button>
           </div>
           <!-- Signos generales -->
@@ -5209,7 +5307,7 @@ function openAddEnfermedad(sistId, editIdx=-1) {
             <textarea id="enf-signos-bulk" class="form-control" style="min-height:50px;font-size:.8rem" placeholder="Letargia, Fiebre, Vómito&#10;Mucosas pálidas"></textarea>
             <button class="btn btn-primary btn-sm" style="margin-top:.3rem;width:100%" onclick="_enf_addSignosBulk()">+ Agregar todos</button>
           </div>
-          <button class="btn btn-secondary btn-sm" style="margin-top:.3rem" onclick="addSignoFromHistory()">+ Desde historial</button>
+          
         </div>
 
         <!-- FIX 7: Diagnóstico expandido -->
@@ -5263,7 +5361,10 @@ function openAddEnfermedad(sistId, editIdx=-1) {
               </label>
             </div>`).join('')}
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="_enf_addDxItem()">+ Agregar método diagnóstico</button>
+          <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.3rem">
+            <button class="btn btn-secondary btn-sm" onclick="_enf_addDxItem()">+ Agregar método diagnóstico</button>
+            <button class="btn btn-secondary btn-sm" style="font-size:.72rem;color:var(--txt3)" onclick="openDxHistorialManager()" title="Editar historial de diagnósticos">📋 Historial dx</button>
+          </div>
         </div>
 
         <!-- FIX 8: Tratamiento reorganizado -->
@@ -5365,7 +5466,7 @@ function openAddEnfermedad(sistId, editIdx=-1) {
           <div id="enf-especies-conf-list">
             ${(editEnf?.especies_confirmadas||[]).map(sp=>`
             <div style="display:flex;gap:.3rem;margin-bottom:.25rem;align-items:center">
-              <input class="form-control enf-especie-conf-item" value="${sp.nombre||sp}" placeholder="Nombre de la especie..." style="flex:2;font-size:.82rem" list="species-hist-dl">
+              <input class="form-control enf-especie-conf-item" value="${sp.nombre||sp}" placeholder="Nombre de la especie..." style="flex:2;font-size:.82rem" list="species-hist-dl" onchange="_autoFillSci(this)" oninput="_autoFillSci(this)">
               <input class="form-control enf-especie-conf-sci" value="${sp.sci||''}" placeholder="Nombre científico..." style="flex:2;font-size:.78rem">
               <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
             </div>`).join('')}
@@ -5385,7 +5486,7 @@ function openAddEnfermedad(sistId, editIdx=-1) {
           <div id="enf-especies-vul-list">
             ${(editEnf?.especies_vulnerables||[]).map(sp=>`
             <div style="display:flex;gap:.3rem;margin-bottom:.25rem;align-items:center">
-              <input class="form-control enf-especie-vul-item" value="${sp.nombre||sp}" placeholder="Nombre de la especie..." style="flex:2;font-size:.82rem" list="species-hist-dl">
+              <input class="form-control enf-especie-vul-item" value="${sp.nombre||sp}" placeholder="Nombre de la especie..." style="flex:2;font-size:.82rem" list="species-hist-dl" onchange="_autoFillSci(this)" oninput="_autoFillSci(this)">
               <input class="form-control enf-especie-vul-sci" value="${sp.sci||''}" placeholder="Nombre científico..." style="flex:2;font-size:.78rem">
               <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
             </div>`).join('')}
@@ -5555,15 +5656,108 @@ function addListItem(containerId, placeholder) {
 }
 
 
+// ── Historial de diagnósticos ──────────────────────────────
+let _dxHistorial = new Set(JSON.parse(localStorage.getItem('wv_dx_hist')||'[]'));
+
+function _saveDxHistorial() {
+  try { localStorage.setItem('wv_dx_hist', JSON.stringify([..._dxHistorial].slice(0,200))); } catch(e) {}
+}
+
+function buildDxHistory() {
+  // Recoger métodos de ENFERMEDADES_GENERALES
+  Object.values(ENFERMEDADES_GENERALES||{}).forEach(claseData => {
+    Object.values(claseData.sistemas||{}).forEach(sist => {
+      (sist.enfermedades||[]).forEach(enf => {
+        (enf.dx_lista||[]).forEach(d => { if (d.metodo) _dxHistorial.add(d.metodo.trim()); });
+        if (enf.dx_gold_std) _dxHistorial.add(enf.dx_gold_std.trim());
+      });
+    });
+  });
+  // Desde fichas
+  SPECIES_DB.forEach(sp => {
+    Object.values(sp.enfermedades_sistemas||{}).forEach(sist => {
+      (sist.enfermedades||[]).forEach(enf => {
+        (enf.dx_lista||[]).forEach(d => { if (d.metodo) _dxHistorial.add(d.metodo.trim()); });
+      });
+    });
+  });
+  // Actualizar datalist
+  let dl = document.getElementById('dx-hist-dl');
+  if (!dl) { dl = document.createElement('datalist'); dl.id = 'dx-hist-dl'; document.body.appendChild(dl); }
+  dl.innerHTML = [..._dxHistorial].sort().map(m=>`<option value="${m}">`).join('');
+  _saveDxHistorial();
+}
+
+function openDxHistorialEditor() {
+  document.getElementById('dx-hist-editor-modal')?.remove();
+  const items = [..._dxHistorial].sort();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="dx-hist-editor-modal" style="position:fixed;inset:0;z-index:1500;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:1rem" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--sur);border-radius:var(--r);padding:1.25rem;width:100%;max-width:440px;max-height:88vh;display:flex;flex-direction:column">
+        <div style="font-weight:700;font-size:.9rem;margin-bottom:.5rem">🔬 Historial de métodos diagnósticos</div>
+        <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.5rem">${items.length} método(s) guardado(s)</div>
+        <div style="flex:1;overflow-y:auto;border:1px solid var(--bor);border-radius:var(--rsm);padding:.3rem;margin-bottom:.5rem">
+          ${items.length ? items.map((m,i)=>`
+          <div style="display:flex;align-items:center;gap:.3rem;padding:.2rem .35rem;border-bottom:1px solid var(--bor)" id="dxhi-${i}">
+            <span style="flex:1;font-size:.82rem">${m}</span>
+            <button onclick="_dxHistEdit(${i},'${m.replace(/'/g,"&#39;")}')" style="background:none;border:1px solid var(--bor);border-radius:var(--rxs);cursor:pointer;font-size:.7rem;padding:.1rem .3rem">✏️</button>
+            <button onclick="_dxHistRemove('${m.replace(/'/g,"&#39;")}',${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem;padding:.1rem .2rem">✕</button>
+          </div>`).join('') : '<p style="font-size:.8rem;color:var(--txt3);text-align:center;padding:.5rem">Sin métodos en el historial</p>'}
+        </div>
+        <div style="display:flex;gap:.3rem;margin-bottom:.5rem">
+          <input id="dx-hist-new" class="form-control" placeholder="Agregar método diagnóstico..." style="flex:1;font-size:.82rem">
+          <button class="btn btn-primary btn-sm" onclick="_dxHistAdd()">+ Agregar</button>
+        </div>
+        <button class="btn btn-secondary" onclick="document.getElementById('dx-hist-editor-modal').remove()">Cerrar</button>
+      </div>
+    </div>`);
+}
+
+function _dxHistAdd() {
+  const inp = document.getElementById('dx-hist-new');
+  const val = inp?.value.trim();
+  if (!val) return;
+  _dxHistorial.add(val);
+  _saveDxHistorial();
+  buildDxHistory();
+  if (inp) inp.value = '';
+  openDxHistorialEditor();
+}
+
+function _dxHistRemove(metodo, idx) {
+  _dxHistorial.delete(metodo);
+  _saveDxHistorial();
+  buildDxHistory();
+  document.getElementById('dxhi-'+idx)?.remove();
+  // Actualizar contador
+  const el = document.querySelector('#dx-hist-editor-modal [style*="método(s)"]');
+  if (el) el.textContent = _dxHistorial.size + ' método(s) guardado(s)';
+}
+
+function _dxHistEdit(idx, old_val) {
+  const nuevo = prompt('Editar método diagnóstico:', old_val);
+  if (!nuevo?.trim() || nuevo.trim() === old_val) return;
+  _dxHistorial.delete(old_val);
+  _dxHistorial.add(nuevo.trim());
+  _saveDxHistorial();
+  buildDxHistory();
+  openDxHistorialEditor();
+}
+
 let _signosHistorial = new Set();
 
 function buildSignosHistory() {
+  const addSigno = s => {
+    const txt = typeof s === 'object' ? (s.signo||'') : (s||'');
+    if (txt.trim()) _signosHistorial.add(txt.trim());
+  };
   // Signos desde enfermedades de la ficha activa
   if (currentSpecies) {
     const sistemas = currentSpecies.enfermedades_sistemas || {};
     Object.values(sistemas).forEach(sist => {
       (sist.enfermedades||[]).forEach(enf => {
-        (enf.signos_lista||[enf.signos||'']).filter(Boolean).forEach(s => _signosHistorial.add(s.trim()));
+        (enf.signos_lista||[enf.signos||'']).filter(Boolean).forEach(addSigno);
+        (enf.fases||[]).forEach(f => (f.signos||[]).forEach(addSigno));
       });
     });
   }
@@ -5571,7 +5765,8 @@ function buildSignosHistory() {
   Object.values(ENFERMEDADES_GENERALES||{}).forEach(claseData => {
     Object.values(claseData.sistemas||{}).forEach(sist => {
       (sist.enfermedades||[]).forEach(enf => {
-        (enf.signos_lista||[enf.signos||'']).filter(Boolean).forEach(s => _signosHistorial.add(s.trim()));
+        (enf.signos_lista||[enf.signos||'']).filter(Boolean).forEach(addSigno);
+        (enf.fases||[]).forEach(f => (f.signos||[]).forEach(addSigno));
       });
     });
   });
@@ -5581,35 +5776,35 @@ function buildSignosHistory() {
 }
 
 
+
 function addSignosBulk() {
-  const raw = document.getElementById('signos-bulk-input')?.value || '';
-  if (!raw.trim()) return;
-  const items = raw.split(/[,\n]+/).map(s=>s.trim()).filter(Boolean);
-  const container = document.getElementById('signos-list');
-  if (!container) return;
-  items.forEach(s => {
-    container.insertAdjacentHTML('beforeend', `
-      <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
-        <input class="form-control signo-item" value="${s.replace(/"/g,'&quot;')}" placeholder="Signo clínico..." style="flex:1;font-size:.82rem" list="signos-hist-dl">
-        <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
-      </div>`);
-    _signosHistorial.add(s);
+  const bulk = document.getElementById('signos-bulk-input') || document.getElementById('enf-signos-bulk');
+  if (!bulk?.value.trim()) return;
+  const list = document.getElementById('signos-list') || document.getElementById('enf-signos-list');
+  if (!list) return;
+  const prefix = list.id === 'enf-signos-list' ? 'enf' : 'enf';
+  bulk.value.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean).forEach(s => {
+    const row = _buildSignoRow(prefix, prefix+'-signo-item', '');
+    row.querySelector('input').value = s;
+    list.appendChild(row);
   });
-  const input = document.getElementById('signos-bulk-input');
-  if (input) input.value = '';
-  toast('✓ ' + items.length + ' signo'+(items.length>1?'s':'')+' agregado'+(items.length>1?'s':''));
+  bulk.value = '';
 }
 
+
 function addSignoFromHistory() {
-  const container = document.getElementById('signos-list');
-  if (!container) return;
-  container.insertAdjacentHTML('beforeend', `
-    <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
-      <input class="form-control signo-item" value="" placeholder="Escribir o seleccionar del historial..." style="flex:1;font-size:.82rem" list="signos-hist-dl" autofocus>
-      <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
-    </div>`);
-  container.lastElementChild?.querySelector('input')?.focus();
+  const list = document.getElementById('enf-signos-list');
+  if (!list) return;
+  const hist = [..._signosHistorial].sort();
+  if (hist.length) {
+    _eg_showSignoHistPicker('enf', list);
+  } else {
+    const row = _buildSignoRow('enf','enf-signo-item','');
+    list.appendChild(row);
+    row.querySelector('input').focus();
+  }
 }
+
 function addDxItem() {
   const container = document.getElementById('dx-list');
   if (!container) return;
@@ -5756,6 +5951,14 @@ async function saveEnfermedadModal(sistId, editIdx=-1) {
   }
 
   if (enf.referencias?.length) { enf.referencias = await _uploadEnfRefs(enf.referencias,enf.nombre,'enf'); window._enfRefsList_enf=[]; }
+  // Agregar signos al historial
+  (enf.signos_lista||[]).forEach(s => { if(s.signo) _signosHistorial.add(s.signo.trim()); });
+  (enf.fases||[]).forEach(f => (f.signos||[]).forEach(s => { if(s.signo) _signosHistorial.add(s.signo.trim()); }));
+  try { localStorage.setItem('wv_signos_hist', JSON.stringify([..._signosHistorial])); } catch(e) {}
+  buildSignosHistory();
+  // Agregar métodos diagnósticos al historial
+  (enf.dx_lista||[]).forEach(d => { if(d.metodo) _dxHistorial.add(d.metodo.trim()); });
+  try { localStorage.setItem('wv_dx_hist', JSON.stringify([..._dxHistorial])); } catch(e) {}
   await dbPutSync('species', currentSpecies);
 
   const todasEspExtra = [...(enf.especies_confirmadas||[]),...(enf.especies_vulnerables||[])];
@@ -13401,7 +13604,7 @@ function _enfGenRenderList(enfs, isAdmin) {
           <div style="font-weight:700;font-size:.88rem;margin-bottom:.2rem">${enf.nombre}</div>
           <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.25rem">${sist.icon} ${sist.label}${enf.agente?' · '+enf.agente:''}</div>
           ${badges ? `<div style="display:flex;flex-wrap:wrap;gap:.2rem;margin-bottom:.25rem">${badges}</div>` : ''}
-          ${enf.signos ? `<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.15rem"><strong>Signos:</strong> ${enf.signos_lista?.slice(0,4).join(', ')||enf.signos}${(enf.signos_lista?.length||0)>4?'…':''}</div>` : ''}
+          ${enf.signos || enf.signos_lista?.length ? `<div style="font-size:.75rem;color:var(--txt2);margin-bottom:.15rem"><strong>Signos:</strong> ${(enf.signos_lista||[]).slice(0,4).map(s=>typeof s==='object'?s.signo:s).join(', ')||enf.signos}${(enf.signos_lista?.length||0)>4?'…':''}</div>` : ''}
           ${enf.dx ? `<div style="font-size:.75rem;color:var(--txt2)"><strong>Dx:</strong> ${enf.dx}</div>` : ''}
         </div>
         <div style="display:flex;flex-direction:column;gap:.25rem;flex-shrink:0">
@@ -13495,39 +13698,51 @@ async function _confirmarCopiarEnfClase(sistId, enfIdx) {
 }
 
 function _enfGenVerDetalle(sistId, enfIdx) {
-  const enf = ENFERMEDADES_GENERALES[_enfGenClaseActiva]?.sistemas[sistId]?.enfermedades[enfIdx];
+  const claseData = ENFERMEDADES_GENERALES[_enfGenClaseActiva] || {};
+  const enf = claseData.sistemas?.[sistId]?.enfermedades?.[enfIdx];
   if (!enf) return;
-  document.getElementById('enfgen-detail-modal')?.remove();
-  const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)||{icon:'📋',label:_getAllSistsLabel(sistId)};
+  document.getElementById('enf-gen-detail-modal')?.remove();
+  const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)||{icon:'📋',label:sistId};
+
+  const _detRow = (label, val) => val ? `<div style="margin-bottom:.4rem"><div style="font-size:.7rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.1rem">${label}</div><div style="font-size:.83rem">${val}</div></div>` : '';
+  const _signoHtml = s => { const txt=typeof s==='object'?s.signo:s; const pat=typeof s==='object'&&s.patognomonico; return `<div style="display:flex;align-items:center;gap:.3rem;padding:.15rem 0;font-size:.82rem">${pat?'<span style="color:var(--g6);font-size:.9rem">⭐</span>':'<span style="color:var(--bor);font-size:.9rem">·</span>'}<span${pat?' style="font-weight:600"':''}>${txt}</span></div>`; };
+  const infoBadges = `${enf.tipo?`<span style="font-size:.7rem;padding:.1rem .4rem;border-radius:20px;background:${enf.tipo==='infecciosa'?'var(--g0)':'var(--sur2)'};border:1px solid var(--bor);margin-right:.25rem">${enf.tipo==='infecciosa'?'🦠':'🔬'} ${enf.tipo}</span>`:''} ${enf.subtipo?`<span style="font-size:.7rem;padding:.1rem .4rem;border-radius:20px;background:var(--sur2);border:1px solid var(--bor)">${enf.subtipo}</span>`:''} ${enf.zoonosis==='si'?'<span style="font-size:.7rem;padding:.1rem .4rem;border-radius:20px;background:var(--r1);border:1px solid var(--r5);color:var(--r5);margin-left:.25rem">⚠️ Zoonosis</span>':''}`;
+  const html = `<div style="margin-bottom:.4rem;display:flex;flex-wrap:wrap;gap:.2rem">${infoBadges}</div>
+    ${enf.agente||enf.agente_tipo||enf.agente_info?`<div style="background:var(--sur2);border-radius:var(--rsm);padding:.4rem .6rem;margin-bottom:.5rem"><div style="font-size:.7rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Agente causal</div>${enf.agente?`<div style="font-size:.85rem;font-weight:600">${enf.agente}${enf.agente_tipo?' <span style="font-weight:400;color:var(--txt3)">('+enf.agente_tipo+')</span>':''}</div>`:''} ${enf.agente_info?`<div style="font-size:.8rem;color:var(--txt3);margin-top:.2rem">${enf.agente_info}</div>`:''}</div>`:''}
+    ${_detRow('Sistemas', (enf.sistemas_afectados||[]).map(s=>_getAllSistsLabel(s)).join(', '))}
+    ${_detRow('Órganos', (enf.organos||[]).map(o=>o.includes('__general')?'General — '+_getAllSistsLabel(o.replace('__general','')):o).join(', '))}
+    ${enf.organos_notas?_detRow('Notas órganos',enf.organos_notas):''}
+    ${_detRow('Vías', [...(enf.vias||[]),enf.vias_extra].filter(Boolean).join(' · '))}
+    ${_detRow('Patogénesis', enf.patogenesis)}
+    ${enf.signos_lista?.filter(s=>(typeof s==='object'?s.signo:s)).length?`<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Signos clínicos generales</div>${(enf.signos_lista||[]).map(_signoHtml).join('')}</div>`:''}
+    ${(enf.fases||[]).filter(f=>f.nombre||f.signos?.length).length?`<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.25rem">Signos por fase</div>${(enf.fases||[]).map(fase=>`<div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem .5rem;margin-bottom:.3rem"><div style="font-size:.8rem;font-weight:700;margin-bottom:.2rem">${fase.nombre||'Fase'}</div>${(fase.signos||[]).map(_signoHtml).join('')}</div>`).join('')}</div>`:''}
+    ${enf.dx_gold_std?`<div style="background:var(--g0);border:1.5px solid var(--g4);border-radius:var(--rsm);padding:.45rem .55rem;margin-bottom:.5rem"><div style="font-size:.7rem;font-weight:700;color:var(--g6);margin-bottom:.25rem">⭐ Gold Standard</div><div style="font-size:.84rem;font-weight:600">${enf.dx_gold_std}</div>${enf.dx_gold_hallazgo?`<div style="font-size:.8rem;color:var(--txt3)">Hallazgo: ${enf.dx_gold_hallazgo}</div>`:''} ${enf.dx_gold_muestra?`<div style="font-size:.78rem;color:var(--txt3)">Muestra: ${enf.dx_gold_muestra}</div>`:''} ${enf.dx_gold_sensibilidad||enf.dx_gold_especificidad?`<div style="font-size:.75rem;color:var(--txt3)">${enf.dx_gold_sensibilidad?'Sens: '+enf.dx_gold_sensibilidad+'%  ':''} ${enf.dx_gold_especificidad?'Esp: '+enf.dx_gold_especificidad+'%':''}</div>`:''} ${enf.dx_gold_descripcion?`<div style="font-size:.78rem;margin-top:.2rem">${enf.dx_gold_descripcion}</div>`:''} ${enf.dx_gold_utilidad?`<div style="font-size:.75rem;color:var(--txt3);font-style:italic">${enf.dx_gold_utilidad}</div>`:''}</div>`:''}
+    ${enf.dx_lista?.length?`<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Métodos diagnósticos</div>${enf.dx_lista.map(d=>`<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.35rem .5rem;margin-bottom:.3rem"><div style="font-size:.83rem;font-weight:600">${d.metodo}</div>${d.esperado?`<div style="font-size:.78rem;color:var(--txt3)">Hallazgo: ${d.esperado}</div>`:''} ${d.muestra?`<div style="font-size:.75rem;color:var(--txt3)">Muestra: ${d.muestra}</div>`:''} ${d.sensibilidad||d.especificidad?`<div style="font-size:.73rem;color:var(--txt3)">${d.sensibilidad?'Sens: '+d.sensibilidad+'%  ':''} ${d.especificidad?'Esp: '+d.especificidad+'%':''}</div>`:''} ${d.descripcion?`<div style="font-size:.78rem;margin-top:.15rem">${d.descripcion}</div>`:''} ${d.utilidad?`<div style="font-size:.73rem;color:var(--txt3);font-style:italic">${d.utilidad}</div>`:''}</div>`).join('')}</div>`:''}
+    ${(enf.tx_posibles||[]).length?`<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Posibles tratamientos</div>${enf.tx_posibles.map(t=>`<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.35rem .5rem;margin-bottom:.3rem"><div style="font-size:.83rem;font-weight:600">${t.nombre||''}</div>${t.objetivo?`<div style="font-size:.78rem;color:var(--txt3)">Objetivo: ${t.objetivo}</div>`:''} ${t.descripcion?`<div style="font-size:.8rem;margin-top:.15rem">${t.descripcion}</div>`:''} ${t.mas_info?`<a href="${t.mas_info.startsWith('http')?t.mas_info:'#'}" target="_blank" style="font-size:.73rem;color:var(--g6)">Más info ↗</a>`:''}</div>`).join('')}</div>`:''}
+    ${enf.tx_lista?.length?`<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Tratamientos específicos</div>${enf.tx_lista.map(t=>{const n=typeof t==='object'?t.nombre:t;const d=typeof t==='object'?t.descripcion:'';const dur=typeof t==='object'?t.duracion:'';return `<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.35rem .5rem;margin-bottom:.3rem"><div style="font-size:.83rem;font-weight:600">${n}</div>${d?'<div style="font-size:.8rem;margin-top:.1rem">'+d+'</div>':''} ${dur?'<div style="font-size:.75rem;color:var(--txt3)">Duración: '+dur+'</div>':''}</div>`;}).join('')}</div>`:''}
+    ${_detRow('Epidemiología', enf.epidemiologia)}
+    ${enf.tags?.length?_detRow('Tags', enf.tags.join(', ')):''}
+    ${_detRow('Notas clínicas', enf.notas)}
+    ${enf.especies_confirmadas?.length?`<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--g6);text-transform:uppercase;margin-bottom:.2rem">✅ Especies confirmadas</div><div style="display:flex;flex-wrap:wrap;gap:.25rem">${enf.especies_confirmadas.map(sp=>`<span style="font-size:.75rem;padding:.1rem .4rem;border-radius:20px;background:var(--g0);border:1px solid var(--g4)">${sp.nombre||sp}${sp.sci?' — <em style="opacity:.7">'+sp.sci+'</em>':''}</span>`).join('')}</div></div>`:''}
+    ${enf.especies_vulnerables?.length?`<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:#d97706;text-transform:uppercase;margin-bottom:.2rem">⚠️ Especies vulnerables</div><div style="display:flex;flex-wrap:wrap;gap:.25rem">${enf.especies_vulnerables.map(sp=>`<span style="font-size:.75rem;padding:.1rem .4rem;border-radius:20px;background:#fffbeb;border:1px dashed #f59e0b">${sp.nombre||sp}${sp.sci?' — <em style="opacity:.7">'+sp.sci+'</em>':''}</span>`).join('')}</div></div>`:''}
+    ${enf.referencias?.length?`<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">📚 Referencias</div>${enf.referencias.map(r=>`<div style="display:flex;align-items:center;gap:.4rem;padding:.2rem 0;border-bottom:1px solid var(--bor)"><span>${r.tipo==='pdf'?'📄':'🔗'}</span><span style="flex:1;font-size:.78rem">${r.titulo||r.url||'Referencia'}</span>${r.url?`<a href="${r.url}" target="_blank" style="font-size:.72rem;color:var(--g6)">Abrir ↗</a>`:''}</div>`).join('')}</div>`:''}
+  `;
+  return html;
+
   document.body.insertAdjacentHTML('beforeend', `
-    <div id="enfgen-detail-modal" style="position:fixed;inset:0;z-index:1300;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
+    <div id="enf-gen-detail-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
-        <div style="font-weight:700;font-size:.95rem;margin-bottom:.25rem">${enf.nombre}</div>
-        <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.75rem">${sist.icon} ${sist.label}${enf.subtipo?' · '+enf.subtipo:''}</div>
-        ${_enfDetRow('Sinónimos', enf.sinonimos)}
-        ${_enfDetRow('Agente', enf.agente + (enf.agente_tipo?' ('+enf.agente_tipo+')':''))}
-        ${_enfDetRow('Sistemas afectados', (enf.sistemas_afectados||[]).map(s=>_getAllSistsLabel(s)).join(', '))}
-        ${_enfDetRow('Órganos', (enf.organos||[]).join(', '))}
-        ${_enfDetRow('Vías de transmisión', [...(enf.vias||[]), enf.vias_extra].filter(Boolean).join(', '))}
-        ${_enfDetRow('Patogénesis', enf.patogenesis)}
-        ${enf.ciclo_tipo ? _enfDetRow('Ciclo del parásito', [enf.ciclo_tipo, enf.hospedadores, enf.ciclo_etapas].filter(Boolean).join(' · ')) : ''}
-        ${enf.signos_lista?.length ? '<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Signos clínicos</div><ul style="margin:0;padding-left:1.1rem;font-size:.82rem">'+enf.signos_lista.map(s=>'<li>'+s+'</li>').join('')+'</ul></div>' : ''}
-        ${(enf.dx_gold_std?'<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--g6);background:var(--g0);padding:.3rem .5rem;border-radius:var(--rxs);margin-bottom:.2rem">⭐ Gold Standard</div><div style="font-size:.82rem"><strong>'+enf.dx_gold_std+'</strong>'+(enf.dx_gold_hallazgo?' — '+enf.dx_gold_hallazgo:'')+'</div></div>':'') +
-        enf.dx_lista?.length ? '<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Diagnóstico</div>'+enf.dx_lista.map(d=>'<div style="font-size:.82rem;padding:.2rem 0;border-bottom:1px solid var(--bor)"><strong>'+d.metodo+'</strong>'+(d.esperado?' — '+d.esperado:'')+'</div>').join('')+'</div>' : ''}
-        ${enf.tx_lista?.length ? '<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Tratamiento</div><ul style="margin:0;padding-left:1.1rem;font-size:.82rem">'+enf.tx_lista.map(t=>'<li>'+t+'</li>').join('')+'</ul></div>' : ''}
-        ${_enfDetRow('Epidemiología', enf.epidemiologia)}
-        ${enf.tags?.length ? _enfDetRow('Tags', enf.tags.join(', ')) : ''}
-        ${_enfDetRow('Zoonosis', enf.zoonosis==='si'?'🦠 Sí':'No')}
-        ${_enfDetRow('Notas clínicas', enf.notas)}
-        ${enf.referencias?.length?`<div style="margin-bottom:.75rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.3rem">📚 Referencias</div>${enf.referencias.map(r=>`<div style="display:flex;align-items:center;gap:.4rem;padding:.2rem 0;border-bottom:1px solid var(--bor)"><span>${r.tipo==='pdf'?'📄':'🔗'}</span><span style="flex:1;font-size:.78rem">${r.titulo||r.url||'Referencia'}</span>${r.url?`<a href="${r.url}" target="_blank" style="font-size:.72rem;color:var(--g6)">Abrir ↗</a>`:''}</div>`).join('')}</div>`:''}
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.15rem">${enf.nombre}</div>
+        <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.5rem">${sist.icon} ${sist.label}</div>
+        ${html}
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
-          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('enfgen-detail-modal').remove()">Cerrar</button>
-          ${currentUser?.role==='admin'?`<button class="btn btn-primary" style="flex:1" onclick="document.getElementById('enfgen-detail-modal').remove();openAddEnfGen('${sistId}',${enfIdx})">✏️ Editar</button>`:''}
-          ${currentUser?.role==='admin'?`<button class="btn btn-admin" style="flex:1" onclick="document.getElementById('enfgen-detail-modal').remove();importarEnfAFichas('${sistId}',${enfIdx})">📋 Importar a fichas</button>`:''}
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('enf-gen-detail-modal').remove()">Cerrar</button>
+          ${currentUser?.role==='admin'?`<button class="btn btn-primary" style="flex:1" onclick="document.getElementById('enf-gen-detail-modal').remove();openAddEnfGen('${sistId}',${enfIdx})">✏️ Editar</button>`:''  }
         </div>
       </div>
     </div>`);
 }
+
 
 function _enfDetRow(label, val) {
   if (!val) return '';
@@ -13634,14 +13849,14 @@ function _eg_addSignosBulk() {
   const list = document.getElementById('enfgen-signos-list');
   if (!list) return;
   bulk.value.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean).forEach(s => {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:.3rem;margin-bottom:.25rem';
-    row.innerHTML = '<input class="form-control enfgen-signo-item" value="'+s.replace(/"/g,'&quot;')+'" placeholder="Signo..." style="flex:1;font-size:.82rem" list="signos-hist-dl">'
-      + '<button onclick="this.closest(\'div\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>';
+    const row = _buildSignoRow('enfgen', 'enfgen-signo-item', '');
+    row.querySelector('input').value = s;
     list.appendChild(row);
   });
   bulk.value = '';
 }
+
+
 function _eg_addSignoHistory() {
   const list = document.getElementById('enfgen-signos-list');
   if (!list) return;
@@ -13952,14 +14167,15 @@ function _enf_addSignosBulk() {
   const list = document.getElementById('enf-signos-list');
   if (!list) return;
   bulk.value.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean).forEach(s => {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:.3rem;margin-bottom:.25rem';
-    row.innerHTML = '<input class="form-control enf-signo-item" value="'+s.replace(/"/g,'&quot;')+'" style="flex:1;font-size:.82rem" list="signos-hist-dl">'
-      + '<button onclick="this.closest(\'div\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>';
+    const row = _buildSignoRow('enf', 'enf-signo-item', '');
+    row.querySelector('input').value = s;
     list.appendChild(row);
   });
   bulk.value = '';
 }
+
+
+
 
 function _enf_updateSubtipo(tipo) {
   const sel = document.getElementById('enf-subtipo');
@@ -13972,7 +14188,7 @@ function _enfgenAddEspecieConfRow() {
   if (!list) return;
   const row = document.createElement('div');
   row.style.cssText = 'display:flex;gap:.3rem;margin-bottom:.25rem;align-items:center';
-  row.innerHTML = '<input class="form-control enfgen-especie-conf-item" placeholder="Nombre de la especie..." style="flex:2;font-size:.82rem" list="species-hist-dl">'
+  row.innerHTML = '<input class="form-control enfgen-especie-conf-item" placeholder="Nombre de la especie..." style="flex:2;font-size:.82rem" list="species-hist-dl" onchange="_autoFillSci(this)" oninput="_autoFillSci(this)">'
     + '<input class="form-control enfgen-especie-conf-sci" placeholder="Nombre científico..." style="flex:2;font-size:.78rem">'
     + '<button onclick="this.closest(\'div\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>';
   list.appendChild(row);
@@ -13984,7 +14200,7 @@ function _enfgenAddEspecieVulRow() {
   if (!list) return;
   const row = document.createElement('div');
   row.style.cssText = 'display:flex;gap:.3rem;margin-bottom:.25rem;align-items:center';
-  row.innerHTML = '<input class="form-control enfgen-especie-vul-item" placeholder="Nombre de la especie..." style="flex:2;font-size:.82rem" list="species-hist-dl">'
+  row.innerHTML = '<input class="form-control enfgen-especie-vul-item" placeholder="Nombre de la especie..." style="flex:2;font-size:.82rem" list="species-hist-dl" onchange="_autoFillSci(this)" oninput="_autoFillSci(this)">'
     + '<input class="form-control enfgen-especie-vul-sci" placeholder="Nombre científico..." style="flex:2;font-size:.78rem">'
     + '<button onclick="this.closest(\'div\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>';
   list.appendChild(row);
@@ -13996,7 +14212,7 @@ function _enfAddEspecieConfRow() {
   if (!list) return;
   const row = document.createElement('div');
   row.style.cssText = 'display:flex;gap:.3rem;margin-bottom:.25rem;align-items:center';
-  row.innerHTML = '<input class="form-control enf-especie-conf-item" placeholder="Nombre de la especie..." style="flex:2;font-size:.82rem" list="species-hist-dl">'
+  row.innerHTML = '<input class="form-control enf-especie-conf-item" placeholder="Nombre de la especie..." style="flex:2;font-size:.82rem" list="species-hist-dl" onchange="_autoFillSci(this)" oninput="_autoFillSci(this)">'
     + '<input class="form-control enf-especie-conf-sci" placeholder="Nombre científico..." style="flex:2;font-size:.78rem">'
     + '<button onclick="this.closest(\'div\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>';
   list.appendChild(row);
@@ -14008,7 +14224,7 @@ function _enfAddEspecieVulRow() {
   if (!list) return;
   const row = document.createElement('div');
   row.style.cssText = 'display:flex;gap:.3rem;margin-bottom:.25rem;align-items:center';
-  row.innerHTML = '<input class="form-control enf-especie-vul-item" placeholder="Nombre de la especie..." style="flex:2;font-size:.82rem" list="species-hist-dl">'
+  row.innerHTML = '<input class="form-control enf-especie-vul-item" placeholder="Nombre de la especie..." style="flex:2;font-size:.82rem" list="species-hist-dl" onchange="_autoFillSci(this)" oninput="_autoFillSci(this)">'
     + '<input class="form-control enf-especie-vul-sci" placeholder="Nombre científico..." style="flex:2;font-size:.78rem">'
     + '<button onclick="this.closest(\'div\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>';
   list.appendChild(row);
@@ -14061,18 +14277,33 @@ function _buildSignoRow(prefix, claseItem, claseFase) {
 function _eg_addSignoGeneral() {
   const list = document.getElementById('enfgen-signos-list');
   if (!list) return;
-  const row = _buildSignoRow('enfgen','enfgen-signo-item','');
-  list.appendChild(row);
-  row.querySelector('input').focus();
+  // Mostrar picker si hay historial
+  const hist = [..._signosHistorial].sort();
+  if (hist.length) {
+    _eg_showSignoHistPicker('enfgen', list);
+  } else {
+    // Si no hay historial, solo agregar fila vacía
+    const row = _buildSignoRow('enfgen','enfgen-signo-item','');
+    list.appendChild(row);
+    row.querySelector('input').focus();
+  }
 }
+
 
 function _enf_addSignoGeneral() {
   const list = document.getElementById('enf-signos-list');
   if (!list) return;
-  const row = _buildSignoRow('enf','enf-signo-item','');
-  list.appendChild(row);
-  row.querySelector('input').focus();
+  const hist = [..._signosHistorial].sort();
+  if (hist.length) {
+    _eg_showSignoHistPicker('enf', list);
+  } else {
+    const row = _buildSignoRow('enf','enf-signo-item','');
+    list.appendChild(row);
+    row.querySelector('input').focus();
+  }
 }
+
+
 
 function _eg_addSignoAFase(btn) {
   const faseBlock = btn.closest('.enfgen-fase-block');
@@ -14281,6 +14512,176 @@ function _autoOrganizarMateriales(el) {
   }
 }
 
+function _eg_showSignoHistPicker(prefix, targetList) {
+  document.getElementById('signo-hist-picker')?.remove();
+  const hist = [..._signosHistorial].sort();
+  const modal = document.createElement('div');
+  modal.id = 'signo-hist-picker';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:1600;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.onclick = e => { if(e.target===modal) modal.remove(); };
+
+  const listId = prefix+'-signos-list';
+  const itemCls = prefix+'-signo-item';
+
+  modal.innerHTML = `
+    <div style="background:var(--sur);border-radius:var(--r);padding:1rem;width:100%;max-width:420px;max-height:85vh;display:flex;flex-direction:column">
+      <div style="font-weight:700;font-size:.9rem;margin-bottom:.5rem">➕ Agregar signo clínico</div>
+      <input id="signo-picker-search" class="form-control" placeholder="Escribir nuevo signo o buscar en historial..." style="margin-bottom:.5rem;font-size:.85rem">
+      ${hist.length ? `<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.25rem;text-transform:uppercase">Historial (${hist.length})</div>
+      <div style="overflow-y:auto;flex:1;border:1px solid var(--bor);border-radius:var(--rsm);padding:.25rem;max-height:45vh" id="signo-picker-list">
+        ${hist.map(s=>`<div class="signo-picker-item" style="padding:.3rem .5rem;cursor:pointer;border-radius:var(--rxs);font-size:.82rem" onclick="_eg_pickSigno('${prefix}','${s.replace(/'/g,"\\'")}')" onmouseover="this.style.background='var(--g0)'" onmouseout="this.style.background=''">${s}</div>`).join('')}
+      </div>` : '<p style="font-size:.8rem;color:var(--txt3);font-style:italic">El historial está vacío. Escribe el signo arriba.</p>'}
+      <div style="display:flex;gap:.4rem;margin-top:.5rem">
+        <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('signo-hist-picker').remove()">Cancelar</button>
+        <button class="btn btn-primary" style="flex:2" onclick="_eg_pickSignoDesdeInput('${prefix}')">+ Agregar</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+
+  // Filtrar historial al escribir
+  const search = modal.querySelector('#signo-picker-search');
+  search?.addEventListener('input', () => {
+    const q = search.value.toLowerCase();
+    modal.querySelectorAll('.signo-picker-item').forEach(el => {
+      el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+  search?.focus();
+}
+
+function _eg_pickSigno(prefix, signo) {
+  const list = document.getElementById(prefix+'-signos-list');
+  if (!list) return;
+  const row = _buildSignoRow(prefix, prefix+'-signo-item', '');
+  row.querySelector('input').value = signo;
+  list.appendChild(row);
+  document.getElementById('signo-hist-picker')?.remove();
+}
+
+function _eg_pickSignoDesdeInput(prefix) {
+  const input = document.getElementById('signo-picker-search');
+  const signo = input?.value.trim();
+  if (!signo) { toast('⚠ Escribe un signo'); return; }
+  const list = document.getElementById(prefix+'-signos-list');
+  if (!list) return;
+  const row = _buildSignoRow(prefix, prefix+'-signo-item', '');
+  row.querySelector('input').value = signo;
+  list.appendChild(row);
+  document.getElementById('signo-hist-picker')?.remove();
+}
+
+function _autoFillSci(input) {
+  const val = input.value.trim();
+  if (!val) return;
+  const dl = document.getElementById('species-hist-dl');
+  if (!dl) return;
+  const opt = [...dl.options].find(o => o.value.toLowerCase() === val.toLowerCase());
+  if (!opt) return;
+  const sci = opt.getAttribute('data-sci') || '';
+  if (!sci) return;
+  // Buscar el input de sci en el mismo row (div padre inmediato)
+  const row = input.closest('div');
+  if (!row) return;
+  // El input de sci es el siguiente input en el mismo div
+  const inputs = [...row.querySelectorAll('input:not([type=hidden])')];
+  const myIdx = inputs.indexOf(input);
+  const sciInput = inputs[myIdx + 1];
+  if (sciInput && !sciInput.value.trim()) sciInput.value = sci;
+}
+
+
+// ══ Gestor de historial de signos (editable) ══
+function openSignosHistorialManager() {
+  document.getElementById('signos-hist-mgr-modal')?.remove();
+  const signos = [..._signosHistorial].sort();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="signos-hist-mgr-modal" style="position:fixed;inset:0;z-index:1500;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.9rem;margin-bottom:.25rem">📋 Historial de signos clínicos</div>
+        <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.6rem">${signos.length} signos en el historial. Toca ✕ para eliminar.</div>
+        <div id="signos-hist-list" style="max-height:60vh;overflow-y:auto">
+          ${signos.map((s,i) => `
+          <div style="display:flex;align-items:center;gap:.35rem;padding:.25rem .35rem;border-bottom:1px solid var(--bor)" id="shl-${i}">
+            <span style="flex:1;font-size:.82rem">${s}</span>
+            <button onclick="_removeSignoHistorial('${s.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem;padding:.1rem .25rem">✕</button>
+          </div>`).join('')}
+        </div>
+        <button class="btn btn-secondary" style="width:100%;margin-top:.75rem" onclick="document.getElementById('signos-hist-mgr-modal').remove()">Cerrar</button>
+      </div>
+    </div>`);
+}
+
+function _removeSignoHistorial(signo) {
+  _signosHistorial.delete(signo);
+  // Regenerar datalist
+  let dl = document.getElementById('signos-hist-dl');
+  if (dl) dl.innerHTML = [..._signosHistorial].sort().map(s=>`<option value="${s}">`).join('');
+  // Rerender el modal
+  openSignosHistorialManager();
+}
+
+// ══ Gestor de historial de diagnósticos (editable) ══
+function openDxHistorialManager() {
+  document.getElementById('dx-hist-mgr-modal')?.remove();
+  const metodos = [...(_dxHistorial||new Set())].sort();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="dx-hist-mgr-modal" style="position:fixed;inset:0;z-index:1500;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.9rem;margin-bottom:.25rem">🔬 Historial de métodos diagnósticos</div>
+        <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.6rem">${metodos.length} métodos en el historial.</div>
+        <div style="max-height:60vh;overflow-y:auto">
+          ${metodos.length ? metodos.map(s => `
+          <div style="display:flex;align-items:center;gap:.35rem;padding:.25rem .35rem;border-bottom:1px solid var(--bor)">
+            <span style="flex:1;font-size:.82rem">${s}</span>
+            <button onclick="_removeDxHistorial('${s.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem;padding:.1rem .25rem">✕</button>
+          </div>`).join('') : '<p style="font-size:.82rem;color:var(--txt3);text-align:center;padding:.5rem">Sin métodos en el historial</p>'}
+        </div>
+        <button class="btn btn-secondary" style="width:100%;margin-top:.75rem" onclick="document.getElementById('dx-hist-mgr-modal').remove()">Cerrar</button>
+      </div>
+    </div>`);
+}
+
+function _removeDxHistorial(metodo) {
+  if (_dxHistorial) {
+    _dxHistorial.delete(metodo);
+    _saveDxHistorial?.();
+  }
+  openDxHistorialManager();
+}
+
+// ══ Actualizar signos al guardar ══
+function _addSignosToHistorial(signos_lista, fases) {
+  (signos_lista||[]).forEach(s => {
+    const txt = typeof s === 'object' ? s.signo : s;
+    if (txt?.trim()) _signosHistorial.add(txt.trim());
+  });
+  (fases||[]).forEach(f => {
+    (f.signos||[]).forEach(s => {
+      const txt = typeof s === 'object' ? s.signo : s;
+      if (txt?.trim()) _signosHistorial.add(txt.trim());
+    });
+  });
+  // Regenerar datalist
+  let dl = document.getElementById('signos-hist-dl');
+  if (dl) dl.innerHTML = [..._signosHistorial].sort().map(s=>`<option value="${s}">`).join('');
+}
+
+// ══ Actualizar dx al guardar ══
+function _addDxToHistorial(dx_lista) {
+  (dx_lista||[]).forEach(d => {
+    const txt = typeof d === 'object' ? d.metodo : d;
+    if (txt?.trim()) {
+      if (!_dxHistorial) window._dxHistorial = new Set();
+      _dxHistorial.add(txt.trim());
+    }
+  });
+  _saveDxHistorial?.();
+  // Regenerar datalist si existe
+  let dl = document.getElementById('dx-hist-dl');
+  if (dl) dl.innerHTML = [...(_dxHistorial||[])].sort().map(s=>`<option value="${s}">`).join('');
+}
+
 function openNuevaEnfGen() {
   // Abrir formulario directamente con el primer sistema como default
   const claseData = ENFERMEDADES_GENERALES[_enfGenClaseActiva] || {};
@@ -14418,6 +14819,7 @@ function openAddEnfGen(sistId, editIdx=-1) {
           <label>Signos clínicos</label>
           <div style="display:flex;gap:.3rem;margin-bottom:.5rem;flex-wrap:wrap">
             <button class="btn btn-secondary btn-sm" style="font-size:.72rem" onclick="_eg_addSignoGeneral()">+ Signo general</button>
+            <button class="btn btn-secondary btn-sm" style="font-size:.72rem;color:var(--txt3)" onclick="openSignosHistorialManager()" title="Editar historial de signos">📋 Historial signos</button>
             <button class="btn btn-secondary btn-sm" style="font-size:.72rem;background:var(--g0);border-color:var(--g4)" onclick="_eg_addFase()">📋 + Nueva fase</button>
           </div>
           <!-- Signos generales -->
@@ -14459,7 +14861,7 @@ function openAddEnfGen(sistId, editIdx=-1) {
             <textarea id="enfgen-signos-bulk" class="form-control" style="min-height:50px;font-size:.8rem" placeholder="Letargia, Fiebre, Vómito&#10;Mucosas pálidas"></textarea>
             <button class="btn btn-primary btn-sm" style="margin-top:.3rem;width:100%" onclick="_eg_addSignosBulk()">+ Agregar todos</button>
           </div>
-          <button class="btn btn-secondary btn-sm" style="margin-top:.3rem" onclick="_eg_addSignoHistory()">+ Desde historial</button>
+          
         </div>
 
         <!-- FIX 7: Diagnóstico expandido -->
@@ -14513,7 +14915,10 @@ function openAddEnfGen(sistId, editIdx=-1) {
               </label>
             </div>`).join('')}
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="_eg_addDxItem()">+ Agregar método diagnóstico</button>
+          <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.3rem">
+            <button class="btn btn-secondary btn-sm" onclick="_eg_addDxItem()">+ Agregar método diagnóstico</button>
+            <button class="btn btn-secondary btn-sm" style="font-size:.72rem;color:var(--txt3)" onclick="openDxHistorialManager()" title="Editar historial de diagnósticos">📋 Historial dx</button>
+          </div>
         </div>
 
         <!-- FIX 8: Tratamiento reorganizado -->
@@ -14615,7 +15020,7 @@ function openAddEnfGen(sistId, editIdx=-1) {
           <div id="enfgen-especies-conf-list">
             ${(editEnf?.especies_confirmadas||[]).map(sp=>`
             <div style="display:flex;gap:.3rem;margin-bottom:.25rem;align-items:center">
-              <input class="form-control enfgen-especie-conf-item" value="${sp.nombre||sp}" placeholder="Nombre de la especie..." style="flex:2;font-size:.82rem" list="species-hist-dl">
+              <input class="form-control enfgen-especie-conf-item" value="${sp.nombre||sp}" placeholder="Nombre de la especie..." style="flex:2;font-size:.82rem" list="species-hist-dl" onchange="_autoFillSci(this)" oninput="_autoFillSci(this)">
               <input class="form-control enfgen-especie-conf-sci" value="${sp.sci||''}" placeholder="Nombre científico..." style="flex:2;font-size:.78rem">
               <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
             </div>`).join('')}
@@ -14635,7 +15040,7 @@ function openAddEnfGen(sistId, editIdx=-1) {
           <div id="enfgen-especies-vul-list">
             ${(editEnf?.especies_vulnerables||[]).map(sp=>`
             <div style="display:flex;gap:.3rem;margin-bottom:.25rem;align-items:center">
-              <input class="form-control enfgen-especie-vul-item" value="${sp.nombre||sp}" placeholder="Nombre de la especie..." style="flex:2;font-size:.82rem" list="species-hist-dl">
+              <input class="form-control enfgen-especie-vul-item" value="${sp.nombre||sp}" placeholder="Nombre de la especie..." style="flex:2;font-size:.82rem" list="species-hist-dl" onchange="_autoFillSci(this)" oninput="_autoFillSci(this)">
               <input class="form-control enfgen-especie-vul-sci" value="${sp.sci||''}" placeholder="Nombre científico..." style="flex:2;font-size:.78rem">
               <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
             </div>`).join('')}
@@ -14775,6 +15180,16 @@ async function saveEnfGen(sistId, editIdx=-1) {
     enf.referencias = await _uploadEnfRefs(enf.referencias, enf.nombre, 'enfgen');
     window._enfRefsList_enfgen = [];
   }
+
+  // Agregar signos nuevos al historial
+  signos_lista.forEach(s => { if(s.signo) _signosHistorial.add(s.signo.trim()); });
+  (fases||[]).forEach(f => (f.signos||[]).forEach(s => { if(s.signo) _signosHistorial.add(s.signo.trim()); }));
+  // Guardar historial
+  try { localStorage.setItem('wv_signos_hist', JSON.stringify([..._signosHistorial])); } catch(e) {}
+  buildSignosHistory();
+  // Agregar métodos diagnósticos al historial
+  (dx_lista||[]).forEach(d => { if(d.metodo) _dxHistorial.add(d.metodo.trim()); });
+  try { localStorage.setItem('wv_dx_hist', JSON.stringify([..._dxHistorial])); } catch(e) {}
 
   await saveEnfermedadesGenerales();
 
