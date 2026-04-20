@@ -3372,20 +3372,26 @@ async function saveHemoRow(field, idx) {
   const p = document.getElementById('hp_'+field+'_'+idx)?.value.trim();
   const u = document.getElementById('hu_'+field+'_'+idx)?.value.trim();
   const v = document.getElementById('hv_'+field+'_'+idx)?.value.trim();
-  const d = document.getElementById('hd_'+field+'_'+idx)?.value.trim()||'';
+  const d = document.getElementById('hd_'+field+'_'+idx)?.value?.trim()||'';
   if (!p) { toast('⚠ Ingresa el nombre del parámetro'); return; }
   if (!currentSpecies[field]) currentSpecies[field] = [];
-  // SET en el índice en lugar de PUSH para evitar duplicados
   currentSpecies[field][idx] = [p, v||'N/D', u||'', d];
+  // Sincronizar en SPECIES_DB en memoria
+  const dbIdx = SPECIES_DB.findIndex(s=>s.id===currentSpecies.id);
+  if (dbIdx>=0) SPECIES_DB[dbIdx] = currentSpecies;
   await dbPutSync('species', currentSpecies);
   renderTab('fisiologia');
   toast('✓ Parámetro guardado');
 }
+
 async function editHemoRow(i, field, col, value) {
   if (!currentSpecies[field]?.[i]) return;
   currentSpecies[field][i][col] = value;
+  const dbIdx = SPECIES_DB.findIndex(s=>s.id===currentSpecies.id);
+  if (dbIdx>=0) SPECIES_DB[dbIdx] = currentSpecies;
   await dbPutSync('species', currentSpecies);
 }
+
 async function removeHemoRow(i, field) {
   if (!currentSpecies[field]) return;
   const label = field === 'hematology' ? 'parámetro hematológico' : 'parámetro bioquímico';
@@ -4847,7 +4853,15 @@ function _enfSpRenderList(enfs, isAdmin, sp) {
 function _enfSpVerDetalle(sistId, enfIdx) {
   const sp = currentSpecies;
   if (!sp) return;
-  const enf = sp.enfermedades_sistemas?.[sistId]?.enfermedades?.[enfIdx];
+  let enf = sp.enfermedades_sistemas?.[sistId]?.enfermedades?.[enfIdx];
+  if (!enf) {
+    // Buscar en todos los sistemas por nombre o índice
+    for (const [sid, sistData] of Object.entries(sp.enfermedades_sistemas||{})) {
+      const found = (sistData.enfermedades||[]).find((e,i) => i===enfIdx);
+      if (found && sid===sistId) { enf = found; break; }
+      if (sid===sistId && sistData.enfermedades?.[enfIdx]) { enf = sistData.enfermedades[enfIdx]; break; }
+    }
+  }
   if (!enf) return;
   document.getElementById('enf-detail-modal')?.remove();
   const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)||{icon:'📋',label:_getAllSistsLabel(sistId)};
@@ -10076,26 +10090,33 @@ function filterEnriqBySpecies(q) {
   if (!q.trim()) { renderEnriquecimientoScreen(); return; }
   const term = q.toLowerCase();
   const filtered = ENRIQUECIMIENTOS_DB.filter(e => {
-    // Buscar en lista nueva de especies
-    const enEspecies = (e.especies||[{especie:e.especie,sci:e.sci}]).some(sp=>
-      (sp?.especie||'').toLowerCase().includes(term) ||
+    // Buscar en el nombre del enriquecimiento
+    if ((e.nombre||'').toLowerCase().includes(term)) return true;
+    // Buscar en lista de especies (formato {sp, sci})
+    const enEspecies = (e.especies||[]).some(sp =>
+      (sp?.sp||sp?.especie||sp?.nombre||'').toLowerCase().includes(term) ||
       (sp?.sci||'').toLowerCase().includes(term)
     );
-    return enEspecies;
+    if (enEspecies) return true;
+    // Compat: campos legacy especie/sci directamente en el objeto
+    if ((e.especie||'').toLowerCase().includes(term)) return true;
+    if ((e.sci||'').toLowerCase().includes(term)) return true;
+    // Buscar en descripción y objetivo
+    if ((e.descripcion||'').toLowerCase().includes(term)) return true;
+    return false;
   });
   const el = document.getElementById('enriq-list');
   if (!el) return;
-  const isAdmin = currentUser?.role === 'admin';
   if (!filtered.length) {
-    el.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--txt3)">Sin enriquecimientos para esa especie.</div>`;
+    el.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--txt3)">Sin enriquecimientos para "<strong>${q}</strong>".</div>`;
     return;
   }
-  // Reusar renderEnriquecimientoScreen pero con lista filtrada
   const origDB = ENRIQUECIMIENTOS_DB;
-  ENRIQUECIMIENTOS_DB = filtered; // temporalmente
+  ENRIQUECIMIENTOS_DB = filtered;
   renderEnriquecimientoScreen('todos');
   ENRIQUECIMIENTOS_DB = origDB;
 }
+
 function filterEnriq(cat, btn) {
   document.querySelectorAll('.tab-filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
@@ -13457,7 +13478,7 @@ function renderEnfGenContent() {
     (sistData.enfermedades || []).forEach((enf, enfIdx) => {
       // Evitar duplicados (una enf puede estar en varios sistemas)
       if (!allEnfs.some(e => e.enf.nombre === enf.nombre)) {
-        allEnfs.push({ enf, sistId, enfIdx });
+        allEnfs.push({ enf, sistId, enfIdx, enfNombre: enf.nombre });
       }
     });
   });
@@ -13699,10 +13720,22 @@ async function _confirmarCopiarEnfClase(sistId, enfIdx) {
 
 function _enfGenVerDetalle(sistId, enfIdx) {
   const claseData = ENFERMEDADES_GENERALES[_enfGenClaseActiva] || {};
-  const enf = claseData.sistemas?.[sistId]?.enfermedades?.[enfIdx];
+  // Buscar por índice en el sistema correcto, o buscar en todos los sistemas
+  let enf = claseData.sistemas?.[sistId]?.enfermedades?.[enfIdx];
+  let realSistId = sistId;
+  if (!enf) {
+    outer: for (const [sid, sistData] of Object.entries(claseData.sistemas||{})) {
+      const enfs = sistData.enfermedades||[];
+      // Intentar por índice en el mismo sistema primero
+      if (sid===sistId && enfs[enfIdx]) { enf=enfs[enfIdx]; break; }
+      // Buscar por posición global
+      if (enfs[enfIdx]) { enf=enfs[enfIdx]; realSistId=sid; break outer; }
+    }
+  }
   if (!enf) return;
+  const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===realSistId)||{icon:'📋',label:realSistId};
   document.getElementById('enf-gen-detail-modal')?.remove();
-  const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)||{icon:'📋',label:sistId};
+  // sist ya definido arriba con realSistId
 
   const _detRow = (label, val) => val ? `<div style="margin-bottom:.4rem"><div style="font-size:.7rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.1rem">${label}</div><div style="font-size:.83rem">${val}</div></div>` : '';
   const _signoHtml = s => { const txt=typeof s==='object'?s.signo:s; const pat=typeof s==='object'&&s.patognomonico; return `<div style="display:flex;align-items:center;gap:.3rem;padding:.15rem 0;font-size:.82rem">${pat?'<span style="color:var(--g6);font-size:.9rem">⭐</span>':'<span style="color:var(--bor);font-size:.9rem">·</span>'}<span${pat?' style="font-weight:600"':''}>${txt}</span></div>`; };
