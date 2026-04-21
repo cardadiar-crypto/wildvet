@@ -3375,22 +3375,29 @@ async function saveHemoRow(field, idx) {
   const d = document.getElementById('hd_'+field+'_'+idx)?.value?.trim()||'';
   if (!p) { toast('⚠ Ingresa el nombre del parámetro'); return; }
   if (!currentSpecies[field]) currentSpecies[field] = [];
-  currentSpecies[field][idx] = [p, v||'N/D', u||'', d];
-  // Sincronizar en SPECIES_DB en memoria
-  const dbIdx = SPECIES_DB.findIndex(s=>s.id===currentSpecies.id);
-  if (dbIdx>=0) SPECIES_DB[dbIdx] = currentSpecies;
-  await dbPutSync('species', currentSpecies);
+  // Usar el índice provisto o agregar al final si no existe
+  if (idx >= currentSpecies[field].length) {
+    currentSpecies[field].push([p, v||'N/D', u||'', d]);
+  } else {
+    currentSpecies[field][idx] = [p, v||'N/D', u||'', d];
+  }
+  // Guardar PRIMERO, luego renderizar
+  const saved = await dbPutSync('species', currentSpecies);
+  if (saved === false) {
+    toast('⚠ Error al guardar — intenta de nuevo'); return;
+  }
   renderTab('fisiologia');
   toast('✓ Parámetro guardado');
 }
 
+
 async function editHemoRow(i, field, col, value) {
-  if (!currentSpecies[field]?.[i]) return;
+  if (!currentSpecies[field]) return;
+  if (!currentSpecies[field][i]) currentSpecies[field][i] = ['','N/D','',''];
   currentSpecies[field][i][col] = value;
-  const dbIdx = SPECIES_DB.findIndex(s=>s.id===currentSpecies.id);
-  if (dbIdx>=0) SPECIES_DB[dbIdx] = currentSpecies;
   await dbPutSync('species', currentSpecies);
 }
+
 
 async function removeHemoRow(i, field) {
   if (!currentSpecies[field]) return;
@@ -4855,138 +4862,151 @@ function _enfSpVerDetalle(sistId, enfIdx) {
   if (!sp) return;
   let enf = sp.enfermedades_sistemas?.[sistId]?.enfermedades?.[enfIdx];
   if (!enf) {
-    // Buscar en todos los sistemas por nombre o índice
-    for (const [sid, sistData] of Object.entries(sp.enfermedades_sistemas||{})) {
-      const found = (sistData.enfermedades||[]).find((e,i) => i===enfIdx);
-      if (found && sid===sistId) { enf = found; break; }
-      if (sid===sistId && sistData.enfermedades?.[enfIdx]) { enf = sistData.enfermedades[enfIdx]; break; }
+    for (const [sid, sData] of Object.entries(sp.enfermedades_sistemas||{})) {
+      if (sData.enfermedades?.[enfIdx]) { enf = sData.enfermedades[enfIdx]; break; }
     }
   }
-  if (!enf) return;
+  if (!enf) { toast('⚠ Enfermedad no encontrada'); return; }
   document.getElementById('enf-detail-modal')?.remove();
   const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)||{icon:'📋',label:_getAllSistsLabel(sistId)};
+  const modalId = 'enf-detail-modal';
+  const editBtn = currentUser?.role==='admin'
+    ? `<button class="btn btn-primary" style="flex:1" onclick="document.getElementById('${modalId}').remove();openAddEnfermedad('${sistId}',${enfIdx})">✏️ Editar</button>`
+    : '';
 
-  const _detRow = (label, val) => val ? `<div style="margin-bottom:.4rem"><div style="font-size:.7rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.1rem">${label}</div><div style="font-size:.83rem">${val}</div></div>` : '';
-  const _listSection = (title, items, renderFn) => items?.length
-    ? `<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.25rem">${title}</div>${items.map(renderFn).join('')}</div>` : '';
-  const _signoHtml = s => { const txt=typeof s==='object'?s.signo:s; const pat=typeof s==='object'&&s.patognomonico; return `<div style="display:flex;align-items:center;gap:.3rem;padding:.15rem 0;font-size:.82rem">${pat?'<span style="color:var(--g6);font-size:.9rem">⭐</span>':'<span style="color:var(--bor);font-size:.9rem">·</span>'}<span${pat?' style="font-weight:600"':''}>${txt}</span></div>`; };
+  // ── Helpers locales ──
+  const dr = (label, val) => val
+    ? `<div style="margin-bottom:.4rem"><div style="font-size:.7rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.1rem">${label}</div><div style="font-size:.83rem">${val}</div></div>`
+    : '';
+  const signoHtml = s => {
+    const txt = typeof s==='object' ? (s.signo||'') : (s||'');
+    const pat = typeof s==='object' && s.patognomonico;
+    if (!txt) return '';
+    return `<div style="display:flex;align-items:center;gap:.25rem;padding:.1rem 0;font-size:.82rem">
+      <span style="color:${pat?'var(--g6)':'var(--bor)'}">${pat?'⭐':'·'}</span>
+      <span${pat?' style="font-weight:600"':''}>${txt}</span>
+    </div>`;
+  };
 
-  const infoBadges = `
-    ${enf.tipo?`<span style="font-size:.7rem;padding:.1rem .4rem;border-radius:20px;background:${enf.tipo==='infecciosa'?'var(--g0)':'var(--sur2)'};border:1px solid var(--bor);margin-right:.25rem">${enf.tipo==='infecciosa'?'🦠':'🔬'} ${enf.tipo}</span>`:''}
-    ${enf.subtipo?`<span style="font-size:.7rem;padding:.1rem .4rem;border-radius:20px;background:var(--sur2);border:1px solid var(--bor)">${enf.subtipo}</span>`:''}
-    ${enf.zoonosis==='si'?'<span style="font-size:.7rem;padding:.1rem .4rem;border-radius:20px;background:var(--r1);border:1px solid var(--r5);color:var(--r5);margin-left:.25rem">⚠️ Zoonosis</span>':''}
-  `;
+  // ── Contenido ──
+  const signos_ok = (enf.signos_lista||[]).filter(s=>typeof s==='object'?s.signo:s);
+  const fases_ok  = (enf.fases||[]).filter(f=>f.nombre||f.signos?.length);
 
-  const html = `
-    <div style="margin-bottom:.4rem;display:flex;flex-wrap:wrap;gap:.2rem">${infoBadges}</div>
+  const contenido = `
+    <div style="display:flex;flex-wrap:wrap;gap:.2rem;margin-bottom:.5rem">
+      ${enf.tipo?`<span style="font-size:.72rem;padding:.15rem .45rem;border-radius:20px;background:${enf.tipo==='infecciosa'?'var(--r1)':'var(--g0)'};border:1px solid ${enf.tipo==='infecciosa'?'var(--r5)':'var(--g4)'};color:${enf.tipo==='infecciosa'?'var(--r5)':'var(--g6)'}">${enf.tipo==='infecciosa'?'🦠':'🔬'} ${enf.subtipo||enf.tipo}</span>`:''}
+      ${enf.zoonosis==='si'?`<span style="font-size:.72rem;padding:.15rem .45rem;border-radius:20px;background:#fef9c3;border:1px solid #fde68a;color:#854d0e">⚠️ Zoonótica</span>`:''}
+    </div>
 
-    ${enf.agente||enf.agente_tipo||enf.agente_info ? `<div style="background:var(--sur2);border-radius:var(--rsm);padding:.4rem .6rem;margin-bottom:.5rem">
+    ${enf.agente||enf.agente_tipo||enf.agente_info?`<div style="background:var(--sur2);border-radius:var(--rsm);padding:.4rem .6rem;margin-bottom:.5rem">
       <div style="font-size:.7rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Agente causal</div>
-      ${enf.agente?`<div style="font-size:.85rem;font-weight:600">${enf.agente}${enf.agente_tipo?' <span style="font-size:.75rem;font-weight:400;color:var(--txt3)">('+enf.agente_tipo+')</span>':''}</div>`:''}
+      ${enf.agente?`<div style="font-size:.85rem;font-weight:600">${enf.agente}${enf.agente_tipo?` <span style="font-weight:400;font-size:.78rem;color:var(--txt3)">(${enf.agente_tipo})</span>`:''}</div>`:''}
       ${enf.agente_info?`<div style="font-size:.8rem;color:var(--txt3);margin-top:.2rem">${enf.agente_info}</div>`:''}
-    </div>` : ''}
+    </div>`:''}
 
-    ${_detRow('Sistemas afectados', (enf.sistemas_afectados||[]).map(s=>_getAllSistsLabel(s)).join(', '))}
-    ${_detRow('Órganos afectados', (enf.organos||[]).map(o=>o.includes('__general')?'General — '+_getAllSistsLabel(o.replace('__general','')):o).join(', '))}
-    ${enf.organos_notas?_detRow('Notas de órganos',enf.organos_notas):''}
-    ${_detRow('Vías de transmisión', [...(enf.vias||[]),enf.vias_extra].filter(Boolean).join(' · '))}
-    ${_detRow('Patogénesis', enf.patogenesis)}
+    ${dr('Sistemas', (enf.sistemas_afectados||[]).map(s=>_getAllSistsLabel(s)).join(', '))}
+    ${dr('Órganos', (enf.organos||[]).map(o=>o.includes('__general')?'General — '+_getAllSistsLabel(o.replace('__general','')):o).join(', '))}
+    ${enf.organos_notas?dr('Notas órganos',enf.organos_notas):''}
+    ${dr('Vías', [...(enf.vias||[]),enf.vias_extra].filter(Boolean).join(' · '))}
+    ${dr('Patogénesis', enf.patogenesis)}
 
-    ${enf.signos_lista?.filter(s=>(typeof s==='object'?s.signo:s)).length
-      ? `<div style="margin-bottom:.5rem">
-          <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Signos clínicos generales</div>
-          ${(enf.signos_lista||[]).map(_signoHtml).join('')}
-        </div>` : ''}
+    ${signos_ok.length?`<div style="margin-bottom:.5rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Signos clínicos generales</div>
+      ${signos_ok.map(signoHtml).join('')}
+    </div>`:''}
 
-    ${(enf.fases||[]).filter(f=>f.nombre||f.signos?.length).length
-      ? `<div style="margin-bottom:.5rem">
-          <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.25rem">Signos por fase</div>
-          ${(enf.fases||[]).map(fase=>`
-          <div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem .5rem;margin-bottom:.3rem">
-            <div style="font-size:.8rem;font-weight:700;margin-bottom:.2rem">${fase.nombre||'Fase'}</div>
-            ${(fase.signos||[]).map(_signoHtml).join('')}
-          </div>`).join('')}
-        </div>` : ''}
+    ${fases_ok.length?`<div style="margin-bottom:.5rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.25rem">Signos por fase</div>
+      ${fases_ok.map(f=>`<div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem .5rem;margin-bottom:.3rem">
+        <div style="font-size:.8rem;font-weight:700;margin-bottom:.15rem">${f.nombre||'Fase'}</div>
+        ${(f.signos||[]).map(signoHtml).join('')}
+      </div>`).join('')}
+    </div>`:''}
 
-    ${enf.dx_gold_std ? `<div style="background:var(--g0);border:1.5px solid var(--g4);border-radius:var(--rsm);padding:.45rem .55rem;margin-bottom:.5rem">
-      <div style="font-size:.7rem;font-weight:700;color:var(--g6);margin-bottom:.25rem">⭐ Gold Standard</div>
+    ${enf.dx_gold_std?`<div style="background:var(--g0);border:1.5px solid var(--g4);border-radius:var(--rsm);padding:.45rem .55rem;margin-bottom:.5rem">
+      <div style="font-size:.7rem;font-weight:700;color:var(--g6);margin-bottom:.2rem">⭐ Gold Standard</div>
       <div style="font-size:.84rem;font-weight:600">${enf.dx_gold_std}</div>
       ${enf.dx_gold_hallazgo?`<div style="font-size:.8rem;color:var(--txt3)">Hallazgo: ${enf.dx_gold_hallazgo}</div>`:''}
       ${enf.dx_gold_muestra?`<div style="font-size:.78rem;color:var(--txt3)">Muestra: ${enf.dx_gold_muestra}</div>`:''}
-      ${(enf.dx_gold_sensibilidad||enf.dx_gold_especificidad)?`<div style="font-size:.75rem;color:var(--txt3)">${enf.dx_gold_sensibilidad?'Sensibilidad: '+enf.dx_gold_sensibilidad+'%  ':''}${enf.dx_gold_especificidad?'Especificidad: '+enf.dx_gold_especificidad+'%':''}</div>`:''}
-      ${enf.dx_gold_descripcion?`<div style="font-size:.78rem;margin-top:.2rem">${enf.dx_gold_descripcion}</div>`:''}
-      ${enf.dx_gold_utilidad?`<div style="font-size:.75rem;color:var(--txt3);margin-top:.15rem;font-style:italic">${enf.dx_gold_utilidad}</div>`:''}
-    </div>` : ''}
+      ${enf.dx_gold_sensibilidad||enf.dx_gold_especificidad?`<div style="font-size:.75rem;color:var(--txt3)">${enf.dx_gold_sensibilidad?'Sens: '+enf.dx_gold_sensibilidad+'%  ':''}${enf.dx_gold_especificidad?'Esp: '+enf.dx_gold_especificidad+'%':''}</div>`:''}
+      ${enf.dx_gold_descripcion?`<div style="font-size:.78rem;margin-top:.15rem">${enf.dx_gold_descripcion}</div>`:''}
+    </div>`:''}
 
-    ${enf.dx_lista?.length ? `<div style="margin-bottom:.5rem">
+    ${enf.dx_lista?.length?`<div style="margin-bottom:.5rem">
       <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Métodos diagnósticos</div>
       ${enf.dx_lista.map(d=>`<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.35rem .5rem;margin-bottom:.3rem">
         <div style="font-size:.83rem;font-weight:600">${d.metodo}</div>
         ${d.esperado?`<div style="font-size:.78rem;color:var(--txt3)">Hallazgo: ${d.esperado}</div>`:''}
         ${d.muestra?`<div style="font-size:.75rem;color:var(--txt3)">Muestra: ${d.muestra}</div>`:''}
-        ${(d.sensibilidad||d.especificidad)?`<div style="font-size:.73rem;color:var(--txt3)">${d.sensibilidad?'Sens: '+d.sensibilidad+'%  ':''}${d.especificidad?'Esp: '+d.especificidad+'%':''}</div>`:''}
-        ${d.descripcion?`<div style="font-size:.78rem;margin-top:.15rem">${d.descripcion}</div>`:''}
+        ${d.sensibilidad||d.especificidad?`<div style="font-size:.73rem;color:var(--txt3)">${d.sensibilidad?'Sens: '+d.sensibilidad+'%  ':''}${d.especificidad?'Esp: '+d.especificidad+'%':''}</div>`:''}
+        ${d.descripcion?`<div style="font-size:.78rem;margin-top:.1rem">${d.descripcion}</div>`:''}
         ${d.utilidad?`<div style="font-size:.73rem;color:var(--txt3);font-style:italic">${d.utilidad}</div>`:''}
       </div>`).join('')}
-    </div>` : ''}
+    </div>`:''}
 
-    ${(enf.tx_posibles||[]).length ? `<div style="margin-bottom:.5rem">
+    ${(enf.tx_posibles||[]).length?`<div style="margin-bottom:.5rem">
       <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Posibles tratamientos</div>
       ${enf.tx_posibles.map(t=>`<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.35rem .5rem;margin-bottom:.3rem">
         <div style="font-size:.83rem;font-weight:600">${t.nombre||''}</div>
         ${t.objetivo?`<div style="font-size:.78rem;color:var(--txt3)">Objetivo: ${t.objetivo}</div>`:''}
-        ${t.descripcion?`<div style="font-size:.8rem;margin-top:.15rem">${t.descripcion}</div>`:''}
-        ${t.mas_info?`<a href="${t.mas_info.startsWith('http')?t.mas_info:'#'}" target="_blank" style="font-size:.73rem;color:var(--g6)">Más info ↗</a>`:''}
+        ${t.descripcion?`<div style="font-size:.8rem;margin-top:.1rem">${t.descripcion}</div>`:''}
       </div>`).join('')}
-    </div>` : ''}
+    </div>`:''}
 
-    ${enf.tx_lista?.length ? `<div style="margin-bottom:.5rem">
+    ${enf.tx_lista?.length?`<div style="margin-bottom:.5rem">
       <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Tratamientos específicos</div>
-      ${enf.tx_lista.map(t=>{const n=typeof t==='object'?t.nombre:t; const d=typeof t==='object'?t.descripcion:''; const dur=typeof t==='object'?t.duracion:''; return `<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.35rem .5rem;margin-bottom:.3rem"><div style="font-size:.83rem;font-weight:600">${n}</div>${d?'<div style="font-size:.8rem;margin-top:.1rem">'+d+'</div>':''}${dur?'<div style="font-size:.75rem;color:var(--txt3)">Duración: '+dur+'</div>':''}</div>`;}).join('')}
-    </div>` : ''}
+      ${enf.tx_lista.map(t=>{
+        const n=typeof t==='object'?t.nombre:t;
+        const d=typeof t==='object'?t.descripcion:'';
+        const dur=typeof t==='object'?t.duracion:'';
+        return `<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.35rem .5rem;margin-bottom:.3rem">
+          <div style="font-size:.83rem;font-weight:600">${n}</div>
+          ${d?`<div style="font-size:.8rem;margin-top:.1rem">${d}</div>`:''}
+          ${dur?`<div style="font-size:.75rem;color:var(--txt3)">Duración: ${dur}</div>`:''}
+        </div>`;
+      }).join('')}
+    </div>`:''}
 
-    ${_detRow('Epidemiología', enf.epidemiologia)}
-    ${enf.tags?.length?_detRow('Tags', enf.tags.join(', ')):''}
-    ${_detRow('Notas clínicas', enf.notas)}
+    ${dr('Epidemiología', enf.epidemiologia)}
+    ${enf.tags?.length?dr('Tags', enf.tags.join(', ')):''}
+    ${dr('Notas clínicas', enf.notas)}
 
-    ${enf.especies_confirmadas?.length ? `<div style="margin-bottom:.5rem">
+    ${enf.especies_confirmadas?.length?`<div style="margin-bottom:.5rem">
       <div style="font-size:.72rem;font-weight:700;color:var(--g6);text-transform:uppercase;margin-bottom:.2rem">✅ Especies confirmadas</div>
       <div style="display:flex;flex-wrap:wrap;gap:.25rem">
-        ${enf.especies_confirmadas.map(sp=>`<span style="font-size:.75rem;padding:.1rem .4rem;border-radius:20px;background:var(--g0);border:1px solid var(--g4)">${sp.nombre||sp}${sp.sci?' <em style="opacity:.7">'+sp.sci+'</em>':''}</span>`).join('')}
-      </div>
-    </div>` : ''}
+        ${enf.especies_confirmadas.map(sp=>`<span style="font-size:.75rem;padding:.1rem .4rem;border-radius:20px;background:var(--g0);border:1px solid var(--g4)">${sp.nombre||sp}${sp.sci?` <em style="opacity:.7">${sp.sci}</em>`:''}</span>`).join('')}
+      </div></div>`:''}
 
-    ${enf.especies_vulnerables?.length ? `<div style="margin-bottom:.5rem">
+    ${enf.especies_vulnerables?.length?`<div style="margin-bottom:.5rem">
       <div style="font-size:.72rem;font-weight:700;color:#d97706;text-transform:uppercase;margin-bottom:.2rem">⚠️ Especies vulnerables</div>
       <div style="display:flex;flex-wrap:wrap;gap:.25rem">
-        ${enf.especies_vulnerables.map(sp=>`<span style="font-size:.75rem;padding:.1rem .4rem;border-radius:20px;background:#fffbeb;border:1px dashed #f59e0b">${sp.nombre||sp}${sp.sci?' <em style="opacity:.7">'+sp.sci+'</em>':''}</span>`).join('')}
-      </div>
-    </div>` : ''}
+        ${enf.especies_vulnerables.map(sp=>`<span style="font-size:.75rem;padding:.1rem .4rem;border-radius:20px;background:#fffbeb;border:1px dashed #f59e0b">${sp.nombre||sp}${sp.sci?` <em style="opacity:.7">${sp.sci}</em>`:''}</span>`).join('')}
+      </div></div>`:''}
 
-    ${enf.referencias?.length ? `<div style="margin-bottom:.5rem">
+    ${enf.referencias?.length?`<div style="margin-bottom:.5rem">
       <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">📚 Referencias</div>
       ${enf.referencias.map(r=>`<div style="display:flex;align-items:center;gap:.4rem;padding:.2rem 0;border-bottom:1px solid var(--bor)">
         <span>${r.tipo==='pdf'?'📄':'🔗'}</span>
         <span style="flex:1;font-size:.78rem">${r.titulo||r.url||'Referencia'}</span>
         ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.72rem;color:var(--g6)">Abrir ↗</a>`:''}
       </div>`).join('')}
-    </div>` : ''}
+    </div>`:''}
   `;
-  return html;
 
   document.body.insertAdjacentHTML('beforeend', `
-    <div id="enf-detail-modal" style="position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
+    <div id="${modalId}" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.15rem">${enf.nombre}</div>
         <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.5rem">${sist.icon} ${sist.label}</div>
-        ${html}
+        ${contenido}
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
-          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('enf-detail-modal').remove()">Cerrar</button>
-          ${currentUser?.role==='admin'?`<button class="btn btn-primary" style="flex:1" onclick="document.getElementById('enf-detail-modal').remove();openAddEnfermedad('${sistId}',${enfIdx})">✏️ Editar</button>`:''}
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('${modalId}').remove()">Cerrar</button>
+          ${editBtn}
         </div>
       </div>
     </div>`);
 }
+
 
 
 async function _enfSpEliminar(sistId, enfIdx) {
@@ -10087,35 +10107,70 @@ function toggleEnriqCard(i) {
 }
 
 function filterEnriqBySpecies(q) {
-  if (!q.trim()) { renderEnriquecimientoScreen(); return; }
-  const term = q.toLowerCase();
-  const filtered = ENRIQUECIMIENTOS_DB.filter(e => {
-    // Buscar en el nombre del enriquecimiento
-    if ((e.nombre||'').toLowerCase().includes(term)) return true;
-    // Buscar en lista de especies (formato {sp, sci})
-    const enEspecies = (e.especies||[]).some(sp =>
-      (sp?.sp||sp?.especie||sp?.nombre||'').toLowerCase().includes(term) ||
-      (sp?.sci||'').toLowerCase().includes(term)
-    );
-    if (enEspecies) return true;
-    // Compat: campos legacy especie/sci directamente en el objeto
-    if ((e.especie||'').toLowerCase().includes(term)) return true;
-    if ((e.sci||'').toLowerCase().includes(term)) return true;
-    // Buscar en descripción y objetivo
-    if ((e.descripcion||'').toLowerCase().includes(term)) return true;
-    return false;
-  });
   const el = document.getElementById('enriq-list');
   if (!el) return;
+  if (!q.trim()) { renderEnriquecimientoScreen(); return; }
+  const term = q.toLowerCase().trim();
+  const filtered = ENRIQUECIMIENTOS_DB.filter(e => {
+    if ((e.nombre||'').toLowerCase().includes(term)) return true;
+    // Formato nuevo: {sp, sci}
+    if ((e.especies||[]).some(sp =>
+      (sp?.sp||sp?.especie||sp?.nombre||'').toLowerCase().includes(term) ||
+      (sp?.sci||'').toLowerCase().includes(term)
+    )) return true;
+    // Formato legacy
+    if ((e.especie||'').toLowerCase().includes(term)) return true;
+    if ((e.sci||'').toLowerCase().includes(term)) return true;
+    if ((e.descripcion||'').toLowerCase().includes(term)) return true;
+    if ((e.objetivo||'').toLowerCase().includes(term)) return true;
+    return false;
+  });
   if (!filtered.length) {
     el.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--txt3)">Sin enriquecimientos para "<strong>${q}</strong>".</div>`;
     return;
   }
-  const origDB = ENRIQUECIMIENTOS_DB;
-  ENRIQUECIMIENTOS_DB = filtered;
-  renderEnriquecimientoScreen('todos');
-  ENRIQUECIMIENTOS_DB = origDB;
+  // Renderizar directamente con la lista filtrada sin tocar ENRIQUECIMIENTOS_DB
+  const isAdmin = currentUser?.role === 'admin';
+  el.innerHTML = filtered.map(enr => {
+    const realIdx = ENRIQUECIMIENTOS_DB.indexOf(enr);
+    const cat = ENRIQ_CATS.find(cc => cc.id === enr.categoria) || ENRIQ_CATS[0];
+    const foto = enr.fotos?.[0]?.data || '';
+    const especiesArr = enr.especies?.length
+      ? enr.especies
+      : (enr.especie ? [{sp:enr.especie, sci:enr.sci||''}] : []);
+    const espBadges = especiesArr.filter(e=>e?.sp||e?.especie).map(e =>
+      `<span style="font-size:.68rem;background:var(--g0);border:1px solid var(--g3);border-radius:20px;padding:.1rem .4rem">${e.sp||e.especie||''}${e.sci?` <em style="opacity:.7">${e.sci}</em>`:''}</span>`
+    ).join('');
+    const catBadges = (enr.categorias||[enr.categoria]).map(cid => {
+      const ct = ENRIQ_CATS.find(cc=>cc.id===cid)||ENRIQ_CATS[0];
+      return `<span style="font-size:.68rem;background:${ct.color}20;border:1px solid ${ct.color}40;border-radius:20px;padding:.1rem .4rem;color:${ct.color}">${ct.icon} ${ct.label}</span>`;
+    }).join('');
+    return `<div class="enriq-card">
+      <div class="enriq-card-header" onclick="toggleEnriqCard(${realIdx})">
+        ${foto
+          ? `<img src="${foto}" style="width:72px;height:56px;object-fit:cover;border-radius:var(--rxs);flex-shrink:0">`
+          : `<div style="width:72px;height:56px;background:${cat.color}20;border-radius:var(--rxs);display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">${cat.icon}</div>`}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.9rem">${enr.nombre||'Sin nombre'}</div>
+          <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.15rem">${catBadges}${espBadges}</div>
+        </div>
+        ${isAdmin?`<div style="display:flex;gap:.3rem">
+          <button onclick="event.stopPropagation();openEditEnriquecimiento(${realIdx})" style="background:var(--g0);border:1px solid var(--bor);border-radius:var(--rxs);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✏️</button>
+          <button onclick="event.stopPropagation();removeEnriquecimiento(${realIdx})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);cursor:pointer;padding:.2rem .4rem;font-size:.7rem;color:var(--r5)">✕</button>
+        </div>`:''}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="enriq-chev-${realIdx}" style="flex-shrink:0;transition:transform .2s"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="enriq-card-body" id="enriq-body-${realIdx}" style="display:none">
+        <div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">${enr.descripcion||enr.objetivo||'Sin descripción'}</div>
+        ${espBadges ? `<div style="font-size:.72rem;font-weight:600;color:var(--txt3);margin-bottom:.3rem">ESPECIES:</div><div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.5rem">${espBadges}</div>` : ''}
+        ${isAdmin?`<div style="display:flex;gap:.4rem;margin-top:.4rem">
+          <button class="btn btn-primary btn-sm" onclick="openEditEnriquecimiento(${realIdx})">✏️ Editar</button>
+        </div>`:''}
+      </div>
+    </div>`;
+  }).join('');
 }
+
 
 function filterEnriq(cat, btn) {
   document.querySelectorAll('.tab-filter-btn').forEach(b => b.classList.remove('active'));
@@ -13720,61 +13775,158 @@ async function _confirmarCopiarEnfClase(sistId, enfIdx) {
 
 function _enfGenVerDetalle(sistId, enfIdx) {
   const claseData = ENFERMEDADES_GENERALES[_enfGenClaseActiva] || {};
-  // Buscar por índice en el sistema correcto, o buscar en todos los sistemas
   let enf = claseData.sistemas?.[sistId]?.enfermedades?.[enfIdx];
   let realSistId = sistId;
   if (!enf) {
-    outer: for (const [sid, sistData] of Object.entries(claseData.sistemas||{})) {
-      const enfs = sistData.enfermedades||[];
-      // Intentar por índice en el mismo sistema primero
-      if (sid===sistId && enfs[enfIdx]) { enf=enfs[enfIdx]; break; }
-      // Buscar por posición global
-      if (enfs[enfIdx]) { enf=enfs[enfIdx]; realSistId=sid; break outer; }
+    for (const [sid, sData] of Object.entries(claseData.sistemas||{})) {
+      if (sData.enfermedades?.[enfIdx]) {
+        enf = sData.enfermedades[enfIdx];
+        realSistId = sid;
+        break;
+      }
     }
   }
-  if (!enf) return;
-  const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===realSistId)||{icon:'📋',label:realSistId};
+  if (!enf) { toast('⚠ Enfermedad no encontrada'); return; }
   document.getElementById('enf-gen-detail-modal')?.remove();
-  // sist ya definido arriba con realSistId
+  const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===realSistId)||{icon:'📋',label:realSistId};
+  const modalId = 'enf-gen-detail-modal';
+  const editBtn = currentUser?.role==='admin'
+    ? `<button class="btn btn-primary" style="flex:1" onclick="document.getElementById('${modalId}').remove();openAddEnfGen('${realSistId}',${enfIdx})">✏️ Editar</button>`
+    : '';
 
-  const _detRow = (label, val) => val ? `<div style="margin-bottom:.4rem"><div style="font-size:.7rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.1rem">${label}</div><div style="font-size:.83rem">${val}</div></div>` : '';
-  const _signoHtml = s => { const txt=typeof s==='object'?s.signo:s; const pat=typeof s==='object'&&s.patognomonico; return `<div style="display:flex;align-items:center;gap:.3rem;padding:.15rem 0;font-size:.82rem">${pat?'<span style="color:var(--g6);font-size:.9rem">⭐</span>':'<span style="color:var(--bor);font-size:.9rem">·</span>'}<span${pat?' style="font-weight:600"':''}>${txt}</span></div>`; };
-  const infoBadges = `${enf.tipo?`<span style="font-size:.7rem;padding:.1rem .4rem;border-radius:20px;background:${enf.tipo==='infecciosa'?'var(--g0)':'var(--sur2)'};border:1px solid var(--bor);margin-right:.25rem">${enf.tipo==='infecciosa'?'🦠':'🔬'} ${enf.tipo}</span>`:''} ${enf.subtipo?`<span style="font-size:.7rem;padding:.1rem .4rem;border-radius:20px;background:var(--sur2);border:1px solid var(--bor)">${enf.subtipo}</span>`:''} ${enf.zoonosis==='si'?'<span style="font-size:.7rem;padding:.1rem .4rem;border-radius:20px;background:var(--r1);border:1px solid var(--r5);color:var(--r5);margin-left:.25rem">⚠️ Zoonosis</span>':''}`;
-  const html = `<div style="margin-bottom:.4rem;display:flex;flex-wrap:wrap;gap:.2rem">${infoBadges}</div>
-    ${enf.agente||enf.agente_tipo||enf.agente_info?`<div style="background:var(--sur2);border-radius:var(--rsm);padding:.4rem .6rem;margin-bottom:.5rem"><div style="font-size:.7rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Agente causal</div>${enf.agente?`<div style="font-size:.85rem;font-weight:600">${enf.agente}${enf.agente_tipo?' <span style="font-weight:400;color:var(--txt3)">('+enf.agente_tipo+')</span>':''}</div>`:''} ${enf.agente_info?`<div style="font-size:.8rem;color:var(--txt3);margin-top:.2rem">${enf.agente_info}</div>`:''}</div>`:''}
-    ${_detRow('Sistemas', (enf.sistemas_afectados||[]).map(s=>_getAllSistsLabel(s)).join(', '))}
-    ${_detRow('Órganos', (enf.organos||[]).map(o=>o.includes('__general')?'General — '+_getAllSistsLabel(o.replace('__general','')):o).join(', '))}
-    ${enf.organos_notas?_detRow('Notas órganos',enf.organos_notas):''}
-    ${_detRow('Vías', [...(enf.vias||[]),enf.vias_extra].filter(Boolean).join(' · '))}
-    ${_detRow('Patogénesis', enf.patogenesis)}
-    ${enf.signos_lista?.filter(s=>(typeof s==='object'?s.signo:s)).length?`<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Signos clínicos generales</div>${(enf.signos_lista||[]).map(_signoHtml).join('')}</div>`:''}
-    ${(enf.fases||[]).filter(f=>f.nombre||f.signos?.length).length?`<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.25rem">Signos por fase</div>${(enf.fases||[]).map(fase=>`<div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem .5rem;margin-bottom:.3rem"><div style="font-size:.8rem;font-weight:700;margin-bottom:.2rem">${fase.nombre||'Fase'}</div>${(fase.signos||[]).map(_signoHtml).join('')}</div>`).join('')}</div>`:''}
-    ${enf.dx_gold_std?`<div style="background:var(--g0);border:1.5px solid var(--g4);border-radius:var(--rsm);padding:.45rem .55rem;margin-bottom:.5rem"><div style="font-size:.7rem;font-weight:700;color:var(--g6);margin-bottom:.25rem">⭐ Gold Standard</div><div style="font-size:.84rem;font-weight:600">${enf.dx_gold_std}</div>${enf.dx_gold_hallazgo?`<div style="font-size:.8rem;color:var(--txt3)">Hallazgo: ${enf.dx_gold_hallazgo}</div>`:''} ${enf.dx_gold_muestra?`<div style="font-size:.78rem;color:var(--txt3)">Muestra: ${enf.dx_gold_muestra}</div>`:''} ${enf.dx_gold_sensibilidad||enf.dx_gold_especificidad?`<div style="font-size:.75rem;color:var(--txt3)">${enf.dx_gold_sensibilidad?'Sens: '+enf.dx_gold_sensibilidad+'%  ':''} ${enf.dx_gold_especificidad?'Esp: '+enf.dx_gold_especificidad+'%':''}</div>`:''} ${enf.dx_gold_descripcion?`<div style="font-size:.78rem;margin-top:.2rem">${enf.dx_gold_descripcion}</div>`:''} ${enf.dx_gold_utilidad?`<div style="font-size:.75rem;color:var(--txt3);font-style:italic">${enf.dx_gold_utilidad}</div>`:''}</div>`:''}
-    ${enf.dx_lista?.length?`<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Métodos diagnósticos</div>${enf.dx_lista.map(d=>`<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.35rem .5rem;margin-bottom:.3rem"><div style="font-size:.83rem;font-weight:600">${d.metodo}</div>${d.esperado?`<div style="font-size:.78rem;color:var(--txt3)">Hallazgo: ${d.esperado}</div>`:''} ${d.muestra?`<div style="font-size:.75rem;color:var(--txt3)">Muestra: ${d.muestra}</div>`:''} ${d.sensibilidad||d.especificidad?`<div style="font-size:.73rem;color:var(--txt3)">${d.sensibilidad?'Sens: '+d.sensibilidad+'%  ':''} ${d.especificidad?'Esp: '+d.especificidad+'%':''}</div>`:''} ${d.descripcion?`<div style="font-size:.78rem;margin-top:.15rem">${d.descripcion}</div>`:''} ${d.utilidad?`<div style="font-size:.73rem;color:var(--txt3);font-style:italic">${d.utilidad}</div>`:''}</div>`).join('')}</div>`:''}
-    ${(enf.tx_posibles||[]).length?`<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Posibles tratamientos</div>${enf.tx_posibles.map(t=>`<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.35rem .5rem;margin-bottom:.3rem"><div style="font-size:.83rem;font-weight:600">${t.nombre||''}</div>${t.objetivo?`<div style="font-size:.78rem;color:var(--txt3)">Objetivo: ${t.objetivo}</div>`:''} ${t.descripcion?`<div style="font-size:.8rem;margin-top:.15rem">${t.descripcion}</div>`:''} ${t.mas_info?`<a href="${t.mas_info.startsWith('http')?t.mas_info:'#'}" target="_blank" style="font-size:.73rem;color:var(--g6)">Más info ↗</a>`:''}</div>`).join('')}</div>`:''}
-    ${enf.tx_lista?.length?`<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Tratamientos específicos</div>${enf.tx_lista.map(t=>{const n=typeof t==='object'?t.nombre:t;const d=typeof t==='object'?t.descripcion:'';const dur=typeof t==='object'?t.duracion:'';return `<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.35rem .5rem;margin-bottom:.3rem"><div style="font-size:.83rem;font-weight:600">${n}</div>${d?'<div style="font-size:.8rem;margin-top:.1rem">'+d+'</div>':''} ${dur?'<div style="font-size:.75rem;color:var(--txt3)">Duración: '+dur+'</div>':''}</div>`;}).join('')}</div>`:''}
-    ${_detRow('Epidemiología', enf.epidemiologia)}
-    ${enf.tags?.length?_detRow('Tags', enf.tags.join(', ')):''}
-    ${_detRow('Notas clínicas', enf.notas)}
-    ${enf.especies_confirmadas?.length?`<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--g6);text-transform:uppercase;margin-bottom:.2rem">✅ Especies confirmadas</div><div style="display:flex;flex-wrap:wrap;gap:.25rem">${enf.especies_confirmadas.map(sp=>`<span style="font-size:.75rem;padding:.1rem .4rem;border-radius:20px;background:var(--g0);border:1px solid var(--g4)">${sp.nombre||sp}${sp.sci?' — <em style="opacity:.7">'+sp.sci+'</em>':''}</span>`).join('')}</div></div>`:''}
-    ${enf.especies_vulnerables?.length?`<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:#d97706;text-transform:uppercase;margin-bottom:.2rem">⚠️ Especies vulnerables</div><div style="display:flex;flex-wrap:wrap;gap:.25rem">${enf.especies_vulnerables.map(sp=>`<span style="font-size:.75rem;padding:.1rem .4rem;border-radius:20px;background:#fffbeb;border:1px dashed #f59e0b">${sp.nombre||sp}${sp.sci?' — <em style="opacity:.7">'+sp.sci+'</em>':''}</span>`).join('')}</div></div>`:''}
-    ${enf.referencias?.length?`<div style="margin-bottom:.5rem"><div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">📚 Referencias</div>${enf.referencias.map(r=>`<div style="display:flex;align-items:center;gap:.4rem;padding:.2rem 0;border-bottom:1px solid var(--bor)"><span>${r.tipo==='pdf'?'📄':'🔗'}</span><span style="flex:1;font-size:.78rem">${r.titulo||r.url||'Referencia'}</span>${r.url?`<a href="${r.url}" target="_blank" style="font-size:.72rem;color:var(--g6)">Abrir ↗</a>`:''}</div>`).join('')}</div>`:''}
+  // ── Helpers locales ──
+  const dr = (label, val) => val
+    ? `<div style="margin-bottom:.4rem"><div style="font-size:.7rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.1rem">${label}</div><div style="font-size:.83rem">${val}</div></div>`
+    : '';
+  const signoHtml = s => {
+    const txt = typeof s==='object' ? (s.signo||'') : (s||'');
+    const pat = typeof s==='object' && s.patognomonico;
+    if (!txt) return '';
+    return `<div style="display:flex;align-items:center;gap:.25rem;padding:.1rem 0;font-size:.82rem">
+      <span style="color:${pat?'var(--g6)':'var(--bor)'}">${pat?'⭐':'·'}</span>
+      <span${pat?' style="font-weight:600"':''}>${txt}</span>
+    </div>`;
+  };
+
+  // ── Contenido ──
+  const signos_ok = (enf.signos_lista||[]).filter(s=>typeof s==='object'?s.signo:s);
+  const fases_ok  = (enf.fases||[]).filter(f=>f.nombre||f.signos?.length);
+
+  const contenido = `
+    <div style="display:flex;flex-wrap:wrap;gap:.2rem;margin-bottom:.5rem">
+      ${enf.tipo?`<span style="font-size:.72rem;padding:.15rem .45rem;border-radius:20px;background:${enf.tipo==='infecciosa'?'var(--r1)':'var(--g0)'};border:1px solid ${enf.tipo==='infecciosa'?'var(--r5)':'var(--g4)'};color:${enf.tipo==='infecciosa'?'var(--r5)':'var(--g6)'}">${enf.tipo==='infecciosa'?'🦠':'🔬'} ${enf.subtipo||enf.tipo}</span>`:''}
+      ${enf.zoonosis==='si'?`<span style="font-size:.72rem;padding:.15rem .45rem;border-radius:20px;background:#fef9c3;border:1px solid #fde68a;color:#854d0e">⚠️ Zoonótica</span>`:''}
+    </div>
+
+    ${enf.agente||enf.agente_tipo||enf.agente_info?`<div style="background:var(--sur2);border-radius:var(--rsm);padding:.4rem .6rem;margin-bottom:.5rem">
+      <div style="font-size:.7rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Agente causal</div>
+      ${enf.agente?`<div style="font-size:.85rem;font-weight:600">${enf.agente}${enf.agente_tipo?` <span style="font-weight:400;font-size:.78rem;color:var(--txt3)">(${enf.agente_tipo})</span>`:''}</div>`:''}
+      ${enf.agente_info?`<div style="font-size:.8rem;color:var(--txt3);margin-top:.2rem">${enf.agente_info}</div>`:''}
+    </div>`:''}
+
+    ${dr('Sistemas', (enf.sistemas_afectados||[]).map(s=>_getAllSistsLabel(s)).join(', '))}
+    ${dr('Órganos', (enf.organos||[]).map(o=>o.includes('__general')?'General — '+_getAllSistsLabel(o.replace('__general','')):o).join(', '))}
+    ${enf.organos_notas?dr('Notas órganos',enf.organos_notas):''}
+    ${dr('Vías', [...(enf.vias||[]),enf.vias_extra].filter(Boolean).join(' · '))}
+    ${dr('Patogénesis', enf.patogenesis)}
+
+    ${signos_ok.length?`<div style="margin-bottom:.5rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Signos clínicos generales</div>
+      ${signos_ok.map(signoHtml).join('')}
+    </div>`:''}
+
+    ${fases_ok.length?`<div style="margin-bottom:.5rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.25rem">Signos por fase</div>
+      ${fases_ok.map(f=>`<div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem .5rem;margin-bottom:.3rem">
+        <div style="font-size:.8rem;font-weight:700;margin-bottom:.15rem">${f.nombre||'Fase'}</div>
+        ${(f.signos||[]).map(signoHtml).join('')}
+      </div>`).join('')}
+    </div>`:''}
+
+    ${enf.dx_gold_std?`<div style="background:var(--g0);border:1.5px solid var(--g4);border-radius:var(--rsm);padding:.45rem .55rem;margin-bottom:.5rem">
+      <div style="font-size:.7rem;font-weight:700;color:var(--g6);margin-bottom:.2rem">⭐ Gold Standard</div>
+      <div style="font-size:.84rem;font-weight:600">${enf.dx_gold_std}</div>
+      ${enf.dx_gold_hallazgo?`<div style="font-size:.8rem;color:var(--txt3)">Hallazgo: ${enf.dx_gold_hallazgo}</div>`:''}
+      ${enf.dx_gold_muestra?`<div style="font-size:.78rem;color:var(--txt3)">Muestra: ${enf.dx_gold_muestra}</div>`:''}
+      ${enf.dx_gold_sensibilidad||enf.dx_gold_especificidad?`<div style="font-size:.75rem;color:var(--txt3)">${enf.dx_gold_sensibilidad?'Sens: '+enf.dx_gold_sensibilidad+'%  ':''}${enf.dx_gold_especificidad?'Esp: '+enf.dx_gold_especificidad+'%':''}</div>`:''}
+      ${enf.dx_gold_descripcion?`<div style="font-size:.78rem;margin-top:.15rem">${enf.dx_gold_descripcion}</div>`:''}
+    </div>`:''}
+
+    ${enf.dx_lista?.length?`<div style="margin-bottom:.5rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Métodos diagnósticos</div>
+      ${enf.dx_lista.map(d=>`<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.35rem .5rem;margin-bottom:.3rem">
+        <div style="font-size:.83rem;font-weight:600">${d.metodo}</div>
+        ${d.esperado?`<div style="font-size:.78rem;color:var(--txt3)">Hallazgo: ${d.esperado}</div>`:''}
+        ${d.muestra?`<div style="font-size:.75rem;color:var(--txt3)">Muestra: ${d.muestra}</div>`:''}
+        ${d.sensibilidad||d.especificidad?`<div style="font-size:.73rem;color:var(--txt3)">${d.sensibilidad?'Sens: '+d.sensibilidad+'%  ':''}${d.especificidad?'Esp: '+d.especificidad+'%':''}</div>`:''}
+        ${d.descripcion?`<div style="font-size:.78rem;margin-top:.1rem">${d.descripcion}</div>`:''}
+        ${d.utilidad?`<div style="font-size:.73rem;color:var(--txt3);font-style:italic">${d.utilidad}</div>`:''}
+      </div>`).join('')}
+    </div>`:''}
+
+    ${(enf.tx_posibles||[]).length?`<div style="margin-bottom:.5rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Posibles tratamientos</div>
+      ${enf.tx_posibles.map(t=>`<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.35rem .5rem;margin-bottom:.3rem">
+        <div style="font-size:.83rem;font-weight:600">${t.nombre||''}</div>
+        ${t.objetivo?`<div style="font-size:.78rem;color:var(--txt3)">Objetivo: ${t.objetivo}</div>`:''}
+        ${t.descripcion?`<div style="font-size:.8rem;margin-top:.1rem">${t.descripcion}</div>`:''}
+      </div>`).join('')}
+    </div>`:''}
+
+    ${enf.tx_lista?.length?`<div style="margin-bottom:.5rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Tratamientos específicos</div>
+      ${enf.tx_lista.map(t=>{
+        const n=typeof t==='object'?t.nombre:t;
+        const d=typeof t==='object'?t.descripcion:'';
+        const dur=typeof t==='object'?t.duracion:'';
+        return `<div style="border:1px solid var(--bor);border-radius:var(--rxs);padding:.35rem .5rem;margin-bottom:.3rem">
+          <div style="font-size:.83rem;font-weight:600">${n}</div>
+          ${d?`<div style="font-size:.8rem;margin-top:.1rem">${d}</div>`:''}
+          ${dur?`<div style="font-size:.75rem;color:var(--txt3)">Duración: ${dur}</div>`:''}
+        </div>`;
+      }).join('')}
+    </div>`:''}
+
+    ${dr('Epidemiología', enf.epidemiologia)}
+    ${enf.tags?.length?dr('Tags', enf.tags.join(', ')):''}
+    ${dr('Notas clínicas', enf.notas)}
+
+    ${enf.especies_confirmadas?.length?`<div style="margin-bottom:.5rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--g6);text-transform:uppercase;margin-bottom:.2rem">✅ Especies confirmadas</div>
+      <div style="display:flex;flex-wrap:wrap;gap:.25rem">
+        ${enf.especies_confirmadas.map(sp=>`<span style="font-size:.75rem;padding:.1rem .4rem;border-radius:20px;background:var(--g0);border:1px solid var(--g4)">${sp.nombre||sp}${sp.sci?` <em style="opacity:.7">${sp.sci}</em>`:''}</span>`).join('')}
+      </div></div>`:''}
+
+    ${enf.especies_vulnerables?.length?`<div style="margin-bottom:.5rem">
+      <div style="font-size:.72rem;font-weight:700;color:#d97706;text-transform:uppercase;margin-bottom:.2rem">⚠️ Especies vulnerables</div>
+      <div style="display:flex;flex-wrap:wrap;gap:.25rem">
+        ${enf.especies_vulnerables.map(sp=>`<span style="font-size:.75rem;padding:.1rem .4rem;border-radius:20px;background:#fffbeb;border:1px dashed #f59e0b">${sp.nombre||sp}${sp.sci?` <em style="opacity:.7">${sp.sci}</em>`:''}</span>`).join('')}
+      </div></div>`:''}
+
+    ${enf.referencias?.length?`<div style="margin-bottom:.5rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">📚 Referencias</div>
+      ${enf.referencias.map(r=>`<div style="display:flex;align-items:center;gap:.4rem;padding:.2rem 0;border-bottom:1px solid var(--bor)">
+        <span>${r.tipo==='pdf'?'📄':'🔗'}</span>
+        <span style="flex:1;font-size:.78rem">${r.titulo||r.url||'Referencia'}</span>
+        ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.72rem;color:var(--g6)">Abrir ↗</a>`:''}
+      </div>`).join('')}
+    </div>`:''}
   `;
-  return html;
 
   document.body.insertAdjacentHTML('beforeend', `
-    <div id="enf-gen-detail-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
+    <div id="${modalId}" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.15rem">${enf.nombre}</div>
         <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.5rem">${sist.icon} ${sist.label}</div>
-        ${html}
+        ${contenido}
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
-          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('enf-gen-detail-modal').remove()">Cerrar</button>
-          ${currentUser?.role==='admin'?`<button class="btn btn-primary" style="flex:1" onclick="document.getElementById('enf-gen-detail-modal').remove();openAddEnfGen('${sistId}',${enfIdx})">✏️ Editar</button>`:''  }
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('${modalId}').remove()">Cerrar</button>
+          ${editBtn}
         </div>
       </div>
     </div>`);
 }
+
 
 
 function _enfDetRow(label, val) {
