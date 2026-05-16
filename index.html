@@ -9598,7 +9598,7 @@ function renderEnriquecimientoTab(el, sp) {
         <div style="font-size:.7rem;font-weight:700;color:${cat.color};text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">${cat.icon} ${cat.label}</div>
         ${items.map((enr,i)=>{
           const realIdx = ENRIQUECIMIENTOS_DB.indexOf(enr);
-          const foto = enr.fotos?.[0]?.data;
+          const foto = _getFotoSrc(enr.fotos?.[0]);
           return `<div style="display:flex;gap:.5rem;padding:.5rem;border:1px solid var(--bor);border-radius:var(--rsm);margin-bottom:.3rem;background:var(--sur)">
             ${foto?`<img src="${foto}" style="width:56px;height:44px;object-fit:cover;border-radius:var(--rxs);flex-shrink:0;cursor:pointer" onclick="openImageFull('${foto}')">`:
               `<div style="width:56px;height:44px;background:${cat.color}20;border-radius:var(--rxs);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">${cat.icon}</div>`}
@@ -10031,6 +10031,12 @@ async function saveEnriquecimientos() {
   } catch(e) { console.warn('Firestore enriq error:', e.message); }
 }
 
+function _getFotoSrc(foto) {
+  if (!foto) return '';
+  if (typeof foto === 'string') return foto;
+  return foto.data || foto.url || '';
+}
+
 function renderEnriquecimientoScreen(filter='todos') {
   buildSpeciesDatalist('sp-hist-dl'); // Actualizar historial siempre
   const el = document.getElementById('enriq-list');
@@ -10049,7 +10055,7 @@ function renderEnriquecimientoScreen(filter='todos') {
   el.innerHTML = items.map((enr, gi) => {
     const realIdx = ENRIQUECIMIENTOS_DB.indexOf(enr);
     const cat = ENRIQ_CATS.find(c => c.id === enr.categoria) || ENRIQ_CATS[0];
-    const foto = enr.fotos?.[0]?.data || '';
+    const foto = _getFotoSrc(enr.fotos?.[0]);
     return `
     <div class="enriq-card">
       <div class="enriq-card-header" onclick="toggleEnriqCard(${realIdx})">
@@ -10134,7 +10140,7 @@ function filterEnriqBySpecies(q) {
   el.innerHTML = filtered.map(enr => {
     const realIdx = ENRIQUECIMIENTOS_DB.indexOf(enr);
     const cat = ENRIQ_CATS.find(cc => cc.id === enr.categoria) || ENRIQ_CATS[0];
-    const foto = enr.fotos?.[0]?.data || '';
+    const foto = _getFotoSrc(enr.fotos?.[0]);
     const especiesArr = enr.especies?.length
       ? enr.especies
       : (enr.especie ? [{sp:enr.especie, sci:enr.sci||''}] : []);
@@ -10746,7 +10752,7 @@ function renderRecintosScreen() {
   el.innerHTML = RECINTOS_DB.map((r,i) => `
     <div class="recinto-card">
       <div style="padding:.75rem 1rem;display:flex;align-items:center;gap:.6rem;cursor:pointer" onclick="toggleRecinto(${i})">
-        ${r.fotos?.[0]?`<img src="${r.fotos[0].data}" style="width:72px;height:56px;object-fit:cover;border-radius:var(--rxs);flex-shrink:0">`:
+        ${r.fotos?.[0]?`<img src="${_getFotoSrc(r.fotos[0])}" style="width:72px;height:56px;object-fit:cover;border-radius:var(--rxs);flex-shrink:0">`:
           `<div style="width:72px;height:56px;background:var(--sur2);border-radius:var(--rxs);display:flex;align-items:center;justify-content:center;font-size:1.5rem">🏠</div>`}
         <div style="flex:1">
           <div style="font-weight:700;font-size:.9rem">${r.nombre||'Sin nombre'}</div>
@@ -13334,12 +13340,15 @@ async function deleteFromStorage(url) {
 // Devuelve el array con las URLs reemplazando los dataUrls
 async function uploadFotosArray(fotosArr, basePath) {
   if (!storage || !fbUid()) return fotosArr;
-  return Promise.all(fotosArr.map(async (f) => {
-    if (!f?.data || isStorageUrl(f.data)) return f;
-    const url = await uploadToStorage(f.data, basePath + '/' + (f.id || Date.now()));
-    return { ...f, data: url };
+  return Promise.all(fotosArr.map(async (f, i) => {
+    if (!f) return f;
+    const src = typeof f === 'string' ? f : (f.data || f.url || '');
+    if (!src || isStorageUrl(src)) return f; // ya está en Storage o vacío
+    const url = await uploadToStorage(src, basePath + '/' + (f.id || Date.now()+'_'+i));
+    return { ...(typeof f === 'object' ? f : {}), data: url, url };
   }));
 }
+
 
 // Migrar fotos existentes de dataUrl a Firebase Storage
 // Se llama desde Admin si quieres mover las fotos ya guardadas
