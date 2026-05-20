@@ -1287,10 +1287,16 @@ const FS_GLOBAL = ['species', 'vademecum', 'inventory', 'settings'];
 async function fsPut(collection, doc) {
   if (!firestore || !fbUid()) return;
   try {
-    const id = String(doc.id || doc.key);
-    await firestore.collection(collection).doc(id).set(doc, { merge: true });
+    const id = String(doc.id || doc.key || 'unknown');
+    // Para 'species' usamos set() SIN merge para garantizar que los arrays se reemplacen completos
+    if (collection === 'species') {
+      await firestore.collection(collection).doc(id).set(doc);
+    } else {
+      await firestore.collection(collection).doc(id).set(doc, { merge: true });
+    }
   } catch(e) { console.warn('Firestore put:', e.message); }
 }
+
 
 // Eliminar documento de Firestore
 async function fsDelete(collection, id) {
@@ -3348,14 +3354,16 @@ function renderFisiologia(el, sp) {
 function addHemoRow(tableId, field) {
   const tbody = document.querySelector('#'+tableId+' tbody');
   if (!tbody) return;
-  const idx = (currentSpecies[field]||[]).length;
+  // Calcular idx desde el DOM actual (no desde currentSpecies que puede no estar sincronizado)
+  const existingRows = tbody.querySelectorAll('tr[id^="hrow_'+field+'_"]');
+  const idx = existingRows.length;
   tbody.insertAdjacentHTML('beforeend', `
     <tr id="hrow_${field}_${idx}">
       <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
         <input style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--g4);outline:none;font-family:var(--sans);font-size:.82rem;color:var(--txt)" placeholder="Parámetro (ej: Cortisol)" id="hp_${field}_${idx}">
       </td>
       <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
-        <input style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--g4);outline:none;font-family:var(--sans);font-size:.78rem;color:var(--txt);text-align:center" placeholder="Unidades (ej: mg/dL)" id="hu_${field}_${idx}">
+        <input style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--g4);outline:none;font-family:var(--sans);font-size:.78rem;color:var(--txt3);text-align:center" placeholder="Unidades (ej: mg/dL)" id="hu_${field}_${idx}">
       </td>
       <td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">
         <input style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--g4);outline:none;font-family:var(--mono);font-size:.82rem;color:var(--txt);text-align:right" placeholder="Rango normal" id="hv_${field}_${idx}">
@@ -3367,7 +3375,10 @@ function addHemoRow(tableId, field) {
         <button class="btn btn-primary btn-sm" style="padding:.2rem .4rem;font-size:.7rem" onclick="saveHemoRow('${field}',${idx})">✓</button>
       </td>
     </tr>`);
+  // Focus en el primer campo
+  document.getElementById('hp_'+field+'_'+idx)?.focus();
 }
+
 async function saveHemoRow(field, idx) {
   const p = document.getElementById('hp_'+field+'_'+idx)?.value.trim();
   const u = document.getElementById('hu_'+field+'_'+idx)?.value.trim();
@@ -3375,20 +3386,16 @@ async function saveHemoRow(field, idx) {
   const d = document.getElementById('hd_'+field+'_'+idx)?.value?.trim()||'';
   if (!p) { toast('⚠ Ingresa el nombre del parámetro'); return; }
   if (!currentSpecies[field]) currentSpecies[field] = [];
-  // Usar el índice provisto o agregar al final si no existe
-  if (idx >= currentSpecies[field].length) {
-    currentSpecies[field].push([p, v||'N/D', u||'', d]);
-  } else {
-    currentSpecies[field][idx] = [p, v||'N/D', u||'', d];
-  }
-  // Guardar PRIMERO, luego renderizar
-  const saved = await dbPutSync('species', currentSpecies);
-  if (saved === false) {
-    toast('⚠ Error al guardar — intenta de nuevo'); return;
-  }
+  // Guardar en la posición exacta
+  while (currentSpecies[field].length <= idx) currentSpecies[field].push(null);
+  currentSpecies[field][idx] = [p, v||'N/D', u||'', d];
+  // Limpiar nulls del array
+  currentSpecies[field] = currentSpecies[field].filter(Boolean);
+  const ok = await dbPutSync('species', currentSpecies);
   renderTab('fisiologia');
   toast('✓ Parámetro guardado');
 }
+
 
 
 async function editHemoRow(i, field, col, value) {
@@ -9482,25 +9489,27 @@ function toast(msg) {
   t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), 2500);
 }
-function compressImage(file, maxW=1200, quality=0.92) {
-  // Por defecto: alta calidad (1200px, 92%)
-  // Para Firestore se reduce en dbPutSync automáticamente si el doc supera 800KB
+function compressImage(file, maxW=1600, quality=0.97) {
+  // Alta calidad: 1600px máx, 97% calidad
   return new Promise((res, rej) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
       const scale = img.width > maxW ? maxW/img.width : 1;
       const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width*scale);
-      canvas.height = Math.round(img.height*scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
       res(canvas.toDataURL('image/jpeg', quality));
     };
-    img.onerror = rej;
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('No se pudo leer la imagen')); };
     img.src = url;
   });
 }
+
 
 // Versión reducida solo para Firestore (mantiene IndexedDB en alta calidad)
 function compressForFirestore(dataUrl) {
@@ -9627,12 +9636,15 @@ async function removeDistMap(i) {
   renderTab('general');
 }
 function openImageFull(src) {
-  const ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;cursor:zoom-out';
-  ov.onclick = () => ov.remove();
-  ov.innerHTML = `<img src="${src}" style="max-width:95vw;max-height:95vh;border-radius:var(--rsm)">`;
-  document.body.appendChild(ov);
+  if (!src) return;
+  document.getElementById('img-full-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="img-full-modal" style="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;cursor:zoom-out" onclick="this.remove()">
+      <img src="${src}" style="max-width:96vw;max-height:92vh;object-fit:contain;border-radius:var(--rsm);box-shadow:0 4px 32px rgba(0,0,0,.5)">
+      <button onclick="document.getElementById('img-full-modal').remove()" style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:50%;width:36px;height:36px;color:white;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>`);
 }
+
 
 // ═══════════════════════════════════════════════════════════
 // BIBLIOTECA GENERAL (13)
@@ -10187,6 +10199,7 @@ function filterEnriq(cat, btn) {
 function openAddEnriquecimiento(editIdx=-1) {
   const existing = editIdx >= 0 ? ENRIQUECIMIENTOS_DB[editIdx] : null;
   document.getElementById('enriq-modal')?.remove();
+  window._enriqFotosToRemove = []; // limpiar al abrir
   document.body.insertAdjacentHTML('beforeend', `
     <div id="enriq-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
@@ -10231,7 +10244,11 @@ function openAddEnriquecimiento(editIdx=-1) {
           <label for="enriq-fotos-up" class="btn btn-secondary btn-sm" style="cursor:pointer">📷 Agregar fotos</label>
           <input type="file" id="enriq-fotos-up" accept="image/*" multiple style="display:none" onchange="previewEnriqFotos(this)">
           <div id="enriq-fotos-preview" style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.3rem">
-            ${(existing?.fotos||[]).map((f,fi)=>`<img src="${f.data}" style="height:60px;width:auto;border-radius:var(--rxs);border:1px solid var(--bor);object-fit:cover">`).join('')}
+            ${(existing?.fotos||[]).map((f,fi)=>`
+            <div style="position:relative;display:inline-block">
+              <img src="${_getFotoSrc(f)}" style="height:60px;width:auto;border-radius:var(--rxs);border:1px solid var(--bor);object-fit:cover;display:block">
+              <button onclick="this.closest('div').remove();_enriqRemoveFoto(${fi})" style="position:absolute;top:-4px;right:-4px;background:var(--r5);color:white;border:none;border-radius:50%;width:18px;height:18px;font-size:.6rem;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>
+            </div>`).join('')}
           </div>
         </div>
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
@@ -10650,6 +10667,12 @@ function addEnriqEspecieRow() {
       <button onclick="this.closest('div').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
     </div>`);
 }
+function _enriqRemoveFoto(fi) {
+  // Marcar foto para eliminar al guardar — guardamos en variable temporal
+  if (!window._enriqFotosToRemove) window._enriqFotosToRemove = [];
+  window._enriqFotosToRemove.push(fi);
+}
+
 function openEditEnriquecimiento(idx) { openAddEnriquecimiento(idx); }
 
 async function saveEnriquecimiento(editIdx=-1) {
@@ -10657,7 +10680,12 @@ async function saveEnriquecimiento(editIdx=-1) {
   if (!nombre) { toast('⚠ El nombre es obligatorio'); return; }
   const materiales = (document.getElementById('enriq-mat')?.value||'').split(/[\n,]+/).map(m=>m.trim()).filter(Boolean);
   const existing = editIdx >= 0 ? ENRIQUECIMIENTOS_DB[editIdx] : null;
-  const fotos = [...(existing?.fotos||[]), ..._enriqFotosNew];
+  let existingFotosArr2 = (existing?.fotos||[]);
+  if (window._enriqFotosToRemove?.length) {
+    existingFotosArr2 = existingFotosArr2.filter((_,fi) => !window._enriqFotosToRemove.includes(fi));
+    window._enriqFotosToRemove = [];
+  }
+  fotos = [...existingFotosArr2, ..._enriqFotosNew];
   _enriqFotosNew = [];
   const categoriasChecks = Array.from(document.querySelectorAll('#enriq-modal input[type=checkbox]:checked')).map(el=>el.value);
   const categorias = categoriasChecks.length ? categoriasChecks : ['alimenticio'];
