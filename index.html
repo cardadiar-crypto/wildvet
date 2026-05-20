@@ -586,9 +586,16 @@ textarea.form-control{resize:vertical;min-height:70px}
   <div id="screen-vademecum" class="screen">
     <div class="flex-between mb-2">
       <h2 style="font-size:1.1rem;font-weight:700">Vademécum</h2>
-      <div id="admin-add-drug-btn" style="display:none"><button class="btn btn-admin btn-sm" onclick="openAddDrug()">+ Fármaco</button></div>
+      <div id="admin-add-drug-btn" style="display:none;gap:.3rem;flex-wrap:wrap">
+        <button class="btn btn-admin btn-sm" onclick="openAddDrug()">+ Fármaco</button>
+        <button class="btn btn-secondary btn-sm" onclick="openAddVadCategoria()">+ Categoría</button>
+      </div>
     </div>
-    <input type="text" class="form-control" placeholder="Buscar fármaco..." oninput="filterVademecum(this.value)" style="margin-bottom:1rem">
+    <!-- Botones de categoría -->
+    <div id="vad-cat-tabs" style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.75rem;padding-bottom:.5rem;border-bottom:1px solid var(--bor)">
+      <button class="vad-tab-btn active" onclick="selectVadCat('__all__',this)" style="padding:.3rem .8rem;border-radius:20px;border:1.5px solid var(--g5);background:var(--g5);color:white;font-size:.8rem;font-weight:600;cursor:pointer">Todos</button>
+    </div>
+    <input type="text" class="form-control" placeholder="Buscar fármaco..." oninput="filterVademecum(this.value)" style="margin-bottom:.75rem">
     <div id="vademecum-list"></div>
   </div>
 
@@ -1327,50 +1334,67 @@ async function fsGetRecords() {
 
 // Wrapper: guardar en IndexedDB LOCAL + Firestore
 async function dbPutSync(store, obj) {
-  // Siempre guardar completo (con dataUrls) en IndexedDB local
+  // Guardar siempre en IndexedDB primero (completo, con base64)
   await dbPut(store, obj);
   if (!firestore || !fbUid()) return;
   try {
-    let fsObj = JSON.parse(JSON.stringify(obj)); // copia profunda
+    let fsObj = JSON.parse(JSON.stringify(obj));
     const uid = fbUid();
+    const basePath = store + '/' + uid + '/' + (obj.id || obj.key || Date.now());
 
-    // ── Subir fotos a Firebase Storage si está disponible ──
+    // ── Subir fotos a Storage si disponible ──
     if (storage) {
-      const basePath = store + '/' + uid + '/' + (obj.id || obj.key || Date.now());
-
-      // Campos imagen individual (string dataUrl)
       const imgFields = ['cover_photo'];
       for (const f of imgFields) {
-        if (fsObj[f] && !isStorageUrl(fsObj[f]) && fsObj[f].startsWith('data:')) {
-          fsObj[f] = await uploadToStorage(fsObj[f], basePath + '/' + f);
+        if (fsObj[f] && !isStorageUrl(fsObj[f]) && fsObj[f].startsWith?.('data:')) {
+          fsObj[f] = await uploadToStorage(fsObj[f], basePath+'/'+f);
         }
       }
-      // Campos arrays de fotos [{data, id}]
       const arrFields = ['cover_photos','dental_fotos','dimorfismo_fotos','dist_maps','fotos'];
       for (const f of arrFields) {
-        if (Array.isArray(fsObj[f]) && fsObj[f].length > 0) {
-          fsObj[f] = await uploadFotosArray(fsObj[f], basePath + '/' + f);
+        if (Array.isArray(fsObj[f]) && fsObj[f].length) {
+          fsObj[f] = await uploadFotosArray(fsObj[f], basePath+'/'+f);
         }
       }
-    } else {
-      // Sin Storage: comprimir para cumplir el límite de 1MB de Firestore
-      const sizeKB = new Blob([JSON.stringify(fsObj)]).size / 1024;
-      if (sizeKB > 600) {
-        const imgFields = ['cover_photo'];
-        const arrFields = ['cover_photos','dental_fotos','dimorfismo_fotos','dist_maps','fotos'];
-        for (const f of imgFields) {
-          if (fsObj[f] && typeof fsObj[f]==='string' && fsObj[f].length > 5000)
-            fsObj[f] = await compressForFirestore(fsObj[f]);
+    }
+
+    // ── Verificar tamaño SIEMPRE (con o sin Storage) ──
+    // Firestore tiene límite de 1MB por documento
+    const sizeKB = new Blob([JSON.stringify(fsObj)]).size / 1024;
+    if (sizeKB > 700) {
+      // Comprimir campos de texto largo que pueden ser base64
+      const imgFields2 = ['cover_photo'];
+      const arrFields2 = ['cover_photos','dental_fotos','dimorfismo_fotos','dist_maps','fotos'];
+      for (const f of imgFields2) {
+        if (fsObj[f] && typeof fsObj[f]==='string' && fsObj[f].startsWith('data:'))
+          fsObj[f] = await compressForFirestore(fsObj[f]);
+      }
+      for (const f of arrFields2) {
+        if (Array.isArray(fsObj[f])) {
+          fsObj[f] = await Promise.all(fsObj[f].map(async item =>
+            item?.data && !isStorageUrl(item.data) && item.data.startsWith?.('data:')
+              ? {...item, data: await compressForFirestore(item.data)}
+              : item
+          ));
         }
-        for (const f of arrFields) {
-          if (Array.isArray(fsObj[f])) {
-            fsObj[f] = await Promise.all(fsObj[f].map(async item =>
-              item?.data && item.data.length > 5000
-                ? {...item, data: await compressForFirestore(item.data)}
-                : item
-            ));
-          }
+      }
+      // Si sigue siendo muy grande, truncar campos no críticos
+      const sizeKB2 = new Blob([JSON.stringify(fsObj)]).size / 1024;
+      if (sizeKB2 > 900) {
+        console.warn('Documento grande ('+Math.round(sizeKB2)+'KB) — truncando campos no críticos');
+        // Guardar solo campos críticos (hematología, bioquímica, enfermedades)
+        // y las fotos como URLs (no base64)
+        const criticalFields = ['id','name','sci','order','family','emoji','uicn_world',
+          'hematology','biochem','vitals','drugs','enfermedades_sistemas','enfermedades_categorias',
+          'cover_photo','dist_maps'];
+        const slim = {};
+        for (const f of criticalFields) if (fsObj[f] !== undefined) slim[f] = fsObj[f];
+        // Agregar resto excepto campos de fotos pesadas
+        for (const [k,v] of Object.entries(fsObj)) {
+          if (!slim[k] && !['cover_photos','dental_fotos','dimorfismo_fotos'].includes(k))
+            slim[k] = v;
         }
+        fsObj = slim;
       }
     }
 
@@ -1379,8 +1403,19 @@ async function dbPutSync(store, obj) {
     } else {
       await fsPut(store, fsObj);
     }
-  } catch(e) { console.warn('Firestore sync error:', e.message); }
+  } catch(e) {
+    console.warn('Firestore sync error:', e.message);
+    // Intentar guardado mínimo con campos críticos
+    try {
+      const minObj = { id: obj.id, name: obj.name, sci: obj.sci,
+        hematology: obj.hematology, biochem: obj.biochem, vitals: obj.vitals,
+        drugs: obj.drugs, enfermedades_sistemas: obj.enfermedades_sistemas };
+      await fsPut(store, minObj);
+      console.log('Guardado mínimo exitoso');
+    } catch(e2) { console.warn('Guardado mínimo también falló:', e2.message); }
+  }
 }
+
 
 // Wrapper: eliminar en IndexedDB LOCAL + Firestore
 async function dbDeleteSync(store, id) {
@@ -2098,8 +2133,20 @@ async function loadData() {
         await Promise.all(SPECIES_DB.map(s => fsPut('species', s)));
         toast('☁ Datos subidos a la nube');
       } else {
-        SPECIES_DB = fsSpecies;
-        for (const s of fsSpecies) await dbPut('species', s);
+        // Merge: preferir datos locales para campos críticos que Firestore puede haber truncado
+        const localSpeciesForMerge = await dbGetAll('species');
+        SPECIES_DB = fsSpecies.map(fsS => {
+          const local = localSpeciesForMerge.find(l => l.id === fsS.id);
+          if (!local) return fsS;
+          // Si el local tiene hematología/bioquímica y el de Firestore no, usar el local
+          const merged = { ...fsS };
+          if (local.hematology?.length && !fsS.hematology?.length) merged.hematology = local.hematology;
+          if (local.biochem?.length && !fsS.biochem?.length) merged.biochem = local.biochem;
+          if (local.vitals && Object.keys(local.vitals).length && !Object.keys(fsS.vitals||{}).length)
+            merged.vitals = local.vitals;
+          return merged;
+        });
+        for (const s of SPECIES_DB) await dbPut('species', s);
       }
 
       // ── Vademécum ──
@@ -8394,14 +8441,85 @@ async function importVademecumFile(input) {
   }
 }
 
+let _vadCatActiva = '__all__'; // Categoría activa en vademécum
+
+function selectVadCat(cat, btn) {
+  _vadCatActiva = cat;
+  document.querySelectorAll('.vad-tab-btn').forEach(b => {
+    b.style.background = 'var(--sur2)';
+    b.style.color = 'var(--txt)';
+    b.style.borderColor = 'var(--bor)';
+  });
+  if (btn) {
+    btn.style.background = 'var(--g5)';
+    btn.style.color = 'white';
+    btn.style.borderColor = 'var(--g5)';
+  }
+  renderVademecum(_vadSearchQ || '');
+}
+
+let _vadSearchQ = '';
+
+function buildVadCatTabs() {
+  const tabsEl = document.getElementById('vad-cat-tabs');
+  if (!tabsEl) return;
+  // Obtener todas las categorías únicas de los fármacos
+  const allCats = new Set();
+  VADEMECUM_DB.forEach(d => {
+    (d.cats?.length ? d.cats : [d.category||'Otro']).forEach(cat => allCats.add(cat));
+  });
+  // Ordenar según VAD_CATS
+  const sorted = [...allCats].sort((a,b) => {
+    const ia = VAD_CATS.indexOf(a), ib = VAD_CATS.indexOf(b);
+    if (ia>=0&&ib>=0) return ia-ib;
+    if (ia>=0) return -1; if (ib>=0) return 1;
+    return a.localeCompare(b);
+  });
+  const isAdmin = currentUser?.role === 'admin';
+  tabsEl.innerHTML = `<button class="vad-tab-btn${_vadCatActiva==='__all__'?' active':''}"
+    onclick="selectVadCat('__all__',this)"
+    style="padding:.3rem .8rem;border-radius:20px;border:1.5px solid ${_vadCatActiva==='__all__'?'var(--g5)':'var(--bor)'};background:${_vadCatActiva==='__all__'?'var(--g5)':'var(--sur2)'};color:${_vadCatActiva==='__all__'?'white':'var(--txt)'};font-size:.8rem;font-weight:600;cursor:pointer;white-space:nowrap">
+    Todos</button>
+  ${sorted.map(cat => `<button class="vad-tab-btn${_vadCatActiva===cat?' active':''}"
+    onclick="selectVadCat('${cat.replace(/'/g,"\\'")}',this)"
+    style="padding:.3rem .8rem;border-radius:20px;border:1.5px solid ${_vadCatActiva===cat?'var(--g5)':'var(--bor)'};background:${_vadCatActiva===cat?'var(--g5)':'var(--sur2)'};color:${_vadCatActiva===cat?'white':'var(--txt)'};font-size:.8rem;cursor:pointer;white-space:nowrap">
+    ${cat}</button>`).join('')}
+  ${isAdmin ? `<button onclick="openAddVadCategoria()"
+    style="padding:.3rem .8rem;border-radius:20px;border:1.5px dashed var(--bor);background:transparent;color:var(--txt3);font-size:.8rem;cursor:pointer;white-space:nowrap">
+    + Categoría</button>` : ''}
+  `;
+}
+
+function openAddVadCategoria() {
+  const nombre = prompt('Nombre de la nueva categoría de fármacos:');
+  if (!nombre?.trim()) return;
+  const cat = nombre.trim().toUpperCase();
+  if (!VAD_CATS.includes(cat)) VAD_CATS.push(cat);
+  _vadCatActiva = cat;
+  buildVadCatTabs();
+  renderVademecum('');
+  // Abrir directamente para agregar un fármaco en esta categoría
+  setTimeout(() => openAddDrug(null, cat), 100);
+}
+
 function renderVademecum(filter='') {
   const list = document.getElementById('vademecum-list');
   if (!list) return;
   const isAdmin = currentUser?.role==='admin';
   const q = filter.toLowerCase().trim();
 
+  _vadSearchQ = q;
+  // Filtrar por categoría activa
+  let baseItems = VADEMECUM_DB;
+  if (_vadCatActiva && _vadCatActiva !== '__all__') {
+    baseItems = VADEMECUM_DB.filter(d => {
+      const drugCats = d.cats?.length ? d.cats : [d.category||'Otro'];
+      return drugCats.includes(_vadCatActiva);
+    });
+  }
+
   const items = q
-    ? VADEMECUM_DB.filter(d =>
+    ? baseItems.filter(d =>
         (d.drug||'').toLowerCase().includes(q) ||
         (d.active||'').toLowerCase().includes(q) ||
         (d.category||'').toLowerCase().includes(q) ||
@@ -8415,7 +8533,10 @@ function renderVademecum(filter='') {
           (s.sci||'').toLowerCase().includes(q)
         )
       )
-    : VADEMECUM_DB;
+    : baseItems;
+
+  // Actualizar tabs
+  buildVadCatTabs();
 
   if (!items.length) {
     list.innerHTML = `<div class="empty-state"><p>Sin resultados${q?` para "${q}"`:''}</p></div>`;
@@ -9466,7 +9587,11 @@ async function syncAndRenderVademecum() {
   _reconstruirHistoriales();
 }
 
-function filterVademecum(val) { renderVademecum(val.toLowerCase()); }
+function filterVademecum(q) {
+  _vadSearchQ = q;
+  renderVademecum(q);
+}
+
 async function deleteDrug(id) {
   const d = VADEMECUM_DB.find(x=>x.id===id);
   const ok = await confirmDelete('¿Eliminar fármaco?', `Se eliminará "${d?.drug||''}" del vademécum global, incluyendo todas sus dosis por especie.`, '💊');
