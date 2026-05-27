@@ -2225,9 +2225,6 @@ async function loadData() {
     }
   }
 
-  // ── Cargar árbol de categorías de vademécum ──
-  await loadVadCatTree();
-
   // ── Sincronizar fármacos de especies → vademécum ──
   for (const sp of SPECIES_DB) {
     if (sp.drugs?.length) await syncAllSpeciesDrugsToVademecum(sp);
@@ -8112,98 +8109,13 @@ async function saveProtocol() {
 // ═══════════════════════════════════
 // VADEMÉCUM — FUNCIONES COMPLETAS
 // ═══════════════════════════════════
-const VAD_CATS_TREE = [
-  { id:'antibiotico',      label:'Antibiótico',             subs:[] },
-  { id:'aine',             label:'Antiinflamatorio (AINE)',  subs:[] },
-  { id:'analgesico',       label:'Analgésico',              subs:[] },
-  { id:'sedante',          label:'Sedante',                  subs:[] },
-  { id:'tranquilizante',   label:'Tranquilizante',          subs:[] },
-  { id:'disociativo',      label:'Disociativo',             subs:[] },
-  { id:'anestesico',       label:'Anestésico',              subs:[] },
-  { id:'antiparasitario',  label:'Antiparasitario',         subs:[] },
-  { id:'reversor',         label:'Reversor',                subs:[] },
-  { id:'vitaminas',        label:'Vitaminas',               subs:[] },
-  { id:'suplementos',      label:'Suplementos',             subs:[] },
-  { id:'antifungico',      label:'Antifúngico',             subs:[] },
-  { id:'antiviral',        label:'Antiviral',               subs:[] },
-  { id:'hormonal',         label:'Hormonal',                subs:[] },
-  { id:'fluidoterapia',    label:'Fluidoterapia',           subs:[] },
-  { id:'otro',             label:'Otro',                    subs:[] },
+const VAD_CATS = [
+  'Antibiótico','Antiinflamatorio (AINE)','Analgésico','Sedante / Tranquilizante',
+  'Disociativo','Anestésico','Antiparasitario','Reversor',
+  'Vitaminas / Suplementos','Antifúngico','Antiviral','Hormonal','Fluidoterapia','Otro'
 ];
-// Plana para compatibilidad con código existente
-VAD_CATS = VAD_CATS_TREE.map(c=>c.label);
 
 // Abre el modal en modo Agregar o Editar
-function _vdRoutesHTML(selectedRoutes) {
-  const routes = ['IM','IV','SC','VO','IM dardo','IN','Tópico','Inhalatorio',
-    'Epidural','Intratecal','Intraperitoneal','Ocular','Auricular','Rectal'];
-  const sel = selectedRoutes || ['IM'];
-  return routes.map(r => {
-    const checked = sel.includes(r) ? 'checked' : '';
-    const bg = sel.includes(r) ? 'var(--g0)' : 'transparent';
-    return '<label style="display:inline-flex;align-items:center;gap:.15rem;font-size:.72rem;'
-      + 'padding:.1rem .35rem;border-radius:20px;border:1px solid var(--bor);cursor:pointer;background:' + bg + '">'
-      + '<input type="checkbox" class="vds-route-chk" value="' + r + '" ' + checked
-      + ' style="accent-color:var(--g5)"> ' + r + '</label>';
-  }).join('');
-}
-
-function _vdFreqOptions(selected) {
-  const freqs = ['SID (cada 24h)','BID (cada 12h)','TID (cada 8h)','QID (cada 6h)',
-    'Q48h','Q72h','Semanal','Quincenal','Mensual','Dosis única','Según necesidad','Infusión continua'];
-  return '<option value="">-- --</option>'
-    + freqs.map(f => '<option value="' + f + '"' + (selected===f?' selected':'') + '>' + f + '</option>').join('');
-}
-function _buildVdConcList(existing) {
-  var concs = existing && existing.concs && existing.concs.length
-    ? existing.concs
-    : (existing && existing.conc ? [existing.conc] : []);
-  return concs.map(function(cv) {
-    return '<span class="vd-conc-tag" data-val="' + cv + '" style="display:inline-flex;align-items:center;gap:.25rem;padding:.2rem .55rem;border-radius:20px;background:var(--g0);border:1px solid var(--g4);font-size:.82rem;font-weight:500">'
-      + cv + ' mg/ml '
-      + '<button type="button" onclick="this.closest(\'.vd-conc-tag\').remove()" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.85rem;padding:0;line-height:1">✕</button>'
-      + '</span>';
-  }).join('');
-}
-
-function _addVdRoute() {
-  var sel = document.getElementById('vd-route-sel');
-  var v = sel ? sel.value : '';
-  if (!v) return;
-  var list = document.getElementById('vd-routes-list');
-  if (!list) return;
-  var already = [...list.querySelectorAll('.vd-route-tag')].some(function(s) {
-    return s.dataset.val === v;
-  });
-  if (already) { toast('⚠ Esa vía ya está agregada'); return; }
-  var span = document.createElement('span');
-  span.className = 'vd-route-tag';
-  span.dataset.val = v;
-  span.style.cssText = 'display:inline-flex;align-items:center;gap:.25rem;padding:.2rem .55rem;border-radius:20px;background:var(--g0);border:1px solid var(--g4);font-size:.82rem;font-weight:500';
-  span.innerHTML = v + ' <button type="button" onclick="this.closest(\'.vd-route-tag\').remove()" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.85rem;padding:0;line-height:1;margin-left:.1rem">✕</button>';
-  list.appendChild(span);
-}
-
-function _addVdConc() {
-  var inp = document.getElementById('vd-conc-inp');
-  var v = parseFloat(inp ? inp.value : '');
-  if (!v || isNaN(v)) { toast('\u26a0 Ingresa un valor num\u00e9rico'); return; }
-  var list = document.getElementById('vd-concs-list');
-  if (!list) return;
-  var already = [...list.querySelectorAll('.vd-conc-tag')].some(function(s) {
-    return parseFloat(s.dataset.val) === v;
-  });
-  if (already) { toast('\u26a0 Esa concentraci\u00f3n ya est\u00e1 agregada'); return; }
-  var span = document.createElement('span');
-  span.className = 'vd-conc-tag';
-  span.dataset.val = String(v);
-  span.style.cssText = 'display:inline-flex;align-items:center;gap:.25rem;padding:.2rem .55rem;border-radius:20px;background:var(--g0);border:1px solid var(--g4);font-size:.82rem;font-weight:500';
-  span.innerHTML = v + ' mg/ml <button type="button" onclick="this.closest(\'.vd-conc-tag\').remove()" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.85rem;padding:0;line-height:1;margin-left:.1rem">&#x2715;</button>';
-  list.appendChild(span);
-  inp.value = '';
-  inp.focus();
-}
-
 function openAddDrug(editId=null, preselectedCat=null) {
   const existing = editId ? VADEMECUM_DB.find(d=>d.id===editId) : null;
   const nombres = existing?.nombres || (existing?.drug ? [existing.drug] : ['']);
@@ -8251,14 +8163,8 @@ function openAddDrug(editId=null, preselectedCat=null) {
         <div class="form-group"><label>Principio activo</label>
           <input id="vd-active" class="form-control" value="${existing?.active||''}" placeholder="Ej: Ketamina, Meloxicam...">
         </div>
-        <div class="form-group">
-          <label>Concentraciones disponibles <span style="font-size:.7rem;color:var(--txt3)">(mg/ml)</span></label>
-          <div id="vd-concs-list" style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.4rem;min-height:28px">${_buildVdConcList(existing)}</div>
-          <div style="display:flex;gap:.3rem;align-items:center">
-            <input id="vd-conc-inp" class="form-control" type="number" step="0.01" placeholder="Ej: 100" style="flex:1;font-size:.82rem">
-            <span style="font-size:.78rem;color:var(--txt3);white-space:nowrap">mg/ml</span>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="_addVdConc()">+ Agregar</button>
-          </div>
+        <div class="form-group"><label>Concentración (mg/ml)</label>
+          <input id="vd-conc" class="form-control" type="number" step="0.01" value="${existing?.conc||''}" placeholder="100">
         </div>
       </div>
 
@@ -8278,14 +8184,11 @@ function openAddDrug(editId=null, preselectedCat=null) {
         <input id="vd-cat-esp" class="form-control" value="${existing?.cat_esp||''}" placeholder="Ej: AINE, α2-adrenérgico, Aminoglucósido...">
       </div>
 
-      <div class="form-group">
-        <label>Vías de administración <span style="font-size:.7rem;color:var(--txt3)">(pueden ser varias)</span></label>
-        <div id="vd-routes-list" style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.4rem;min-height:28px">${_buildVdRouteList(existing)}</div>
-        <div style="display:flex;gap:.3rem;align-items:center">
-          <select id="vd-route-sel" class="form-control" style="flex:1;font-size:.82rem">
-            ${['IM','IV','SC','VO','IM dardo','IN','Tópico','Inhalatorio','Epidural','Intratecal','Intraperitoneal','Ocular','Auricular','Rectal'].map(function(r){return '<option value="'+r+'">'+r+'</option>';}).join('')}
+      <div class="form-row">
+        <div class="form-group"><label>Vía habitual</label>
+          <select id="vd-route" class="form-control">
+            ${['IM','IV','SC','VO','IM dardo','IN','Tópico','Inhalatorio'].map(r=>`<option ${(existing?.route||'IM')===r?'selected':''}>${r}</option>`).join('')}
           </select>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="_addVdRoute()">+ Agregar</button>
         </div>
       </div>
 
@@ -8342,6 +8245,7 @@ function openAddDrug(editId=null, preselectedCat=null) {
   document.body.appendChild(m);
   buildSpeciesDatalist('sp-hist-dl');
 }
+
 function addVdNombreRow() {
   const list = document.getElementById('vd-nombres-list');
   if (!list) return;
@@ -8411,12 +8315,8 @@ async function saveDrug(editId='') {
     cats,
     category:         cats[0]||'Otro',
     cat_esp:          document.getElementById('vd-cat-esp')?.value||'',
-    concs:            [...(document.querySelectorAll('#vd-concs-list .vd-conc-tag')||[])].map(function(s){return parseFloat(s.dataset.val);}).filter(Boolean),
-    conc:             (function(){var tags=[...document.querySelectorAll('#vd-concs-list .vd-conc-tag')];return tags.length?parseFloat(tags[0].dataset.val):0;})(),
-    freq:             document.getElementById('vd-freq')?.value||'',
-    freq_custom:      document.getElementById('vd-freq-custom')?.value.trim()||'',
-    routes:           [...(document.querySelectorAll('#vd-routes-list .vd-route-tag')||[])].map(function(s){return s.dataset.val;}).filter(Boolean),
-    route:            (function(){var tags=[...document.querySelectorAll('#vd-routes-list .vd-route-tag')];return tags.length?tags[0].dataset.val:'IM';})(),
+    conc:             parseFloat(document.getElementById('vd-conc')?.value)||0,
+    route:            document.getElementById('vd-route')?.value||'IM',
     indic:            document.getElementById('vd-indic')?.value||'',
     contraindications:document.getElementById('vd-contra')?.value||'',
     info:             document.getElementById('vd-info')?.value||'',
@@ -8541,326 +8441,66 @@ async function importVademecumFile(input) {
   }
 }
 
-
-
-// ══════════════════════════════════════════════════════════
-// VADEMÉCUM — Sistema de categorías y subcategorías
-// ══════════════════════════════════════════════════════════
-
-function buildVadCatTabs() {
-  var tabsEl = document.getElementById('vad-cat-tabs');
-  if (!tabsEl) return;
-  var isAdmin = currentUser && currentUser.role === 'admin';
-  var tree = _getVadTree();
-
-  var html = '';
-  var allActive = _vadCatActiva === '__all__';
-  html += '<button class="vad-tab-btn" onclick="selectVadCat(\'__all__\',this)" style="padding:.3rem .85rem;border-radius:20px;font-size:.82rem;font-weight:600;cursor:pointer;white-space:nowrap;border:1.5px solid ' + (allActive ? 'var(--g5);background:var(--g5);color:white' : 'var(--bor);background:var(--sur2);color:var(--txt)') + '">Todos</button>';
-
-  tree.forEach(function(node) {
-    var isActive = _vadCatActiva === node.label;
-    var count = VADEMECUM_DB.filter(function(d) {
-      var dc = d.cats && d.cats.length ? d.cats : [d.category || 'Otro'];
-      return dc.some(function(x) { return x === node.label || (node.subs||[]).includes(x); });
-    }).length;
-    html += '<div style="position:relative;display:inline-flex;align-items:center"><button class="vad-tab-btn" onclick="selectVadCat(\'' + node.label.replace(/'/g,"\\'") + '\',this)" style="padding:.3rem .85rem;border-radius:20px;font-size:.82rem;cursor:pointer;white-space:nowrap;border:1.5px solid ' + (isActive ? 'var(--g5);background:var(--g5);color:white' : 'var(--bor);background:var(--sur2);color:var(--txt)') + '">' + node.label + (count ? ' <span style="font-size:.68rem;opacity:.7">(' + count + ')</span>' : '') + '</button>'
-      + (isAdmin ? '<button onclick="event.stopPropagation();_editVadCat(\'' + node.label.replace(/'/g,"\\'") + '\')" title="Opciones" style="position:absolute;top:-4px;right:-4px;background:var(--sur);border:1px solid var(--bor);border-radius:50%;width:16px;height:16px;font-size:.55rem;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--txt3);z-index:1">⚙</button>' : '')
-      + '</div>';
-  });
-
-  if (isAdmin) html += '<button onclick="openAddVadCategoria()" style="padding:.3rem .85rem;border-radius:20px;border:1.5px dashed var(--g4);background:transparent;color:var(--g6);font-size:.82rem;cursor:pointer;white-space:nowrap">+ Categoría</button>';
-
-  tabsEl.innerHTML = html;
-
-  var existingSubRow = document.getElementById('vad-sub-tabs');
-  var existingNotaRow = document.getElementById('vad-sub-nota-display');
-  var activeNode = _getVadNodeByCat(_vadCatActiva);
-
-  if (!activeNode) {
-    if (existingSubRow) existingSubRow.remove();
-    if (existingNotaRow) existingNotaRow.remove();
-    return;
-  }
-
-  var subs = activeNode.subs || [];
-  var subHtml = '<div id="vad-sub-tabs" style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.4rem;padding:.4rem .5rem;background:var(--sur2);border-radius:var(--rsm)">';
-  var allSubActive = _vadSubActiva === null;
-  subHtml += '<button class="vad-sub-btn" onclick="selectVadSub(null,this)" style="padding:.2rem .65rem;border-radius:20px;font-size:.78rem;cursor:pointer;white-space:nowrap;border:1px solid ' + (allSubActive ? 'var(--g5);background:var(--g5);color:white' : 'var(--bor);background:transparent;color:var(--txt3)') + '">Todas</button>';
-
-  subs.forEach(function(sub) {
-    var isSubActive = _vadSubActiva === sub;
-    var subCount = VADEMECUM_DB.filter(function(d) {
-      var dc = d.cats && d.cats.length ? d.cats : [d.category||'Otro'];
-      return dc.includes(sub);
-    }).length;
-    subHtml += '<div style="position:relative;display:inline-flex;align-items:center"><button class="vad-sub-btn" onclick="selectVadSub(\'' + sub.replace(/'/g,"\\'") + '\',this)" style="padding:.2rem .65rem;border-radius:20px;font-size:.78rem;cursor:pointer;white-space:nowrap;border:1px solid ' + (isSubActive ? 'var(--g5);background:var(--g5);color:white' : 'var(--bor);background:transparent;color:var(--txt3)') + '">' + sub + (subCount ? ' <span style="font-size:.65rem;opacity:.7">(' + subCount + ')</span>' : '') + '</button>'
-      + (isAdmin ? '<button onclick="event.stopPropagation();_editVadSub(\'' + activeNode.label.replace(/'/g,"\\'") + '\',\'' + sub.replace(/'/g,"\\'") + '\')" title="Opciones" style="position:absolute;top:-4px;right:-4px;background:var(--sur);border:1px solid var(--bor);border-radius:50%;width:14px;height:14px;font-size:.5rem;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--txt3);z-index:1">⚙</button>' : '')
-      + '</div>';
-  });
-
-  if (isAdmin) subHtml += '<button onclick="openAddVadSubcategoria(\'' + activeNode.label.replace(/'/g,"\\'") + '\')" style="padding:.2rem .65rem;border-radius:20px;border:1px dashed var(--g4);background:transparent;color:var(--g6);font-size:.78rem;cursor:pointer;white-space:nowrap">+ Subcategoría</button>';
-  subHtml += '</div>';
-
-  if (existingSubRow) existingSubRow.outerHTML = subHtml;
-  else tabsEl.insertAdjacentHTML('afterend', subHtml);
-
-  _renderVadSubNota(activeNode);
-}
-
-function _getVadTree() { return VAD_CATS_TREE; }
-
-function _getVadNodeByCat(catLabel) {
-  return _getVadTree().find(function(n) { return n.label === catLabel; }) || null;
-}
-
-function _syncVadCatsFlat() {
-  var flat = [];
-  _getVadTree().forEach(function(n) {
-    flat.push(n.label);
-    (n.subs || []).forEach(function(s) { flat.push(s); });
-  });
-  VAD_CATS = flat.filter(function(v, i, a) { return a.indexOf(v) === i; });
-}
+let _vadCatActiva = '__all__'; // Categoría activa en vademécum
 
 function selectVadCat(cat, btn) {
   _vadCatActiva = cat;
-  _vadSubActiva = null;
-  renderVademecum(_vadSearchQ);
-}
-
-function selectVadSub(sub, btn) {
-  _vadSubActiva = sub;
-  renderVademecum(_vadSearchQ);
-}
-
-function _renderVadSubNota(activeNode) {
-  // Eliminar panel de nota anterior
-  var old = document.getElementById('vad-sub-nota-display');
-  if (old) old.remove();
-  if (!activeNode) return;
-
-  var isAdmin = currentUser && currentUser.role === 'admin';
-
-  if (_vadSubActiva) {
-    // Mostrar/editar nota de subcategoría activa
-    var nota = (activeNode.subNotas && activeNode.subNotas[_vadSubActiva]) || '';
-    var panel = document.createElement('div');
-    panel.id = 'vad-sub-nota-display';
-    panel.style.cssText = 'background:var(--g0);border-left:3px solid var(--g4);border-radius:0 var(--rsm) var(--rsm) 0;padding:.5rem .75rem;margin-bottom:.5rem;margin-top:.25rem';
-
-    if (isAdmin) {
-      panel.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem">'
-        + '<div style="flex:1">'
-        + '<div style="font-size:.68rem;font-weight:700;color:var(--g6);text-transform:uppercase;margin-bottom:.25rem">ℹ️ Info farmacológica — ' + _vadSubActiva + '</div>'
-        + '<textarea id="vad-sub-nota-ta" style="width:100%;min-height:60px;resize:vertical;background:transparent;border:1px solid var(--bor);border-radius:var(--rxs);font-size:.8rem;padding:.3rem .4rem;font-family:var(--sans);color:var(--txt)" placeholder="Agrega información farmacológica importante sobre esta subcategoría (mecanismo de acción, consideraciones, etc.)...">' + nota + '</textarea>'
-        + '</div>'
-        + '<button onclick="_saveVadSubNota(\'' + activeNode.label.replace(/'/g, "\\'") + '\',\'' + _vadSubActiva.replace(/'/g, "\\'") + '\')" class="btn btn-primary btn-sm" style="white-space:nowrap;flex-shrink:0">💾 Guardar</button>'
-        + '</div>';
-    } else if (nota) {
-      panel.innerHTML = '<div style="font-size:.68rem;font-weight:700;color:var(--g6);text-transform:uppercase;margin-bottom:.2rem">ℹ️ ' + _vadSubActiva + '</div>'
-        + '<div style="font-size:.82rem;white-space:pre-line">' + nota + '</div>';
-    }
-
-    if (isAdmin || nota) {
-      var subTabEl = document.getElementById('vad-sub-tabs');
-      if (subTabEl) subTabEl.insertAdjacentElement('afterend', panel);
-    }
-  } else if (_vadCatActiva && _vadCatActiva !== '__all__') {
-    // Sin subcategoría activa — mostrar panel para agregar fármacos directamente a la categoría
-    var isAdmin2 = currentUser && currentUser.role === 'admin';
-    if (!isAdmin2) return;
-    var panel2 = document.createElement('div');
-    panel2.id = 'vad-sub-nota-display';
-    panel2.style.cssText = 'margin-top:.25rem;margin-bottom:.35rem';
-    panel2.innerHTML = '<button onclick="openAddDrug(null,\'' + _vadCatActiva.replace(/'/g, "\\'") + '\')" class="btn btn-admin btn-sm" style="font-size:.78rem">+ Fármaco en ' + _vadCatActiva + '</button>';
-    var subTabEl2 = document.getElementById('vad-sub-tabs');
-    var target = subTabEl2 || document.getElementById('vad-cat-tabs');
-    if (target) target.insertAdjacentElement('afterend', panel2);
+  document.querySelectorAll('.vad-tab-btn').forEach(b => {
+    b.style.background = 'var(--sur2)';
+    b.style.color = 'var(--txt)';
+    b.style.borderColor = 'var(--bor)';
+  });
+  if (btn) {
+    btn.style.background = 'var(--g5)';
+    btn.style.color = 'white';
+    btn.style.borderColor = 'var(--g5)';
   }
+  renderVademecum(_vadSearchQ || '');
 }
 
-function _saveVadSubNota(catLabel, sub) {
-  var ta = document.getElementById('vad-sub-nota-ta');
-  if (!ta) return;
-  var node = _getVadNodeByCat(catLabel);
-  if (!node) return;
-  if (!node.subNotas) node.subNotas = {};
-  node.subNotas[sub] = ta.value.trim();
-  saveVadCatTree();
-  toast('✓ Información guardada');
+let _vadSearchQ = '';
+
+function buildVadCatTabs() {
+  const tabsEl = document.getElementById('vad-cat-tabs');
+  if (!tabsEl) return;
+  // Obtener todas las categorías únicas de los fármacos
+  const allCats = new Set();
+  VADEMECUM_DB.forEach(d => {
+    (d.cats?.length ? d.cats : [d.category||'Otro']).forEach(cat => allCats.add(cat));
+  });
+  // Ordenar según VAD_CATS
+  const sorted = [...allCats].sort((a,b) => {
+    const ia = VAD_CATS.indexOf(a), ib = VAD_CATS.indexOf(b);
+    if (ia>=0&&ib>=0) return ia-ib;
+    if (ia>=0) return -1; if (ib>=0) return 1;
+    return a.localeCompare(b);
+  });
+  const isAdmin = currentUser?.role === 'admin';
+  tabsEl.innerHTML = `<button class="vad-tab-btn${_vadCatActiva==='__all__'?' active':''}"
+    onclick="selectVadCat('__all__',this)"
+    style="padding:.3rem .8rem;border-radius:20px;border:1.5px solid ${_vadCatActiva==='__all__'?'var(--g5)':'var(--bor)'};background:${_vadCatActiva==='__all__'?'var(--g5)':'var(--sur2)'};color:${_vadCatActiva==='__all__'?'white':'var(--txt)'};font-size:.8rem;font-weight:600;cursor:pointer;white-space:nowrap">
+    Todos</button>
+  ${sorted.map(cat => `<button class="vad-tab-btn${_vadCatActiva===cat?' active':''}"
+    onclick="selectVadCat('${cat.replace(/'/g,"\\'")}',this)"
+    style="padding:.3rem .8rem;border-radius:20px;border:1.5px solid ${_vadCatActiva===cat?'var(--g5)':'var(--bor)'};background:${_vadCatActiva===cat?'var(--g5)':'var(--sur2)'};color:${_vadCatActiva===cat?'white':'var(--txt)'};font-size:.8rem;cursor:pointer;white-space:nowrap">
+    ${cat}</button>`).join('')}
+  ${isAdmin ? `<button onclick="openAddVadCategoria()"
+    style="padding:.3rem .8rem;border-radius:20px;border:1.5px dashed var(--bor);background:transparent;color:var(--txt3);font-size:.8rem;cursor:pointer;white-space:nowrap">
+    + Categoría</button>` : ''}
+  `;
 }
 
 function openAddVadCategoria() {
-  var nombre = prompt('Nombre de la nueva categoría:');
-  if (!nombre || !nombre.trim()) return;
-  var label = nombre.trim();
-  if (!_getVadTree().some(function(n) { return n.label === label; })) {
-    VAD_CATS_TREE.push({ id: label.toLowerCase().replace(/\s+/g,'_'), label: label, subs: [], subNotas: {} });
-    _syncVadCatsFlat();
-    saveVadCatTree();
-  }
-  _vadCatActiva = label;
-  _vadSubActiva = null;
+  const nombre = prompt('Nombre de la nueva categoría de fármacos:');
+  if (!nombre?.trim()) return;
+  const cat = nombre.trim().toUpperCase();
+  if (!VAD_CATS.includes(cat)) VAD_CATS.push(cat);
+  _vadCatActiva = cat;
   buildVadCatTabs();
   renderVademecum('');
+  // Abrir directamente para agregar un fármaco en esta categoría
+  setTimeout(() => openAddDrug(null, cat), 100);
 }
-
-function openAddVadSubcategoria(catLabel) {
-  var nombre = prompt('Nombre de la subcategoría en "' + catLabel + '":');
-  if (!nombre || !nombre.trim()) return;
-  var sub = nombre.trim();
-  var node = _getVadNodeByCat(catLabel);
-  if (node && !node.subs.includes(sub)) {
-    node.subs.push(sub);
-    _syncVadCatsFlat();
-    saveVadCatTree();
-  }
-  _vadSubActiva = sub;
-  buildVadCatTabs();
-  renderVademecum('');
-}
-
-function renameVadCategory(catLabel) {
-  var nuevo = prompt('Nuevo nombre para "' + catLabel + '":', catLabel);
-  if (!nuevo || !nuevo.trim() || nuevo.trim() === catLabel) return;
-  var node = _getVadNodeByCat(catLabel);
-  if (!node) return;
-  var old = node.label;
-  node.label = nuevo.trim();
-  node.id = nuevo.trim().toLowerCase().replace(/\s+/g,'_');
-  VADEMECUM_DB.forEach(function(d) {
-    if (d.category === old) d.category = node.label;
-    if (d.cats) d.cats = d.cats.map(function(cc) { return cc === old ? node.label : cc; });
-  });
-  _syncVadCatsFlat();
-  saveVadCatTree();
-  if (_vadCatActiva === old) _vadCatActiva = node.label;
-  buildVadCatTabs();
-  renderVademecum('');
-}
-
-function _editVadCat(catLabel) {
-  document.getElementById('vad-ctx-menu')?.remove();
-  var menu = document.createElement('div');
-  menu.id = 'vad-ctx-menu';
-  menu.style.cssText = 'position:fixed;z-index:3000;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rsm);box-shadow:0 4px 16px rgba(0,0,0,.15);padding:.3rem 0;min-width:170px';
-  var items = [
-    { icon:'✏️', label:'Renombrar', fn:'renameVadCategory(\'' + catLabel.replace(/'/g,"\\'") + '\')' },
-    { icon:'➕', label:'+ Subcategoría', fn:'openAddVadSubcategoria(\'' + catLabel.replace(/'/g,"\\'") + '\')' },
-    { icon:'🗑', label:'Eliminar categoría', fn:'_deleteVadCat(\'' + catLabel.replace(/'/g,"\\'") + '\')', danger:true },
-  ];
-  menu.innerHTML = items.map(function(it) {
-    return '<div onclick="' + it.fn + ';document.getElementById(\'vad-ctx-menu\')?.remove()" style="padding:.4rem .85rem;cursor:pointer;font-size:.83rem;display:flex;align-items:center;gap:.4rem;color:' + (it.danger?'var(--r5)':'var(--txt)') + '" onmouseenter="this.style.background=\'var(' + (it.danger?'--r1':'--sur2') + ')\'" onmouseleave="this.style.background=\'\'">' + it.icon + ' ' + it.label + '</div>';
-  }).join('');
-
-  // Posicionar cerca del botón activo
-  var tabBtn = document.querySelector('.vad-tab-btn.active') || document.querySelector('.vad-tab-btn');
-  var r = tabBtn ? tabBtn.getBoundingClientRect() : {left:100,bottom:60};
-  menu.style.left = Math.min(r.left, window.innerWidth-180) + 'px';
-  menu.style.top  = (r.bottom + 6) + 'px';
-  document.body.appendChild(menu);
-  setTimeout(function() {
-    document.addEventListener('click', function h(){ document.getElementById('vad-ctx-menu')?.remove(); document.removeEventListener('click',h); });
-  }, 50);
-}
-
-function _editVadSub(catLabel, sub) {
-  document.getElementById('vad-ctx-menu')?.remove();
-  var menu = document.createElement('div');
-  menu.id = 'vad-ctx-menu';
-  menu.style.cssText = 'position:fixed;z-index:3000;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rsm);box-shadow:0 4px 16px rgba(0,0,0,.15);padding:.3rem 0;min-width:170px';
-  var items = [
-    { icon:'✏️', label:'Renombrar', fn:'_renameVadSub(\'' + catLabel.replace(/'/g,"\\'") + '\',\'' + sub.replace(/'/g,"\\'") + '\')' },
-    { icon:'➕', label:'+ Fármaco aquí', fn:'selectVadSub(\'' + sub.replace(/'/g,"\\'") + '\',null);openAddDrug(null,\'' + sub.replace(/'/g,"\\'") + '\')' },
-    { icon:'🗑', label:'Eliminar', fn:'_deleteVadSub(\'' + catLabel.replace(/'/g,"\\'") + '\',\'' + sub.replace(/'/g,"\\'") + '\')', danger:true },
-  ];
-  menu.innerHTML = items.map(function(it) {
-    return '<div onclick="' + it.fn + ';document.getElementById(\'vad-ctx-menu\')?.remove()" style="padding:.4rem .85rem;cursor:pointer;font-size:.83rem;display:flex;align-items:center;gap:.4rem;color:' + (it.danger?'var(--r5)':'var(--txt)') + '" onmouseenter="this.style.background=\'var(' + (it.danger?'--r1':'--sur2') + ')\'" onmouseleave="this.style.background=\'\'">' + it.icon + ' ' + it.label + '</div>';
-  }).join('');
-
-  var subTabEl = document.getElementById('vad-sub-tabs');
-  var r2 = subTabEl ? subTabEl.getBoundingClientRect() : {left:100, bottom:100};
-  menu.style.left = Math.min(r2.left + 20, window.innerWidth-180) + 'px';
-  menu.style.top  = (r2.bottom + 6) + 'px';
-  document.body.appendChild(menu);
-  setTimeout(function() {
-    document.addEventListener('click', function h(){ document.getElementById('vad-ctx-menu')?.remove(); document.removeEventListener('click',h); });
-  }, 50);
-}
-
-function _deleteVadCat(catLabel) {
-  if (!confirm('¿Eliminar la categoría "' + catLabel + '"? Los fármacos no se borran.')) return;
-  var idx = VAD_CATS_TREE.findIndex(function(n) { return n.label === catLabel; });
-  if (idx >= 0) VAD_CATS_TREE.splice(idx, 1);
-  _syncVadCatsFlat();
-  saveVadCatTree();
-  if (_vadCatActiva === catLabel) { _vadCatActiva = '__all__'; _vadSubActiva = null; }
-  buildVadCatTabs();
-  renderVademecum('');
-}
-
-function _renameVadSub(catLabel, sub) {
-  var nuevo = prompt('Renombrar "' + sub + '":', sub);
-  if (!nuevo || !nuevo.trim() || nuevo.trim() === sub) return;
-  var node = _getVadNodeByCat(catLabel);
-  if (!node) return;
-  var idx2 = node.subs.indexOf(sub);
-  if (idx2 >= 0) node.subs[idx2] = nuevo.trim();
-  if (node.subNotas && node.subNotas[sub]) {
-    node.subNotas[nuevo.trim()] = node.subNotas[sub];
-    delete node.subNotas[sub];
-  }
-  VADEMECUM_DB.forEach(function(d) {
-    if (d.category === sub) d.category = nuevo.trim();
-    if (d.cats) d.cats = d.cats.map(function(cc) { return cc === sub ? nuevo.trim() : cc; });
-  });
-  _syncVadCatsFlat();
-  saveVadCatTree();
-  if (_vadSubActiva === sub) _vadSubActiva = nuevo.trim();
-  buildVadCatTabs();
-  renderVademecum('');
-}
-
-function _deleteVadSub(catLabel, sub) {
-  var node = _getVadNodeByCat(catLabel);
-  if (!node) return;
-  node.subs = node.subs.filter(function(s) { return s !== sub; });
-  _syncVadCatsFlat();
-  saveVadCatTree();
-  if (_vadSubActiva === sub) _vadSubActiva = null;
-  buildVadCatTabs();
-  renderVademecum('');
-}
-
-async function saveVadCatTree() {
-  try {
-    await dbPut('settings', { key:'vad_cat_tree', value: VAD_CATS_TREE });
-    if (firestore && fbUid()) {
-      await firestore.collection('settings').doc('vad_cat_tree').set({ value: VAD_CATS_TREE });
-    }
-  } catch(e) { console.warn('saveVadCatTree:', e.message); }
-}
-
-async function loadVadCatTree() {
-  try {
-    var local = await dbGet('settings', 'vad_cat_tree');
-    if (local && local.value && local.value.length) {
-      VAD_CATS_TREE = local.value;
-      _syncVadCatsFlat();
-      return;
-    }
-    if (firestore && fbUid()) {
-      var doc = await firestore.collection('settings').doc('vad_cat_tree').get();
-      if (doc.exists && doc.data().value && doc.data().value.length) {
-        VAD_CATS_TREE = doc.data().value;
-        _syncVadCatsFlat();
-      }
-    }
-  } catch(e) { console.warn('loadVadCatTree:', e.message); }
-}
-
-
-
 
 function renderVademecum(filter='') {
   const list = document.getElementById('vademecum-list');
@@ -8869,22 +8509,13 @@ function renderVademecum(filter='') {
   const q = filter.toLowerCase().trim();
 
   _vadSearchQ = q;
-  // Filtrar por categoría activa y/o subcategoría activa
+  // Filtrar por categoría activa
   let baseItems = VADEMECUM_DB;
   if (_vadCatActiva && _vadCatActiva !== '__all__') {
-    const node = _getVadNodeByCat(_vadCatActiva);
-    const catLabels = node ? [node.label, ...(node.subs||[])] : [_vadCatActiva];
     baseItems = VADEMECUM_DB.filter(d => {
       const drugCats = d.cats?.length ? d.cats : [d.category||'Otro'];
-      return drugCats.some(dc => catLabels.includes(dc));
+      return drugCats.includes(_vadCatActiva);
     });
-    // Si hay subcategoría activa, filtrar más
-    if (_vadSubActiva) {
-      baseItems = baseItems.filter(d => {
-        const drugCats = d.cats?.length ? d.cats : [d.category||'Otro'];
-        return drugCats.includes(_vadSubActiva);
-      });
-    }
   }
 
   const items = q
@@ -9065,6 +8696,21 @@ async function onVadDrop(event, targetCat) {
 }
 
 // ── Renombrar categoría ──
+async function renameVadCategory(oldName) {
+  const newName = prompt('Nuevo nombre para la categoría "'+oldName+'":', oldName);
+  if (!newName || newName.trim()===oldName) return;
+  const affected = VADEMECUM_DB.filter(d =>
+    (d.cats?.includes(oldName)) || (!d.cats?.length && d.category===oldName)
+  );
+  for (const d of affected) {
+    if (d.cats?.length) d.cats = d.cats.map(c=>c===oldName?newName.trim():c);
+    else d.cats = [newName.trim()];
+    if (d.category===oldName) d.category = newName.trim();
+    await dbPutSync('vademecum', d);
+  }
+  renderVademecum();
+  toast('✓ Categoría renombrada ('+affected.length+' fármacos)');
+}
 
 // ── Nueva categoría ──
 async function addVadCategory() {
