@@ -6997,21 +6997,91 @@ async function saveProtocol() {
 // VADEMÉCUM — FUNCIONES COMPLETAS
 // ═══════════════════════════════════
 const DEFAULT_VADEMECUM_CATS = {
-  antibiotico: { label:'Antibiótico', icon:'💊', subcategories: {} },
-  antiinflamatorio: { label:'Antiinflamatorio (AINE)', icon:'🔥', subcategories: {} },
-  analgesico: { label:'Analgésico', icon:'💉', subcategories: {} },
-  sedante: { label:'Sedante', icon:'😴', subcategories: {} },
-  tranquilizante: { label:'Tranquilizante', icon:'🧠', subcategories: {} },
-  disociativo: { label:'Disociativo', icon:'🌀', subcategories: {} },
-  anestesico: { label:'Anestésico', icon:'🫁', subcategories: {} },
-  antiparasitario: { label:'Antiparasitario', icon:'🐛', subcategories: {} },
-  reversor: { label:'Reversor', icon:'🔄', subcategories: {} },
-  vitaminas: { label:'Vitaminas', icon:'🟨', subcategories: {} },
-  suplementos: { label:'Suplementos', icon:'🟩', subcategories: {} },
-  antifungico: { label:'Antifúngico', icon:'🍄', subcategories: {} },
-  antiviral: { label:'Antiviral', icon:'🛡️', subcategories: {} },
-  hormonal: { label:'Hormonal', icon:'⚗️', subcategories: {} },
-  fluidoterapia: { label:'Fluidoterapia', icon:'💧', subcategories: {} }
+  antiinfecciosos: { label:'Antiinfecciosos y Antiparasitarios', icon:'🦠', subcategories: {
+    antibacterianos: { label:'Antibacterianos / Antibióticos', info:'', subcats: {
+      betalactamicos: { label:'Betalactámicos (Penicilinas y Cefalosporinas)', info:'' },
+      fluoroquinolonas: { label:'Fluoroquinolonas', info:'' },
+      macrolidos: { label:'Macrólidos, Lincosamidas y Fenicoles', info:'' },
+      tetraciclinas_aminoglucosidos: { label:'Tetraciclinas y Aminoglucósidos', info:'' },
+      sulfamidas: { label:'Sulfamidas y Sulfamidas Potenciadas', info:'' }
+    }},
+    antifungicos: { label:'Antifúngicos Sistémicos y Cutáneos', info:'', subcats:{} },
+    antivirales: { label:'Antivirales', info:'', subcats:{} },
+    antiparasitarios: { label:'Antiparasitarios', info:'', subcats: {
+      endoparasitos: { label:'Endoparásitos (Antelmínticos y Antiprotozoarios)', info:'' },
+      ectoparasitos: { label:'Ectoparásitos y Endectocidas (Insecticidas, Acaricidas e Isoxazolinas)', info:'' }
+    }}
+  }},
+  biologicos: { label:'Biológicos e Inmunología', icon:'🧬', subcategories: {
+    vacunas: { label:'Vacunas y Toxoides', info:'', subcats:{} },
+    inmunoglobulinas: { label:'Inmunoglobulinas, Sueros y Anticuerpos Monoclonales', info:'', subcats:{} },
+    inmunomoduladores: { label:'Inmunomoduladores e Inmunosupresores', info:'', subcats:{} }
+  }},
+  neuroanestesia: { label:'Sistema Nervioso y Anestesiología', icon:'🧠', subcategories: {
+    tranquilizantes: { label:'Tranquilizantes y Sedantes', info:'', subcats:{} },
+    anestesicos_inyectables: { label:'Anestésicos Generales Inyectables', info:'', subcats:{} },
+    anestesicos_inhalatorios: { label:'Anestésicos Generales Inhalatorios', info:'', subcats:{} },
+    disociativos: { label:'Anestésicos Disociativos', info:'', subcats:{} },
+    locales: { label:'Anestésicos Locales y Regionales', info:'', subcats:{} },
+    reversores: { label:'Reversores y Antagonistas', info:'', subcats:{} },
+    anticonvulsivos: { label:'Anticonvulsivos y Antiepilépticos', info:'', subcats:{} }
+  }},
+  dolor: { label:'Manejo del Dolor e Inflamación', icon:'💊', subcategories: {
+    opioides: { label:'Analgésicos Opioides', info:'', subcats:{} },
+    aine: { label:'Antiinflamatorios No Esteroideos (AINEs)', info:'', subcats:{} },
+    corticoides: { label:'Antiinflamatorios Esteroideos (Corticoides)', info:'', subcats:{} },
+    adyuvantes: { label:'Analgésicos Adyuvantes y Moduladores Neuropáticos', info:'', subcats:{} }
+  }},
+  cardiovascular: { label:'Sistema Cardiovascular y Sangre', icon:'❤️', subcategories: {
+    inotropicos: { label:'Inotrópicos Positivos y Sensibilizadores de Calcio', info:'', subcats:{} },
+    antiarritmicos: { label:'Antiarrítmicos', info:'', subcats:{} },
+    antihipertensivos: { label:'Vasodilatadores y Antihipertensivos', info:'', subcats:{} },
+    hematologicos: { label:'Hematológicos (Hemostáticos y Anticoagulantes)', info:'', subcats:{} }
+  }},
+  respiratorio: { label:'Sistema Respiratorio', icon:'🫁', subcategories: {
+    broncodilatadores: { label:'Broncodilatadores', info:'', subcats:{} },
+    mucoliticos: { label:'Mucolíticos y Expectorantes', info:'', subcats:{} },
+    antitusigenos: { label:'Antitusígenos y Estimulantes Respiratorios', info:'', subcats:{} }
+  }},
+  digestivo: { label:'Sistema Digestivo y Metabolismo', icon:'🫃', subcategories: {
+    antiemeticos: { label:'Antieméticos y Antinauseosos', info:'', subcats:{} },
+    gastroprotectores: { label:'Gastroprotectores, Antiácidos y Antiulcerosos', info:'', subcats:{} },
+    orexigenos: { label:'Estimulantes del Apetito y Orexígenos', info:'', subcats:{} },
+    procineticos: { label:'Procinéticos y Laxantes', info:'', subcats:{} },
+    antidiarreicos: { label:'Antidiarreicos, Absorbentes y Protectores de Mucosa', info:'', subcats:{} },
+    hepaticos: { label:'Protectores Hepáticos y Colagogos', info:'', subcats:{} }
+  }},
+  endocrino: { label:'Endocrinología y Reproducción', icon:'⚗️', subcategories: {
+    reproductivas: { label:'Hormonas Reproductivas y Manejo del Celo', info:'', subcats:{} },
+    tiroideas: { label:'Hormonas Tiroideas y Antitiroideos', info:'', subcats:{} },
+    pancreas_suprarrenal: { label:'Manejo Pancreático y Suprarrenal', info:'', subcats:{} },
+    anabolicos: { label:'Anabólicos Esteroideos', info:'', subcats:{} }
+  }},
+  fluidoterapia: { label:'Fluidoterapia, Electrolitos y Nutrición', icon:'💧', subcategories: {
+    cristaloides: { label:'Cristaloides', info:'', subcats:{} },
+    coloides: { label:'Coloides', info:'', subcats:{} },
+    vitaminicos: { label:'Suplementos Vitamínicos y Minerales', info:'', subcats:{} },
+    nutraceuticos: { label:'Nutracéuticos y Protectores Articulares', info:'', subcats:{} }
+  }},
+  renal: { label:'Sistema Urinario y Renal', icon:'🫘', subcategories: {
+    diureticos: { label:'Diuréticos', info:'', subcats:{} },
+    ph_urinario: { label:'Modificadores del pH Urinario y Manejo de Urolitiasis', info:'', subcats:{} },
+    protectores_renales: { label:'Protectores Renales y Aglutinantes de Fósforo', info:'', subcats:{} }
+  }},
+  oncologia: { label:'Oncología y Terapia Avanzada', icon:'🔬', subcategories: {
+    quimioterapia: { label:'Agentes Quimioterapéuticos Sistémicos', info:'', subcats:{} },
+    terapia_dirigida: { label:'Terapia Dirigida e Inhibidores de Tyrosine Kinase', info:'', subcats:{} }
+  }},
+  dermato_oftalmo: { label:'Dermatología, Oftalmología y Otología', icon:'👁️', subcategories: {
+    dermatologicos: { label:'Dermatológicos (Tópicos)', info:'', subcats:{} },
+    oftalmicos: { label:'Oftálmicos', info:'', subcats:{} },
+    oticos: { label:'Óticos', info:'', subcats:{} }
+  }},
+  urgencias: { label:'Urgencias, Toxicología y Eutanasia', icon:'🚨', subcategories: {
+    antidotos: { label:'Antídotos Específicos y Desintoxicantes', info:'', subcats:{} },
+    analepticos: { label:'Analépticos y Estimulantes de Emergencia', info:'', subcats:{} },
+    eutanasia: { label:'Agentes Eutanásicos', info:'', subcats:{} }
+  }}
 };
 
 // Abre el modal en modo Agregar o Editar
@@ -7243,6 +7313,7 @@ async function saveDrug(editId='') {
     cat_esp:          document.getElementById('vd-cat-esp')?.value||'',
     cat_vad:          _vadCatActiva !== '__all__' ? _vadCatActiva : (cats[0] ? Object.entries(VADEMECUM_CATS).find(([k,v]) => v.label === cats[0])?.[0] || '' : ''),
     subcat_vad:       _vadSubcatActiva || '',
+    subsubcat_vad:    _vadSubSubcatActiva || '',
     conc:             concs[0]||0,
     concs:            concs.length ? concs : (concs[0] ? concs : []),
     route:            routes[0]||'IM',
@@ -7314,6 +7385,7 @@ function openEditDrug(id) { openAddDrug(id); }
 
 let _vadCatActiva = '__all__';
 let _vadSubcatActiva = null;
+let _vadSubSubcatActiva = null;
 let _vadView = 'categories';
 let _vadSearchQ = '';
 
@@ -7329,23 +7401,54 @@ async function saveVademecumCats() {
 function selectVadCategory(catId) {
   _vadCatActiva = catId;
   _vadSubcatActiva = null;
+  _vadSubSubcatActiva = null;
+  history.pushState({vadNav:true}, '');
   renderVademecum();
 }
 
 function selectVadSubcategory(subId) {
-  _vadSubcatActiva = subId;
+  const cat = VADEMECUM_CATS[_vadCatActiva];
+  const sub = cat?.subcategories?.[subId];
+  if (sub?.subcats && Object.keys(sub.subcats).length) {
+    _vadSubcatActiva = subId;
+    _vadSubSubcatActiva = null;
+    _vadView = 'subsubcategories';
+  } else {
+    _vadSubcatActiva = subId;
+    _vadSubSubcatActiva = null;
+  }
+  history.pushState({vadNav:true}, '');
+  renderVademecum();
+}
+
+function selectVadSubSubcategory(subSubId) {
+  _vadSubSubcatActiva = subSubId;
+  history.pushState({vadNav:true}, '');
   renderVademecum();
 }
 
 function vadGoBack() {
-  if (_vadView === 'drugs') {
-    _vadSubcatActiva = null;
+  if (_vadView === 'drugs' || _vadView === 'subsubcategories') {
+    if (_vadSubSubcatActiva) {
+      _vadSubSubcatActiva = null;
+    } else if (_vadSubcatActiva) {
+      _vadSubcatActiva = null;
+      _vadSubSubcatActiva = null;
+    }
   } else if (_vadView === 'subcategories') {
     _vadCatActiva = '__all__';
     _vadSubcatActiva = null;
+    _vadSubSubcatActiva = null;
   }
   renderVademecum();
 }
+
+window.addEventListener('popstate', function(e) {
+  if (document.getElementById('screen-vademecum')?.classList.contains('active')) {
+    vadGoBack();
+    e.stopImmediatePropagation();
+  }
+});
 
 // ── Category CRUD ──
 function openAddVadCategory() {
@@ -7457,6 +7560,102 @@ function editVadSubcategoryInfo(subId) {
   toast('✓ Información actualizada');
 }
 
+// ── Sub-subcategory CRUD ──
+function openAddVadSubSubcategory() {
+  const cat = VADEMECUM_CATS[_vadCatActiva];
+  const sub = cat?.subcategories?.[_vadSubcatActiva];
+  if (!sub) return;
+  if (!sub.subcats) sub.subcats = {};
+  const nombre = prompt('Nombre de la nueva sub-subcategoría:');
+  if (!nombre?.trim()) return;
+  const id = nombre.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_');
+  if (sub.subcats[id]) { toast('⚠ Ya existe una sub-subcategoría con ese nombre'); return; }
+  sub.subcats[id] = { label: nombre.trim(), info: '' };
+  saveVademecumCats();
+  renderVademecum();
+  toast('✓ Sub-subcategoría creada');
+}
+
+async function renameVadSubSubcat(subSubId) {
+  const cat = VADEMECUM_CATS[_vadCatActiva];
+  const sub = cat?.subcategories?.[_vadSubcatActiva];
+  if (!sub?.subcats?.[subSubId]) return;
+  const ss = sub.subcats[subSubId];
+  const newName = prompt('Nuevo nombre para "' + ss.label + '":', ss.label);
+  if (!newName || newName.trim() === ss.label) return;
+  const oldLabel = ss.label;
+  ss.label = newName.trim();
+  for (const d of VADEMECUM_DB) {
+    if (d.subsubcat_vad === oldLabel && d.cat_vad === _vadCatActiva && d.subcat_vad === _vadSubcatActiva) {
+      d.subsubcat_vad = newName.trim();
+      await dbPutSync('vademecum', d);
+    }
+  }
+  await saveVademecumCats();
+  renderVademecum();
+  toast('✓ Sub-subcategoría renombrada');
+}
+
+async function deleteVadSubSubcat(subSubId) {
+  const cat = VADEMECUM_CATS[_vadCatActiva];
+  const sub = cat?.subcategories?.[_vadSubcatActiva];
+  if (!sub?.subcats?.[subSubId]) return;
+  const ss = sub.subcats[subSubId];
+  const drugCount = VADEMECUM_DB.filter(d => d.subsubcat_vad === ss.label && d.cat_vad === _vadCatActiva && d.subcat_vad === _vadSubcatActiva).length;
+  const ok = await confirmDelete('¿Eliminar sub-subcategoría?', `Se eliminará "${ss.label}" y ${drugCount} fármaco(s).`, '🗑️');
+  if (!ok) return;
+  const toDelete = VADEMECUM_DB.filter(d => d.subsubcat_vad === ss.label && d.cat_vad === _vadCatActiva && d.subcat_vad === _vadSubcatActiva);
+  for (const d of toDelete) {
+    await dbDeleteSync('vademecum', d.id);
+  }
+  VADEMECUM_DB = VADEMECUM_DB.filter(d => !(d.subsubcat_vad === ss.label && d.cat_vad === _vadCatActiva && d.subcat_vad === _vadSubcatActiva));
+  delete sub.subcats[subSubId];
+  _vadSubSubcatActiva = null;
+  await saveVademecumCats();
+  renderVademecum();
+  toast('✓ Sub-subcategoría eliminada');
+}
+
+function editVadSubSubcatInfo(subSubId) {
+  const cat = VADEMECUM_CATS[_vadCatActiva];
+  const sub = cat?.subcategories?.[_vadSubcatActiva];
+  if (!sub?.subcats?.[subSubId]) return;
+  const ss = sub.subcats[subSubId];
+  const info = prompt('Información para "' + ss.label + '":\n(Ej: dosis máximas, notas clínicas...)', ss.info || '');
+  if (info === null) return;
+  ss.info = info.trim();
+  saveVademecumCats();
+  renderVademecum();
+  toast('✓ Información actualizada');
+}
+
+function copyDrug(drugId) {
+  const drug = VADEMECUM_DB.find(d => d.id === drugId);
+  if (!drug) return;
+  const targetCat = prompt(
+    '¿En qué categoría quieres copiar "' + drug.drug + '"?\n\n' +
+    'Escribe el nombre exacto de la categoría (déjalo vacío para usar la actual):',
+    VADEMECUM_CATS[_vadCatActiva]?.label || ''
+  );
+  if (targetCat === null) return;
+  const targetCatId = targetCat.trim()
+    ? Object.entries(VADEMECUM_CATS).find(([k,v]) => v.label.toLowerCase() === targetCat.trim().toLowerCase())?.[0] || ''
+    : _vadCatActiva;
+  if (targetCat.trim() && !targetCatId) { toast('⚠ Categoría no encontrada'); return; }
+
+  const newDrug = {
+    ...JSON.parse(JSON.stringify(drug)),
+    id: 'vad_' + Date.now() + '_' + Math.random().toString(36).slice(2,5),
+    drug: drug.drug + ' (copia)',
+    cat_vad: targetCatId || drug.cat_vad,
+  };
+  VADEMECUM_DB.push(newDrug);
+  dbPutSync('vademecum', newDrug).then(() => {
+    renderVademecum();
+    toast('✓ Fármaco copiado a ' + (VADEMECUM_CATS[newDrug.cat_vad]?.label || 'misma categoría'));
+  });
+}
+
 // ── Render: main dispatcher ──
 function renderVademecum(filter='') {
   const list = document.getElementById('vademecum-list');
@@ -7470,11 +7669,20 @@ function renderVademecum(filter='') {
   const addBtn = document.getElementById('admin-add-drug-btn');
   if (addBtn) addBtn.style.display = isAdmin ? 'flex' : 'none';
 
+  // Search mode: show all results globally
+  if (q) {
+    _vadView = 'search';
+    if (backBtn) backBtn.style.display = 'block';
+    if (titleEl) titleEl.textContent = 'Resultados';
+    _renderVadSearch(list, isAdmin, q);
+    return;
+  }
+
   if (!_vadCatActiva || _vadCatActiva === '__all__') {
     _vadView = 'categories';
     if (backBtn) backBtn.style.display = 'none';
     if (titleEl) titleEl.textContent = 'Vademécum';
-    _renderVadCategories(list, isAdmin, q);
+    _renderVadCategories(list, isAdmin);
     return;
   }
 
@@ -7482,23 +7690,36 @@ function renderVademecum(filter='') {
     _vadView = 'subcategories';
     if (backBtn) backBtn.style.display = 'block';
     if (titleEl) titleEl.textContent = VADEMECUM_CATS[_vadCatActiva]?.label || _vadCatActiva;
-    _renderVadSubcategories(list, isAdmin, q);
+    _renderVadSubcategories(list, isAdmin);
     return;
+  }
+
+  if (_vadCatActiva && _vadSubcatActiva && !_vadSubSubcatActiva) {
+    const sub = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva];
+    if (sub?.subcats && Object.keys(sub.subcats).length) {
+      _vadView = 'subsubcategories';
+      if (backBtn) backBtn.style.display = 'block';
+      if (titleEl) titleEl.textContent = sub.label || _vadSubcatActiva;
+      _renderVadSubSubcategories(list, isAdmin);
+      return;
+    }
   }
 
   _vadView = 'drugs';
   if (backBtn) backBtn.style.display = 'block';
-  const subcat = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva];
-  if (titleEl) titleEl.textContent = subcat?.label || _vadSubcatActiva;
-  _renderVadDrugs(list, isAdmin, q);
+  let title = '';
+  if (_vadSubSubcatActiva) {
+    const subSub = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva]?.subcats?.[_vadSubSubcatActiva];
+    title = subSub?.label || _vadSubSubcatActiva;
+  } else if (_vadSubcatActiva) {
+    title = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva]?.label || _vadSubcatActiva;
+  }
+  if (titleEl) titleEl.textContent = title;
+  _renderVadDrugs(list, isAdmin);
 }
 
 // ── Render: Level 1 — Categories ──
-function _renderVadCategories(el, isAdmin, q) {
-  if (q) {
-    _renderVadDrugs(el, isAdmin, q);
-    return;
-  }
+function _renderVadCategories(el, isAdmin) {
   const cats = Object.entries(VADEMECUM_CATS);
   if (!cats.length) {
     el.innerHTML = '<div class="empty-state"><p>Sin categorías configuradas</p></div>';
@@ -7506,7 +7727,16 @@ function _renderVadCategories(el, isAdmin, q) {
   }
   el.innerHTML = cats.map(([id, cat]) => {
     const subCount = Object.keys(cat.subcategories||{}).length;
-    const drugCount = VADEMECUM_DB.filter(d => d.cat_vad === id || (d.cats||[]).includes(cat.label)).length;
+    let drugCount = 0;
+    Object.values(cat.subcategories||{}).forEach(sub => {
+      if (sub.subcats && Object.keys(sub.subcats).length) {
+        Object.keys(sub.subcats).forEach(ssId => {
+          drugCount += VADEMECUM_DB.filter(d => d.cat_vad === id && d.subcat_vad === sub.label && d.subsubcat_vad === sub.subcats[ssId].label).length;
+        });
+      }
+      drugCount += VADEMECUM_DB.filter(d => d.cat_vad === id && d.subcat_vad === sub.label && !d.subsubcat_vad).length;
+    });
+    drugCount += VADEMECUM_DB.filter(d => d.cat_vad === id && !d.subcat_vad).length;
     return `
     <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.5rem;overflow:hidden">
       <div style="display:flex;align-items:center;gap:.5rem;padding:.7rem .85rem;cursor:pointer" onclick="selectVadCategory('${id}')">
@@ -7529,31 +7759,30 @@ function _renderVadCategories(el, isAdmin, q) {
 }
 
 // ── Render: Level 2 — Subcategories ──
-function _renderVadSubcategories(el, isAdmin, q) {
+function _renderVadSubcategories(el, isAdmin) {
   const cat = VADEMECUM_CATS[_vadCatActiva];
   if (!cat) { el.innerHTML = '<div class="empty-state"><p>Categoría no encontrada</p></div>'; return; }
   const subcats = Object.entries(cat.subcategories||{});
-  if (!subcats.length && !q) {
-    el.innerHTML = (isAdmin ? `
-    <button onclick="openAddVadSubcategory()" class="btn btn-secondary btn-sm" style="width:100%;margin-top:.5rem">
-      + Nueva subcategoría
-    </button>` : '<div class="empty-state"><p>Sin subcategorías. Los fármacos sin subcategoría aparecen al buscar.</p></div>');
-    if (isAdmin) el.insertAdjacentHTML('afterbegin', '<div class="empty-state"><p>Sin subcategorías configuradas aún</p></div>');
-    return;
-  }
-  if (q) {
-    _renderVadDrugs(el, isAdmin, q);
+  if (!subcats.length) {
+    el.innerHTML = (isAdmin ? `<button onclick="openAddVadSubcategory()" class="btn btn-secondary btn-sm" style="width:100%;margin-top:.5rem">+ Nueva subcategoría</button>` : '<div class="empty-state"><p>Sin subcategorías</p></div>');
     return;
   }
   el.innerHTML = subcats.map(([id, sub]) => {
-    const drugCount = VADEMECUM_DB.filter(d => d.subcat_vad === id && d.cat_vad === _vadCatActiva).length;
+    const hasSubcats = sub.subcats && Object.keys(sub.subcats).length;
+    let drugCount = 0;
+    if (hasSubcats) {
+      Object.values(sub.subcats).forEach(ss => {
+        drugCount += VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && d.subcat_vad === sub.label && d.subsubcat_vad === ss.label).length;
+      });
+    }
+    drugCount += VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && d.subcat_vad === sub.label && !d.subsubcat_vad).length;
     return `
     <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.5rem;overflow:hidden">
       <div style="display:flex;align-items:center;gap:.5rem;padding:.6rem .85rem;cursor:pointer" onclick="selectVadSubcategory('${id}')">
         <div style="flex:1;min-width:0">
           <div style="font-size:.88rem;font-weight:700;color:var(--txt)">${sub.label}</div>
           ${sub.info ? `<div style="font-size:.7rem;color:var(--txt3);margin-top:.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sub.info}</div>` : ''}
-          <div style="font-size:.68rem;color:var(--g6);margin-top:.15rem">${drugCount} fármaco(s)</div>
+          <div style="font-size:.68rem;color:var(--g6);margin-top:.15rem">${hasSubcats ? Object.keys(sub.subcats).length+' subcategoría(s) · ' : ''}${drugCount} fármaco(s)</div>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
@@ -7569,8 +7798,62 @@ function _renderVadSubcategories(el, isAdmin, q) {
     </button>` : '');
 }
 
-// ── Render: Level 3 — Drugs ──
-function _renderVadDrugs(el, isAdmin, q) {
+// ── Render: Level 2.5 — Sub-subcategories ──
+function _renderVadSubSubcategories(el, isAdmin) {
+  const cat = VADEMECUM_CATS[_vadCatActiva];
+  const sub = cat?.subcategories?.[_vadSubcatActiva];
+  if (!sub?.subcats) { el.innerHTML = '<div class="empty-state"><p>No hay sub-subcategorías</p></div>'; return; }
+  const subsubs = Object.entries(sub.subcats);
+  el.innerHTML = subsubs.map(([id, ss]) => {
+    const drugCount = VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && d.subcat_vad === sub.label && d.subsubcat_vad === ss.label).length;
+    return `
+    <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.5rem;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:.5rem;padding:.6rem .85rem;cursor:pointer" onclick="selectVadSubSubcategory('${id}')">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.88rem;font-weight:700;color:var(--txt)">${ss.label}</div>
+          ${ss.info ? `<div style="font-size:.7rem;color:var(--txt3);margin-top:.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ss.info}</div>` : ''}
+          <div style="font-size:.68rem;color:var(--g6);margin-top:.15rem">${drugCount} fármaco(s)</div>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      ${isAdmin ? `<div style="display:flex;gap:.3rem;padding:0 .85rem .4rem;flex-wrap:wrap">
+        <button onclick="event.stopPropagation();editVadSubSubcatInfo('${id}')" class="btn btn-secondary btn-sm" style="font-size:.68rem">📝 Info</button>
+        <button onclick="event.stopPropagation();renameVadSubSubcat('${id}')" class="btn btn-secondary btn-sm" style="font-size:.68rem">✏️ Renombrar</button>
+        <button onclick="event.stopPropagation();deleteVadSubSubcat('${id}')" class="btn btn-secondary btn-sm" style="font-size:.68rem;color:var(--r5)">✕ Eliminar</button>
+      </div>` : ''}
+    </div>`;
+  }).join('') + (isAdmin ? `
+    <button onclick="openAddVadSubSubcategory()" class="btn btn-secondary btn-sm" style="width:100%;margin-top:.5rem">
+      + Nueva sub-subcategoría
+    </button>` : '');
+}
+
+// ── Render: Search (global, shows all instances) ──
+function _renderVadSearch(el, isAdmin, q) {
+  let items = VADEMECUM_DB.filter(d =>
+    (d.drug||'').toLowerCase().includes(q) ||
+    (d.active||'').toLowerCase().includes(q) ||
+    (d.cat_esp||'').toLowerCase().includes(q) ||
+    (d.indic||'').toLowerCase().includes(q) ||
+    (d.info||'').toLowerCase().includes(q) ||
+    (d.nombres||[]).some(n=>n.toLowerCase().includes(q)) ||
+    (d.cats||[]).some(cc=>cc.toLowerCase().includes(q)) ||
+    (d.species_doses||[]).some(s=>
+      (s.species||'').toLowerCase().includes(q) ||
+      (s.sci||'').toLowerCase().includes(q)
+    )
+  );
+  items.sort((a,b) => (a.drug||'').localeCompare(b.drug||'', 'es'));
+  if (!items.length) {
+    el.innerHTML = `<div class="empty-state"><p>Sin resultados para "${q}"</p></div>`;
+    return;
+  }
+  el.innerHTML = `<div style="font-size:.75rem;color:var(--txt3);margin-bottom:.5rem">${items.length} resultado(s)</div>` +
+    items.map(d => _buildVadDrugCard(d, isAdmin, true)).join('');
+}
+
+// ── Render: Level 3 — Drugs (sorted alphabetically) ──
+function _renderVadDrugs(el, isAdmin) {
   let items = VADEMECUM_DB.filter(d => {
     if (_vadCatActiva && _vadCatActiva !== '__all__') {
       if (d.cat_vad !== _vadCatActiva) {
@@ -7579,124 +7862,124 @@ function _renderVadDrugs(el, isAdmin, q) {
       }
     }
     if (_vadSubcatActiva) {
-      if (d.subcat_vad !== _vadSubcatActiva) {
-        const subLabel = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva]?.label || '';
-        if (d.cat_esp !== subLabel) return false;
-      }
+      const subLabel = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva]?.label || '';
+      if (d.subcat_vad !== _vadSubcatActiva && d.cat_esp !== subLabel && d.subcat_vad !== subLabel) return false;
+    }
+    if (_vadSubSubcatActiva) {
+      const ssLabel = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva]?.subcats?.[_vadSubSubcatActiva]?.label || '';
+      if (d.subsubcat_vad !== _vadSubSubcatActiva && d.subsubcat_vad !== ssLabel) return false;
     }
     return true;
   });
-
-  if (q) {
-    items = items.filter(d =>
-      (d.drug||'').toLowerCase().includes(q) ||
-      (d.active||'').toLowerCase().includes(q) ||
-      (d.cat_esp||'').toLowerCase().includes(q) ||
-      (d.indic||'').toLowerCase().includes(q) ||
-      (d.info||'').toLowerCase().includes(q) ||
-      (d.nombres||[]).some(n=>n.toLowerCase().includes(q)) ||
-      (d.cats||[]).some(cc=>cc.toLowerCase().includes(q)) ||
-      (d.species_doses||[]).some(s=>
-        (s.species||'').toLowerCase().includes(q) ||
-        (s.sci||'').toLowerCase().includes(q)
-      )
-    );
-  }
+  items.sort((a,b) => (a.drug||'').localeCompare(b.drug||'', 'es'));
 
   let infoHtml = '';
-  if (_vadSubcatActiva && !q) {
+  if (_vadSubSubcatActiva) {
+    const ss = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva]?.subcats?.[_vadSubSubcatActiva];
+    if (ss?.info) infoHtml = `<div style="background:var(--g0);border:1px solid var(--g3);border-radius:var(--rsm);padding:.5rem .7rem;margin-bottom:.6rem;font-size:.78rem;color:var(--g7)"><strong>ℹ️ ${ss.label}:</strong> ${ss.info}</div>`;
+  } else if (_vadSubcatActiva) {
     const sub = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva];
-    if (sub?.info) {
-      infoHtml = `<div style="background:var(--g0);border:1px solid var(--g3);border-radius:var(--rsm);padding:.5rem .7rem;margin-bottom:.6rem;font-size:.78rem;color:var(--g7)">
-        <strong>ℹ️ ${sub.label}:</strong> ${sub.info}
-      </div>`;
-    }
+    if (sub?.info) infoHtml = `<div style="background:var(--g0);border:1px solid var(--g3);border-radius:var(--rsm);padding:.5rem .7rem;margin-bottom:.6rem;font-size:.78rem;color:var(--g7)"><strong>ℹ️ ${sub.label}:</strong> ${sub.info}</div>`;
   }
 
   if (!items.length) {
-    el.innerHTML = infoHtml + `<div class="empty-state"><p>Sin fármacos${q?` para "${q}"`:''}</p></div>`;
+    el.innerHTML = infoHtml + `<div class="empty-state"><p>Sin fármacos en esta categoría</p></div>` +
+      (isAdmin ? `<button onclick="openAddDrug()" class="btn btn-primary btn-sm" style="width:100%;margin-top:.5rem">+ Agregar fármaco</button>` : '');
     return;
   }
+  el.innerHTML = infoHtml + items.map(d => _buildVadDrugCard(d, isAdmin, false)).join('');
+}
 
-  el.innerHTML = infoHtml + items.map(d => {
-    const doses = d.species_doses||[];
-    const displayName = d.nombres?.length>1 ? d.nombres.join(' / ') : (d.drug||d.active||'Sin nombre');
-    return `
-    <div id="vd-card-${d.id}" style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.35rem;overflow:hidden">
-      <div style="display:flex;align-items:center;gap:.5rem;padding:.6rem .85rem">
-        <div style="flex:1;min-width:0;cursor:pointer" onclick="toggleVdCard('${d.id}')">
-          <div style="font-size:.9rem;font-weight:700;color:var(--txt)">${displayName}</div>
-          ${d.active?`<div style="font-size:.72rem;color:var(--txt3);font-style:italic">${d.active}</div>`:''}
-          ${d.cat_esp?`<span style="font-size:.65rem;background:var(--g0);color:var(--g7);border-radius:20px;padding:.05rem .3rem">${d.cat_esp}</span>`:''}
-          ${(d.concs?.length||d.conc)?`<span style="font-size:.65rem;color:var(--txt3);margin-left:.3rem">${(d.concs?.length ? d.concs.join('/') : d.conc)+' mg/ml'}</span>`:''}
-          ${(d.routes?.length||d.route)?`<span style="font-size:.65rem;color:var(--txt3);margin-left:.3rem">· ${(d.routes?.length ? d.routes.join(', ') : d.route)}</span>`:''}
-          ${d.freq?`<span style="font-size:.65rem;color:var(--g6);margin-left:.3rem">· ${d.freq}</span>`:''}
-        </div>
-        <div style="display:flex;align-items:center;gap:.25rem;flex-shrink:0">
-          <span style="font-size:.65rem;background:var(--g1);color:var(--g7);border-radius:20px;padding:.1rem .4rem;font-weight:600">${doses.length} esp.</span>
-          ${isAdmin?`
-          <button onclick="event.stopPropagation();openEditDrug('${d.id}')" title="Editar"
-            style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);width:26px;height:26px;cursor:pointer;font-size:.75rem">✏️</button>
-          <button onclick="event.stopPropagation();deleteDrugVad('${d.id}')" title="Eliminar"
-            style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);width:26px;height:26px;cursor:pointer;font-size:.7rem;color:var(--r5)">✕</button>`:''}
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            id="vd-chev-${d.id}" style="cursor:pointer;transition:transform .2s;flex-shrink:0" onclick="toggleVdCard('${d.id}')">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
-        </div>
+// ── Shared drug card builder ──
+function _buildVadDrugCard(d, isAdmin, showBreadcrumb) {
+  const doses = d.species_doses||[];
+  const displayName = d.nombres?.length>1 ? d.nombres.join(' / ') : (d.drug||d.active||'Sin nombre');
+  let breadcrumb = '';
+  if (showBreadcrumb) {
+    const parts = [];
+    if (d.cat_vad && VADEMECUM_CATS[d.cat_vad]) parts.push(VADEMECUM_CATS[d.cat_vad].label);
+    if (d.subcat_vad) parts.push(d.subcat_vad);
+    if (d.subsubcat_vad) parts.push(d.subsubcat_vad);
+    if (parts.length) breadcrumb = `<div style="font-size:.65rem;color:var(--g6);margin-bottom:.2rem">${parts.join(' › ')}</div>`;
+  }
+  return `
+  <div id="vd-card-${d.id}" style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.35rem;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:.5rem;padding:.6rem .85rem">
+      <div style="flex:1;min-width:0;cursor:pointer" onclick="toggleVdCard('${d.id}')">
+        ${breadcrumb}
+        <div style="font-size:.9rem;font-weight:700;color:var(--txt)">${displayName}</div>
+        ${d.active?`<div style="font-size:.72rem;color:var(--txt3);font-style:italic">${d.active}</div>`:''}
+        ${d.cat_esp?`<span style="font-size:.65rem;background:var(--g0);color:var(--g7);border-radius:20px;padding:.05rem .3rem">${d.cat_esp}</span>`:''}
+        ${(d.concs?.length||d.conc)?`<span style="font-size:.65rem;color:var(--txt3);margin-left:.3rem">${(d.concs?.length ? d.concs.join('/') : d.conc)+' mg/ml'}</span>`:''}
+        ${(d.routes?.length||d.route)?`<span style="font-size:.65rem;color:var(--txt3);margin-left:.3rem">· ${(d.routes?.length ? d.routes.join(', ') : d.route)}</span>`:''}
+        ${d.freq?`<span style="font-size:.65rem;color:var(--g6);margin-left:.3rem">· ${d.freq}</span>`:''}
       </div>
-      <div id="vd-panel-${d.id}" style="display:none;border-top:1px solid var(--bor)">
-        <div style="padding:.5rem .85rem;display:grid;gap:.2rem">
-          ${(d.concs?.length||d.conc)?`<p style="margin:0;font-size:.8rem"><strong>Concentración:</strong> ${(d.concs?.length ? d.concs.map(c=>c+' mg/ml').join(', ') : d.conc+' mg/ml')}</p>`:''}
-          ${(d.routes?.length||d.route)?`<p style="margin:0;font-size:.8rem"><strong>Vías de administración:</strong> ${(d.routes?.length ? d.routes.join(', ') : d.route||'—')}</p>`:''}
-          ${d.freq?`<p style="margin:0;font-size:.8rem"><strong>Frecuencia:</strong> ${d.freq}</p>`:''}
-          ${d.indic?`<p style="margin:0;font-size:.8rem;color:var(--txt2)"><strong style="color:var(--g6)">✅ Indicaciones:</strong> ${d.indic}</p>`:''}
-          ${d.contraindications?`<div style="background:var(--r1);border-radius:var(--rxs);padding:.3rem .5rem;font-size:.78rem;color:var(--r5)">⚠ <strong>Contraindicaciones:</strong> ${d.contraindications}</div>`:''}
-          ${d.info?`<p style="margin:0;font-size:.78rem;color:var(--txt3)"><strong>Efectos adversos:</strong> ${d.info}</p>`:''}
-          ${d.notes?`<p style="margin:0;font-size:.78rem;color:var(--txt3);font-style:italic">📋 ${d.notes}</p>`:''}
-        </div>
-        <div style="padding:.4rem .85rem .6rem;background:var(--sur2);border-top:1px solid var(--bor)">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem">
-            <span style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Dosis por especie</span>
-            ${isAdmin?`<button onclick="openEditDrug('${d.id}')" style="background:var(--g5);color:white;border:none;border-radius:var(--rxs);padding:.2rem .5rem;font-size:.7rem;cursor:pointer">+ Especie</button>`:''}
-          </div>
-          ${doses.length ? `
-          <div style="overflow-x:auto">
-            <table style="width:100%;border-collapse:collapse;font-size:.75rem">
-              <thead><tr style="background:var(--sur)">
-                <th style="padding:.25rem .4rem;text-align:left;border-bottom:1px solid var(--bor);color:var(--txt3)">Especie</th>
-                <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--txt3)">Mín</th>
-                <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--g6);font-weight:700">Rec.</th>
-                <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--txt3)">Máx</th>
-                <th style="padding:.25rem .4rem;text-align:left;border-bottom:1px solid var(--bor);color:var(--txt3)">Vía(s)</th>
-                <th style="padding:.25rem .4rem;text-align:left;border-bottom:1px solid var(--bor);color:var(--txt3)">Frecuencia</th>
-                <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--g6)">Resultado</th>
-              </tr></thead>
-              <tbody>
-                ${doses.map((s,si) => {
-                  const spWeight = SPECIES_DB.find(sp => sp.name?.toLowerCase() === (s.species||'').split('(')[0].trim().toLowerCase())?.weight_avg || 0;
-                  const vol = (spWeight && s.dose && d.conc) ? (spWeight * s.dose / d.conc).toFixed(2) + ' ml' : '—';
-                  return `<tr style="border-bottom:1px solid var(--bor)">
-                    <td style="padding:.3rem .4rem">
-                      <div style="font-weight:600;font-size:.8rem">${(s.species||'').split('(')[0].trim()}</div>
-                      ${s.sci?`<div style="font-size:.65rem;color:var(--txt3);font-style:italic">${s.sci}</div>`:''}
-                    </td>
-                    <td style="padding:.3rem .4rem;text-align:center;color:var(--txt3);font-family:var(--mono)">${s.dose_min||'—'}</td>
-                    <td style="padding:.3rem .4rem;text-align:center;font-weight:700;color:var(--g5);font-family:var(--mono)">${s.dose||'—'}</td>
-                    <td style="padding:.3rem .4rem;text-align:center;color:var(--txt3);font-family:var(--mono)">${s.dose_max||'—'}</td>
-                    <td style="padding:.3rem .4rem;font-size:.72rem">${(s.routes?.length ? s.routes.join(', ') : s.route||'—')}</td>
-                    <td style="padding:.3rem .4rem;font-size:.75rem">${s.freq||'—'}</td>
-                    <td style="padding:.3rem .4rem;text-align:center;font-size:.72rem;color:var(--g6)">${vol}</td>
-                  </tr>`;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>` : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin dosis registradas</p>`}
-        </div>
-        <div id="vd-calc-container-${d.id}"></div>
+      <div style="display:flex;align-items:center;gap:.25rem;flex-shrink:0">
+        <span style="font-size:.65rem;background:var(--g1);color:var(--g7);border-radius:20px;padding:.1rem .4rem;font-weight:600">${doses.length} esp.</span>
+        ${isAdmin?`
+        <button onclick="event.stopPropagation();copyDrug('${d.id}')" title="Copiar a otra categoría"
+          style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);width:26px;height:26px;cursor:pointer;font-size:.75rem">📋</button>
+        <button onclick="event.stopPropagation();openEditDrug('${d.id}')" title="Editar"
+          style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);width:26px;height:26px;cursor:pointer;font-size:.75rem">✏️</button>
+        <button onclick="event.stopPropagation();deleteDrugVad('${d.id}')" title="Eliminar"
+          style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);width:26px;height:26px;cursor:pointer;font-size:.7rem;color:var(--r5)">✕</button>`:''}
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          id="vd-chev-${d.id}" style="cursor:pointer;transition:transform .2s;flex-shrink:0" onclick="toggleVdCard('${d.id}')">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
       </div>
-    </div>`;
-  }).join('');
+    </div>
+    <div id="vd-panel-${d.id}" style="display:none;border-top:1px solid var(--bor)">
+      <div style="padding:.5rem .85rem;display:grid;gap:.2rem">
+        ${(d.concs?.length||d.conc)?`<p style="margin:0;font-size:.8rem"><strong>Concentración:</strong> ${(d.concs?.length ? d.concs.map(c=>c+' mg/ml').join(', ') : d.conc+' mg/ml')}</p>`:''}
+        ${(d.routes?.length||d.route)?`<p style="margin:0;font-size:.8rem"><strong>Vías de administración:</strong> ${(d.routes?.length ? d.routes.join(', ') : d.route||'—')}</p>`:''}
+        ${d.freq?`<p style="margin:0;font-size:.8rem"><strong>Frecuencia:</strong> ${d.freq}</p>`:''}
+        ${d.indic?`<p style="margin:0;font-size:.8rem;color:var(--txt2)"><strong style="color:var(--g6)">✅ Indicaciones:</strong> ${d.indic}</p>`:''}
+        ${d.contraindications?`<div style="background:var(--r1);border-radius:var(--rxs);padding:.3rem .5rem;font-size:.78rem;color:var(--r5)">⚠ <strong>Contraindicaciones:</strong> ${d.contraindications}</div>`:''}
+        ${d.info?`<p style="margin:0;font-size:.78rem;color:var(--txt3)"><strong>Efectos adversos:</strong> ${d.info}</p>`:''}
+        ${d.notes?`<p style="margin:0;font-size:.78rem;color:var(--txt3);font-style:italic">📋 ${d.notes}</p>`:''}
+      </div>
+      <div style="padding:.4rem .85rem .6rem;background:var(--sur2);border-top:1px solid var(--bor)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem">
+          <span style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em">Dosis por especie</span>
+          ${isAdmin?`<button onclick="openEditDrug('${d.id}')" style="background:var(--g5);color:white;border:none;border-radius:var(--rxs);padding:.2rem .5rem;font-size:.7rem;cursor:pointer">+ Especie</button>`:''}
+        </div>
+        ${doses.length ? `
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:.75rem">
+            <thead><tr style="background:var(--sur)">
+              <th style="padding:.25rem .4rem;text-align:left;border-bottom:1px solid var(--bor);color:var(--txt3)">Especie</th>
+              <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--txt3)">Mín</th>
+              <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--g6);font-weight:700">Rec.</th>
+              <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--txt3)">Máx</th>
+              <th style="padding:.25rem .4rem;text-align:left;border-bottom:1px solid var(--bor);color:var(--txt3)">Vía(s)</th>
+              <th style="padding:.25rem .4rem;text-align:left;border-bottom:1px solid var(--bor);color:var(--txt3)">Frecuencia</th>
+              <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--g6)">Resultado</th>
+            </tr></thead>
+            <tbody>
+              ${doses.map((s,si) => {
+                const spWeight = SPECIES_DB.find(sp => sp.name?.toLowerCase() === (s.species||'').split('(')[0].trim().toLowerCase())?.weight_avg || 0;
+                const vol = (spWeight && s.dose && d.conc) ? (spWeight * s.dose / d.conc).toFixed(2) + ' ml' : '—';
+                return `<tr style="border-bottom:1px solid var(--bor)">
+                  <td style="padding:.3rem .4rem">
+                    <div style="font-weight:600;font-size:.8rem">${(s.species||'').split('(')[0].trim()}</div>
+                    ${s.sci?`<div style="font-size:.65rem;color:var(--txt3);font-style:italic">${s.sci}</div>`:''}
+                  </td>
+                  <td style="padding:.3rem .4rem;text-align:center;color:var(--txt3);font-family:var(--mono)">${s.dose_min||'—'}</td>
+                  <td style="padding:.3rem .4rem;text-align:center;font-weight:700;color:var(--g5);font-family:var(--mono)">${s.dose||'—'}</td>
+                  <td style="padding:.3rem .4rem;text-align:center;color:var(--txt3);font-family:var(--mono)">${s.dose_max||'—'}</td>
+                  <td style="padding:.3rem .4rem;font-size:.72rem">${(s.routes?.length ? s.routes.join(', ') : s.route||'—')}</td>
+                  <td style="padding:.3rem .4rem;font-size:.75rem">${s.freq||'—'}</td>
+                  <td style="padding:.3rem .4rem;text-align:center;font-size:.72rem;color:var(--g6)">${vol}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>` : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin dosis registradas</p>`}
+      </div>
+      <div id="vd-calc-container-${d.id}"></div>
+    </div>
+  </div>`;
 }
 
 function toggleVdCard(id) {
