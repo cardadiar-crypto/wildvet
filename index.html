@@ -7043,13 +7043,22 @@ function openAddDrug(editId=null, preselectedCat=null) {
         <button onclick="addVdNombreRow()" class="btn btn-secondary btn-sm" style="margin-top:.2rem">+ Otro nombre</button>
       </div>
 
-      <div class="form-row">
-        <div class="form-group"><label>Principio activo</label>
-          <input id="vd-active" class="form-control" value="${existing?.active||''}" placeholder="Ej: Ketamina, Meloxicam...">
+      <div class="form-group"><label>Principio activo</label>
+        <input id="vd-active" class="form-control" value="${existing?.active||''}" placeholder="Ej: Ketamina, Meloxicam...">
+      </div>
+
+      <!-- Concentraciones (múltiple) -->
+      <div class="form-group">
+        <label>Concentraciones comerciales <span style="font-size:.7rem;font-weight:400;color:var(--txt3)">(mg/ml — puede haber varias)</span></label>
+        <div id="vd-conc-list" style="margin-top:.25rem">
+          ${(existing?.concs?.length ? existing.concs : (existing?.conc ? [existing.conc] : [null])).map((c,i)=>`
+          <div style="display:flex;gap:.3rem;margin-bottom:.25rem" id="vdc-row-${i}">
+            <input class="form-control vd-conc-inp" type="number" step="0.01" value="${c||''}" placeholder="Ej: 10, 50, 100..." style="flex:1;font-size:.82rem">
+            <span style="font-size:.75rem;color:var(--txt3);align-self:center">mg/ml</span>
+            <button onclick="document.getElementById('vdc-row-${i}').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+          </div>`).join('')}
         </div>
-        <div class="form-group"><label>Concentración (mg/ml)</label>
-          <input id="vd-conc" class="form-control" type="number" step="0.01" value="${existing?.conc||''}" placeholder="100">
-        </div>
+        <button onclick="addVdConcRow()" class="btn btn-secondary btn-sm" style="margin-top:.2rem">+ Otra concentración</button>
       </div>
 
       <!-- Categorías generales (múltiple) -->
@@ -7068,12 +7077,21 @@ function openAddDrug(editId=null, preselectedCat=null) {
         <input id="vd-cat-esp" class="form-control" value="${existing?.cat_esp||''}" placeholder="Ej: AINE, α2-adrenérgico, Aminoglucósido...">
       </div>
 
-      <div class="form-row">
-        <div class="form-group"><label>Vía habitual</label>
-          <select id="vd-route" class="form-control">
-            ${['IM','IV','SC','VO','IM dardo','IN','Tópico','Inhalatorio'].map(r=>`<option ${(existing?.route||'IM')===r?'selected':''}>${r}</option>`).join('')}
-          </select>
+      <!-- Vías de administración (múltiple) -->
+      <div class="form-group">
+        <label>Vías de administración <span style="font-size:.7rem;font-weight:400;color:var(--txt3)">(selecciona todas las que apliquen)</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.25rem">
+          ${['IM','IV','SC','VO','IM dardo','IN','Tópico','Inhalatorio'].map(r=>`
+          <label style="display:inline-flex;align-items:center;gap:.2rem;cursor:pointer;font-size:.75rem;padding:.2rem .5rem;border-radius:20px;border:1px solid var(--bor)">
+            <input type="checkbox" class="vd-route-chk" value="${r}" ${(existing?.routes||[existing?.route]||[]).includes(r)?'checked':''} style="accent-color:var(--g5)"> ${r}
+          </label>`).join('')}
         </div>
+      </div>
+
+      <!-- Frecuencia de administración general -->
+      <div class="form-group">
+        <label>Frecuencia habitual de administración</label>
+        <input id="vd-freq" class="form-control" value="${existing?.freq||''}" placeholder="Ej: SID, BID, cada 24h, dosis única...">
       </div>
 
       <div class="form-group"><label>Indicaciones</label>
@@ -7103,14 +7121,18 @@ function openAddDrug(editId=null, preselectedCat=null) {
               <input class="form-control vds-sci" value="${s.sci||''}" placeholder="Nombre científico" style="flex:1;font-size:.78rem">
               <button onclick="this.closest('.vd-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .35rem;font-size:.7rem;flex-shrink:0">✕</button>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.3rem">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem">
               <div><label style="font-size:.65rem;color:var(--txt3)">Dosis mín</label><input class="form-control vds-dmin" type="number" step="0.001" value="${s.dose_min||''}" placeholder="1.0" style="font-size:.78rem"></div>
               <div><label style="font-size:.65rem;color:var(--txt3)">Dosis rec.</label><input class="form-control vds-drec" type="number" step="0.001" value="${s.dose||''}" placeholder="2.0" style="font-size:.78rem"></div>
               <div><label style="font-size:.65rem;color:var(--txt3)">Dosis máx</label><input class="form-control vds-dmax" type="number" step="0.001" value="${s.dose_max||''}" placeholder="4.0" style="font-size:.78rem"></div>
-              <div><label style="font-size:.65rem;color:var(--txt3)">Vía</label>
-                <select class="form-control vds-route" style="font-size:.72rem">
-                  ${['IM','IV','SC','VO','IM dardo','IN','Tópico'].map(r=>`<option ${s.route===r?'selected':''}>${r}</option>`).join('')}
-                </select>
+            </div>
+            <div style="margin-top:.3rem">
+              <label style="font-size:.65rem;color:var(--txt3);display:block;margin-bottom:.15rem">Vías de administración</label>
+              <div class="vds-routes-wrap" style="display:flex;flex-wrap:wrap;gap:.25rem">
+                ${['IM','IV','SC','VO','IM dardo','IN','Tópico'].map(r=>`
+                <label style="display:inline-flex;align-items:center;gap:.15rem;font-size:.68rem;cursor:pointer;padding:.1rem .35rem;border-radius:15px;border:1px solid var(--bor);background:var(--sur)">
+                  <input type="checkbox" class="vds-route-chk" value="${r}" ${(s.routes||[s.route]||[]).includes(r)?'checked':''} style="accent-color:var(--g5);width:12px;height:12px"> ${r}
+                </label>`).join('')}
               </div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 2fr;gap:.3rem;margin-top:.3rem">
@@ -7141,6 +7163,18 @@ function addVdNombreRow() {
     </div>`);
 }
 
+function addVdConcRow() {
+  const list = document.getElementById('vd-conc-list');
+  if (!list) return;
+  const idx = list.children.length;
+  list.insertAdjacentHTML('beforeend', `
+    <div style="display:flex;gap:.3rem;margin-bottom:.25rem" id="vdc-row-${idx}">
+      <input class="form-control vd-conc-inp" type="number" step="0.01" value="" placeholder="Ej: 10, 50, 100..." style="flex:1;font-size:.82rem">
+      <span style="font-size:.75rem;color:var(--txt3);align-self:center">mg/ml</span>
+      <button onclick="document.getElementById('vdc-row-${idx}').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+    </div>`);
+}
+
 function addVdSpeciesDoseRow() {
   const rows = document.getElementById('vd-species-rows');
   if (!rows) return;
@@ -7152,14 +7186,18 @@ function addVdSpeciesDoseRow() {
         <input class="form-control vds-sci" value="" placeholder="Nombre científico" style="flex:1;font-size:.78rem">
         <button onclick="this.closest('.vd-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .35rem;font-size:.7rem;flex-shrink:0">✕</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.3rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem">
         <div><label style="font-size:.65rem;color:var(--txt3)">Dosis mín</label><input class="form-control vds-dmin" type="number" step="0.001" placeholder="1.0" style="font-size:.78rem"></div>
         <div><label style="font-size:.65rem;color:var(--txt3)">Dosis rec.</label><input class="form-control vds-drec" type="number" step="0.001" placeholder="2.0" style="font-size:.78rem"></div>
         <div><label style="font-size:.65rem;color:var(--txt3)">Dosis máx</label><input class="form-control vds-dmax" type="number" step="0.001" placeholder="4.0" style="font-size:.78rem"></div>
-        <div><label style="font-size:.65rem;color:var(--txt3)">Vía</label>
-          <select class="form-control vds-route" style="font-size:.72rem">
-            <option>IM</option><option>IV</option><option>SC</option><option>VO</option><option>IM dardo</option><option>IN</option><option>Tópico</option>
-          </select>
+      </div>
+      <div style="margin-top:.3rem">
+        <label style="font-size:.65rem;color:var(--txt3);display:block;margin-bottom:.15rem">Vías de administración</label>
+        <div class="vds-routes-wrap" style="display:flex;flex-wrap:wrap;gap:.25rem">
+          ${['IM','IV','SC','VO','IM dardo','IN','Tópico'].map(r=>`
+          <label style="display:inline-flex;align-items:center;gap:.15rem;font-size:.68rem;cursor:pointer;padding:.1rem .35rem;border-radius:15px;border:1px solid var(--bor);background:var(--sur)">
+            <input type="checkbox" class="vds-route-chk" value="${r}" style="accent-color:var(--g5);width:12px;height:12px"> ${r}
+          </label>`).join('')}
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 2fr;gap:.3rem;margin-top:.3rem">
@@ -7177,16 +7215,20 @@ async function saveDrug(editId='') {
   if (!drugName && !active) { toast('⚠ Ingresa al menos un nombre o el principio activo'); return; }
 
   const cats = Array.from(document.querySelectorAll('#modal-add-drug .vd-cat-chk:checked')).map(el=>el.value);
+  const concs = Array.from(document.querySelectorAll('#modal-add-drug .vd-conc-inp')).map(el=>parseFloat(el.value)).filter(v=>!isNaN(v)&&v>0);
+  const routes = Array.from(document.querySelectorAll('#modal-add-drug .vd-route-chk:checked')).map(el=>el.value);
   const species_doses = [];
   document.querySelectorAll('#vd-species-rows .vd-sp-row').forEach(row => {
     const sp = row.querySelector('.vds-sp')?.value.trim();
+    const spRoutes = Array.from(row.querySelectorAll('.vds-route-chk:checked')).map(el=>el.value);
     if (sp) species_doses.push({
       species:  sp,
       sci:      row.querySelector('.vds-sci')?.value.trim()||'',
       dose_min: parseFloat(row.querySelector('.vds-dmin')?.value)||0,
       dose:     parseFloat(row.querySelector('.vds-drec')?.value)||0,
       dose_max: parseFloat(row.querySelector('.vds-dmax')?.value)||0,
-      route:    row.querySelector('.vds-route')?.value||'IM',
+      route:    spRoutes[0]||'IM',
+      routes:   spRoutes.length ? spRoutes : ['IM'],
       freq:     row.querySelector('.vds-freq')?.value||'',
       notes:    row.querySelector('.vds-notes')?.value||''
     });
@@ -7201,8 +7243,11 @@ async function saveDrug(editId='') {
     cat_esp:          document.getElementById('vd-cat-esp')?.value||'',
     cat_vad:          _vadCatActiva !== '__all__' ? _vadCatActiva : (cats[0] ? Object.entries(VADEMECUM_CATS).find(([k,v]) => v.label === cats[0])?.[0] || '' : ''),
     subcat_vad:       _vadSubcatActiva || '',
-    conc:             parseFloat(document.getElementById('vd-conc')?.value)||0,
-    route:            document.getElementById('vd-route')?.value||'IM',
+    conc:             concs[0]||0,
+    concs:            concs.length ? concs : (concs[0] ? concs : []),
+    route:            routes[0]||'IM',
+    routes:           routes.length ? routes : [],
+    freq:             document.getElementById('vd-freq')?.value||'',
     indic:            document.getElementById('vd-indic')?.value||'',
     contraindications:document.getElementById('vd-contra')?.value||'',
     info:             document.getElementById('vd-info')?.value||'',
@@ -7583,7 +7628,9 @@ function _renderVadDrugs(el, isAdmin, q) {
           <div style="font-size:.9rem;font-weight:700;color:var(--txt)">${displayName}</div>
           ${d.active?`<div style="font-size:.72rem;color:var(--txt3);font-style:italic">${d.active}</div>`:''}
           ${d.cat_esp?`<span style="font-size:.65rem;background:var(--g0);color:var(--g7);border-radius:20px;padding:.05rem .3rem">${d.cat_esp}</span>`:''}
-          ${d.conc?`<span style="font-size:.65rem;color:var(--txt3);margin-left:.3rem">${d.conc} mg/ml</span>`:''}
+          ${(d.concs?.length||d.conc)?`<span style="font-size:.65rem;color:var(--txt3);margin-left:.3rem">${(d.concs?.length ? d.concs.join('/') : d.conc)+' mg/ml'}</span>`:''}
+          ${(d.routes?.length||d.route)?`<span style="font-size:.65rem;color:var(--txt3);margin-left:.3rem">· ${(d.routes?.length ? d.routes.join(', ') : d.route)}</span>`:''}
+          ${d.freq?`<span style="font-size:.65rem;color:var(--g6);margin-left:.3rem">· ${d.freq}</span>`:''}
         </div>
         <div style="display:flex;align-items:center;gap:.25rem;flex-shrink:0">
           <span style="font-size:.65rem;background:var(--g1);color:var(--g7);border-radius:20px;padding:.1rem .4rem;font-weight:600">${doses.length} esp.</span>
@@ -7600,7 +7647,9 @@ function _renderVadDrugs(el, isAdmin, q) {
       </div>
       <div id="vd-panel-${d.id}" style="display:none;border-top:1px solid var(--bor)">
         <div style="padding:.5rem .85rem;display:grid;gap:.2rem">
-          ${d.conc?`<p style="margin:0;font-size:.8rem"><strong>Concentración:</strong> ${d.conc} mg/ml &nbsp;·&nbsp; <strong>Vía habitual:</strong> ${d.route||'—'}</p>`:''}
+          ${(d.concs?.length||d.conc)?`<p style="margin:0;font-size:.8rem"><strong>Concentración:</strong> ${(d.concs?.length ? d.concs.map(c=>c+' mg/ml').join(', ') : d.conc+' mg/ml')}</p>`:''}
+          ${(d.routes?.length||d.route)?`<p style="margin:0;font-size:.8rem"><strong>Vías de administración:</strong> ${(d.routes?.length ? d.routes.join(', ') : d.route||'—')}</p>`:''}
+          ${d.freq?`<p style="margin:0;font-size:.8rem"><strong>Frecuencia:</strong> ${d.freq}</p>`:''}
           ${d.indic?`<p style="margin:0;font-size:.8rem;color:var(--txt2)"><strong style="color:var(--g6)">✅ Indicaciones:</strong> ${d.indic}</p>`:''}
           ${d.contraindications?`<div style="background:var(--r1);border-radius:var(--rxs);padding:.3rem .5rem;font-size:.78rem;color:var(--r5)">⚠ <strong>Contraindicaciones:</strong> ${d.contraindications}</div>`:''}
           ${d.info?`<p style="margin:0;font-size:.78rem;color:var(--txt3)"><strong>Efectos adversos:</strong> ${d.info}</p>`:''}
@@ -7619,7 +7668,7 @@ function _renderVadDrugs(el, isAdmin, q) {
                 <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--txt3)">Mín</th>
                 <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--g6);font-weight:700">Rec.</th>
                 <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--txt3)">Máx</th>
-                <th style="padding:.25rem .4rem;text-align:left;border-bottom:1px solid var(--bor);color:var(--txt3)">Vía</th>
+                <th style="padding:.25rem .4rem;text-align:left;border-bottom:1px solid var(--bor);color:var(--txt3)">Vía(s)</th>
                 <th style="padding:.25rem .4rem;text-align:left;border-bottom:1px solid var(--bor);color:var(--txt3)">Frecuencia</th>
                 <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--g6)">Resultado</th>
               </tr></thead>
@@ -7635,7 +7684,7 @@ function _renderVadDrugs(el, isAdmin, q) {
                     <td style="padding:.3rem .4rem;text-align:center;color:var(--txt3);font-family:var(--mono)">${s.dose_min||'—'}</td>
                     <td style="padding:.3rem .4rem;text-align:center;font-weight:700;color:var(--g5);font-family:var(--mono)">${s.dose||'—'}</td>
                     <td style="padding:.3rem .4rem;text-align:center;color:var(--txt3);font-family:var(--mono)">${s.dose_max||'—'}</td>
-                    <td style="padding:.3rem .4rem;font-size:.75rem">${s.route||'—'}</td>
+                    <td style="padding:.3rem .4rem;font-size:.72rem">${(s.routes?.length ? s.routes.join(', ') : s.route||'—')}</td>
                     <td style="padding:.3rem .4rem;font-size:.75rem">${s.freq||'—'}</td>
                     <td style="padding:.3rem .4rem;text-align:center;font-size:.72rem;color:var(--g6)">${vol}</td>
                   </tr>`;
@@ -7726,7 +7775,7 @@ function calcVdDose(drugId, idx) {
       <tr><td style="color:var(--txt3);padding:.1rem .2rem">Dosis mín:</td><td><strong>${mg(s.dose_min)}</strong> (${fmt(s.dose_min)})</td></tr>
       <tr><td style="color:var(--txt3);padding:.1rem .2rem">Dosis rec.:</td><td><strong style="color:var(--g6)">${mg(s.dose)}</strong> (${fmt(s.dose)})</td></tr>
       <tr><td style="color:var(--txt3);padding:.1rem .2rem">Dosis máx:</td><td><strong>${mg(s.dose_max)}</strong> (${fmt(s.dose_max)})</td></tr>
-      <tr><td style="color:var(--txt3);padding:.1rem .2rem">Vía / Frec.:</td><td>${s.route||'—'} ${s.freq?'· '+s.freq:''}</td></tr>
+      <tr><td style="color:var(--txt3);padding:.1rem .2rem">Vía / Frec.:</td><td>${(s.routes?.length ? s.routes.join(', ') : s.route||'—')} ${s.freq?'· '+s.freq:''}</td></tr>
       ${s.notes?`<tr><td style="color:var(--txt3);padding:.1rem .2rem">Notas:</td><td>${s.notes}</td></tr>`:''}
     </table>`;
 }
