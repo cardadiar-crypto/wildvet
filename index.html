@@ -689,8 +689,7 @@ textarea.form-control{resize:vertical;min-height:70px}
     <div style="display:flex;gap:.25rem;flex-shrink:0">
       <button onclick="exportSpeciesWord(currentSpecies)" title="Word" style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .4rem;cursor:pointer;font-size:.65rem;font-family:var(--sans)">📄</button>
       <button onclick="exportSpeciesPDF(currentSpecies)" title="PDF" style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .4rem;cursor:pointer;font-size:.65rem;font-family:var(--sans)">🖨</button>
-      <label for="multitab-excel-up" title="Importar ficha con IA (PDF, Word, Excel)" style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .4rem;cursor:pointer;font-size:.65rem;font-family:var(--sans);display:inline-flex;align-items:center">🤖</label>
-      <input type="file" id="multitab-excel-up" accept=".pdf,.xlsx,.xls,.docx,.txt,.csv" style="display:none" onchange="importExcelMultiTab(this)">
+
     </div>
   </div>
   <div class="tabs-scroll">
@@ -2919,21 +2918,7 @@ function renderGeneral(el, sp) {
           <button onclick="addBiometriaRow()" class="btn btn-admin btn-sm" style="font-size:.68rem">+ Agregar dato</button>
         </div>`:''}
       </div>
-      <div style="background:var(--g0);border:1.5px dashed var(--g4);border-radius:var(--rsm);padding:.5rem .6rem;margin-bottom:.4rem">
-        <div style="font-size:.68rem;color:var(--g7);font-weight:600;margin-bottom:.3rem">🤖 Importar con IA — PDF, Word o Excel</div>
-        <div style="display:flex;gap:.3rem;align-items:center">
-          <label for="biom-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem;white-space:nowrap">📂 Seleccionar archivo</label>
-          <input type="file" id="biom-excel-up" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importBiometriaExcel(this)">
-          <span id="biom-excel-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
-        </div>
-          <div style="margin-top:.3rem">
-            <button onclick="togglePasteBox('biom-excel-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
-            <div id="paste-box-biom-excel-status" style="display:none;margin-top:.25rem">
-              <textarea id="paste-text-biom-excel-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí la información sobre biometría (parámetros por macho y hembra)..."></textarea>
-              <button onclick="processTextInput('biom-excel-status','importBiometriaExcel(null)')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
-            </div>
-          </div>
-      </div>
+
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse">
           <thead>${tblH}</thead>
@@ -2973,19 +2958,10 @@ function renderGeneral(el, sp) {
       <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
         Longevidad y Reproducción
         ${isAdmin?`<div style="display:flex;gap:.4rem;align-items:center">
-          <label for="life-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem;background:var(--g1);color:var(--g7);border-color:var(--g4)">🤖 IA</label>
-          <input type="file" id="life-excel-up" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importLongevidadExcel(this)">
           <span style="font-size:.68rem;color:var(--g6);font-weight:400">Toca los campos para editar</span>
         </div>`:''}
       </div>
       <div id="life-excel-status" style="font-size:.72rem;color:var(--g6);min-height:.9rem;margin-top:.2rem"></div>
-      <div style="margin-top:.3rem">
-        <button onclick="togglePasteBox('life-excel-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
-        <div id="paste-box-life-excel-status" style="display:none;margin-top:.25rem">
-          <textarea id="paste-text-life-excel-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí datos de longevidad y reproducción (silvestre y bajo cuidado profesional)..."></textarea>
-          <button onclick="processAIText(document.getElementById('paste-text-life-excel-status').value,'life-excel-status','')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
-        </div>
-      </div>
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse">
           <thead>${tblLifeH}</thead>
@@ -3308,21 +3284,7 @@ function renderFisiologia(el, sp) {
           <button class="btn btn-admin btn-sm" onclick="addHemoRow('hemo-table','hematology')">+ Agregar</button>
         </div>`:''}
       </div>
-      <div style="background:var(--g0);border:1.5px dashed var(--g4);border-radius:var(--rsm);padding:.5rem .6rem;margin-bottom:.4rem">
-        <div style="font-size:.68rem;color:var(--g7);font-weight:600;margin-bottom:.3rem">🤖 Importar con IA — PDF, Word o Excel</div>
-        <div style="display:flex;gap:.3rem;align-items:center">
-          <label for="hemo-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem;white-space:nowrap">📂 Seleccionar archivo</label>
-          <input type="file" id="hemo-excel-up" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importHemoExcel(this,'hematology')">
-          <span id="hemo-excel-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
-        </div>
-          <div style="margin-top:.3rem">
-            <button onclick="togglePasteBox('hemo-excel-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
-            <div id="paste-box-hemo-excel-status" style="display:none;margin-top:.25rem">
-              <textarea id="paste-text-hemo-excel-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí la información sobre hematología básica (parámetro, unidad, rango, definición)..."></textarea>
-              <button onclick="processTextInput('hemo-excel-status','importHemoExcel(null,'hematology')')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
-            </div>
-          </div>
-      </div>
+
       <table style="width:100%;font-size:.82rem;border-collapse:collapse" id="hemo-table">
         <thead><tr>
           <th style="text-align:left;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Parámetro</th>
@@ -3356,21 +3318,7 @@ function renderFisiologia(el, sp) {
           <button class="btn btn-admin btn-sm" onclick="addHemoRow('bio-table','biochem')">+ Agregar</button>
         </div>`:''}
       </div>
-      <div style="background:var(--g0);border:1.5px dashed var(--g4);border-radius:var(--rsm);padding:.5rem .6rem;margin-bottom:.4rem">
-        <div style="font-size:.68rem;color:var(--g7);font-weight:600;margin-bottom:.3rem">🤖 Importar con IA — PDF, Word o Excel</div>
-        <div style="display:flex;gap:.3rem;align-items:center">
-          <label for="bio-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem;white-space:nowrap">📂 Seleccionar archivo</label>
-          <input type="file" id="bio-excel-up" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importHemoExcel(this,'biochem')">
-          <span id="bio-excel-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
-        </div>
-          <div style="margin-top:.3rem">
-            <button onclick="togglePasteBox('bio-excel-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
-            <div id="paste-box-bio-excel-status" style="display:none;margin-top:.25rem">
-              <textarea id="paste-text-bio-excel-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí la información sobre bioquímica sérica (parámetro, unidad, rango, definición)..."></textarea>
-              <button onclick="processTextInput('bio-excel-status','importHemoExcel(null,'biochem')')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
-            </div>
-          </div>
-      </div>
+
       <table style="width:100%;font-size:.82rem;border-collapse:collapse" id="bio-table">
         <thead><tr>
           <th style="text-align:left;padding:.3rem .5rem;font-size:.7rem;color:var(--txt3);border-bottom:1px solid var(--bor)">Parámetro</th>
@@ -3683,21 +3631,7 @@ function renderNutricion(el, sp) {
           <button onclick="addDiente()" class="btn btn-admin btn-sm">+ Diente</button>
         </div>`:''}
       </div>
-      <div style="background:var(--g0);border:1.5px dashed var(--g4);border-radius:var(--rsm);padding:.5rem .6rem;margin-bottom:.4rem">
-        <div style="font-size:.68rem;color:var(--g7);font-weight:600;margin-bottom:.3rem">🤖 Importar con IA — PDF, Word o Excel</div>
-        <div style="display:flex;gap:.3rem;align-items:center">
-          <label for="dent-excel-up" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem;white-space:nowrap">📂 Seleccionar archivo</label>
-          <input type="file" id="dent-excel-up" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importFormulaDentariaExcel(this)">
-          <span id="dent-excel-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
-        </div>
-          <div style="margin-top:.3rem">
-            <button onclick="togglePasteBox('dent-excel-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
-            <div id="paste-box-dent-excel-status" style="display:none;margin-top:.25rem">
-              <textarea id="paste-text-dent-excel-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí la información sobre fórmula dentaria (tipo, superior, inferior, función)..."></textarea>
-              <button onclick="processTextInput('dent-excel-status','importFormulaDentariaExcel(null)')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
-            </div>
-          </div>
-      </div>
+
       ${denticion.length ? `
       <div style="overflow-x:auto;margin-bottom:.5rem">
         <table style="width:100%;border-collapse:collapse;font-size:.8rem">
@@ -4183,342 +4117,6 @@ async function removeDentalMeasure(i) {
   renderTab('nutricion');
   toast('Medida eliminada');
 }
-// ── Funciones de texto libre para extracción con IA ──
-function togglePasteBox(statusId) {
-  const box = document.getElementById('paste-box-'+statusId);
-  if (box) box.style.display = box.style.display==='none'?'block':'none';
-}
-
-async function processTextInput(statusId, fnName) {
-  const textarea = document.getElementById('paste-text-'+statusId);
-  const text = textarea?.value?.trim();
-  if (!text) { toast('⚠ Pega texto en el cuadro primero'); return; }
-  const statusEl = document.getElementById(statusId);
-  if (statusEl) { statusEl.textContent = '🤖 Procesando texto con IA...'; statusEl.style.color='var(--g6)'; }
-  // Create a fake file-like object with the text
-  const fakeFile = new Blob([text], {type:'text/plain'});
-  fakeFile.name = 'texto_pegado.txt';
-  fakeFile.text = () => Promise.resolve(text);
-  // Create fake input
-  const fakeInput = { files: [fakeFile] };
-  try {
-    // Call the appropriate import function with the text directly
-    await processAIText(text, statusId, fnName);
-    if (textarea) textarea.value='';
-    const box = document.getElementById('paste-box-'+statusId);
-    if (box) box.style.display='none';
-  } catch(e) {
-    if (statusEl) { statusEl.textContent='⚠ '+e.message; statusEl.style.color='var(--r5)'; }
-  }
-}
-
-async function processAIText(text, statusId, fnName) {
-  const apiKey = _AI_PROXY_URL ? 'proxy' : (getModalAIKey() || getActiveAIKey().key || '');
-  const statusEl = document.getElementById(statusId);
-  // Route to correct import function based on statusId
-  const routes = {
-    'hemo-excel-status': async () => {
-      const prompt = `Extrae todos los parámetros de hematología. Devuelve SOLO un array JSON: [["Parámetro","Rango normal","Unidades","Definición"]]
-
-Texto:
-${text.substring(0,12000)}`;
-      const clean = await callAI(apiKey,[{role:'user',content:prompt}],2000);
-      const items = parseAIJson(clean);
-      if (!Array.isArray(items)) throw new Error('Formato inesperado');
-      if (!currentSpecies.hematology) currentSpecies.hematology=[];
-      currentSpecies.hematology.push(...items);
-      await dbPutSync('species',currentSpecies); renderTab('fisiologia');
-      if(statusEl){statusEl.textContent=`✅ ${items.length} parámetros importados`;statusEl.style.color='var(--g5)';}
-    },
-    'bio-excel-status': async () => {
-      const prompt = `Extrae todos los parámetros de bioquímica sérica. Devuelve SOLO un array JSON: [["Parámetro","Rango normal","Unidades","Definición"]]
-
-Texto:
-${text.substring(0,12000)}`;
-      const clean = await callAI(apiKey,[{role:'user',content:prompt}],2000);
-      const items = parseAIJson(clean);
-      if (!currentSpecies.biochem) currentSpecies.biochem=[];
-      currentSpecies.biochem.push(...items);
-      await dbPutSync('species',currentSpecies); renderTab('fisiologia');
-      if(statusEl){statusEl.textContent=`✅ ${items.length} parámetros importados`;statusEl.style.color='var(--g5)';}
-    },
-    'biom-excel-status': async () => {
-      const prompt = `Extrae datos biométricos con valores por sexo. Devuelve SOLO un array JSON: [{"label":"parámetro","m":"valor macho","f":"valor hembra"}]
-
-Texto:
-${text.substring(0,8000)}`;
-      const clean = await callAI(apiKey,[{role:'user',content:prompt}],2000);
-      const items = parseAIJson(clean);
-      if (!currentSpecies.biometria) currentSpecies.biometria={};
-      if (!currentSpecies.biometria._extra) currentSpecies.biometria._extra=[];
-      currentSpecies.biometria._extra.push(...items);
-      await dbPutSync('species',currentSpecies); renderTab('general');
-      if(statusEl){statusEl.textContent=`✅ ${items.length} datos importados`;statusEl.style.color='var(--g5)';}
-    },
-    'dent-excel-status': async () => {
-      const prompt = `Extrae la fórmula dentaria. Devuelve SOLO un array JSON: [{"tipo":"tipo de diente","sup":"cantidad superior","inf":"cantidad inferior","funcion":"función"}]
-
-Texto:
-${text.substring(0,8000)}`;
-      const clean = await callAI(apiKey,[{role:'user',content:prompt}],2000);
-      const items = parseAIJson(clean);
-      if (!currentSpecies.denticion) currentSpecies.denticion=[];
-      currentSpecies.denticion.push(...items);
-      await dbPutSync('species',currentSpecies); renderTab('nutricion');
-      if(statusEl){statusEl.textContent=`✅ ${items.length} dientes importados`;statusEl.style.color='var(--g5)';}
-    },
-    'drug-import-status': async () => {
-      const prompt = `Extrae fármacos/medicamentos. Devuelve SOLO un array JSON: [{"name":"","cat":"","conc":0,"dose_min":0,"dose":0,"dose_max":0,"route":"IM","freq":"","effects":"","notes":""}]
-
-Texto:
-${text.substring(0,12000)}`;
-      const clean = await callAI(apiKey,[{role:'user',content:prompt}],3000);
-      const drugs = parseAIJson(clean);
-      if (!currentSpecies.drugs) currentSpecies.drugs=[];
-      currentSpecies.drugs.push(...drugs);
-      await dbPutSync('species',currentSpecies);
-      for(const d of drugs) await syncDrugToVademecum(d,currentSpecies.name,currentSpecies.sci);
-      VADEMECUM_DB = await dbGetAll('vademecum');
-      renderTab('medicamentos');
-      if(statusEl){statusEl.textContent=`✅ ${drugs.length} fármacos importados`;statusEl.style.color='var(--g5)';}
-    },
-    'vd-import-status': async () => {
-      const prompt = `Extrae fármacos del vademécum veterinario. Devuelve SOLO array JSON: [{"drug":"","active":"","category":"","conc":0,"route":"IM","indic":"","contraindications":"","info":"","notes":"","species_doses":[{"species":"","dose_min":0,"dose":0,"dose_max":0,"route":"IM","freq":"","notes":""}]}]
-
-Texto:
-${text.substring(0,14000)}`;
-      const clean = await callAI(apiKey,[{role:'user',content:prompt}],4000);
-      const extracted = parseAIJson(clean);
-      let saved=0;
-      for(const d of extracted){
-        if(!d.drug&&!d.active)continue;
-        const cats=d.cats||(d.category?[d.category]:[]);
-        const nd={id:'vad_'+Date.now()+'_'+Math.random().toString(36).slice(2,5),drug:d.drug||d.active||'Sin nombre',nombres:[d.drug||d.active||''],active:d.active||'',cats,category:cats[0]||'Otro',cat_esp:d.cat_esp||'',conc:parseFloat(d.conc)||0,route:d.route||'IM',indic:d.indic||'',contraindications:d.contraindications||'',info:d.info||'',notes:d.notes||'',species_doses:(d.species_doses||[])};
-        VADEMECUM_DB.push(nd); await dbPutSync('vademecum',nd); saved++;
-      }
-      renderVademecum();
-      if(statusEl){statusEl.textContent=`✅ ${saved} fármacos importados`;statusEl.style.color='var(--g5)';}
-    },
-  };
-  const handler = routes[statusId];
-  if (handler) { await handler(); }
-  else { toast('⚠ Función no implementada para esta sección'); }
-}
-
-// ── Helper centralizado para llamadas a IA (Claude o Gemini) ──
-// ── URL del proxy (se configura en Ajustes → URL Proxy IA) ──
-let _AI_PROXY_URL = localStorage.getItem('wv_proxy_url') || 'https://wildvet-proxy.cardadiar.workers.dev';
-
-function saveProxyUrl(url) {
-  _AI_PROXY_URL = (url || '').trim().replace(/\/$/, '');
-  localStorage.setItem('wv_proxy_url', _AI_PROXY_URL);
-}
-
-async function callAI(apiKey, messages, maxTokens = 3000) {
-  // ── Modo proxy: el servidor llama a Claude con su propia key ──
-  if (_AI_PROXY_URL) {
-    const isGemini = (apiKey || '').startsWith('AIza');
-    const body = { messages, maxTokens, provider: isGemini ? 'gemini' : 'claude' };
-    if (isGemini) body.geminiKey = apiKey;
-    // Si es Claude con proxy, NO enviamos la key del usuario (el servidor tiene la suya)
-
-    const resp = await fetch(_AI_PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ error: 'Error ' + resp.status }));
-      throw new Error('Proxy error: ' + (err.error || resp.status));
-    }
-    const data = await resp.json();
-    if (data.error) throw new Error(data.error);
-    return data.text || '';
-  }
-
-  // ── Modo directo: el usuario pone su propia key ──
-  if (!apiKey && !_AI_PROXY_URL) throw new Error('Sin API Key — configúrala en el campo de la sección o configura el Proxy en Ajustes');
-  let raw = '';
-  if (apiKey.startsWith('sk-')) {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: maxTokens, messages })
-    });
-    if (!resp.ok) {
-      const st = resp.status;
-      if (st === 401) throw new Error('API Key rechazada (401) — verifica en console.anthropic.com');
-      if (st === 400) throw new Error('API Key inválida o expirada (400) — genera una nueva');
-      if (st === 429) throw new Error('Límite de uso alcanzado (429) — espera un momento');
-      const errBody = await resp.text().catch(()=>'');
-      throw new Error('Error Claude ' + st + (errBody ? ': ' + errBody.substring(0,200) : ''));
-    }
-    const d = await resp.json();
-    raw = d.content.map(c => c.text || '').join('');
-  } else if (apiKey.startsWith('AIza')) {
-    const textParts = messages.map(m =>
-      Array.isArray(m.content)
-        ? m.content.filter(c => c.type === 'text').map(c => c.text).join('\n')
-        : (m.content || '')
-    ).join('\n\n');
-    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: textParts }] }], generationConfig: { temperature: 0.1 } })
-    });
-    if (!resp.ok) {
-      const st = resp.status;
-      if (st === 401) throw new Error('Gemini Key inválida (401) — verifica en aistudio.google.com/apikey');
-      if (st === 400) throw new Error('Gemini Key incorrecta o API no habilitada (400)');
-      if (st === 429) throw new Error('Gemini límite alcanzado (429) — espera un momento');
-      throw new Error('Error Gemini: ' + st);
-    }
-    const d = await resp.json();
-    raw = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  } else {
-    throw new Error('API Key no reconocida — debe empezar con sk- (Claude) o AIza (Gemini)');
-  }
-  return raw.replace(/```json|```/g, '').trim();
-}
-
-function parseAIJson(clean) {
-  const arrS = clean.indexOf('['), arrE = clean.lastIndexOf(']');
-  const objS = clean.indexOf('{'), objE = clean.lastIndexOf('}');
-  if (arrS !== -1 && (objS === -1 || arrS < objS)) return JSON.parse(clean.substring(arrS, arrE + 1));
-  if (objS !== -1) return JSON.parse(clean.substring(objS, objE + 1));
-  throw new Error('No se encontró JSON en la respuesta de la IA');
-}
-
-// ── Helper: importar con IA (Anthropic o Gemini) ──
-async function importExcelWithAI(file, prompt) {
-  const apiKey = getModalAIKey();
-  if (!apiKey) throw new Error('Sin API Key — configúrala en el campo de arriba');
-
-  const ext = (file.name.split('.').pop() || '').toLowerCase();
-  let text = '';
-  if (ext === 'xlsx' || ext === 'xls') {
-    text = await readExcel(file);
-  } else if (ext === 'docx' || ext === 'doc') {
-    text = await readDocx(file);
-  } else if (ext === 'pdf' && apiKey.startsWith('sk-')) {
-    // Claude puede leer PDF nativo como documento
-    const b64 = await new Promise((res, rej) => {
-      const r = new FileReader(); r.onload = e => res(e.target.result.split(',')[1]); r.onerror = rej; r.readAsDataURL(file);
-    });
-    const clean = await callAI(apiKey, [{ role: 'user', content: [
-      { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
-      { type: 'text', text: prompt }
-    ]}], 3000);
-    return parseAIJson(clean);
-  } else {
-    text = await file.text();
-  }
-
-  const fullPrompt = prompt + '\n\nDocumento:\n' + text.substring(0, 14000);
-  const clean = await callAI(apiKey, [{ role: 'user', content: fullPrompt }], 3000);
-  return parseAIJson(clean);
-}
-
-// Hematología / Bioquímica desde Excel
-async function importHemoExcel(input, field) {
-  if (!input.files?.[0]) return;
-  const statusId = field === 'hematology' ? 'hemo-excel-status' : 'bio-excel-status';
-  const statusEl = document.getElementById(statusId);
-  if (statusEl) { statusEl.textContent = '⏳ Procesando...'; statusEl.style.color = 'var(--g6)'; }
-  try {
-    const label = field === 'hematology' ? 'hematología' : 'bioquímica sérica';
-    const items = await importExcelWithAI(input.files[0],
-      `Extrae todos los parámetros de ${label} de este documento. Devuelve SOLO un array JSON:
-[["nombre parámetro", "rango normal", "unidades"]]
-Ejemplo: [["Eritrocitos", "4.5-6.5", "x10⁶/μL"], ["Hematocrito", "36-48", "%"]]`);
-    if (!currentSpecies[field]) currentSpecies[field] = [];
-    currentSpecies[field].push(...items);
-    await dbPutSync('species', currentSpecies);
-    renderTab('fisiologia');
-    if (statusEl) { statusEl.textContent = `✅ ${items.length} parámetros importados`; statusEl.style.color = 'var(--g5)'; }
-  } catch(e) {
-    if (statusEl) { statusEl.textContent = '⚠ ' + e.message; statusEl.style.color = 'var(--r5)'; }
-  }
-}
-
-// Biometría desde Excel
-async function importBiometriaExcel(input) {
-  if (!input.files?.[0]) return;
-  const statusEl = document.getElementById('biom-excel-status');
-  if (statusEl) { statusEl.textContent = '⏳ Procesando...'; statusEl.style.color = 'var(--g6)'; }
-  try {
-    const items = await importExcelWithAI(input.files[0],
-      `Extrae los datos biométricos con valores por sexo. Devuelve SOLO un array JSON:
-[{"label":"nombre del parámetro","m":"valor macho","f":"valor hembra"}]
-Ejemplo: [{"label":"Peso promedio (kg)","m":"70-100","f":"55-80"},{"label":"Longitud cabeza-cuerpo (cm)","m":"112-185","f":"105-170"}]`);
-    if (!currentSpecies.biometria) currentSpecies.biometria = {};
-    if (!currentSpecies.biometria._extra) currentSpecies.biometria._extra = [];
-    // Mapear a campos conocidos o agregar como extra
-    const known = { 'peso promedio': 'peso_prom', 'rango de peso': 'peso_rango', 'longitud cabeza': 'long_cc', 'longitud de cola': 'long_cola', 'altura a la cruz': 'altura_cruz' };
-    items.forEach(item => {
-      const key = Object.keys(known).find(k => item.label?.toLowerCase().includes(k));
-      if (key) {
-        currentSpecies.biometria[known[key]] = { m: item.m || '', f: item.f || '' };
-      } else {
-        currentSpecies.biometria._extra.push({ label: item.label, m: item.m || '', f: item.f || '' });
-      }
-    });
-    await dbPutSync('species', currentSpecies);
-    renderTab('general');
-    if (statusEl) { statusEl.textContent = `✅ ${items.length} datos biométricos importados`; statusEl.style.color = 'var(--g5)'; }
-  } catch(e) {
-    if (statusEl) { statusEl.textContent = '⚠ ' + e.message; statusEl.style.color = 'var(--r5)'; }
-  }
-}
-
-// Longevidad desde Excel
-async function importLongevidadExcel(input) {
-  if (!input.files?.[0]) return;
-  const statusEl = document.getElementById('life-excel-status');
-  if (statusEl) { statusEl.textContent = '⏳ Procesando...'; statusEl.style.color = 'var(--g6)'; }
-  try {
-    const items = await importExcelWithAI(input.files[0],
-      `Extrae datos de longevidad y reproducción con valores para vida silvestre y bajo cuidado profesional. Devuelve SOLO un array JSON:
-[{"campo":"nombre del parámetro","silv":"valor silvestre","prof":"valor bajo cuidado"}]
-Campos esperados: esperanza de vida, edad promedio, edad máxima, madurez sexual, gestación.
-Ejemplo: [{"campo":"esp_vida","silv":"10-12 años","prof":"18-22 años"},{"campo":"gestacion","silv":"93-105 días","prof":"93-105 días"}]
-Los campos deben ser uno de: esp_vida, edad_prom, edad_max, mad_sexual, gestacion`);
-    if (!currentSpecies.biometria) currentSpecies.biometria = {};
-    items.forEach(item => {
-      if (item.campo) currentSpecies.biometria[item.campo] = { silv: item.silv || '', prof: item.prof || '' };
-    });
-    await dbPutSync('species', currentSpecies);
-    renderTab('general');
-    if (statusEl) { statusEl.textContent = `✅ ${items.length} datos de longevidad importados`; statusEl.style.color = 'var(--g5)'; }
-  } catch(e) {
-    if (statusEl) { statusEl.textContent = '⚠ ' + e.message; statusEl.style.color = 'var(--r5)'; }
-  }
-}
-
-// Fórmula dentaria desde Excel
-async function importFormulaDentariaExcel(input) {
-  if (!input.files?.[0]) return;
-  const statusEl = document.getElementById('dent-excel-status');
-  if (statusEl) { statusEl.textContent = '⏳ Procesando...'; statusEl.style.color = 'var(--g6)'; }
-  try {
-    const items = await importExcelWithAI(input.files[0],
-      `Extrae la fórmula dentaria. Devuelve SOLO un array JSON:
-[{"tipo":"tipo de diente","sup":"cantidad superior","inf":"cantidad inferior","funcion":"función"}]
-Ejemplo: [{"tipo":"Incisivo","sup":"3","inf":"3","funcion":"Corte"},{"tipo":"Canino","sup":"1","inf":"1","funcion":"Prensión, sujeción de presas"}]`);
-    if (!currentSpecies.denticion) currentSpecies.denticion = [];
-    currentSpecies.denticion.push(...items);
-    await dbPutSync('species', currentSpecies);
-    renderTab('nutricion');
-    if (statusEl) { statusEl.textContent = `✅ ${items.length} dientes importados`; statusEl.style.color = 'var(--g5)'; }
-  } catch(e) {
-    if (statusEl) { statusEl.textContent = '⚠ ' + e.message; statusEl.style.color = 'var(--r5)'; }
-  }
-}
 
 // Editar campo de fórmula dentaria inline
 async function editDiente(i, field, value) {
@@ -4558,141 +4156,6 @@ async function importDentalMeasures(input) {
   }
 }
 
-// ═══════════════════════════════════
-// IMPORTACIÓN EXCEL MULTI-PESTAÑA (ficha completa)
-// ═══════════════════════════════════
-async function importExcelMultiTab(input) {
-  if (!input.files?.[0]) return;
-  const statusEl = document.getElementById('sp-import-multitab-status');
-  const modalKey2 = (document.getElementById('gemini-api-key')?.value||document.getElementById('claude-api-key')?.value||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  const { key: _k2 } = getActiveAIKey();
-  const apiKey = modalKey2 || _k2 || (localStorage.getItem('wv_api_key')||'').replace(/[\s\u200B\u00A0\uFEFF]/g,'');
-  if (!apiKey) {
-    if (statusEl) { statusEl.textContent = '⚠ API Key requerida — configura Gemini o Claude arriba'; statusEl.style.color = 'var(--r5)'; }
-    return;
-  }
-  if (statusEl) { statusEl.textContent = '⏳ Leyendo Excel multi-pestaña...'; statusEl.style.color = 'var(--g6)'; }
-  try {
-    // Leer todas las pestañas del Excel
-    const text = await readExcel(input.files[0]);
-    if (statusEl) statusEl.textContent = '🤖 Extrayendo información de todas las pestañas...';
-
-    const prompt = `Eres un experto en veterinaria de fauna silvestre. Este Excel tiene múltiples pestañas con información de una especie.
-Cada pestaña tiene nombre que indica la sección (Hematología, Bioquímica, Biometría, Longevidad, Fórmula Dentaria, Enfermedades, Fármacos, etc.).
-Extrae TODA la información y devuelve ÚNICAMENTE un JSON válido con esta estructura:
-
-{
-  "name": "nombre común de la especie (del nombre del archivo o primera pestaña)",
-  "hematology": [["parámetro","rango normal","unidades"]],
-  "biochem": [["parámetro","rango normal","unidades"]],
-  "biometria_extra": [{"label":"parámetro","m":"valor macho","f":"valor hembra"}],
-  "biometria_campos": {
-    "peso_prom": {"m":"","f":""}, "peso_rango": {"m":"","f":""},
-    "long_cc": {"m":"","f":""}, "long_cola": {"m":"","f":""},
-    "altura_cruz": {"m":"","f":""},
-    "esp_vida": {"silv":"","prof":""}, "edad_prom": {"silv":"","prof":""},
-    "edad_max": {"silv":"","prof":""}, "mad_sexual": {"silv":"","prof":""},
-    "gestacion": {"silv":"","prof":""}
-  },
-  "denticion": [{"tipo":"","sup":"","inf":"","funcion":""}],
-  "dental_measures": [{"num":"","label":"","value":""}],
-  "venopuncion_lista": [{"sitio":"","volumen":"","indicacion":""}],
-  "req_energetico": [{"cat":"categoría","kcal":"rango kcal/kg/día","notes":""}],
-  "toxicos_lista": [{"nombre":"","efecto":""}],
-  "suplementos": [{"nombre":"","dosis":"","unit":"mg/kg","notes":""}],
-  "enfermedades_sistemas": {
-    "dental": {"notas":"","enfermedades":[{"nombre":"","agente":"","signos":"","dx":"","tx":""}]},
-    "gastro": {"notas":"","enfermedades":[]},
-    "renal": {"notas":"","enfermedades":[]},
-    "respiratorio": {"notas":"","enfermedades":[]},
-    "infeccioso": {"notas":"","enfermedades":[]},
-    "musculo": {"notas":"","enfermedades":[]},
-    "dermatol": {"notas":"","enfermedades":[]},
-    "nervioso": {"notas":"","enfermedades":[]},
-    "cardiaco": {"notas":"","enfermedades":[]},
-    "otro": {"notas":"","enfermedades":[]}
-  },
-  "drugs": [{"name":"","cat":"","conc":0,"dose_min":0,"dose":0,"dose_max":0,"route":"IM","freq":"","effects":"","sites":"","notes":""}],
-  "protocols": [{"name":"","induction":0,"duration":0,"drugs":[{"name":"","dose":0,"conc":0}],"reversals":[{"name":"","dose":0,"conc":0,"route":"IM"}],"notes":""}]
-}`;
-
-    let raw = '';
-    if (apiKey.startsWith('AIza')) {
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ contents:[{parts:[{text: prompt+'\n\nContenido del Excel:\n'+text.substring(0,20000)}]}], generationConfig:{temperature:0.1} })
-      });
-      if (!resp.ok) { const e=await resp.json().catch(()=>{}); throw new Error('Gemini '+resp.status+': '+(e?.error?.message||'')); }
-      const d = await resp.json();
-      raw = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    } else {
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 8000, messages: [{ role: 'user', content: prompt + '\n\nContenido del Excel:\n' + text.substring(0, 20000) }] })
-      });
-      if (!resp.ok) throw new Error('Claude error: ' + resp.status);
-      const d = await resp.json();
-      raw = d.content.map(c => c.text || '').join('');
-    }
-    const clean = raw.replace(/```json|```/g, '').trim();
-    const js = clean.indexOf('{'), je = clean.lastIndexOf('}');
-    const extracted = JSON.parse(clean.substring(js, je + 1));
-
-    // Aplicar datos extraídos a la especie actual
-    if (!currentSpecies) { toast('⚠ Abre una ficha de especie primero'); return; }
-    let changes = [];
-
-    if (extracted.hematology?.length) { currentSpecies.hematology = [...(currentSpecies.hematology||[]), ...extracted.hematology]; changes.push(extracted.hematology.length + ' parámetros hematológicos'); }
-    if (extracted.biochem?.length) { currentSpecies.biochem = [...(currentSpecies.biochem||[]), ...extracted.biochem]; changes.push(extracted.biochem.length + ' bioquímicas'); }
-    if (extracted.denticion?.length) { currentSpecies.denticion = [...(currentSpecies.denticion||[]), ...extracted.denticion]; changes.push(extracted.denticion.length + ' dientes'); }
-    if (extracted.dental_measures?.length) { currentSpecies.dental_measures = [...(currentSpecies.dental_measures||[]), ...extracted.dental_measures.map(m=>({...m, date:new Date().toLocaleDateString('es-CO')}))]; changes.push(extracted.dental_measures.length + ' medidas dentales'); }
-    if (extracted.venopuncion_lista?.length) { currentSpecies.venopuncion_lista = [...(currentSpecies.venopuncion_lista||[]), ...extracted.venopuncion_lista]; changes.push(extracted.venopuncion_lista.length + ' sitios venopunción'); }
-    if (extracted.req_energetico?.length) { currentSpecies.req_energetico = [...(currentSpecies.req_energetico||[]), ...extracted.req_energetico]; changes.push(extracted.req_energetico.length + ' req. energéticos'); }
-    if (extracted.toxicos_lista?.length) { currentSpecies.toxicos_lista = [...(currentSpecies.toxicos_lista||[]), ...extracted.toxicos_lista]; changes.push(extracted.toxicos_lista.length + ' tóxicos'); }
-    if (extracted.suplementos?.length) { currentSpecies.suplementos = [...(currentSpecies.suplementos||[]), ...extracted.suplementos]; changes.push(extracted.suplementos.length + ' suplementos'); }
-    if (extracted.drugs?.length) { currentSpecies.drugs = [...(currentSpecies.drugs||[]), ...extracted.drugs]; changes.push(extracted.drugs.length + ' fármacos'); }
-    if (extracted.protocols?.length) { currentSpecies.protocols = [...(currentSpecies.protocols||[]), ...extracted.protocols]; changes.push(extracted.protocols.length + ' protocolos'); }
-
-    if (extracted.biometria_campos) {
-      if (!currentSpecies.biometria) currentSpecies.biometria = {};
-      Object.entries(extracted.biometria_campos).forEach(([k,v]) => { if (v.m||v.f||v.silv||v.prof) currentSpecies.biometria[k] = v; });
-    }
-    if (extracted.biometria_extra?.length) {
-      if (!currentSpecies.biometria) currentSpecies.biometria = {};
-      if (!currentSpecies.biometria._extra) currentSpecies.biometria._extra = [];
-      currentSpecies.biometria._extra.push(...extracted.biometria_extra);
-      changes.push(extracted.biometria_extra.length + ' datos biométricos extra');
-    }
-    if (extracted.enfermedades_sistemas) {
-      if (!currentSpecies.enfermedades_sistemas) currentSpecies.enfermedades_sistemas = {};
-      let totalEnf = 0;
-      Object.entries(extracted.enfermedades_sistemas).forEach(([sistId, sist]) => {
-        if (sist.enfermedades?.length) {
-          if (!currentSpecies.enfermedades_sistemas[sistId]) currentSpecies.enfermedades_sistemas[sistId] = { notas: '', enfermedades: [] };
-          currentSpecies.enfermedades_sistemas[sistId].enfermedades.push(...sist.enfermedades);
-          totalEnf += sist.enfermedades.length;
-        }
-      });
-      if (totalEnf) changes.push(totalEnf + ' enfermedades');
-    }
-
-    await dbPutSync('species', currentSpecies);
-    // Sincronizar fármacos con vademécum
-    if (extracted.drugs?.length) {
-      for (const d of extracted.drugs) await syncDrugToVademecum(d, currentSpecies.name, currentSpecies.sci);
-      VADEMECUM_DB = await dbGetAll('vademecum');
-    }
-    const tab = document.querySelector('.tab-btn.active')?.dataset?.tab || 'general';
-    renderTab(tab);
-    const msg = changes.length ? changes.join(', ') : 'sin datos nuevos';
-    if (statusEl) { statusEl.textContent = `✅ Importado: ${msg}`; statusEl.style.color = 'var(--g5)'; }
-    toast(`✓ Excel importado — ${msg}`);
-  } catch(e) {
-    if (statusEl) { statusEl.textContent = '⚠ ' + e.message; statusEl.style.color = 'var(--r5)'; }
-    toast('⚠ Error: ' + e.message);
-  }
-}
 const SISTEMAS_ENFERMEDAD = [
   { id:'digestivo',      label:'Digestivo',                    icon:'🫁' },
   { id:'respiratorio',   label:'Respiratorio',                  icon:'🫧' },
@@ -5241,22 +4704,7 @@ function openAddEnfermedad(sistId, editIdx=-1) {
     <div id="enf-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:96vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${editEnf?'✏️ Editar':'+'} enfermedad${sName?' — '+sName:''}</div>
-        ${editIdx<0?`<div style="background:var(--g0);border:1.5px dashed var(--g4);border-radius:var(--rsm);padding:.5rem .6rem;margin-bottom:.75rem">
-          <div style="font-size:.68rem;color:var(--g7);font-weight:600;margin-bottom:.35rem">⚡ Cargar desde base de enfermedades o IA</div>
-          <div style="display:flex;gap:.3rem;flex-wrap:wrap">
-            <button onclick="_enfSpCargarDesdeGeneral()" class="btn btn-secondary btn-sm" style="font-size:.72rem">📋 Desde sección Enfermedades</button>
-            <label for="enf-file-import" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.72rem">🤖 Desde archivo (IA)</label>
-            <input type="file" id="enf-file-import" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importEnfermedadesFile(this,'${sistId||''}')">
-          </div>
-          <div style="margin-top:.3rem">
-            <button onclick="togglePasteBox('enf-import-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;text-decoration:underline">✏️ O pega texto directamente aquí</button>
-            <span id="enf-import-status" style="font-size:.7rem;color:var(--g6)"></span>
-            <div id="paste-box-enf-import-status" style="display:none;margin-top:.25rem">
-              <textarea id="paste-text-enf-import-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí la información sobre la enfermedad..."></textarea>
-              <button onclick="processTextInput('enf-import-status','importEnfermedadesFile(null,currentSistId)')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
-            </div>
-          </div>
-        </div>`:``}
+
 
         <!-- Nombre y sinónimos -->
         <div class="form-group"><label>Nombre de la enfermedad *</label>
@@ -5586,7 +5034,7 @@ function openAddEnfermedad(sistId, editIdx=-1) {
         </div>
       </div>
     </div>`);
-  setTimeout(() => { updateModalAIStatus?.(); buildSignosHistory?.(); _buildSpeciesDatalist?.(); setTimeout(()=>_enfRenderRefList('enf'),50); }, 50);
+  setTimeout(() => { buildSignosHistory?.(); _buildSpeciesDatalist?.(); setTimeout(()=>_enfRenderRefList('enf'),50); }, 50);
 }
 
 
@@ -6078,47 +5526,6 @@ async function saveEnfermedadModal(sistId, editIdx=-1) {
 
 
 
-
-async function importEnfermedadesFile(input, sistId) {
-  if (!input.files?.[0]) return;
-  const statusEl = document.getElementById('enf-import-status');
-  // Limpiar la key de espacios, saltos de línea y caracteres invisibles
-  const apiKey = getModalAIKey();
-  if (!apiKey) { statusEl.textContent = '⚠ Sin API Key'; statusEl.style.color='var(--r5)'; return; }
-  statusEl.textContent = '⏳ Leyendo archivo...'; statusEl.style.color='var(--g6)';
-  try {
-    const text = await (input.files[0].name.match(/\.xlsx?$/i)
-      ? readExcel(input.files[0])
-      : input.files[0].text());
-    statusEl.textContent = '🤖 Extrayendo con IA...';
-    const sistLabel = (SISTEMAS_ENFERMEDAD.find(x=>x.id===sistId) ||
-                       (currentSpecies.enfermedades_categorias||[]).find(x=>x.id===sistId))?.label || sistId;
-    const prompt = `Analiza este documento y extrae TODAS las enfermedades del sistema "${sistLabel}". Devuelve SOLO un array JSON sin texto adicional:
-[{"nombre":"","agente":"","signos":"","dx":"","tx":""}]
-Documento:\n${text.substring(0,12000)}`;
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:3000, messages:[{role:'user',content:prompt}] })
-    });
-    if (!resp.ok) throw new Error('API error: ' + resp.status);
-    const data = await resp.json();
-    const raw = data.content.map(c=>c.text||'').join('');
-    const clean = raw.replace(/```json|```/g,'').trim();
-    const start = clean.indexOf('['), end = clean.lastIndexOf(']');
-    const enfs = JSON.parse(clean.substring(start, end+1));
-    if (!currentSpecies.enfermedades_sistemas) currentSpecies.enfermedades_sistemas = {};
-    if (!currentSpecies.enfermedades_sistemas[sistId]) currentSpecies.enfermedades_sistemas[sistId] = {notas:'',enfermedades:[]};
-    currentSpecies.enfermedades_sistemas[sistId].enfermedades.push(...enfs);
-    await dbPutSync('species', currentSpecies);
-    document.getElementById('enf-modal')?.remove();
-    renderTab('enfermedades');
-    setTimeout(()=>{ toggleSistema(sistId); }, 100);
-    toast(`✓ ${enfs.length} enfermedad(es) importadas al sistema ${sistLabel}`);
-  } catch(e) {
-    statusEl.textContent = '⚠ ' + e.message; statusEl.style.color='var(--r5)';
-  }
-}
 
 async function saveEnfermedad(sistId) {
   const nombre = document.getElementById('enf-nombre')?.value.trim();
@@ -6759,97 +6166,11 @@ function renderAdminSpeciesList() {
     </div>`).join('') || '<p class="text-muted">Sin especies registradas</p>';
 }
 
-// ═══ GESTIÓN DE KEYS DE IA ═══
-let selectedAI = localStorage.getItem('wv_ai_provider') || 'gemini';
-
-function selectAI(provider) {
-  selectedAI = provider;
-  localStorage.setItem('wv_ai_provider', provider);
-  const geminiBlock = document.getElementById('gemini-key-block');
-  const claudeBlock = document.getElementById('claude-key-block');
-  const geminiBtn   = document.getElementById('ai-sel-gemini');
-  const claudeBtn   = document.getElementById('ai-sel-claude');
-  if (geminiBlock) geminiBlock.style.display = provider === 'gemini' ? 'block' : 'none';
-  if (claudeBlock) claudeBlock.style.display = provider === 'claude' ? 'block' : 'none';
-  if (geminiBtn) { geminiBtn.style.borderColor = provider==='gemini'?'var(--g4)':'var(--bor)'; geminiBtn.style.background = provider==='gemini'?'var(--g1)':'var(--sur2)'; geminiBtn.style.color = provider==='gemini'?'var(--g7)':'var(--txt3)'; }
-  if (claudeBtn) { claudeBtn.style.borderColor = provider==='claude'?'var(--am)':'var(--bor)'; claudeBtn.style.background = provider==='claude'?'#fff8e1':'var(--sur2)'; claudeBtn.style.color = provider==='claude'?'#b45309':'var(--txt3)'; }
-  updateAIKeyStatus(provider);
-}
-
-function saveAIKey(provider, raw) {
-  const key = (raw||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g, '');
-  localStorage.setItem('wv_key_' + provider, key);
-  updateAIKeyStatus(provider);
-}
-
-function clearAIKey(provider) {
-  localStorage.removeItem('wv_key_' + provider);
-  const inp = document.getElementById(provider + '-api-key');
-  if (inp) inp.value = '';
-  updateAIKeyStatus(provider);
-  toast('🗑 Key de ' + (provider==='gemini'?'Gemini':'Claude') + ' eliminada');
-}
-
-function updateAIKeyStatus(provider) {
-  const key = (localStorage.getItem('wv_key_' + provider) || '').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  const statusEl = document.getElementById(provider + '-key-status');
-  const inp = document.getElementById(provider + '-api-key');
-  if (!statusEl) return;
-  if (inp && !inp.value && key) inp.value = key;
-  if (!key) {
-    statusEl.textContent = provider==='gemini'
-      ? '⚠ Sin key — aistudio.google.com/apikey (gratis)'
-      : '⚠ Sin key — console.anthropic.com';
-    statusEl.style.color = 'var(--am)';
-  } else if (provider==='gemini' && key.startsWith('AIza')) {
-    statusEl.textContent = '✓ Gemini: ' + key.substring(0,12) + '...';
-    statusEl.style.color = 'var(--g6)';
-  } else if (provider==='claude' && key.startsWith('sk-')) {
-    statusEl.textContent = '✓ Claude: ' + key.substring(0,16) + '...';
-    statusEl.style.color = 'var(--g6)';
-  } else {
-    statusEl.textContent = provider==='gemini'
-      ? '⚠ Key inválida — debe empezar con AIza'
-      : '⚠ Key inválida — debe empezar con sk-ant-';
-    statusEl.style.color = 'var(--r5)';
-  }
-}
-
-function initAIKeyUI() {
-  selectAI(selectedAI);
-  // Cargar URL del proxy si está guardada
-  const proxyInp = document.getElementById('proxy-url-inp');
-  if (proxyInp && _AI_PROXY_URL) proxyInp.value = _AI_PROXY_URL;
-  updateProxyStatus();
-}
-
-function updateProxyStatus() {
-  const st = document.getElementById('proxy-status');
-  if (!st) return;
-  if (_AI_PROXY_URL) {
-    st.textContent = '✓ Proxy configurado: ' + _AI_PROXY_URL.substring(0, 40) + '...';
-    st.style.color = 'var(--g6)';
-  } else {
-    st.textContent = 'Sin proxy — la IA se llama directo desde el navegador';
-    st.style.color = 'var(--txt3)';
-  }
-}
-
-// Funciones legacy para compatibilidad
-function saveApiKey(raw) { saveAIKey(selectedAI, raw); }
-function clearApiKey() { clearAIKey(selectedAI); }
-function showApiKeyStatus() { updateAIKeyStatus('gemini'); updateAIKeyStatus('claude'); }
-
-function getActiveAIKey() {
-  const key = (localStorage.getItem('wv_key_' + selectedAI) || '').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  return { provider: selectedAI, key };
-}
 function openAddSpecies() {
   document.getElementById('modal-species-title').textContent = 'Nueva Especie';
   window._formCoverPhoto = null;
   buildSpeciesForm(null);
   document.getElementById('modal-species').classList.add('open');
-  setTimeout(() => { showApiKeyStatus(); initAIKeyUI(); }, 80);
 }
 function editSpecies(id) {
   const sp = SPECIES_DB.find(s=>s.id===id);
@@ -6860,206 +6181,6 @@ function editSpecies(id) {
 }
 function editCurrentSpecies() {
   if (currentSpecies) editSpecies(currentSpecies.id);
-}
-
-// ═══════════════════════════════════
-// IMPORTACIÓN DE ARCHIVOS (IA)
-// ═══════════════════════════════════
-async function importSpeciesFile(input) {
-  if (!input.files || !input.files[0]) return;
-  const file = input.files[0];
-  const statusEl = document.getElementById('import-status');
-  const ext = file.name.split('.').pop().toLowerCase();
-  statusEl.textContent = '⏳ Leyendo archivo...';
-  statusEl.style.color = 'var(--g6)';
-
-  try {
-    let textContent = '';
-    let base64Data = '';
-    let mediaType = '';
-
-    if (ext === 'pdf') {
-      base64Data = await fileToBase64(file);
-      mediaType = 'application/pdf';
-    } else if (ext === 'xlsx' || ext === 'xls') {
-      statusEl.textContent = '⏳ Procesando Excel...';
-      textContent = await readExcel(file);
-    } else if (ext === 'docx' || ext === 'doc') {
-      statusEl.textContent = '⏳ Procesando Word...';
-      textContent = await readDocx(file);
-    } else if (ext === 'txt' || ext === 'csv') {
-      textContent = await file.text();
-    } else {
-      statusEl.textContent = '⚠ Formato no soportado. Usa PDF, Word (.docx), Excel o TXT.';
-      statusEl.style.color = 'var(--r5)'; return;
-    }
-
-    // Obtener key activa (Gemini o Claude)
-    const modalKey = (document.getElementById('gemini-api-key')?.value || document.getElementById('claude-api-key')?.value || '').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-    const { key: savedKey } = getActiveAIKey();
-    const apiKey = modalKey || savedKey || (localStorage.getItem('wv_api_key')||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-
-    if (!apiKey) {
-      statusEl.textContent = '⚠ Sin API Key. Configúrala arriba — Gemini es gratis en aistudio.google.com/apikey';
-      statusEl.style.color = 'var(--r5)'; return;
-    }
-
-    statusEl.textContent = '🤖 Extrayendo información con IA...';
-
-    const PROMPT = `Eres un asistente experto en veterinaria de fauna silvestre. Analiza el documento y extrae TODA la información disponible sobre la especie. Devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional ni markdown.
-
-Usa cadenas vacías "" para campos no encontrados, arrays vacíos [] si no hay datos, 0 para números no encontrados.
-
-{
-  "name": "nombre común",
-  "sci": "nombre científico",
-  "order": "orden taxonómico",
-  "family": "familia",
-  "generalidades": "descripción general, historia natural, importancia ecológica",
-  "uicn_world": "LC|NT|VU|EN|CR|EW|EX|DD",
-  "uicn_colombia": "LC|NT|VU|EN|CR|EW|EX|DD",
-  "conservacion": {
-    "cites": "Apéndice I / II / III / No listada",
-    "res0126": "categoría según resolución colombiana"
-  },
-  "weight_avg": número_kg,
-  "weight_min": número_kg,
-  "weight_max": número_kg,
-  "biometria": {
-    "peso_prom":   {"m": "valor con unidad", "f": "valor con unidad"},
-    "peso_rango":  {"m": "rango", "f": "rango"},
-    "long_cc":     {"m": "cm", "f": "cm"},
-    "long_cola":   {"m": "cm", "f": "cm"},
-    "altura_cruz": {"m": "cm", "f": "cm"},
-    "esp_vida":    {"silv": "años", "prof": "años"},
-    "edad_prom":   {"silv": "", "prof": ""},
-    "edad_max":    {"silv": "", "prof": ""},
-    "mad_sexual":  {"silv": "", "prof": ""},
-    "gestacion":   {"silv": "", "prof": ""}
-  },
-  "lifespan": "texto",
-  "dimorphism": "texto",
-  "temp_range": [min, max],
-  "humidity": [min, max],
-  "distribution": "texto",
-  "diet_wild": "texto",
-  "vitals": {
-    "temp": "rango °C",
-    "fc": "rango bpm",
-    "fr": "rango rpm",
-    "ps": "texto mmHg",
-    "vol_sang": "texto"
-  },
-  "hematology": [["Parámetro","Valor referencia"]],
-  "biochem": [["Parámetro","Valor referencia"]],
-  "nutrition": {
-    "captive": "descripción dieta cautiverio",
-    "kcal_day": "kcal/kg/día",
-    "freq": "frecuencia alimentación",
-    "supplements": "suplementos",
-    "toxic": "tóxicos prohibidos"
-  },
-  "req_energetico": [{"cat": "categoría (macho adulto, cachorro...)", "kcal": número, "notes": ""}],
-  "toxicos_lista": [{"nombre": "sustancia", "efecto": "efecto tóxico"}],
-  "denticion": [{"num": "número", "tipo": "tipo diente", "sup": "cantidad superior", "inf": "cantidad inferior", "funcion": "función"}],
-  "behavior": {
-    "wild": "comportamiento silvestre",
-    "captive": "bajo cuidado",
-    "stress": "señales de estrés",
-    "reproductive": "comportamiento reproductivo"
-  },
-  "enfermedades_sistemas": {
-    "dental":       {"notas": "", "enfermedades": [{"nombre":"","agente":"","signos":"","dx":"","tx":""}]},
-    "gastro":       {"notas": "", "enfermedades": []},
-    "renal":        {"notas": "", "enfermedades": []},
-    "cardiaco":     {"notas": "", "enfermedades": []},
-    "respiratorio": {"notas": "", "enfermedades": []},
-    "infeccioso":   {"notas": "", "enfermedades": []}
-  },
-  "diseases": [{"name":"nombre enfermedad","agent":"agente causante","signs":"signos clínicos","dx":"diagnóstico","tx":"tratamiento"}],
-  "drugs": [{"name":"","cat":"categoría farmacológica","conc":0,"dose_min":0,"dose":0,"dose_max":0,"route":"IM|IV|SC|VO","freq":"","effects":"efectos adversos","sites":"sitios venopunción","notes":""}],
-  "protocols": [{"name":"","induction":0,"duration":0,"drugs":[{"name":"","dose":0,"conc":0}],"reversals":[{"name":"","dose":0,"conc":0,"route":"IM"}],"notes":""}]
-}`;
-
-    let messages;
-    if (mediaType === 'application/pdf') {
-      messages = [{
-        role: 'user',
-        content: [
-          { type: 'document', source: { type: 'base64', media_type: mediaType, data: base64Data } },
-          { type: 'text', text: PROMPT }
-        ]
-      }];
-    } else {
-      messages = [{
-        role: 'user',
-        content: PROMPT + '\n\n--- CONTENIDO DEL DOCUMENTO ---\n' + textContent.substring(0, 15000)
-      }];
-    }
-
-    let raw = '';
-    if (apiKey.startsWith('AIza')) {
-      // ── Gemini ──
-      let parts = [];
-      if (base64Data && mediaType === 'application/pdf') {
-        parts = [{ inline_data: { mime_type: 'application/pdf', data: base64Data } }, { text: PROMPT }];
-      } else {
-        parts = [{ text: PROMPT + '\n\n--- CONTENIDO ---\n' + textContent.substring(0, 15000) }];
-      }
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0.1 } })
-      });
-      if (!resp.ok) { const e = await resp.json().catch(()=>{}); throw new Error('Gemini error ' + resp.status + ': ' + (e?.error?.message||'')); }
-      const d = await resp.json();
-      raw = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    } else if (apiKey.startsWith('sk-')) {
-      // ── Anthropic Claude ──
-      if (!messages) {
-        messages = base64Data
-          ? [{ role:'user', content:[
-              { type:'document', source:{ type:'base64', media_type: mediaType, data: base64Data } },
-              { type:'text', text: PROMPT }
-            ]}]
-          : [{ role:'user', content: PROMPT + '\n\n--- CONTENIDO ---\n' + textContent.substring(0,15000) }];
-      }
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
-        body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:4000, messages })
-      });
-      if (!resp.ok) throw new Error('Claude error ' + resp.status);
-      const d = await resp.json();
-      raw = d.content.map(c => c.text || '').join('');
-    } else {
-      throw new Error('API Key no reconocida. Usa Gemini (AIza...) o Claude (sk-ant-...)');
-    }
-
-    const clean = raw.replace(/```json|```/g, '').trim();
-    const jsonStart = clean.indexOf('{');
-    const jsonEnd = clean.lastIndexOf('}');
-    if (jsonStart === -1) throw new Error('No se encontró JSON en la respuesta');
-    const extracted = JSON.parse(clean.substring(jsonStart, jsonEnd + 1));
-
-    fillSpeciesForm(extracted);
-    statusEl.textContent = '✅ Información extraída. Revisa y ajusta los campos antes de guardar.';
-    statusEl.style.color = 'var(--g5)';
-
-  } catch (err) {
-    console.error('Import error:', err);
-    statusEl.textContent = '⚠ Error al procesar: ' + err.message + '. Puedes ingresar los datos manualmente.';
-    statusEl.style.color = 'var(--r5)';
-  }
-}
-
-function fileToBase64(file) {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result.split(',')[1]);
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
 }
 
 async function readExcel(file) {
@@ -7098,125 +6219,6 @@ async function readExcel(file) {
   });
 }
 
-async function readDocx(file) {
-  return new Promise((res, rej) => {
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
-    script.onload = () => {
-      const reader = new FileReader();
-      reader.onload = e => {
-        mammoth.extractRawText({ arrayBuffer: e.target.result })
-          .then(result => res(result.value))
-          .catch(rej);
-      };
-      reader.readAsArrayBuffer(file);
-    };
-    script.onerror = () => {
-      // Fallback: leer como texto plano
-      file.text().then(res).catch(rej);
-    };
-    document.head.appendChild(script);
-  });
-}
-
-function fillSpeciesForm(data) {
-  const set = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined && val !== null) el.value = val; };
-  const setSelect = (id, val) => { const el = document.getElementById(id); if (el && val) { for (const opt of el.options) { if (opt.value === String(val)) { opt.selected = true; break; } } } };
-
-  set('sp-name', data.name);
-  set('sp-sci', data.sci);
-  set('sp-order', data.order);
-  set('sp-family', data.family);
-  setSelect('sp-uicn-w', data.uicn_world);
-  setSelect('sp-uicn-c', data.uicn_colombia);
-  set('sp-wavg', data.weight_avg);
-  set('sp-wmin', data.weight_min);
-  set('sp-wmax', data.weight_max);
-  set('sp-life', data.lifespan);
-  set('sp-dim', data.dimorphism);
-  if (data.temp_range?.length >= 2) { set('sp-tmin', data.temp_range[0]); set('sp-tmax', data.temp_range[1]); }
-  if (data.humidity?.length >= 2) { set('sp-hmin', data.humidity[0]); set('sp-hmax', data.humidity[1]); }
-  set('sp-dist', data.distribution);
-  set('sp-diet', data.diet_wild);
-  set('sp-generalidades', data.generalidades);
-  // Cover photo
-  window._formCoverPhoto = data.cover_photo || null;
-  const _prev = document.getElementById('form-cover-preview');
-  const _ph   = document.getElementById('form-cover-placeholder');
-  if (_prev && data.cover_photo) { _prev.src = data.cover_photo; _prev.style.display = 'block'; if(_ph) _ph.style.display='none'; }
-  if (data.vitals) {
-    set('sp-vtemp', data.vitals.temp);
-    set('sp-vfc', data.vitals.fc);
-    set('sp-vfr', data.vitals.fr);
-    set('sp-vps', data.vitals.ps);
-    set('sp-vvs', data.vitals.vol_sang);
-  }
-  if (data.nutrition) {
-    set('sp-ncap', data.nutrition.captive);
-    set('sp-nkcal', data.nutrition.kcal_day);
-    set('sp-nfreq', data.nutrition.freq);
-    set('sp-nsup', data.nutrition.supplements);
-    set('sp-ntox', data.nutrition.toxic);
-  }
-  if (data.behavior) {
-    set('sp-bwild', data.behavior.wild);
-    set('sp-bcap', data.behavior.captive);
-    set('sp-bstress', data.behavior.stress);
-    set('sp-brep', data.behavior.reproductive);
-  }
-  // Store extracted arrays temporarily for saveSpecies to use
-  window._importedSpeciesData = {
-    hematology:            data.hematology            || [],
-    biochem:               data.biochem               || [],
-    diseases:              data.diseases              || [],
-    drugs:                 data.drugs                 || [],
-    protocols:             data.protocols             || [],
-    req_energetico:        data.req_energetico        || [],
-    toxicos_lista:         data.toxicos_lista         || [],
-    denticion:             data.denticion             || [],
-    enfermedades_sistemas: data.enfermedades_sistemas || {},
-    biometria:             data.biometria             || {},
-    conservacion:          data.conservacion          || {}
-  };
-
-  // Rellenar campos de biometría por sexo
-  if (data.biometria) {
-    const bmFields  = ['peso_prom','peso_rango','long_cc','long_cola','altura_cruz'];
-    const lifeFields = ['esp_vida','edad_prom','edad_max','mad_sexual','gestacion'];
-    bmFields.forEach(field => {
-      if (data.biometria[field]) {
-        set(`bm-${field}-m`, data.biometria[field].m || '');
-        set(`bm-${field}-f`, data.biometria[field].f || '');
-      }
-    });
-    lifeFields.forEach(field => {
-      if (data.biometria[field]) {
-        set(`bm-${field}-silv`, data.biometria[field].silv || '');
-        set(`bm-${field}-prof`, data.biometria[field].prof || '');
-      }
-    });
-  }
-
-  // Conservación
-  if (data.conservacion) {
-    set('sp-cons-cites',   data.conservacion.cites   || '');
-    set('sp-cons-res0126', data.conservacion.res0126 || '');
-  }
-
-  // Resumen de lo extraído
-  const counts = [];
-  if (data.drugs?.length)              counts.push(data.drugs.length + ' fármaco(s)');
-  if (data.diseases?.length)           counts.push(data.diseases.length + ' enfermedad(es)');
-  if (data.protocols?.length)          counts.push(data.protocols.length + ' protocolo(s)');
-  if (data.hematology?.length)         counts.push(data.hematology.length + ' param. hematológicos');
-  if (data.toxicos_lista?.length)      counts.push(data.toxicos_lista.length + ' tóxico(s)');
-  if (data.req_energetico?.length)     counts.push(data.req_energetico.length + ' req. energéticos');
-  if (counts.length) {
-    const statusEl = document.getElementById('import-status');
-    if (statusEl) statusEl.textContent += ' · Extraídos: ' + counts.join(', ');
-  }
-}
-
 function buildSpeciesForm(sp) {
   const f = document.getElementById('modal-species-form');
   const v  = (field, def='') => sp ? (sp[field]??def) : def;
@@ -7228,87 +6230,6 @@ function buildSpeciesForm(sp) {
   const bmv = (field, sex) => bm[field]?.[sex] || '';
 
   f.innerHTML = `
-
-    <!-- ═══ IMPORTAR ARCHIVO ═══ -->
-    <div style="background:var(--g0);border:2px dashed var(--g4);border-radius:var(--r);padding:1rem;margin-bottom:1rem;text-align:center">
-      <div style="font-size:1.5rem;margin-bottom:.3rem">📄</div>
-      <div style="font-weight:600;font-size:.9rem;margin-bottom:.15rem">Importar desde archivo</div>
-      <div style="font-size:.73rem;color:var(--txt3);margin-bottom:.5rem">PDF, Word (.docx) o Excel (.xlsx) — La IA extrae la información automáticamente</div>
-
-      <!-- Selector de IA -->
-      <div style="margin-bottom:.5rem;text-align:left">
-        <label style="font-size:.7rem;color:var(--txt3);font-weight:600">IA para importar</label>
-        <div style="display:flex;gap:.4rem;margin-top:.25rem">
-          <button id="ai-sel-gemini" onclick="selectAI('gemini')"
-            style="flex:1;padding:.4rem;border-radius:var(--rsm);border:2px solid var(--g4);background:var(--g1);color:var(--g7);font-family:var(--sans);font-size:.78rem;font-weight:600;cursor:pointer">
-            🔵 Google Gemini <span style="font-size:.65rem;font-weight:400">(gratis)</span>
-          </button>
-          <button id="ai-sel-claude" onclick="selectAI('claude')"
-            style="flex:1;padding:.4rem;border-radius:var(--rsm);border:2px solid var(--bor);background:var(--sur2);color:var(--txt3);font-family:var(--sans);font-size:.78rem;cursor:pointer">
-            🟠 Anthropic Claude
-          </button>
-        </div>
-      </div>
-
-      <!-- Key de Gemini -->
-      <div id="gemini-key-block" style="margin-bottom:.4rem;text-align:left">
-        <div style="display:flex;gap:.3rem;align-items:center">
-          <input type="password" id="gemini-api-key" class="form-control"
-            placeholder="AIzaSy..."
-            value=""
-            style="font-size:.78rem;flex:1"
-            onchange="saveAIKey('gemini',this.value)">
-          <button onclick="clearAIKey('gemini')" class="btn btn-secondary btn-sm" style="color:var(--r5);font-size:.7rem">🗑</button>
-          <a href="https://aistudio.google.com/apikey" target="_blank" class="btn btn-secondary btn-sm" style="font-size:.7rem">Obtener</a>
-        </div>
-        <div id="gemini-key-status" style="font-size:.7rem;margin-top:.2rem;color:var(--txt3)">...</div>
-      </div>
-
-      <!-- Key de Claude -->
-      <div id="claude-key-block" style="display:none;margin-bottom:.4rem;text-align:left">
-        <div style="display:flex;gap:.3rem;align-items:center">
-          <input type="password" id="claude-api-key" class="form-control"
-            placeholder="sk-ant-api03-..."
-            value=""
-            style="font-size:.78rem;flex:1"
-            onchange="saveAIKey('claude',this.value)">
-          <button onclick="clearAIKey('claude')" class="btn btn-secondary btn-sm" style="color:var(--r5);font-size:.7rem">🗑</button>
-          <a href="https://console.anthropic.com" target="_blank" class="btn btn-secondary btn-sm" style="font-size:.7rem">Obtener</a>
-        </div>
-        <div id="claude-key-status" style="font-size:.7rem;margin-top:.2rem;color:var(--txt3)">...</div>
-      </div>
-
-      <!-- Proxy de IA (opcional — evita problemas de CORS) -->
-      <div style="margin-top:.6rem;padding:.5rem;background:var(--sur2);border-radius:var(--rsm);text-align:left">
-        <div style="font-size:.68rem;font-weight:600;color:var(--txt3);margin-bottom:.25rem">🔗 URL Proxy de IA <span style="font-weight:400">(opcional — soluciona problemas de conexión)</span></div>
-        <div style="display:flex;gap:.3rem;align-items:center">
-          <input type="text" id="proxy-url-inp" class="form-control"
-            placeholder="https://wildvet-proxy.TU-USUARIO.workers.dev"
-            style="font-size:.75rem;flex:1"
-            oninput="saveProxyUrl(this.value)">
-          <button onclick="saveProxyUrl('');document.getElementById('proxy-url-inp').value='';updateProxyStatus()" class="btn btn-secondary btn-sm" style="color:var(--r5);font-size:.7rem">🗑</button>
-        </div>
-        <div id="proxy-status" style="font-size:.68rem;margin-top:.2rem;color:var(--txt3)">Sin proxy configurado</div>
-      </div>
-
-      <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.5rem;text-align:left">
-        <a href="#" onclick="downloadSpeciesTemplate();return false;" style="color:var(--g6)">📥 Descargar plantilla Word/Excel</a>
-      </div>
-
-      <label for="sp-file-import" class="btn btn-primary" style="cursor:pointer;display:inline-flex">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Seleccionar archivo
-      </label>
-      <input type="file" id="sp-file-import" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.csv" style="display:none" onchange="importSpeciesFile(this)">
-      <div id="import-status" style="margin-top:.6rem;font-size:.8rem;color:var(--g6);min-height:1.2rem"></div>
-      <div style="margin-top:.3rem">
-        <button onclick="togglePasteBox('import-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
-        <div id="paste-box-import-status" style="display:none;margin-top:.25rem">
-          <textarea id="paste-text-import-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí toda la información de la especie (generalidades, biometría, fisiología, etc.)..."></textarea>
-          <button onclick="processAIText(document.getElementById('paste-text-import-status').value,'import-status','')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
-        </div>
-      </div>
-    </div>
 
     <div style="font-size:.75rem;color:var(--g6);background:var(--g0);border-radius:var(--rsm);padding:.4rem .65rem;margin-bottom:.75rem">
       ✓ Solo el <strong>nombre común</strong> es obligatorio. Todos los demás campos se pueden completar después.
@@ -7721,33 +6642,6 @@ function openAddSpeciesDrug() {
       <div id="vad-search-results" style="max-height:100px;overflow-y:auto;margin-top:.25rem;background:var(--sur);border-radius:var(--rxs)"></div>
     </div>
 
-    <!-- Importar desde Excel -->
-    <div style="background:var(--g0);border-radius:var(--rsm);padding:.6rem;margin-bottom:.75rem">
-      <div style="font-size:.75rem;font-weight:600;color:var(--g6);margin-bottom:.3rem">📊 Importar fármacos desde Excel</div>
-      <div style="background:var(--sur2);border-radius:var(--rsm);padding:.4rem .5rem;margin-bottom:.4rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
-          <span style="font-size:.68rem;color:var(--txt3);font-weight:600">IA:</span>
-          <button onclick="setModalAI(this,'gemini')" data-provider="gemini"
-            style="font-size:.68rem;padding:.15rem .4rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--g1);color:var(--g7);cursor:pointer;font-family:var(--sans)">🔵 Gemini</button>
-          <button onclick="setModalAI(this,'claude')" data-provider="claude"
-            style="font-size:.68rem;padding:.15rem .4rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--sur);color:var(--txt3);cursor:pointer;font-family:var(--sans)">🟠 Claude</button>
-          <input type="password" id="modal-ai-key" class="form-control" style="flex:1;min-width:0;font-size:.72rem;height:1.6rem"
-            placeholder="API Key..." oninput="saveModalAIKey(this.value)">
-          <div id="modal-ai-status" style="font-size:.65rem;color:var(--txt3);width:100%"></div>
-        </div>
-      <div style="display:flex;gap:.4rem;margin-top:.3rem">
-        <label class="btn btn-secondary btn-sm" for="drug-file-import" style="cursor:pointer;white-space:nowrap">📂 Seleccionar archivo</label>
-        <input type="file" id="drug-file-import" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importFarmacosFile(this)">
-      </div>
-      <div id="drug-import-status" style="font-size:.72rem;color:var(--g6);margin-top:.25rem;min-height:1rem"></div>
-      <div style="margin-top:.3rem">
-        <button onclick="togglePasteBox('drug-import-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
-        <div id="paste-box-drug-import-status" style="display:none;margin-top:.25rem">
-          <textarea id="paste-text-drug-import-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí información de fármacos (nombre, dosis, vía, indicaciones, efectos adversos)..."></textarea>
-          <button onclick="processAIText(document.getElementById('paste-text-drug-import-status').value,'drug-import-status','')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
-        </div>
-      </div>
-    </div>
-
     <div class="form-row">
       <div class="form-group"><label>Nombre comercial *</label><input id="sdrug-name" class="form-control" placeholder="Ej: Ketavet, Meloxidyl..."></div>
       <div class="form-group"><label>Principio activo</label><input id="sdrug-active" class="form-control" placeholder="Ej: Ketamina, Meloxicam..."></div>
@@ -7788,46 +6682,7 @@ function openAddSpeciesDrug() {
       <button class="btn btn-secondary" onclick="closeModal('modal-species-drug')">Cancelar</button>
       <button class="btn btn-primary" style="flex:1" onclick="saveSpeciesDrug()">💾 Agregar fármaco</button>
     </div>`;
-  document.getElementById('modal-species-drug').classList.add('open'); setTimeout(updateModalAIStatus, 50);
-}
-
-async function importFarmacosFile(input) {
-  if (!input.files?.[0]) return;
-  const statusEl = document.getElementById('drug-import-status');
-  const apiKey = getModalAIKey();
-  if (!apiKey) { statusEl.textContent = '⚠ Sin API Key'; statusEl.style.color='var(--r5)'; return; }
-  statusEl.textContent = '⏳ Leyendo archivo...'; statusEl.style.color='var(--g6)';
-  try {
-    const text = await (input.files[0].name.match(/\.xlsx?$/i)
-      ? readExcel(input.files[0])
-      : input.files[0].text());
-    statusEl.textContent = '🤖 Extrayendo fármacos con IA...';
-    const prompt = `Analiza este documento y extrae TODOS los fármacos/medicamentos para fauna silvestre. Devuelve SOLO un array JSON sin texto adicional:
-[{"name":"","cat":"categoría farmacológica","conc":0,"dose_min":0,"dose":0,"dose_max":0,"route":"IM","freq":"","effects":"","sites":"","notes":""}]
-Documento:\n${text.substring(0,12000)}`;
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:4000, messages:[{role:'user',content:prompt}] })
-    });
-    if (!resp.ok) throw new Error('API error: ' + resp.status);
-    const data = await resp.json();
-    const raw = data.content.map(c=>c.text||'').join('');
-    const clean = raw.replace(/```json|```/g,'').trim();
-    const start = clean.indexOf('['), end = clean.lastIndexOf(']');
-    const drugs = JSON.parse(clean.substring(start, end+1));
-    if (!currentSpecies.drugs) currentSpecies.drugs = [];
-    currentSpecies.drugs.push(...drugs);
-    await dbPutSync('species', currentSpecies);
-    // Sincronizar con vademécum
-    for (const drug of drugs) await syncDrugToVademecum(drug, currentSpecies.name, currentSpecies.sci);
-    VADEMECUM_DB = await dbGetAll('vademecum');
-    closeModal('modal-species-drug');
-    renderTab('medicamentos');
-    toast(`✓ ${drugs.length} fármaco(s) importados`);
-  } catch(e) {
-    statusEl.textContent = '⚠ ' + e.message; statusEl.style.color='var(--r5)';
-  }
+  document.getElementById('modal-species-drug').classList.add('open');
 }
 
 // ═══════════════════════════════════
@@ -8129,22 +6984,7 @@ function openAddDrug(editId=null, preselectedCat=null) {
     <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
       <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${existing?'✏️ Editar':'+ Agregar'} fármaco al vademécum</div>
 
-      <!-- IA import -->
-      <div style="background:var(--g0);border:1.5px dashed var(--g4);border-radius:var(--rsm);padding:.5rem .6rem;margin-bottom:.75rem">
-        <div style="font-size:.68rem;color:var(--g7);font-weight:600;margin-bottom:.3rem">🤖 Importar con IA — PDF, Word o Excel</div>
-        <div style="display:flex;gap:.3rem;align-items:center">
-          <label for="vd-file-import" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem;white-space:nowrap">📂 Seleccionar archivo</label>
-          <input type="file" id="vd-file-import" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importVademecumFile(this)">
-          <span id="vd-import-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
-        </div>
-          <div style="margin-top:.3rem">
-            <button onclick="togglePasteBox('vd-import-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">✏️ O pega texto directamente aquí</button>
-            <div id="paste-box-vd-import-status" style="display:none;margin-top:.25rem">
-              <textarea id="paste-text-vd-import-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí la información sobre fármacos del vademécum (nombre, categoría, dosis por especie)..."></textarea>
-              <button onclick="processTextInput('vd-import-status','importVademecumFile(null)')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
-            </div>
-          </div>
-      </div>
+
 
       <!-- Nombres comerciales -->
       <div style="margin-bottom:.5rem">
@@ -8380,66 +7220,6 @@ async function syncVadToSpecies(vadId) {
 
 // openEditDrug: simplified — just calls openAddDrug with the id
 function openEditDrug(id) { openAddDrug(id); }
-
-async function importVademecumFile(input) {
-  if (!input.files||!input.files[0]) return;
-  const file = input.files[0];
-  const ext = file.name.split('.').pop().toLowerCase();
-  const statusEl = document.getElementById('vd-import-status');
-  if (!statusEl) return;
-  statusEl.textContent = '⏳ Leyendo archivo...'; statusEl.style.color='var(--g6)';
-  try {
-    let messages;
-    const PROMPT = `Analiza este documento de farmacología veterinaria y extrae TODOS los fármacos con sus dosis por especie. Devuelve ÚNICAMENTE un array JSON válido:\n[{"drug":"Nombre","active":"Principio activo","category":"Categoría","cat_esp":"Cat. específica (ej: AINE)","conc":100,"route":"IM","indic":"Indicaciones","contraindications":"","info":"Efectos adversos","notes":"","species_doses":[{"species":"Nombre esp.","sci":"Nombre científico","dose_min":0,"dose":2,"dose_max":4,"route":"IM","freq":"SID x 5 días","notes":""}]}]`;
-
-    if (ext === 'pdf') {
-      const b64 = await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});
-      statusEl.textContent='🤖 Extrayendo fármacos del PDF con IA...';
-      messages = [{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:PROMPT}]}];
-    } else {
-      let text = '';
-      if (ext==='xlsx'||ext==='xls') { statusEl.textContent='⏳ Procesando Excel...'; text = await readExcel(file); }
-      else if (ext==='docx'||ext==='doc') { text = await readDocx(file); }
-      else { text = await file.text(); }
-      statusEl.textContent='🤖 Interpretando con IA...';
-      messages = [{role:'user',content: PROMPT+'\n\n--- DOCUMENTO ---\n'+text.substring(0,15000)}];
-    }
-
-    const vadKey = _AI_PROXY_URL ? 'proxy' : (getActiveAIKey().key || '');
-    const clean = await callAI(vadKey, messages, 4000);
-    const arrStart = clean.indexOf('['), arrEnd = clean.lastIndexOf(']');
-    if (arrStart === -1) throw new Error('No se encontró JSON en la respuesta');
-    const extracted = JSON.parse(clean.substring(arrStart, arrEnd+1));
-
-    let saved = 0;
-    for (const d of extracted) {
-      if (!d.drug && !d.active) continue;
-      const cats = d.cats || (d.category ? [d.category] : []);
-      const newDrug = {
-        id: 'vad_'+Date.now()+'_'+Math.random().toString(36).slice(2,5),
-        drug: d.drug||d.active||'Sin nombre', nombres:[d.drug||d.active||''], active:d.active||'',
-        cats, category: cats[0]||d.category||'Otro', cat_esp:d.cat_esp||'',
-        conc:parseFloat(d.conc)||0, route:d.route||'IM',
-        indic:d.indic||'', contraindications:d.contraindications||'',
-        info:d.info||d.effects||'', notes:d.notes||'',
-        species_doses:(d.species_doses||[]).map(s=>({
-          species:s.species||'', sci:s.sci||'',
-          dose_min:parseFloat(s.dose_min)||0, dose:parseFloat(s.dose)||0,
-          dose_max:parseFloat(s.dose_max)||0, route:s.route||d.route||'IM',
-          freq:s.freq||'', notes:s.notes||''
-        }))
-      };
-      VADEMECUM_DB.push(newDrug);
-      await dbPutSync('vademecum', newDrug);
-      saved++;
-    }
-    statusEl.textContent = `✅ ${saved} fármaco(s) importados`; statusEl.style.color='var(--g5)';
-    renderVademecum();
-    toast(`✓ ${saved} fármaco(s) importados al vademécum`);
-  } catch(e) {
-    statusEl.textContent = '⚠ ' + e.message; statusEl.style.color='var(--r5)';
-  }
-}
 
 let _vadCatActiva = '__all__'; // Categoría activa en vademécum
 
@@ -9906,12 +8686,11 @@ function openEditRef(spId, idx) {
   if (!r) return;
   _refPDFData = r.pdf || null;
   document.getElementById('ref-modal')?.remove();
-  const { provider, key } = getActiveAIKey();
   document.body.insertAdjacentHTML('beforeend', `
     <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">✏️ Editar referencia</div>
-        ${buildRefFormHTML(key, provider)}
+        ${buildRefFormHTML()}
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
           <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
           <button class="btn btn-primary" style="flex:2" onclick="updateRef('${spId}',${idx})">💾 Guardar cambios</button>
@@ -9953,12 +8732,11 @@ function openEditRefGeneral(idx) {
   if (!r) return;
   _refPDFData = r.pdf || null;
   document.getElementById('ref-modal')?.remove();
-  const { provider, key } = getActiveAIKey();
   document.body.insertAdjacentHTML('beforeend', `
     <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">✏️ Editar referencia general</div>
-        ${buildRefFormHTML(key, provider)}
+        ${buildRefFormHTML()}
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
           <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
           <button class="btn btn-primary" style="flex:2" onclick="updateRefGeneral(${idx})">💾 Guardar cambios</button>
@@ -9995,12 +8773,11 @@ async function updateRefGeneral(idx) {
 function openAddRefGeneral() {
   _refPDFData = null;
   document.getElementById('ref-modal')?.remove();
-  const { provider, key } = getActiveAIKey();
   document.body.insertAdjacentHTML('beforeend', `
     <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">📖 Agregar referencia general</div>
-        ${buildRefFormHTML(key, provider)}
+        ${buildRefFormHTML()}
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
           <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
           <button class="btn btn-primary" style="flex:2" onclick="saveRefGeneral()">💾 Guardar</button>
@@ -10009,19 +8786,8 @@ function openAddRefGeneral() {
     </div>`);
 }
 
-function buildRefFormHTML(key, provider) {
+function buildRefFormHTML() {
   return `
-    <div style="background:var(--g0);border:2px dashed var(--g4);border-radius:var(--r);padding:.75rem;margin-bottom:.75rem;text-align:center">
-      <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.35rem">📄 Importar desde archivo — la IA extrae los metadatos automáticamente</div>
-      <div style="display:flex;gap:.3rem;justify-content:center;margin-bottom:.35rem">
-        <button onclick="setRefAI(this,'gemini')" data-ai="gemini" style="font-size:.7rem;padding:.2rem .5rem;border-radius:var(--rxs);border:${provider==='gemini'?'2px solid var(--g4)':'1px solid var(--bor)'};background:${provider==='gemini'?'var(--g1)':'var(--sur)'};color:${provider==='gemini'?'var(--g7)':'var(--txt3)'};cursor:pointer">🔵 Gemini</button>
-        <button onclick="setRefAI(this,'claude')" data-ai="claude" style="font-size:.7rem;padding:.2rem .5rem;border-radius:var(--rxs);border:${provider==='claude'?'2px solid #f59e0b':'1px solid var(--bor)'};background:${provider==='claude'?'#fff8e1':'var(--sur)'};color:${provider==='claude'?'#b45309':'var(--txt3)'};cursor:pointer">🟠 Claude</button>
-        <input type="password" id="ref-ai-key" class="form-control" style="flex:1;min-width:80px;font-size:.72rem;height:1.6rem" placeholder="API Key..." value="${key||''}" oninput="saveRefAIKey(this.value)">
-      </div>
-      <label for="ref-file-up" class="btn btn-primary btn-sm" style="cursor:pointer">📂 Seleccionar archivo (PDF, Word, TXT)</label>
-      <input type="file" id="ref-file-up" accept=".pdf,.docx,.doc,.txt" style="display:none" onchange="importRefFile(this)">
-      <div id="ref-import-status" style="font-size:.75rem;color:var(--g6);margin-top:.3rem;min-height:1rem"></div>
-    </div>
     <div class="form-group"><label>Título *</label><input id="ref-titulo" class="form-control" placeholder="Ej: Wild Mammal Husbandry, Formulario AAZV..."></div>
     <div class="form-row">
       <div class="form-group"><label>Autores</label><input id="ref-autores" class="form-control" placeholder="Apellido, N. et al."></div>
@@ -10040,7 +8806,7 @@ function buildRefFormHTML(key, provider) {
       <label>PDF adjunto <span style="font-size:.7rem;color:var(--txt3)">(se guarda localmente; se puede ver o descargar)</span></label>
       <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
         <label for="ref-pdf-extra" class="btn btn-secondary btn-sm" style="cursor:pointer">📎 Adjuntar PDF</label>
-        <input type="file" id="ref-pdf-extra" accept=".pdf" style="display:none" onchange="previewRefPDF(this)">
+        <input type="file" id="ref-pdf-extra" accept=".pdf" style="display:none">
         <span id="ref-pdf-name" style="font-size:.75rem;color:var(--txt3)">Sin PDF adjunto</span>
         <span id="ref-pdf-actions" style="display:none;gap:.4rem">
           <button onclick="viewRefPDF()" class="btn btn-secondary btn-sm">👁 Ver</button>
@@ -12551,182 +11317,13 @@ async function saveBiblioteca() {
 }
 
 
-function setModalAI(btn, provider) {
-  selectedAI = provider;
-  localStorage.setItem('wv_ai_provider', provider);
-  // Actualizar estilos botones
-  btn.closest('div').querySelectorAll('[data-provider]').forEach(b => {
-    const isSel = b.dataset.provider === provider;
-    b.style.background = isSel ? (provider==='gemini'?'var(--g1)':'#fff8e1') : 'var(--sur)';
-    b.style.color = isSel ? (provider==='gemini'?'var(--g7)':'#b45309') : 'var(--txt3)';
-    b.style.borderColor = isSel ? (provider==='gemini'?'var(--g4)':'#f59e0b') : 'var(--bor)';
-  });
-  updateModalAIStatus();
-}
-function saveModalAIKey(raw) {
-  const key = (raw||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  if (key.startsWith('AIza')) { localStorage.setItem('wv_key_gemini', key); selectedAI='gemini'; }
-  else if (key.startsWith('sk-')) { localStorage.setItem('wv_key_claude', key); selectedAI='claude'; }
-  localStorage.setItem('wv_ai_provider', selectedAI);
-  updateModalAIStatus();
-}
-function updateModalAIStatus() {
-  const { key } = getActiveAIKey();
-  const inp = document.getElementById('modal-ai-key');
-  const st  = document.getElementById('modal-ai-status');
-  if (inp && !inp.value && key) inp.value = key;
-  if (!st) return;
-  if (!key) st.textContent = '⚠ Sin key — Gemini gratis: aistudio.google.com/apikey';
-  else st.textContent = '✓ ' + (selectedAI==='gemini'?'Gemini':'Claude') + ': ' + key.substring(0,14) + '...';
-  st.style.color = key ? 'var(--g6)' : 'var(--am)';
-}
-function getModalAIKey() {
-  // Leer del campo modal o del almacenamiento según proveedor seleccionado
-  const modalKey = (document.getElementById('modal-ai-key')?.value||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  if (modalKey) {
-    // Actualizar el proveedor según el tipo de key
-    if (modalKey.startsWith('AIza')) selectedAI = 'gemini';
-    else if (modalKey.startsWith('sk-')) selectedAI = 'claude';
-    return modalKey;
-  }
-  const { key } = getActiveAIKey();
-  return key || '';
-}
-async function importBibFile(input) {
-  if (!input.files?.[0]) return;
-  const statusEl = document.getElementById('bib-import-status');
-  const spId = document.getElementById('bib-sp-select')?.value;
-  if (!spId) { if(statusEl) statusEl.textContent='⚠ Selecciona una especie'; return; }
-  if (statusEl) { statusEl.textContent = '⏳ Procesando archivo...'; statusEl.style.color='var(--g6)'; }
-  try {
-    const file = input.files[0];
-    const isPDF = file.name.match(/\.pdf$/i);
-    const apiKey = getModalAIKey();
-    if (!apiKey) throw new Error('Sin API Key — configúrala arriba');
-
-    const prompt = `Analiza este documento académico/científico y extrae sus metadatos bibliográficos. Devuelve SOLO un JSON:
-{"titulo":"título completo","autores":"Apellido1, N.; Apellido2, N.","año":"año","tipo":"Libro|Artículo científico|Paper|Guía clínica|Tesis|Manual|Otro","doi":"DOI o URL si está disponible","resumen":"resumen de 1-2 oraciones de qué trata el documento"}`;
-
-    let metadata = null;
-
-    if (isPDF) {
-      // Leer como base64
-      const base64 = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(file); });
-      const b64 = base64.split(',')[1];
-      if (apiKey.startsWith('sk-')) {
-        const resp = await fetch('https://api.anthropic.com/v1/messages',{
-          method:'POST', headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-          body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,messages:[{role:'user',content:[
-            {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}
-          ]}]})
-        });
-        if (!resp.ok) throw new Error('Claude error '+resp.status);
-        const d = await resp.json(); const raw=d.content.map(c=>c.text||'').join('');
-        const cl=raw.replace(/```json|```/g,'').trim(); const js=cl.indexOf('{'),je=cl.lastIndexOf('}');
-        if(js>=0) metadata=JSON.parse(cl.substring(js,je+1));
-      } else {
-        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,{
-          method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:'application/pdf',data:b64}},{text:prompt}]}]})
-        });
-        if (!resp.ok) throw new Error('Gemini error '+resp.status);
-        const d=await resp.json(); const raw=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
-        const cl=raw.replace(/```json|```/g,'').trim(); const js=cl.indexOf('{'),je=cl.lastIndexOf('}');
-        if(js>=0) metadata=JSON.parse(cl.substring(js,je+1));
-      }
-    } else {
-      // Word, Excel, TXT — usar importExcelWithAI
-      metadata = await importExcelWithAI(file, prompt);
-      if (Array.isArray(metadata)) metadata = metadata[0];
-    }
-
-    if (metadata && metadata.titulo) {
-      if (!BIBLIOTECA_DB[spId]) BIBLIOTECA_DB[spId] = [];
-      BIBLIOTECA_DB[spId].push({
-        titulo: metadata.titulo||'',
-        autores: metadata.autores||'',
-        año: metadata.año||'',
-        tipo: metadata.tipo||'Artículo científico',
-        url: metadata.doi||'',
-        notas: metadata.resumen||''
-      });
-      await saveBiblioteca();
-      if (statusEl) { statusEl.textContent = `✅ Referencia importada: "${metadata.titulo}"`;  statusEl.style.color='var(--g5)'; }
-      input.value = '';
-      renderBiblioteca();
-      setTimeout(updateModalAIStatus, 50);
-    } else {
-      throw new Error('No se encontraron metadatos en el documento');
-    }
-  } catch(e) {
-    if (statusEl) { statusEl.textContent = '⚠ ' + e.message; statusEl.style.color='var(--r5)'; }
-  }
-}
-
-function saveRefAIKey(raw) {
-  const key = (raw||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  // Guardar como key activa del proveedor detectado
-  if (key.startsWith('AIza')) {
-    localStorage.setItem('wv_key_gemini', key);
-    selectedAI = 'gemini';
-  } else if (key.startsWith('sk-')) {
-    localStorage.setItem('wv_key_claude', key);
-    selectedAI = 'claude';
-  }
-  localStorage.setItem('wv_ai_provider', selectedAI);
-  const status = document.getElementById('ref-ai-key-status');
-  if (status) {
-    if (!key) { status.textContent = ''; return; }
-    if (key.startsWith('AIza')) { status.textContent = '✓ Gemini configurado'; status.style.color='var(--g6)'; }
-    else if (key.startsWith('sk-')) { status.textContent = '✓ Claude configurado'; status.style.color='var(--g6)'; }
-    else { status.textContent = '⚠ Key no reconocida'; status.style.color='var(--r5)'; }
-  }
-}
-
 function openAddRef(spId) {
   document.getElementById('ref-modal')?.remove();
-  _refPDFData = null;
   const sp = SPECIES_DB.find(s => s.id === spId);
-  const { provider, key } = getActiveAIKey();
   document.body.insertAdjacentHTML('beforeend', `
     <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">📚 Agregar referencia — ${sp?.name||''}</div>
-
-        <!-- IMPORTAR DESDE ARCHIVO (igual a agregar especie) -->
-        <div style="background:var(--g0);border:2px dashed var(--g4);border-radius:var(--r);padding:1rem;margin-bottom:1rem;text-align:center">
-          <div style="font-size:1.4rem;margin-bottom:.25rem">📄</div>
-          <div style="font-weight:600;font-size:.88rem;margin-bottom:.1rem">Importar desde PDF, Word o Excel</div>
-          <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.6rem">La IA extrae título, autores, año y tipo automáticamente</div>
-
-          <!-- Selector IA -->
-          <div style="display:flex;gap:.3rem;justify-content:center;margin-bottom:.4rem">
-            <button onclick="setRefAI(this,'gemini')" data-ai="gemini"
-              style="font-size:.72rem;padding:.2rem .55rem;border-radius:var(--rxs);border:2px solid var(--g4);background:var(--g1);color:var(--g7);cursor:pointer;font-family:var(--sans);font-weight:600">🔵 Gemini (gratis)</button>
-            <button onclick="setRefAI(this,'claude')" data-ai="claude"
-              style="font-size:.72rem;padding:.2rem .55rem;border-radius:var(--rxs);border:1px solid var(--bor);background:var(--sur);color:var(--txt3);cursor:pointer;font-family:var(--sans)">🟠 Claude</button>
-          </div>
-
-          <!-- Key -->
-          <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
-            <input type="password" id="ref-ai-key" class="form-control" style="flex:1;font-size:.75rem"
-              placeholder="${key ? key.substring(0,8)+'...' : 'AIzaSy... o sk-ant-...'}"
-              value="${key||''}"
-              oninput="saveRefAIKey(this.value)">
-            <a href="https://aistudio.google.com/apikey" target="_blank" class="btn btn-secondary btn-sm" style="font-size:.68rem;white-space:nowrap">Obtener</a>
-          </div>
-          <div id="ref-ai-key-status" style="font-size:.68rem;color:${key?'var(--g6)':'var(--am)'};margin-bottom:.5rem;text-align:left">
-            ${key ? '✓ '+( provider==='gemini'?'Gemini':'Claude')+' configurado' : '⚠ Sin key — sin key solo se guarda el PDF sin extraer datos'}
-          </div>
-
-          <!-- Botón seleccionar archivo -->
-          <label for="ref-file-up" class="btn btn-primary" style="cursor:pointer;display:inline-flex;gap:.4rem">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Seleccionar archivo
-          </label>
-          <input type="file" id="ref-file-up" accept=".pdf,.docx,.doc,.txt" style="display:none" onchange="importRefFile(this)">
-          <div id="ref-import-status" style="margin-top:.5rem;font-size:.8rem;color:var(--g6);min-height:1rem"></div>
-        </div>
 
         <!-- Campos manuales -->
         <div class="form-group"><label>Título *</label><input id="ref-titulo" class="form-control" placeholder="Ej: Wild Mammal Husbandry..."></div>
@@ -12757,199 +11354,6 @@ function openAddRef(spId) {
       </div>
     </div>`);
   document.getElementById('ref-titulo')?.focus();
-}
-
-function setRefAI(btn, provider) {
-  selectedAI = provider;
-  localStorage.setItem('wv_ai_provider', provider);
-  btn.closest('div').querySelectorAll('[data-ai]').forEach(b => {
-    const sel = b.dataset.ai === provider;
-    b.style.borderWidth = sel ? '2px' : '1px';
-    b.style.borderColor = sel ? (provider==='gemini'?'var(--g4)':'#f59e0b') : 'var(--bor)';
-    b.style.background  = sel ? (provider==='gemini'?'var(--g1)':'#fff8e1') : 'var(--sur)';
-    b.style.color       = sel ? (provider==='gemini'?'var(--g7)':'#b45309') : 'var(--txt3)';
-    b.style.fontWeight  = sel ? '600' : '400';
-  });
-}
-
-async function importRefFile(input) {
-  if (!input.files?.[0]) return;
-  const file = input.files[0];
-  const statusEl = document.getElementById('ref-import-status');
-  const nameEl   = document.getElementById('ref-pdf-name');
-
-  if (statusEl) { statusEl.textContent = '⏳ Leyendo archivo...'; statusEl.style.color='var(--g6)'; }
-
-  // Guardar PDF
-  if (file.name.toLowerCase().endsWith('.pdf')) {
-    const base64 = await new Promise((res,rej) => {
-      const r = new FileReader(); r.onload = e => res(e.target.result); r.onerror = rej; r.readAsDataURL(file);
-    });
-    _refPDFData = { name: file.name, data: base64 };
-  }
-  if (nameEl) { nameEl.textContent = '📎 ' + file.name; const prev = document.getElementById('ref-pdf-preview'); if(prev) prev.style.display='flex'; }
-
-  // Obtener key — buscar en todos los campos del modal y en localStorage
-  const apiKey = [
-    document.getElementById('ref-ai-key')?.value,
-    document.getElementById('gemini-api-key')?.value,
-    document.getElementById('claude-api-key')?.value,
-    getActiveAIKey().key
-  ].map(k=>(k||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'')).find(k=>k.length>0)||'';
-
-  if (!apiKey) {
-    if (statusEl) { statusEl.textContent = 'Sin API key — completa los campos manualmente'; statusEl.style.color='var(--am)'; }
-    return;
-  }
-
-  if (statusEl) statusEl.textContent = '🤖 Extrayendo información con IA...';
-
-  try {
-    const prompt = `Analiza este documento y extrae sus metadatos bibliográficos. Devuelve SOLO un objeto JSON, sin texto adicional:\n{"titulo":"título completo","autores":"Apellido1, N.; Apellido2, N.","año":"año","tipo":"Libro|Artículo científico|Paper|Guía clínica|Tesis|Manual|Otro","url":"DOI o URL","notas":"editorial o revista"}`;
-
-    let messages;
-    const isPDF = file.name.toLowerCase().endsWith('.pdf');
-    if (isPDF && apiKey.startsWith('sk-') && _refPDFData) {
-      const b64 = _refPDFData.data.split(',')[1];
-      messages = [{role:'user', content:[
-        {type:'document', source:{type:'base64', media_type:'application/pdf', data:b64}},
-        {type:'text', text:prompt}
-      ]}];
-    } else {
-      let text = '';
-      try { text = await file.text(); } catch(e2) { text = file.name; }
-      messages = [{role:'user', content: prompt + '\n\nArchivo: ' + file.name + '\n' + text.substring(0,8000)}];
-    }
-
-    // Llamada con errores visibles
-    const clean = await callAI(apiKey, messages, 600);
-    const m = clean.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error('La IA no devolvió JSON — intenta de nuevo');
-    const result = JSON.parse(m[0]);
-
-    const set = (id,v) => { const el=document.getElementById(id); if(el&&v) el.value=v; };
-    set('ref-titulo',  result.titulo);
-    set('ref-autores', result.autores);
-    set('ref-año',     result.año);
-    set('ref-url',     result.url);
-    set('ref-notas',   result.notas);
-    if (result.tipo) {
-      const sel = document.getElementById('ref-tipo');
-      if (sel) for (const o of sel.options) if (o.value.toLowerCase().includes((result.tipo||'').toLowerCase().substring(0,5))) { o.selected=true; break; }
-    }
-    if (statusEl) { statusEl.textContent = '✅ Metadatos extraídos correctamente'; statusEl.style.color='var(--g5)'; }
-    toast('✓ Metadatos extraídos');
-
-  } catch(e) {
-    // Mostrar error real en lugar de mensaje genérico
-    if (statusEl) { statusEl.textContent = '⚠ ' + e.message; statusEl.style.color='var(--r5)'; }
-  }
-}
-
-let _refPDFData = null;
-
-async function previewRefPDF(input) {
-  if (!input.files?.[0]) return;
-  const file = input.files[0];
-  const nameEl = document.getElementById('ref-pdf-name');
-  if (nameEl) nameEl.textContent = '⏳ Leyendo PDF...';
-
-  // Guardar base64
-  const base64 = await new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = e => res(e.target.result);
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
-  _refPDFData = { name: file.name, data: base64 };
-
-  if (nameEl) nameEl.textContent = file.name + ' (' + (file.size/1024).toFixed(0) + ' KB)';
-  const actionsEl = document.getElementById('ref-pdf-actions');
-  if (actionsEl) actionsEl.style.display = 'flex';
-
-  // Intentar extraer metadatos con IA
-  // Priorizar key del campo del modal, luego la guardada
-  const modalKey = (document.getElementById('ref-ai-key')?.value||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  const { key: savedKey } = getActiveAIKey();
-  const rawKey = modalKey || savedKey || (localStorage.getItem('wv_api_key')||'').replace(/[\s\r\n\t\u200B\u00A0\uFEFF]/g,'');
-  if (!rawKey) return; // Sin key, dejar campos vacíos
-
-  if (nameEl) nameEl.textContent += ' · 🤖 Extrayendo metadatos...';
-
-  try {
-    const prompt = `Analiza este documento científico/académico y extrae sus metadatos bibliográficos. Devuelve SOLO un JSON válido:
-{"titulo":"título completo del documento","autores":"Apellido1, N.; Apellido2, N. (todos los autores)","año":"año de publicación","tipo":"Libro|Artículo científico|Paper|Guía clínica|Tesis|Manual|Otro"}
-Si no encuentras algún dato deja el campo vacío "".`;
-
-    let metadata = null;
-
-    if (rawKey.startsWith('sk-')) {
-      // Anthropic — enviar como documento PDF base64
-      const b64 = base64.split(',')[1];
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json','x-api-key':rawKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
-        body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:500,
-          messages:[{ role:'user', content:[
-            { type:'document', source:{ type:'base64', media_type:'application/pdf', data:b64 } },
-            { type:'text', text:prompt }
-          ]}]
-        })
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        const raw = data.content.map(c=>c.text||'').join('');
-        const clean = raw.replace(/```json|```/g,'').trim();
-        const js = clean.indexOf('{'), je = clean.lastIndexOf('}');
-        if (js>=0) metadata = JSON.parse(clean.substring(js, je+1));
-      }
-    } else if (rawKey.startsWith('AIza')) {
-      // Gemini — enviar como inlineData
-      const b64 = base64.split(',')[1];
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${rawKey}`, {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ contents:[{ parts:[
-          { inline_data:{ mime_type:'application/pdf', data:b64 } },
-          { text: prompt }
-        ]}]})
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const clean = raw.replace(/```json|```/g,'').trim();
-        const js = clean.indexOf('{'), je = clean.lastIndexOf('}');
-        if (js>=0) metadata = JSON.parse(clean.substring(js, je+1));
-      }
-    }
-
-    if (metadata) {
-      // Rellenar campos automáticamente
-      const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
-      set('ref-titulo',  metadata.titulo);
-      set('ref-autores', metadata.autores);
-      set('ref-año',     metadata.año);
-      // Tipo: buscar opción más cercana
-      if (metadata.tipo) {
-        const sel = document.getElementById('ref-tipo');
-        if (sel) {
-          for (const opt of sel.options) {
-            if (opt.value.toLowerCase().includes(metadata.tipo.toLowerCase()) ||
-                metadata.tipo.toLowerCase().includes(opt.value.toLowerCase())) {
-              opt.selected = true; break;
-            }
-          }
-        }
-      }
-      if (nameEl) nameEl.textContent = file.name + ' ✅ Metadatos extraídos';
-      toast('✓ Metadatos del PDF extraídos automáticamente');
-    } else {
-      if (nameEl) nameEl.textContent = file.name + ' (completa los campos manualmente)';
-    }
-  } catch(e) {
-    console.warn('No se pudieron extraer metadatos:', e.message);
-    if (nameEl) nameEl.textContent = file.name + ' (completa los campos manualmente)';
-  }
 }
 
 async function saveRef(spId) {
@@ -15055,21 +13459,7 @@ function openAddEnfGen(sistId, editIdx=-1) {
     <div id="enfgen-add-modal" style="position:fixed;inset:0;z-index:1300;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:96vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">${editEnf?'✏️ Editar':'+'} enfermedad${sName?' — '+sName:''}</div>
-        ${editIdx<0?`<div style="background:var(--g0);border:1.5px dashed var(--g4);border-radius:var(--rsm);padding:.5rem .6rem;margin-bottom:.75rem">
-          <div style="font-size:.68rem;color:var(--g7);font-weight:600;margin-bottom:.3rem">🤖 Importar con IA — PDF, Word o Excel</div>
-          <div style="display:flex;gap:.3rem;align-items:center">
-            <label for="enfgen-file-import" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.7rem">📂 Seleccionar archivo</label>
-            <input type="file" id="enfgen-file-import" accept=".pdf,.xlsx,.xls,.csv,.docx,.txt" style="display:none" onchange="importEnfGenFile(this,'${sistId}')">
-            <span id="enfgen-import-status" style="font-size:.7rem;color:var(--g6);flex:1;min-width:0"></span>
-          </div>
-          <div style="margin-top:.3rem">
-            <button onclick="togglePasteBox('enfgen-import-status')" style="font-size:.65rem;color:var(--g6);background:none;border:none;cursor:pointer;text-decoration:underline">✏️ O pega texto directamente aquí</button>
-            <div id="paste-box-enfgen-import-status" style="display:none;margin-top:.25rem">
-              <textarea id="paste-text-enfgen-import-status" class="form-control" style="min-height:80px;font-size:.78rem;resize:vertical" placeholder="Pega aquí la información sobre la enfermedad..."></textarea>
-              <button onclick="processEnfGenTextInput('${sistId}')" class="btn btn-secondary btn-sm" style="margin-top:.25rem;font-size:.7rem">🤖 Procesar con IA</button>
-            </div>
-          </div>
-        </div>`:``}
+
 
         <!-- Nombre y sinónimos -->
         <div class="form-group"><label>Nombre de la enfermedad *</label>
@@ -15399,7 +13789,7 @@ function openAddEnfGen(sistId, editIdx=-1) {
         </div>
       </div>
     </div>`);
-  setTimeout(() => { updateModalAIStatus?.(); buildSignosHistory?.(); _buildSpeciesDatalist?.(); setTimeout(()=>_enfRenderRefList('enfgen'),50); }, 50);
+  setTimeout(() => { buildSignosHistory?.(); _buildSpeciesDatalist?.(); setTimeout(()=>_enfRenderRefList('enfgen'),50); }, 50);
 }
 
 
