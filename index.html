@@ -2250,6 +2250,36 @@ async function loadData() {
     }
   }
 
+  // ── Merge: añadir categorías nuevas del DEFAULT sin borrar las existentes ──
+  let vadCatsChanged = false;
+  for (const [defId, defCat] of Object.entries(DEFAULT_VADEMECUM_CATS)) {
+    if (!VADEMECUM_CATS[defId]) {
+      VADEMECUM_CATS[defId] = JSON.parse(JSON.stringify(defCat));
+      vadCatsChanged = true;
+    } else {
+      const existing = VADEMECUM_CATS[defId];
+      if (!existing.subcategories) existing.subcategories = {};
+      for (const [subId, defSub] of Object.entries(defCat.subcategories || {})) {
+        if (!existing.subcategories[subId]) {
+          existing.subcategories[subId] = JSON.parse(JSON.stringify(defSub));
+          vadCatsChanged = true;
+        } else {
+          const exSub = existing.subcategories[subId];
+          if (defSub.subcats && Object.keys(defSub.subcats).length) {
+            if (!exSub.subcats) exSub.subcats = {};
+            for (const [ssId, defSS] of Object.entries(defSub.subcats)) {
+              if (!exSub.subcats[ssId]) {
+                exSub.subcats[ssId] = JSON.parse(JSON.stringify(defSS));
+                vadCatsChanged = true;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  if (vadCatsChanged) await saveVademecumCats();
+
   // ── Sincronizar fármacos de especies → vademécum ──
   for (const sp of SPECIES_DB) {
     if (sp.drugs?.length) await syncAllSpeciesDrugsToVademecum(sp);
