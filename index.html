@@ -2250,36 +2250,6 @@ async function loadData() {
     }
   }
 
-  // ── Merge: añadir categorías nuevas del DEFAULT sin borrar las existentes ──
-  let vadCatsChanged = false;
-  for (const [defId, defCat] of Object.entries(DEFAULT_VADEMECUM_CATS)) {
-    if (!VADEMECUM_CATS[defId]) {
-      VADEMECUM_CATS[defId] = JSON.parse(JSON.stringify(defCat));
-      vadCatsChanged = true;
-    } else {
-      const existing = VADEMECUM_CATS[defId];
-      if (!existing.subcategories) existing.subcategories = {};
-      for (const [subId, defSub] of Object.entries(defCat.subcategories || {})) {
-        if (!existing.subcategories[subId]) {
-          existing.subcategories[subId] = JSON.parse(JSON.stringify(defSub));
-          vadCatsChanged = true;
-        } else {
-          const exSub = existing.subcategories[subId];
-          if (defSub.subcats && Object.keys(defSub.subcats).length) {
-            if (!exSub.subcats) exSub.subcats = {};
-            for (const [ssId, defSS] of Object.entries(defSub.subcats)) {
-              if (!exSub.subcats[ssId]) {
-                exSub.subcats[ssId] = JSON.parse(JSON.stringify(defSS));
-                vadCatsChanged = true;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  if (vadCatsChanged) await saveVademecumCats();
-
   // ── Sincronizar fármacos de especies → vademécum ──
   for (const sp of SPECIES_DB) {
     if (sp.drugs?.length) await syncAllSpeciesDrugsToVademecum(sp);
@@ -2292,6 +2262,10 @@ async function loadData() {
       if (d.cat_vad || d.subcat_vad) await dbPutSync('vademecum', d);
     }
   }
+
+  // ── Precargar fármacos por defecto ──
+  seedDefaultVademecumDrugs();
+  VADEMECUM_DB = await dbGetAll('vademecum');
 
   // ── PIN admin ──
   const pinSaved = await dbGet('settings', 'admin_pin');
@@ -7113,6 +7087,143 @@ const DEFAULT_VADEMECUM_CATS = {
     eutanasia: { label:'Agentes Eutanásicos', info:'', subcats:{} }
   }}
 };
+
+const DEFAULT_VADEMECUM_DRUGS = [
+  // ═══ I. ANTIINFECIOSOS Y ANTIPARASITARIOS SISTÉMICOS ═══
+  // ── 1. Antibacterianos / Antibióticos ──
+  // Betalactámicos
+  { drug:'Amoxicilina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Betalactámicos (Penicilinas y Cefalosporinas)' },
+  { drug:'Amoxicilina + Ácido Clavulánico', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Betalactámicos (Penicilinas y Cefalosporinas)' },
+  { drug:'Ampicilina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Betalactámicos (Penicilinas y Cefalosporinas)' },
+  { drug:'Penicilina G Procaínica', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Betalactámicos (Penicilinas y Cefalosporinas)' },
+  { drug:'Cefalexina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Betalactámicos (Penicilinas y Cefalosporinas)' },
+  { drug:'Cefovecina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Betalactámicos (Penicilinas y Cefalosporinas)' },
+  { drug:'Cefquinoma', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Betalactámicos (Penicilinas y Cefalosporinas)' },
+  { drug:'Ceftiofur', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Betalactámicos (Penicilinas y Cefalosporinas)' },
+  { drug:'Cefazolina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Betalactámicos (Penicilinas y Cefalosporinas)' },
+  { drug:'Cefadroxilo', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Betalactámicos (Penicilinas y Cefalosporinas)' },
+  // Fluoroquinolonas
+  { drug:'Enrofloxacina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Fluoroquinolonas' },
+  { drug:'Marbofloxacina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Fluoroquinolonas' },
+  { drug:'Pradofloxacina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Fluoroquinolonas' },
+  { drug:'Ciprofloxacina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Fluoroquinolonas' },
+  { drug:'Orbifloxacina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Fluoroquinolonas' },
+  { drug:'Danofloxacina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Fluoroquinolonas' },
+  { drug:'Ibafloxacina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Fluoroquinolonas' },
+  { drug:'Difloxacina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Fluoroquinolonas' },
+  { drug:'Norfloxacina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Fluoroquinolonas' },
+  { drug:'Ofloxacina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Fluoroquinolonas' },
+  // Macrólidos, Lincosamidas y Fenicoles
+  { drug:'Tildipirosina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Macrólidos, Lincosamidas y Fenicoles' },
+  { drug:'Tulatromicina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Macrólidos, Lincosamidas y Fenicoles' },
+  { drug:'Tylosina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Macrólidos, Lincosamidas y Fenicoles' },
+  { drug:'Gamitromicina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Macrólidos, Lincosamidas y Fenicoles' },
+  { drug:'Clindamicina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Macrólidos, Lincosamidas y Fenicoles' },
+  { drug:'Lincomicina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Macrólidos, Lincosamidas y Fenicoles' },
+  { drug:'Florfenicol', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Macrólidos, Lincosamidas y Fenicoles' },
+  { drug:'Eritromicina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Macrólidos, Lincosamidas y Fenicoles' },
+  { drug:'Spiramicina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Macrólidos, Lincosamidas y Fenicoles' },
+  { drug:'Azitromicina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Macrólidos, Lincosamidas y Fenicoles' },
+  // Tetraciclinas y Aminoglucósidos
+  { drug:'Oxitetraciclina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Tetraciclinas y Aminoglucósidos' },
+  { drug:'Doxiciclina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Tetraciclinas y Aminoglucósidos' },
+  { drug:'Clortetraciclina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Tetraciclinas y Aminoglucósidos' },
+  { drug:'Gentamicina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Tetraciclinas y Aminoglucósidos' },
+  { drug:'Amikacina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Tetraciclinas y Aminoglucósidos' },
+  { drug:'Neomicina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Tetraciclinas y Aminoglucósidos' },
+  { drug:'Estreptomicina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Tetraciclinas y Aminoglucósidos' },
+  { drug:'Tobramicina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Tetraciclinas y Aminoglucósidos' },
+  { drug:'Kanamicina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Tetraciclinas y Aminoglucósidos' },
+  { drug:'Dihidroestreptomicina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Tetraciclinas y Aminoglucósidos' },
+  // Sulfamidas
+  { drug:'Sulfadiazina + Trimetoprima', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Sulfamidas y Sulfamidas Potenciadas' },
+  { drug:'Sulfametoxazol + Trimetoprima', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Sulfamidas y Sulfamidas Potenciadas' },
+  { drug:'Sulfadimetoxina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Sulfamidas y Sulfamidas Potenciadas' },
+  { drug:'Sulfametazina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Sulfamidas y Sulfamidas Potenciadas' },
+  { drug:'Sulfaquinoxalina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Sulfamidas y Sulfamidas Potenciadas' },
+  { drug:'Sulfatiazol', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Sulfamidas y Sulfamidas Potenciadas' },
+  { drug:'Sulfamerazina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Sulfamidas y Sulfamidas Potenciadas' },
+  { drug:'Sulfadimetoxina + Baquiloprim', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Sulfamidas y Sulfamidas Potenciadas' },
+  { drug:'Sulfaclorpiridazina', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Sulfamidas y Sulfamidas Potenciadas' },
+  { drug:'Sulfadoxina + Trimetoprima', cat_vad:'antiinfecciosos', subcat_vad:'antibacterianos', subsubcat_vad:'Sulfamidas y Sulfamidas Potenciadas' },
+  // ── 2. Antifúngicos ──
+  { drug:'Ketoconazol', cat_vad:'antiinfecciosos', subcat_vad:'antifungicos' },
+  { drug:'Itraconazol', cat_vad:'antiinfecciosos', subcat_vad:'antifungicos' },
+  { drug:'Fluconazol', cat_vad:'antiinfecciosos', subcat_vad:'antifungicos' },
+  { drug:'Griseofulvina', cat_vad:'antiinfecciosos', subcat_vad:'antifungicos' },
+  { drug:'Anfotericina B', cat_vad:'antiinfecciosos', subcat_vad:'antifungicos' },
+  { drug:'Terbinafina', cat_vad:'antiinfecciosos', subcat_vad:'antifungicos' },
+  { drug:'Voriconazol', cat_vad:'antiinfecciosos', subcat_vad:'antifungicos' },
+  { drug:'Nistatina', cat_vad:'antiinfecciosos', subcat_vad:'antifungicos' },
+  { drug:'Posaconazol', cat_vad:'antiinfecciosos', subcat_vad:'antifungicos' },
+  { drug:'Clotrimazol', cat_vad:'antiinfecciosos', subcat_vad:'antifungicos' },
+  // ── 3. Antivirales ──
+  { drug:'Oseltamivir', cat_vad:'antiinfecciosos', subcat_vad:'antivirales' },
+  { drug:'Aciclovir', cat_vad:'antiinfecciosos', subcat_vad:'antivirales' },
+  { drug:'Interferón Omega Felino', cat_vad:'antiinfecciosos', subcat_vad:'antivirales' },
+  { drug:'Zidovudina (AZT)', cat_vad:'antiinfecciosos', subcat_vad:'antivirales' },
+  { drug:'Famciclovir', cat_vad:'antiinfecciosos', subcat_vad:'antivirales' },
+  { drug:'Vidarabina', cat_vad:'antiinfecciosos', subcat_vad:'antivirales' },
+  { drug:'Idoxuridina', cat_vad:'antiinfecciosos', subcat_vad:'antivirales' },
+  { drug:'Ribavirina', cat_vad:'antiinfecciosos', subcat_vad:'antivirales' },
+  { drug:'GS-441524', cat_vad:'antiinfecciosos', subcat_vad:'antivirales' },
+  { drug:'Molnupiravir', cat_vad:'antiinfecciosos', subcat_vad:'antivirales' },
+  // ── 4. Antiparasitarios ──
+  // Endoparásitos
+  { drug:'Fenbendazol', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Endoparásitos (Antelmínticos y Antiprotozoarios)' },
+  { drug:'Albendazol', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Endoparásitos (Antelmínticos y Antiprotozoarios)' },
+  { drug:'Praziquantel', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Endoparásitos (Antelmínticos y Antiprotozoarios)' },
+  { drug:'Pyrantel', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Endoparásitos (Antelmínticos y Antiprotozoarios)' },
+  { drug:'Febantel', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Endoparásitos (Antelmínticos y Antiprotozoarios)' },
+  { drug:'Metronidazol', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Endoparásitos (Antelmínticos y Antiprotozoarios)' },
+  { drug:'Toltrazuril', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Endoparásitos (Antelmínticos y Antiprotozoarios)' },
+  { drug:'Oxfendazol', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Endoparásitos (Antelmínticos y Antiprotozoarios)' },
+  { drug:'Levamisol', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Endoparásitos (Antelmínticos y Antiprotozoarios)' },
+  { drug:'Nitroxinil', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Endoparásitos (Antelmínticos y Antiprotozoarios)' },
+  // Ectoparásitos
+  { drug:'Ivermectina', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Ectoparásitos y Endectocidas (Insecticidas, Acaricidas e Isoxazolinas)' },
+  { drug:'Milbemicina Oxima', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Ectoparásitos y Endectocidas (Insecticidas, Acaricidas e Isoxazolinas)' },
+  { drug:'Moxidectina', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Ectoparásitos y Endectocidas (Insecticidas, Acaricidas e Isoxazolinas)' },
+  { drug:'Selamectina', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Ectoparásitos y Endectocidas (Insecticidas, Acaricidas e Isoxazolinas)' },
+  { drug:'Afoxolaner', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Ectoparásitos y Endectocidas (Insecticidas, Acaricidas e Isoxazolinas)' },
+  { drug:'Fluralaner', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Ectoparásitos y Endectocidas (Insecticidas, Acaricidas e Isoxazolinas)' },
+  { drug:'Sarolaner', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Ectoparásitos y Endectocidas (Insecticidas, Acaricidas e Isoxazolinas)' },
+  { drug:'Lotilaner', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Ectoparásitos y Endectocidas (Insecticidas, Acaricidas e Isoxazolinas)' },
+  { drug:'Fipronil', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Ectoparásitos y Endectocidas (Insecticidas, Acaricidas e Isoxazolinas)' },
+  { drug:'Amitraz', cat_vad:'antiinfecciosos', subcat_vad:'antiparasitarios', subsubcat_vad:'Ectoparásitos y Endectocidas (Insecticidas, Acaricidas e Isoxazolinas)' }
+];
+
+function seedDefaultVademecumDrugs() {
+  const existingNames = new Set(VADEMECUM_DB.map(d => (d.drug||'').toLowerCase()));
+  const existingCats = new Set(VADEMECUM_DB.map(d => (d.cat_vad||'')+(d.subcat_vad||'')+(d.subsubcat_vad||'')));
+  let added = 0;
+  for (const def of DEFAULT_VADEMECUM_DRUGS) {
+    const key = (def.drug||'').toLowerCase();
+    const posKey = (def.cat_vad||'')+(def.subcat_vad||'')+(def.subsubcat_vad||'');
+    if (existingNames.has(key) && existingCats.has(posKey)) continue;
+    const newDrug = {
+      id: 'vad_' + Date.now() + '_' + Math.random().toString(36).slice(2,5),
+      drug: def.drug,
+      nombres: [def.drug],
+      active: '',
+      cats: [VADEMECUM_CATS[def.cat_vad]?.label || ''],
+      category: VADEMECUM_CATS[def.cat_vad]?.label || '',
+      cat_esp: '',
+      cat_vad: def.cat_vad || '',
+      subcat_vad: def.subcat_vad || '',
+      subsubcat_vad: def.subsubcat_vad || '',
+      conc: 0, concs: [],
+      route: '', routes: [],
+      freq: '',
+      indic: '', contraindications: '', info: '', notes: '',
+      species_doses: []
+    };
+    VADEMECUM_DB.push(newDrug);
+    dbPutSync('vademecum', newDrug);
+    added++;
+  }
+  if (added) toast('✓ ' + added + ' fármaco(s) precargado(s)');
+}
 
 // Abre el modal en modo Agregar o Editar
 function openAddDrug(editId=null, preselectedCat=null) {
