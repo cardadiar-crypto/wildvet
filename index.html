@@ -975,117 +975,7 @@ const DEFAULT_SPECIES = [
   }
 ];
 
-const DEFAULT_VADEMECUM = [
-  {id:'v1',drug:'Tiletamina/Zolazepam',category:'Disociativo-BZD',
-   info:'Anestesia disociativa de amplio espectro. Siempre ajustar dosis según estado corporal y especie. No tiene reversor específico.',
-   contraindications:'Insuficiencia renal o hepática grave. Usar con precaución en debilitados.',
-   species_doses:[
-     {species:'Danta (Tapirus terrestris)',dose_min:1.0,dose:2.0,dose_max:3.0,conc:100,route:'IM dardo',freq:'Dosis única',notes:'Combinar con medetomidina para reducir dosis'},
-     {species:'Puma (Puma concolor)',dose_min:3.0,dose:4.5,dose_max:6.0,conc:100,route:'IM dardo',freq:'Dosis única',notes:'Bloquear visión antes de abordar'},
-     {species:'Caimán (Crocodylus intermedius)',dose_min:2.0,dose:3.5,dose_max:6.0,conc:100,route:'IM dardo',freq:'Dosis única',notes:'Siempre vendaje de hocico previo'},
-     {species:'Oso Andino (Tremarctos ornatus)',dose_min:3.0,dose:5.0,dose_max:7.0,conc:100,route:'IM dardo',freq:'Dosis única',notes:'Ayuno 12h previo'},
-     {species:'Lapa (Cuniculus paca)',dose_min:3.0,dose:4.0,dose_max:5.0,conc:100,route:'IM',freq:'Dosis única',notes:''},
-   ]},
-  {id:'v2',drug:'Medetomidina',category:'Agonista α2-adrenérgico',
-   info:'Sedante y analgésico potente. Siempre revertir con atipamezol al terminar el procedimiento. Produce bradicardia e hipotermia.',
-   contraindications:'Cardiopatías, bradicardia preexistente, gestación avanzada.',
-   species_doses:[
-     {species:'Danta (Tapirus terrestris)',dose_min:0.05,dose:0.07,dose_max:0.10,conc:1.0,route:'IM dardo',freq:'Dosis única',notes:'Revertir con atipamezol 5× dosis'},
-     {species:'Puma (Puma concolor)',dose_min:0.05,dose:0.08,dose_max:0.12,conc:1.0,route:'IM dardo',freq:'Dosis única',notes:''},
-     {species:'Oso Andino (Tremarctos ornatus)',dose_min:0.05,dose:0.08,dose_max:0.15,conc:1.0,route:'IM dardo',freq:'Dosis única',notes:''},
-   ]},
-  {id:'v3',drug:'Atipamezol',category:'Antagonista α2-adrenérgico (reversor)',
-   info:'Reversor específico de medetomidina y dexmedetomidina. Dosis = 5× la dosis de medetomidina administrada. Aplicar IM, no IV rápido.',
-   contraindications:'No usar sin medetomidina previa.',
-   species_doses:[
-     {species:'General (todos los mamíferos)',dose_min:0.2,dose:0.25,dose_max:0.5,conc:5.0,route:'IM',freq:'Dosis única al finalizar',notes:'Calcular: 5 × dosis medetomidina × peso'},
-   ]},
-  {id:'v4',drug:'Ketamina',category:'Disociativo (anestésico)',
-   info:'Anestésico disociativo. Siempre combinar con benzodiacepina o agonista α2 para reducir rigidez y dosis total. Produce catalepsia.',
-   contraindications:'No usar solo en procedimientos dolorosos. Cardiopatía hipertrófica.',
-   species_doses:[
-     {species:'Guacamaya y psitácidas',dose_min:10,dose:20,dose_max:30,conc:100,route:'IM pectoral',freq:'Dosis única',notes:'Combinar con midazolam 0.5–1 mg/kg'},
-     {species:'Lapa (Cuniculus paca)',dose_min:20,dose:30,dose_max:40,conc:100,route:'IM epaxial',freq:'Dosis única',notes:'Combinar con midazolam'},
-     {species:'Serpientes medianas',dose_min:20,dose:40,dose_max:60,conc:100,route:'IM primer tercio cuerpo',freq:'Dosis única',notes:'Tiempo de inducción variable 15–30 min'},
-     {species:'Tortugas y quelonios',dose_min:20,dose:50,dose_max:80,conc:100,route:'IM miembro pelviano',freq:'Dosis única',notes:'Recuperación muy prolongada'},
-   ]},
-  {id:'v5',drug:'Midazolam',category:'Benzodiacepina',
-   info:'Sedante, miorrelajante y anticonvulsivante. Vía intranasal muy útil en aves y reptiles para pre-sedación sin estrés de captura.',
-   contraindications:'Hipersensibilidad. No usar como único agente en procedimientos dolorosos.',
-   species_doses:[
-     {species:'Aves (psitácidas, rapaces)',dose_min:0.3,dose:0.5,dose_max:1.0,conc:5.0,route:'IM pectoral o IN',freq:'Dosis única',notes:'Vía intranasal: dilución 1:1 en SF'},
-     {species:'Reptiles (iguanas, varanos)',dose_min:0.2,dose:0.5,dose_max:1.0,conc:5.0,route:'IM',freq:'Dosis única',notes:''},
-     {species:'Mamíferos pequeños (roedores)',dose_min:0.3,dose:0.5,dose_max:1.0,conc:5.0,route:'IM o IP',freq:'Dosis única',notes:''},
-   ]},
-  {id:'v6',drug:'Isoflurano',category:'Anestésico inhalatorio (halogenado)',
-   info:'Anestésico de elección para mantenimiento inhalatorio. Inicio y recuperación rápidos. Requiere máquina anestésica.',
-   contraindications:'Sin equipo de soporte respiratorio. Nunca administrar sin vía aérea garantizada.',
-   species_doses:[
-     {species:'Aves en general',dose_min:1.5,dose:3.0,dose_max:5.0,conc:100,route:'Inhalatorio — máscara/cámara',freq:'Inducción/mantenimiento',notes:'Inducción 3–5%, mantenimiento 1.5–2.5%. % volumen.'},
-     {species:'Reptiles (temperatura 25–28°C)',dose_min:2.0,dose:3.5,dose_max:5.0,conc:100,route:'Inhalatorio — cámara',freq:'Inducción/mantenimiento',notes:'Metabolismo lento: recuperación prolongada'},
-     {species:'Mamíferos pequeños',dose_min:1.5,dose:2.5,dose_max:4.0,conc:100,route:'Inhalatorio — máscara',freq:'Mantenimiento',notes:'Pre-medicación reduce requerimiento'},
-   ]},
-  {id:'v7',drug:'Meloxicam',category:'AINE (Antiinflamatorio no esteroideo)',
-   info:'AINE preferido en fauna silvestre. Analgésico y antiinflamatorio. Menor toxicidad renal que otros AINEs. Disponible en múltiples concentraciones.',
-   contraindications:'Deshidratación, insuficiencia renal, úlcera GI activa.',
-   species_doses:[
-     {species:'Mamíferos grandes (>10 kg)',dose_min:0.1,dose:0.2,dose_max:0.3,conc:5.0,route:'IM/SC/VO',freq:'SID × 3–5 días',notes:'Administrar con alimento si VO'},
-     {species:'Aves',dose_min:0.5,dose:1.0,dose_max:1.5,conc:1.5,route:'IM pectoral / VO pipeta',freq:'SID × 3–7 días',notes:'AINE de elección. Concentración 1.5 mg/ml para dosificación precisa'},
-     {species:'Reptiles',dose_min:0.1,dose:0.2,dose_max:0.5,conc:5.0,route:'IM epaxial / VO',freq:'SID × 5–7 días',notes:'Asegurar hidratación previa'},
-     {species:'Mamíferos pequeños (<10 kg)',dose_min:0.2,dose:0.3,dose_max:0.5,conc:5.0,route:'SC/VO',freq:'SID × 3–5 días',notes:''},
-   ]},
-  {id:'v8',drug:'Enrofloxacina',category:'Antibiótico fluoroquinolona',
-   info:'Amplio espectro. Primera línea en infecciones respiratorias, GI y de tejidos blandos en fauna silvestre. Diluir para reducir irritación local.',
-   contraindications:'Animales jóvenes en crecimiento activo (artropatía). Gestación.',
-   species_doses:[
-     {species:'Mamíferos adultos',dose_min:5,dose:7.5,dose_max:10,conc:100,route:'IM/SC/VO',freq:'SID × 7–14 días',notes:'Diluir 1:1 en SF para IM'},
-     {species:'Aves',dose_min:5,dose:10,dose_max:15,conc:100,route:'IM pectoral / VO',freq:'SID-BID × 7–14 días',notes:''},
-     {species:'Reptiles',dose_min:3,dose:5,dose_max:10,conc:100,route:'IM epaxial / VO',freq:'SID × 14–21 días',notes:'Temperatura óptima para absorción'},
-   ]},
-  {id:'v9',drug:'Doxiciclina',category:'Antibiótico tetraciclina',
-   info:'Primera línea para clamidiosis (psitacosis) — ZOONOSIS. También útil en micoplasmosis y rickettsiosis. Ciclos largos requeridos.',
-   contraindications:'Animales jóvenes, gestación, lactancia. No administrar con alimentos ricos en calcio.',
-   species_doses:[
-     {species:'Aves (clamidiosis)',dose_min:25,dose:40,dose_max:50,conc:100,route:'IM pectoral / VO',freq:'SID × 45 días',notes:'⚠ ZOONOSIS — reportar al médico responsable. VO: dar agua abundante.'},
-     {species:'Mamíferos',dose_min:5,dose:10,dose_max:15,conc:100,route:'VO',freq:'BID × 7–14 días',notes:''},
-   ]},
-  {id:'v10',drug:'Ivermectina',category:'Antiparasitario macrólido',
-   info:'Ectoparásitos e internos sensibles (nematodos). NO usar en quelonios, tortugas ni colies. Tóxico en MDR1-positivos.',
-   contraindications:'TÓXICO en tortugas, quelonios. No usar en cachorros <6 semanas. MDR1.',
-   species_doses:[
-     {species:'Mamíferos en general',dose_min:0.2,dose:0.2,dose_max:0.4,conc:1.0,route:'SC / VO',freq:'Dosis única, repetir × 14 días',notes:''},
-     {species:'Aves (ectoparásitos)',dose_min:0.2,dose:0.2,dose_max:0.4,conc:1.0,route:'SC / tópico dilución',freq:'Dosis única',notes:''},
-     {species:'Lagartos y serpientes',dose_min:0.2,dose:0.2,dose_max:0.3,conc:1.0,route:'SC',freq:'Cada 14 días × 2',notes:'NO en tortugas ni quelonios'},
-   ]},
-  {id:'v11',drug:'Voriconazol',category:'Antifúngico azólico (triazol)',
-   info:'Primera línea en aspergillosis en aves. Mejor absorción oral que itraconazol. Monitorear enzimas hepáticas en tratamientos >4 semanas.',
-   contraindications:'Insuficiencia hepática grave.',
-   species_doses:[
-     {species:'Aves (aspergillosis)',dose_min:10,dose:15,dose_max:18,conc:40,route:'VO pipeta o sonda',freq:'BID × 6–8 semanas',notes:'Preparar dilución 0.2% en agua. Monitorear ALT/AST cada 2 semanas.'},
-   ]},
-  {id:'v12',drug:'Buprenorfina',category:'Opioide agonista-antagonista parcial',
-   info:'Analgesia postoperatoria de alta calidad y larga duración (6–12 h). Menor depresión respiratoria que opioides puros.',
-   contraindications:'No usar con otros depresores del SNC sin monitoreo.',
-   species_doses:[
-     {species:'Felinos silvestres',dose_min:0.005,dose:0.01,dose_max:0.02,conc:0.3,route:'IM / IV lento / sublingual',freq:'BID-TID × 2–3 días',notes:'Sublingual muy efectivo en felinos'},
-     {species:'Primates',dose_min:0.005,dose:0.01,dose_max:0.02,conc:0.3,route:'IM / IV',freq:'TID × 2–3 días',notes:''},
-     {species:'Mamíferos medianos',dose_min:0.005,dose:0.01,dose_max:0.02,conc:0.3,route:'IM',freq:'BID × 2–3 días',notes:''},
-   ]},
-  {id:'v13',drug:'Praziquantel',category:'Antiparasitario (cestocida / trematocida)',
-   info:'Muy seguro. Activo contra todos los cestodos y trematodos. Dosis única generalmente suficiente. Amplio margen terapéutico.',
-   contraindications:'Sin contraindicaciones conocidas relevantes en fauna silvestre.',
-   species_doses:[
-     {species:'Reptiles',dose_min:5,dose:8,dose_max:10,conc:56.8,route:'IM / VO / por sonda',freq:'Dosis única. Repetir × 14 días.',notes:''},
-     {species:'Aves',dose_min:5,dose:10,dose_max:20,conc:56.8,route:'IM pectoral / VO',freq:'Dosis única',notes:''},
-     {species:'Mamíferos',dose_min:5,dose:10,dose_max:20,conc:56.8,route:'VO',freq:'Dosis única',notes:''},
-   ]},
-  {id:'v14',drug:'Dexametasona',category:'Corticoide potente (glucocorticoide)',
-   info:'Urgencias: shock, edema cerebral, reacciones alérgicas graves. Solo usar en dosis única de emergencia. Uso crónico contraindicado.',
-   contraindications:'Infecciones bacterianas o fúngicas activas sin antibiótico. No usar crónico.',
-   species_doses:[
-     {species:'Todas las especies (emergencia)',dose_min:0.5,dose:1.0,dose_max:2.0,conc:4.0,route:'IV lento / IM',freq:'Dosis única de emergencia',notes:'IV: diluir y pasar en 5–10 min. No repetir.'},
-   ]},
-];
+const DEFAULT_VADEMECUM = [];
 
 
 // ═══════════════════════════════════
@@ -1096,58 +986,7 @@ let currentSpecies = null;
 let currentWeight = 50;
 let SPECIES_DB = [];
 let VADEMECUM_DB = [];
-// Generate initial drug entries from DEFAULT_VADEMECUM_CATS structure
-(function _initVadDrugs() {
-  if (VADEMECUM_DB.length > 0) return; // Don't overwrite existing drugs
-  const _drugLists = {
-    betalactamicos: ['Amoxicilina','Amoxicilina + Ácido Clavulánico','Ampicilina','Penicilina G Procaínica','Cefalexina','Cefovecina','Cefquinoma','Ceftiofur','Cefazolina','Cefadroxilo'],
-    fluoroquinolonas: ['Enrofloxacina','Marbofloxacina','Pradofloxacina','Ciprofloxacina','Orbifloxacina','Danofloxacina','Ibafloxacina','Difloxacina','Norfloxacina','Ofloxacina'],
-    macrolidos: ['Tildipirosina','Tulatromicina','Tylosina','Gamitromicina','Clindamicina','Lincomicina','Florfenicol','Eritromicina','Spiramicina','Azitromicina'],
-    tetraciclinas_aminoglucosidos: ['Oxitetraciclina','Doxiciclina','Clortetraciclina','Gentamicina','Amikacina','Neomicina','Estreptomicina','Tobramicina','Kanamicina','Dihidroestreptomicina'],
-    sulfamidas: ['Sulfadiazina + Trimetoprima','Sulfametoxazol + Trimetoprima','Sulfadimetoxina','Sulfametazina','Sulfaquinoxalina','Sulfatiazol','Sulfamerazina','Sulfadimetoxina + Baquiloprim','Sulfaclorpiridazina','Sulfadoxina + Trimetoprima'],
-    antifungicos: ['Ketoconazol','Itraconazol','Fluconazol','Griseofulvina','Anfotericina B','Terbinafina','Voriconazol','Nistatina','Posaconazol','Clotrimazol'],
-    antivirales: ['Oseltamivir','Aciclovir','Interferón Omega Felino','Zidovudina (AZT)','Famciclovir','Vidarabina','Idoxuridina','Ribavirina','GS-441524','Molnupiravir'],
-    endoparasitos: ['Fenbendazol','Albendazol','Praziquantel','Pyrantel','Febantel','Metronidazol','Toltrazuril','Oxfendazol','Levamisol','Nitroxinil'],
-    ectoparasitos: ['Ivermectina','Milbemicina Oxima','Moxidectina','Selamectina','Afoxolaner','Fluralaner','Sarolaner','Lotilaner','Fipronil','Amitraz']
-  };
-  const _subcatMap = {
-    betalactamicos:'Betalactámicos (Penicilinas y Cefalosporinas)',
-    fluoroquinolonas:'Fluoroquinolonas',
-    macrolidos:'Macrólidos, Lincosamidas y Fenicoles',
-    tetraciclinas_aminoglucosidos:'Tetraciclinas y Aminoglucósidos',
-    sulfamidas:'Sulfamidas y Sulfamidas Potenciadas',
-    antifungicos:'2. Antifúngicos Sistémicos y Cutáneos',
-    antivirales:'3. Antivirales',
-    endoparasitos:'Endoparásitos (Antelmínticos, Antihelmínticos y Antiprotozoarios)',
-    ectoparasitos:'Ectoparásitos y Endectocidas (Insecticidas, Acaricidas y Isoxazolinas)'
-  };
-  Object.entries(_drugLists).forEach(([groupKey, drugNames]) => {
-    drugNames.forEach(name => {
-      VADEMECUM_DB.push({
-        id: 'vad_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
-        drug: name,
-        nombres: [name],
-        active: '',
-        cats: ['I. Antiinfecciosos y Antiparasitarios Sistémicos'],
-        category: 'I. Antiinfecciosos y Antiparasitarios Sistémicos',
-        cat_esp: _subcatMap[groupKey] || '',
-        cat_vad: 'antiinfecciosos',
-        subcat_vad: groupKey === 'antifungicos' ? 'antifungicos' : groupKey === 'antivirales' ? 'antivirales' : 'antibacterianos',
-        subsubcat_vad: ['betalactamicos','fluoroquinolonas','macrolidos','tetraciclinas_aminoglucosidos','sulfamidas','endoparasitos','ectoparasitos'].includes(groupKey) ? _subcatMap[groupKey] : '',
-        conc: 0,
-        concs: [],
-        route: '',
-        routes: [],
-        freq: '',
-        indic: '',
-        contraindications: '',
-        info: '',
-        notes: '',
-        species_doses: []
-      });
-    });
-  });
-})();
+// _initVadDrugs — empty by default; admin builds from UI
 let VADEMECUM_CATS = {};
 let clinicalRecords = [];
 let inventoryItems = [];
@@ -7048,23 +6887,7 @@ async function saveProtocol() {
 // ═══════════════════════════════════
 // VADEMÉCUM — FUNCIONES COMPLETAS
 // ═══════════════════════════════════
-const DEFAULT_VADEMECUM_CATS = {
-  antiinfecciosos: { label:'I. Antiinfecciosos y Antiparasitarios Sistémicos', icon:'🦠', subcategories: {
-    antibacterianos: { label:'1. Antibacterianos / Antibióticos', info:'', subcats: {
-      betalactamicos: { label:'Betalactámicos (Penicilinas y Cefalosporinas)', info:'' },
-      fluoroquinolonas: { label:'Fluoroquinolonas', info:'' },
-      macrolidos: { label:'Macrólidos, Lincosamidas y Fenicoles', info:'' },
-      tetraciclinas_aminoglucosidos: { label:'Tetraciclinas y Aminoglucósidos', info:'' },
-      sulfamidas: { label:'Sulfamidas y Sulfamidas Potenciadas', info:'' }
-    }},
-    antifungicos: { label:'2. Antifúngicos Sistémicos y Cutáneos', info:'', subcats:{} },
-    antivirales: { label:'3. Antivirales', info:'', subcats:{} },
-    antiparasitarios: { label:'4. Antiparasitarios', info:'', subcats: {
-      endoparasitos: { label:'Endoparásitos (Antelmínticos, Antihelmínticos y Antiprotozoarios)', info:'' },
-      ectoparasitos: { label:'Ectoparásitos y Endectocidas (Insecticidas, Acaricidas y Isoxazolinas)', info:'' }
-    }}
-  }}
-};
+const DEFAULT_VADEMECUM_CATS = {};
 
 // Abre el modal en modo Agregar o Editar
 function openAddDrug(editId=null, preselectedCat=null) {
