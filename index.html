@@ -591,6 +591,7 @@ textarea.form-control{resize:vertical;min-height:70px}
       </div>
       <div id="admin-add-drug-btn" style="display:none;gap:.3rem;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="openAddDrug()">+ Fármaco</button>
+        <button class="btn btn-secondary btn-sm" onclick="resetVademecumAll()" style="font-size:.7rem;color:var(--r5)">🗑 Vaciar todo</button>
       </div>
     </div>
     <input type="text" class="form-control" placeholder="Buscar fármaco..." oninput="filterVademecum(this.value)" style="margin-bottom:.75rem">
@@ -7200,6 +7201,29 @@ async function saveVademecumCats() {
   if (firestore && fbUid()) {
     try { await firestore.collection('settings').doc('vademecum_cats').set({ value: VADEMECUM_CATS }); } catch(e){}
   }
+}
+
+// ── Reset total del vademécum (IndexedDB + Firestore) ──
+async function resetVademecumAll() {
+  const ok = await confirmDelete('¿Vaciar TODO el vademécum?', 'Se eliminarán TODAS las categorías, subcategorías, fármacos y dosis. Esta acción no se puede deshacer.', '🗑️');
+  if (!ok) return;
+  // 1. Borrar todos los fármacos de IndexedDB
+  const allDrugs = await dbGetAll('vademecum');
+  for (const d of allDrugs) {
+    await dbDelete('vademecum', d.id);
+    if (firestore && fbUid()) { try { await firestore.collection('vademecum').doc(String(d.id)).delete(); } catch(e){} }
+  }
+  // 2. Borrar categorías de settings
+  await dbDelete('settings', 'vademecum_cats');
+  if (firestore && fbUid()) { try { await firestore.collection('settings').doc('vademecum_cats').delete(); } catch(e){} }
+  // 3. Reset arrays en memoria
+  VADEMECUM_DB = [];
+  VADEMECUM_CATS = {};
+  _vadCatActiva = '__all__';
+  _vadSubcatActiva = null;
+  _vadSubSubcatActiva = null;
+  renderVademecum();
+  toast('✓ Vademécum vaciado completamente');
 }
 
 // ── Navigation ──
