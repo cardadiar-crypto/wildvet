@@ -591,7 +591,6 @@ textarea.form-control{resize:vertical;min-height:70px}
       </div>
       <div id="admin-add-drug-btn" style="display:none;gap:.3rem;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="openAddDrug()">+ Fármaco</button>
-        <button class="btn btn-secondary btn-sm" onclick="resetVademecumAll()" style="font-size:.7rem;color:var(--r5)">🗑 Vaciar todo</button>
       </div>
     </div>
     <input type="text" class="form-control" placeholder="Buscar fármaco..." oninput="filterVademecum(this.value)" style="margin-bottom:.75rem">
@@ -7203,29 +7202,6 @@ async function saveVademecumCats() {
   }
 }
 
-// ── Reset total del vademécum (IndexedDB + Firestore) ──
-async function resetVademecumAll() {
-  const ok = await confirmDelete('¿Vaciar TODO el vademécum?', 'Se eliminarán TODAS las categorías, subcategorías, fármacos y dosis. Esta acción no se puede deshacer.', '🗑️');
-  if (!ok) return;
-  // 1. Borrar todos los fármacos de IndexedDB
-  const allDrugs = await dbGetAll('vademecum');
-  for (const d of allDrugs) {
-    await dbDelete('vademecum', d.id);
-    if (firestore && fbUid()) { try { await firestore.collection('vademecum').doc(String(d.id)).delete(); } catch(e){} }
-  }
-  // 2. Borrar categorías de settings
-  await dbDelete('settings', 'vademecum_cats');
-  if (firestore && fbUid()) { try { await firestore.collection('settings').doc('vademecum_cats').delete(); } catch(e){} }
-  // 3. Reset arrays en memoria
-  VADEMECUM_DB = [];
-  VADEMECUM_CATS = {};
-  _vadCatActiva = '__all__';
-  _vadSubcatActiva = null;
-  _vadSubSubcatActiva = null;
-  renderVademecum();
-  toast('✓ Vademécum vaciado completamente');
-}
-
 // ── Navigation ──
 function selectVadCategory(catId) {
   _vadCatActiva = catId;
@@ -7285,7 +7261,7 @@ function openAddVadCategory() {
   if (!nombre?.trim()) return;
   const id = nombre.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_');
   if (VADEMECUM_CATS[id]) { toast('⚠ Ya existe una categoría con ese nombre'); return; }
-  VADEMECUM_CATS[id] = { label: nombre.trim(), icon:'📦', subcategories: {} };
+  VADEMECUM_CATS[id] = { label: nombre.trim(), icon:'📦', info: '', subcategories: {} };
   saveVademecumCats();
   renderVademecum();
   toast('✓ Categoría creada');
@@ -7306,6 +7282,17 @@ async function renameVadCategory(catId) {
   await saveVademecumCats();
   renderVademecum();
   toast('✓ Categoría renombrada');
+}
+
+function editVadCategoryInfo(catId) {
+  const cat = VADEMECUM_CATS[catId];
+  if (!cat) return;
+  const info = prompt('Información para "' + cat.label + '":\n(Ej: descripción general, notas clínicas...)', cat.info || '');
+  if (info === null) return;
+  cat.info = info.trim();
+  saveVademecumCats();
+  renderVademecum();
+  toast('✓ Información actualizada');
 }
 
 async function deleteVadCategory(catId) {
@@ -7551,7 +7538,10 @@ function renderVademecum(filter='') {
 function _renderVadCategories(el, isAdmin) {
   const cats = Object.entries(VADEMECUM_CATS);
   if (!cats.length) {
-    el.innerHTML = '<div class="empty-state"><p>Sin categorías configuradas</p></div>';
+    el.innerHTML = '<div class="empty-state"><p>Sin categorías configuradas</p></div>' + (isAdmin ? `
+    <button onclick="openAddVadCategory()" class="btn btn-secondary btn-sm" style="width:100%;margin-top:.5rem">
+      + Nueva categoría
+    </button>` : '');
     return;
   }
   el.innerHTML = cats.map(([id, cat]) => {
@@ -7572,11 +7562,13 @@ function _renderVadCategories(el, isAdmin) {
         <span style="font-size:1.2rem">${cat.icon||'📦'}</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:.9rem;font-weight:700;color:var(--txt)">${cat.label}</div>
+          ${cat.info ? `<div style="font-size:.7rem;color:var(--txt3);margin-top:.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${cat.info}</div>` : ''}
           <div style="font-size:.7rem;color:var(--txt3)">${subCount} subcategoría(s) · ${drugCount} fármaco(s)</div>
         </div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
-      ${isAdmin ? `<div style="display:flex;gap:.3rem;padding:0 .85rem .5rem">
+      ${isAdmin ? `<div style="display:flex;gap:.3rem;padding:0 .85rem .5rem;flex-wrap:wrap">
+        <button onclick="event.stopPropagation();editVadCategoryInfo('${id}')" class="btn btn-secondary btn-sm" style="font-size:.7rem">📝 Info</button>
         <button onclick="event.stopPropagation();renameVadCategory('${id}')" class="btn btn-secondary btn-sm" style="font-size:.7rem">✏️ Renombrar</button>
         <button onclick="event.stopPropagation();deleteVadCategory('${id}')" class="btn btn-secondary btn-sm" style="font-size:.7rem;color:var(--r5)">✕ Eliminar</button>
       </div>` : ''}
