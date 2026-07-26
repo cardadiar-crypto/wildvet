@@ -130,19 +130,19 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .quick-card span{display:block;font-size:.72rem;font-weight:500;color:var(--txt2)}
 
 /* DETAIL */
-#species-detail{display:none;padding-top:160px;padding-bottom:calc(env(safe-area-inset-bottom,16px) + 1.5rem)}
-.detail-header{background:var(--g9);padding:.4rem .75rem;display:flex;align-items:center;gap:.35rem;position:fixed;top:56px;left:0;right:0;z-index:90;box-shadow:0 1px 0 rgba(78,180,110,.2);flex-wrap:nowrap;min-height:44px;max-height:56px;overflow:hidden}
+#species-detail{display:none;padding-bottom:calc(env(safe-area-inset-bottom,16px) + 1.5rem)}
+.detail-header{background:var(--g9);padding:.4rem .75rem;display:flex;align-items:center;gap:.35rem;position:relative;z-index:10;box-shadow:0 1px 0 rgba(78,180,110,.2);flex-wrap:nowrap;min-height:44px;max-height:56px;overflow:hidden}
 .back-btn{background:rgba(78,180,110,.2);border:none;color:var(--g3);width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .detail-name{color:white;font-size:.95rem;font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .detail-sci{color:var(--g2);font-size:.7rem;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* TABS */
-.tabs-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--sur);border-bottom:1px solid var(--bor);position:fixed;top:104px;left:0;right:0;z-index:89}
+.tabs-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--sur);border-bottom:1px solid var(--bor);position:relative;z-index:9}
 .tabs-scroll::-webkit-scrollbar{display:none}
 .tabs{display:flex;min-width:max-content}
 .tab-btn{padding:.6rem .85rem;font-family:var(--sans);font-size:.78rem;font-weight:500;background:none;border:none;border-bottom:2px solid transparent;color:var(--txt3);cursor:pointer;white-space:nowrap;transition:all .15s}
 .tab-btn.active{color:var(--g6);border-bottom-color:var(--g5)}
-/* spacer: 56px topbar + 48px detail-header + 40px tabs = 144px */
+/* header and tabs flow naturally — no padding-top hack needed */
 .tab-content-spacer{height:0;min-height:0;display:none}
 .tab-content{display:none;padding:1rem;padding-bottom:calc(env(safe-area-inset-bottom,16px) + 1.5rem)}
 .tab-content.active{display:block}
@@ -2651,37 +2651,6 @@ function openSpecies(id, trackNav=true) {
   window.scrollTo({top:0, behavior:'instant'});
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
-  // Ajustar posición de tabs: actualiza el padding-top del species-detail
-  function adjustTabsPosition() {
-    const header    = document.getElementById('detail-header');
-    const tabsScroll = document.querySelector('.tabs-scroll');
-    const detail    = document.getElementById('species-detail');
-    if (!header || !tabsScroll || !detail) return;
-    const topbarH = 56;
-    // Usar clientHeight si getBoundingClientRect devuelve 0
-    const headerH = header.getBoundingClientRect().height || header.clientHeight || 48;
-    const tabsTop = topbarH + headerH;
-    tabsScroll.style.top = tabsTop + 'px';
-    const tabsH = tabsScroll.getBoundingClientRect().height || tabsScroll.clientHeight || 40;
-    const totalPad = tabsTop + tabsH + 8;
-    detail.style.paddingTop = totalPad + 'px';
-  }
-  // Ejecutar en secuencia garantizada
-  requestAnimationFrame(() => {
-    adjustTabsPosition();
-    requestAnimationFrame(() => {
-      adjustTabsPosition();
-      setTimeout(adjustTabsPosition, 100);
-      setTimeout(adjustTabsPosition, 300);
-    });
-  });
-  // ResizeObserver para recalcular cuando el header cambie de altura
-  if (window._headerResizeObs) window._headerResizeObs.disconnect();
-  const headerEl = document.getElementById('detail-header');
-  if (headerEl && typeof ResizeObserver !== 'undefined') {
-    window._headerResizeObs = new ResizeObserver(() => adjustTabsPosition());
-    window._headerResizeObs.observe(headerEl);
-  }
 }
 function showTab(tab) {
   const tabs = ['general','fisiologia','nutricion','enfermedades','comportamiento','medicamentos','protocolos','fluidoterapia','enriquecimiento'];
@@ -2690,31 +2659,6 @@ function showTab(tab) {
   document.getElementById('tab-'+tab).classList.add('active');
   renderTab(tab);
   window.scrollTo({top:0, behavior:'instant'});
-  // Mantener el padding-top correcto al cambiar de tab
-  requestAnimationFrame(() => {
-    const header    = document.getElementById('detail-header');
-    const tabsScroll = document.querySelector('.tabs-scroll');
-    const detail    = document.getElementById('species-detail');
-    if (header && tabsScroll && detail) {
-      const topbarH = 56;
-      const headerH = header.getBoundingClientRect().height || header.clientHeight || 48;
-      const tabsTop = topbarH + headerH;
-      tabsScroll.style.top = tabsTop + 'px';
-      const tabsH = tabsScroll.getBoundingClientRect().height || tabsScroll.clientHeight || 40;
-      detail.style.paddingTop = (tabsTop + tabsH + 8) + 'px';
-    }
-    setTimeout(() => {
-      const header2    = document.getElementById('detail-header');
-      const tabsScroll2 = document.querySelector('.tabs-scroll');
-      const detail2    = document.getElementById('species-detail');
-      if (!header2 || !tabsScroll2 || !detail2) return;
-      const hH = header2.getBoundingClientRect().height || header2.clientHeight || 48;
-      const tT = 56 + hH;
-      tabsScroll2.style.top = tT + 'px';
-      const tH = tabsScroll2.getBoundingClientRect().height || tabsScroll2.clientHeight || 40;
-      detail2.style.paddingTop = (tT + tH + 8) + 'px';
-    }, 200);
-  });
 }
 function renderTab(tab) {
   const sp = currentSpecies;
