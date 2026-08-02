@@ -349,6 +349,9 @@ textarea.form-control{resize:vertical;min-height:70px}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<!-- pdf.js para extracción de metadatos y visor de PDFs -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>pdfjsLib && (pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js');</script>
 
 <div id="login-screen">
   <div class="login-logo">🦜</div>
@@ -8841,6 +8844,7 @@ function openImageFull(src) {
 // BIBLIOTECA GENERAL (13)
 // ═══════════════════════════════════════════════════════════
 let BIBLIOTECA_GENERAL = []; // referencias sin especie específica
+let _refPDFData = null; // PDF adjunto temporal en el formulario de referencia
 
 async function loadBibliotecaGeneral() {
   const saved = await dbGet('settings', 'biblioteca_general');
@@ -8861,6 +8865,35 @@ async function saveBibliotecaGeneral() {
       await firestore.collection('settings').doc('biblioteca_general').set({ value: noPDF });
     } catch(e) { console.warn('Firestore biblioteca_general:', e.message); }
   }
+}
+
+// Botones de Ver/Descargar PDF de una referencia guardada
+// spKey: '' para general, o spId para específica
+function refPdfButtons(r, spKey, idx) {
+  if (!r.pdf) return '';
+  const src = r.pdf.url || r.pdf.data;
+  if (!src) {
+    return `<span style="font-size:.68rem;color:var(--txt3);font-style:italic">📄 ${r.pdf.name||'PDF'} — solo en este dispositivo</span>`;
+  }
+  const isLocal = !isStorageUrl(src) && src.startsWith('data:');
+  const view = isLocal
+    ? `<button onclick="viewPdfFromRef('${spKey}',${idx})"
+         style="font-size:.7rem;color:var(--g6);background:var(--g0);border:1px solid var(--g4);border-radius:var(--rxs);padding:.15rem .45rem;cursor:pointer;display:inline-flex;align-items:center;gap:.2rem">👁 Ver PDF</button>`
+    : `<a href="${src}" target="_blank" rel="noopener"
+         style="font-size:.7rem;color:var(--g6);background:var(--g0);border:1px solid var(--g4);border-radius:var(--rxs);padding:.15rem .45rem;text-decoration:none;display:inline-flex;align-items:center;gap:.2rem">👁 Ver PDF</a>`;
+  const dl = `<a href="${src}" download="${r.pdf.name||'documento.pdf'}"
+      style="font-size:.7rem;color:var(--bl);background:var(--b0,#eff6ff);border:1px solid var(--bl);border-radius:var(--rxs);padding:.15rem .45rem;text-decoration:none;display:inline-flex;align-items:center;gap:.2rem">⬇ Descargar</a>`;
+  return `<span style="display:inline-flex;gap:.3rem;align-items:center;flex-wrap:wrap">${view}${dl}</span>`;
+}
+
+function viewPdfFromRef(spKey, idx) {
+  const refs = spKey === '' ? BIBLIOTECA_GENERAL : (BIBLIOTECA_DB[spKey] || []);
+  const r = refs[idx];
+  if (!r?.pdf) return;
+  const src = r.pdf.url || r.pdf.data;
+  if (!src) return;
+  if (isStorageUrl(src)) { window.open(src, '_blank'); return; }
+  openPdfViewer(src, r.pdf.name || r.titulo || 'PDF');
 }
 
 function renderBiblioteca() {
@@ -8887,14 +8920,7 @@ function renderBiblioteca() {
           <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
             ${r.tipo?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>`:''}
             ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
-            ${r.pdf?`<span style="display:inline-flex;gap:.3rem;align-items:center;flex-wrap:wrap">${
-  (r.pdf.url||r.pdf.data)
-    ? `<a href="${r.pdf.url||r.pdf.data}" target="_blank" rel="noopener"
-         style="font-size:.7rem;color:var(--g6);background:var(--g0);border:1px solid var(--g4);border-radius:var(--rxs);padding:.15rem .45rem;text-decoration:none;display:inline-flex;align-items:center;gap:.2rem">👁 Ver PDF</a>
-       <a href="${r.pdf.url||r.pdf.data}" download="${r.pdf.name||'documento.pdf'}"
-         style="font-size:.7rem;color:var(--bl);background:var(--b0,#eff6ff);border:1px solid var(--bl);border-radius:var(--rxs);padding:.15rem .45rem;text-decoration:none;display:inline-flex;align-items:center;gap:.2rem">⬇ Descargar</a>`
-    : `<span style="font-size:.68rem;color:var(--txt3);font-style:italic">📄 ${r.pdf.name||'PDF'} — solo en este dispositivo</span>`
-}</span>`:''}
+            ${r.pdf ? refPdfButtons(r, '', i) : ''}
           </div>
         </div>
         ${isAdmin?`<div style="display:flex;gap:.3rem">
@@ -8934,14 +8960,7 @@ function renderBiblioteca() {
                 <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
                   ${r.tipo?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>`:''}
                   ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
-                  ${r.pdf?`<span style="display:inline-flex;gap:.3rem;align-items:center;flex-wrap:wrap">${
-  (r.pdf.url||r.pdf.data)
-    ? `<a href="${r.pdf.url||r.pdf.data}" target="_blank" rel="noopener"
-         style="font-size:.7rem;color:var(--g6);background:var(--g0);border:1px solid var(--g4);border-radius:var(--rxs);padding:.15rem .45rem;text-decoration:none;display:inline-flex;align-items:center;gap:.2rem">👁 Ver PDF</a>
-       <a href="${r.pdf.url||r.pdf.data}" download="${r.pdf.name||'documento.pdf'}"
-         style="font-size:.7rem;color:var(--bl);background:var(--b0,#eff6ff);border:1px solid var(--bl);border-radius:var(--rxs);padding:.15rem .45rem;text-decoration:none;display:inline-flex;align-items:center;gap:.2rem">⬇ Descargar</a>`
-    : `<span style="font-size:.68rem;color:var(--txt3);font-style:italic">📄 ${r.pdf.name||'PDF'} — solo en este dispositivo</span>`
-}</span>`:''}
+                  ${r.pdf ? refPdfButtons(r, sp.id, i) : ''}
                 </div>
               </div>
               ${isAdmin?`<div style="display:flex;gap:.3rem">
@@ -8988,7 +9007,10 @@ function openEditRef(spId, idx) {
     const s=(id,v)=>{const el=document.getElementById(id);if(el&&v!==undefined)el.value=v;};
     s('ref-titulo',r.titulo);s('ref-autores',r.autores);s('ref-año',r.año);s('ref-url',r.url);s('ref-notas',r.notas);
     if(r.tipo){const sel=document.getElementById('ref-tipo');if(sel)for(const o of sel.options)if(o.value===r.tipo){o.selected=true;break;}}
-    if(r.pdf){const n=document.getElementById('ref-pdf-name');if(n)n.textContent='📎 '+r.pdf.name;}
+    if(r.pdf){
+      const n=document.getElementById('ref-pdf-name');if(n)n.textContent='📎 '+r.pdf.name;
+      const a=document.getElementById('ref-pdf-actions');if(a)a.style.display='inline-flex';
+    }
   },50);
 }
 
@@ -8996,6 +9018,9 @@ async function updateRef(spId, idx) {
   const titulo = document.getElementById('ref-titulo')?.value.trim();
   if (!titulo) { toast('⚠ El título es obligatorio'); return; }
   if (!BIBLIOTECA_DB[spId]?.[idx]) return;
+  const newPdf = _refPDFData && !isStorageUrl(_refPDFData.url || _refPDFData.data)
+    ? { name: _refPDFData.name, data: _refPDFData.data }
+    : BIBLIOTECA_DB[spId][idx].pdf;
   BIBLIOTECA_DB[spId][idx] = {
     ...BIBLIOTECA_DB[spId][idx],
     titulo,
@@ -9004,9 +9029,17 @@ async function updateRef(spId, idx) {
     tipo:    document.getElementById('ref-tipo')?.value||'Libro',
     url:     document.getElementById('ref-url')?.value.trim()||'',
     notas:   document.getElementById('ref-notas')?.value.trim()||'',
-    pdf:     _refPDFData || BIBLIOTECA_DB[spId][idx].pdf || null
+    pdf:     newPdf
   };
   _refPDFData = null;
+  // Subir nuevo PDF a Storage si corresponde
+  if (storage && newPdf?.data && !isStorageUrl(newPdf.data) && BIBLIOTECA_DB[spId][idx]) {
+    try {
+      const safeName = (newPdf.name||'doc').replace(/[^a-zA-Z0-9._-]/g,'_');
+      const url = await uploadToStorage(newPdf.data, 'biblioteca/' + fbUid() + '/' + spId + '/' + Date.now() + '_' + safeName);
+      BIBLIOTECA_DB[spId][idx].pdf = { name: newPdf.name, url, inStorage: true };
+    } catch(e) { console.warn('PDF upload:', e.message); }
+  }
   await saveBiblioteca();
   document.getElementById('ref-modal')?.remove();
   renderBiblioteca();
@@ -9033,13 +9066,19 @@ function openEditRefGeneral(idx) {
     const s=(id,v)=>{const el=document.getElementById(id);if(el&&v!==undefined)el.value=v;};
     s('ref-titulo',r.titulo);s('ref-autores',r.autores);s('ref-año',r.año);s('ref-url',r.url);s('ref-notas',r.notas);
     if(r.tipo){const sel=document.getElementById('ref-tipo');if(sel)for(const o of sel.options)if(o.value===r.tipo){o.selected=true;break;}}
-    if(r.pdf){const n=document.getElementById('ref-pdf-name');if(n)n.textContent='📎 '+r.pdf.name;}
+    if(r.pdf){
+      const n=document.getElementById('ref-pdf-name');if(n)n.textContent='📎 '+r.pdf.name;
+      const a=document.getElementById('ref-pdf-actions');if(a)a.style.display='inline-flex';
+    }
   },50);
 }
 
 async function updateRefGeneral(idx) {
   const titulo = document.getElementById('ref-titulo')?.value.trim();
   if (!titulo || !BIBLIOTECA_GENERAL[idx]) return;
+  const newPdf = _refPDFData && !isStorageUrl(_refPDFData.url || _refPDFData.data)
+    ? { name: _refPDFData.name, data: _refPDFData.data }
+    : BIBLIOTECA_GENERAL[idx].pdf;
   BIBLIOTECA_GENERAL[idx] = {
     ...BIBLIOTECA_GENERAL[idx],
     titulo,
@@ -9048,9 +9087,16 @@ async function updateRefGeneral(idx) {
     tipo:    document.getElementById('ref-tipo')?.value||'Libro',
     url:     document.getElementById('ref-url')?.value.trim()||'',
     notas:   document.getElementById('ref-notas')?.value.trim()||'',
-    pdf:     _refPDFData || BIBLIOTECA_GENERAL[idx].pdf || null
+    pdf:     newPdf
   };
   _refPDFData = null;
+  if (storage && newPdf?.data && !isStorageUrl(newPdf.data)) {
+    try {
+      const safeName = (newPdf.name||'doc').replace(/[^a-zA-Z0-9._-]/g,'_');
+      const url = await uploadToStorage(newPdf.data, 'biblioteca/' + fbUid() + '/general/' + Date.now() + '_' + safeName);
+      BIBLIOTECA_GENERAL[idx].pdf = { name: newPdf.name, url, inStorage: true };
+    } catch(e) { console.warn('PDF upload:', e.message); }
+  }
   await saveBibliotecaGeneral();
   document.getElementById('ref-modal')?.remove();
   renderBiblioteca();
@@ -9092,7 +9138,7 @@ function buildRefFormHTML() {
       <label>PDF adjunto <span style="font-size:.7rem;color:var(--txt3)">(se guarda localmente; se puede ver o descargar)</span></label>
       <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
         <label for="ref-pdf-extra" class="btn btn-secondary btn-sm" style="cursor:pointer">📎 Adjuntar PDF</label>
-        <input type="file" id="ref-pdf-extra" accept=".pdf" style="display:none">
+        <input type="file" id="ref-pdf-extra" accept=".pdf" style="display:none" onchange="handleRefPDF(this)">
         <span id="ref-pdf-name" style="font-size:.75rem;color:var(--txt3)">Sin PDF adjunto</span>
         <span id="ref-pdf-actions" style="display:none;gap:.4rem">
           <button onclick="viewRefPDF()" class="btn btn-secondary btn-sm">👁 Ver</button>
@@ -9102,20 +9148,118 @@ function buildRefFormHTML() {
     </div>`;
 }
 
+// ── Manejo del adjunto PDF ──
+async function handleRefPDF(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
+    toast('⚠ Solo se aceptan archivos PDF');
+    input.value = '';
+    return;
+  }
+  try {
+    const dataUrl = await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = e => res(e.target.result);
+      reader.onerror = rej;
+      reader.readAsDataURL(file);
+    });
+    _refPDFData = { name: file.name, data: dataUrl };
+    const nameEl  = document.getElementById('ref-pdf-name');
+    const actEl   = document.getElementById('ref-pdf-actions');
+    if (nameEl) nameEl.textContent = '📎 ' + file.name;
+    if (actEl) actEl.style.display = 'inline-flex';
+    toast('📄 PDF adjuntado');
+    // Extraer metadatos y autocompletar el formulario
+    const meta = await extractPDFMetadata(dataUrl);
+    if (meta && (meta.title || meta.author || meta.year)) {
+      const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el && val && !el.value.trim()) el.value = val;
+      };
+      setVal('ref-titulo', meta.title);
+      setVal('ref-autores', meta.author);
+      setVal('ref-año', meta.year);
+      if (meta.title || meta.author) toast('✨ Metadatos extraídos del PDF');
+    }
+  } catch(e) {
+    console.warn('handleRefPDF:', e);
+    toast('⚠ No se pudo leer el PDF');
+  }
+}
+
+// Extraer título/autor/año del Info dictionary usando pdf.js
+async function extractPDFMetadata(dataUrl) {
+  if (!dataUrl || !dataUrl.startsWith('data:application/pdf')) return null;
+  if (typeof pdfjsLib === 'undefined') return null;
+  try {
+    const b64 = dataUrl.split(',')[1];
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+    const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+    let title='', author='', year='';
+    try {
+      const meta = await pdf.getMetadata();
+      const info = meta?.info || {};
+      title  = cleanPdfText(info.Title);
+      author = cleanPdfText(info.Author);
+      const cd = String(info.CreationDate||'');
+      const ym = cd.match(/D:(\d{4})/);
+      if (ym) year = ym[1];
+    } catch(e) {}
+    // Fallback: intentar leer título desde la primera página
+    if (!title) {
+      try {
+        const page = await pdf.getPage(1);
+        const tc = await page.getTextContent();
+        const lines = tc.items.map(it=>it.str).filter(s=>s && s.trim());
+        if (lines.length) title = cleanPdfText(lines[0]).slice(0,150);
+      } catch(e) {}
+    }
+    return { title, author, year };
+  } catch(e) {
+    console.warn('extractPDFMetadata:', e.message);
+    return null;
+  }
+}
+
+function cleanPdfText(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/[\u0000-\u001f\u007f]/g,' ')
+    .replace(/\s+/g,' ')
+    .trim()
+    .slice(0,200);
+}
+
+// Visor de PDF dentro de la app
+function openPdfViewer(src, name) {
+  document.getElementById('pdf-viewer-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="pdf-viewer-modal" style="position:fixed;inset:0;z-index:1300;background:rgba(0,0,0,.65);display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:var(--g9);color:var(--g2);flex-shrink:0">
+        <span style="font-size:.82rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📄 ${name||'PDF'}</span>
+        <button onclick="document.getElementById('pdf-viewer-modal').remove()" style="background:none;border:none;color:var(--g2);font-size:1.3rem;cursor:pointer;padding:.1rem .4rem">✕</button>
+      </div>
+      <iframe src="${src}" style="flex:1;width:100%;border:none;background:white" title="Visor PDF"></iframe>
+    </div>`);
+}
+
 function viewRefPDF() {
-  if (!_refPDFData?.data) return;
-  const win = window.open('', '_blank');
-  if (!win) { toast('⚠ Activa ventanas emergentes'); return; }
-  win.document.write(`<!DOCTYPE html><html><head><title>${_refPDFData.name||'PDF'}</title></head><body style="margin:0;height:100vh">
-    <embed src="${_refPDFData.data}" type="application/pdf" width="100%" height="100%">
-  </body></html>`);
-  win.document.close();
+  if (!_refPDFData) return;
+  const src = _refPDFData.url || _refPDFData.data;
+  if (!src) return;
+  if (isStorageUrl(src)) { window.open(src, '_blank'); return; }
+  openPdfViewer(src, _refPDFData.name || 'PDF');
 }
 
 function downloadRefPDF() {
-  if (!_refPDFData?.data) return;
+  if (!_refPDFData) return;
+  const src = _refPDFData.url || _refPDFData.data;
+  if (!src) return;
   const a = document.createElement('a');
-  a.href = _refPDFData.data;
+  a.href = src;
   a.download = _refPDFData.name || 'referencia.pdf';
   a.click();
 }
@@ -11628,9 +11772,17 @@ function openAddRef(spId) {
         </div>
         <div class="form-group"><label>Notas</label><textarea id="ref-notas" class="form-control" placeholder="Capítulos relevantes, páginas, observaciones..." style="min-height:50px"></textarea></div>
 
-        <!-- PDF adjunto guardado -->
-        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem" id="ref-pdf-preview" style="display:none">
-          <span style="font-size:.72rem;color:var(--g6)" id="ref-pdf-name"></span>
+        <div class="form-group">
+          <label>PDF adjunto <span style="font-size:.7rem;color:var(--txt3)">(se extrae título/autor automáticamente)</span></label>
+          <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+            <label for="ref-pdf-extra-sp" class="btn btn-secondary btn-sm" style="cursor:pointer">📎 Adjuntar PDF</label>
+            <input type="file" id="ref-pdf-extra-sp" accept=".pdf" style="display:none" onchange="handleRefPDF(this)">
+            <span id="ref-pdf-name" style="font-size:.75rem;color:var(--txt3)">Sin PDF adjunto</span>
+            <span id="ref-pdf-actions" style="display:none;gap:.4rem">
+              <button onclick="viewRefPDF()" class="btn btn-secondary btn-sm">👁 Ver</button>
+              <button onclick="downloadRefPDF()" class="btn btn-secondary btn-sm">⬇ Descargar</button>
+            </span>
+          </div>
         </div>
 
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
@@ -12148,8 +12300,8 @@ function isStorageUrl(val) {
   );
 }
 
-// Subir imagen (dataUrl) a Firebase Storage, devuelve URL pública
-// path: ej. 'species/sp_123/cover_photo.jpg'
+// Subir archivo (dataUrl) a Firebase Storage, devuelve URL pública
+// Soporta imágenes y PDFs. path: ej. 'species/sp_123/cover_photo.jpg'
 async function uploadToStorage(dataUrl, path) {
   if (!storage || !fbUid()) return dataUrl; // fallback: devuelve dataUrl si no hay Storage
   if (isStorageUrl(dataUrl)) return dataUrl; // ya está en Storage
@@ -12158,10 +12310,18 @@ async function uploadToStorage(dataUrl, path) {
     // Convertir dataUrl a Blob
     const res  = await fetch(dataUrl);
     const blob = await res.blob();
-    const ext  = blob.type.includes('png') ? 'png' : 'jpg';
-    const fullPath = path.endsWith('.jpg') || path.endsWith('.png') ? path : path + '.' + ext;
+    const isPdf = blob.type === 'application/pdf' || /^data:application\/pdf/i.test(dataUrl);
+    let ext = 'jpg';
+    if (blob.type.includes('png')) ext = 'png';
+    else if (isPdf) ext = 'pdf';
+    else if (blob.type.includes('webp')) ext = 'webp';
+    else if (blob.type.includes('gif')) ext = 'gif';
+    else if (blob.type.includes('bmp')) ext = 'bmp';
+    const fullPath = /\.(jpg|jpeg|png|webp|gif|bmp|pdf)$/i.test(path) ? path : path + '.' + ext;
     const ref  = storage.ref(fullPath);
-    await ref.put(blob);
+    const metadata = isPdf ? { contentType: 'application/pdf' } : (blob.type ? { contentType: blob.type } : undefined);
+    if (metadata) await ref.put(blob, metadata);
+    else await ref.put(blob);
     const url = await ref.getDownloadURL();
     return url;
   } catch(e) {
@@ -14394,7 +14554,7 @@ function openBulkPdfImport(spId) {
     <div id="bulk-pdf-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.3rem">📥 Importar PDFs masivamente</div>
-        <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.85rem">Destino: <strong>${destLabel}</strong> · Los archivos se suben directamente sin necesidad de llenar título ni autores.</div>
+        <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.85rem">Destino: <strong>${destLabel}</strong> · Se extraerán título, autores y año de cada PDF automáticamente para que los revises antes de guardar.</div>
 
         <!-- Zona de soltar archivos -->
         <div id="bulk-dropzone"
@@ -14426,7 +14586,7 @@ function openBulkPdfImport(spId) {
         <div style="display:flex;gap:.5rem">
           <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('bulk-pdf-modal').remove()">Cancelar</button>
           <button id="bulk-upload-btn" class="btn btn-primary" style="flex:2;display:none" onclick="startBulkUpload('${spId||''}')">
-            📤 Subir todos
+            🔍 Procesar y revisar
           </button>
         </div>
       </div>
@@ -14488,16 +14648,16 @@ async function startBulkUpload(spId) {
   const progressWrap = document.getElementById('bulk-progress-wrap');
   const progressBar  = document.getElementById('bulk-progress-bar');
   const progressLbl  = document.getElementById('bulk-progress-label');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Subiendo...'; }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Procesando...'; }
   if (progressWrap) progressWrap.style.display = 'block';
 
-  const uid = fbUid();
   const total = _bulkFiles.length;
+  _bulkReviewItems = [];
   let done = 0; let errors = 0;
 
   for (const file of _bulkFiles) {
     try {
-      if (progressLbl) progressLbl.textContent = `Subiendo ${done+1} de ${total}: ${file.name}`;
+      if (progressLbl) progressLbl.textContent = `Procesando ${done+1} de ${total}: ${file.name}`;
 
       // Leer el archivo como base64
       const base64 = await new Promise((res, rej) => {
@@ -14507,80 +14667,221 @@ async function startBulkUpload(spId) {
         reader.readAsDataURL(file);
       });
 
-      // Nombre limpio para Storage
-      const safeName = file.name.replace(/[^a-zA-Z0-9._\-() ]/g, '_');
+      // Extraer metadatos (título, autores, año) con pdf.js
+      const meta = await extractPDFMetadata(base64);
+
+      _bulkReviewItems.push({
+        file,
+        base64,
+        meta: meta || { title:'', author:'', year:'' }
+      });
+
+      done++;
+      if (progressBar) progressBar.style.width = Math.round(done/total*100) + '%';
+    } catch(e) {
+      errors++;
+      console.error('Error procesando', file.name, e);
+      _bulkReviewItems.push({
+        file, base64: null,
+        meta: { title:'', author:'', year:'' }
+      });
+      done++;
+      if (progressBar) progressBar.style.width = Math.round(done/total*100) + '%';
+    }
+  }
+
+  // Cerrar modal de selección y abrir modal de revisión
+  document.getElementById('bulk-pdf-modal')?.remove();
+  if (_bulkReviewItems.length) {
+    openBulkReviewModal(spId);
+  } else {
+    toast(`⚠ No se pudo procesar ningún archivo${errors?` (${errors} error(es))`:''}`);
+  }
+  _bulkFiles = [];
+}
+
+// ── Revisión de PDFs extraídos ──
+let _bulkReviewItems = [];
+
+function openBulkReviewModal(spId) {
+  document.getElementById('bulk-review-modal')?.remove();
+  const destLabel = spId
+    ? (SPECIES_DB.find(s=>s.id===spId)?.name || 'especie')
+    : 'Referencias Generales';
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="bulk-review-modal" style="position:fixed;inset:0;z-index:1450;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.3rem">🔍 Revisar PDFs extraídos</div>
+        <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.85rem">Destino: <strong>${destLabel}</strong> · Verifica y edita la información de cada PDF. Guarda <strong>uno por uno</strong> o <strong>todos</strong> si está correcto.</div>
+        <div id="bulk-review-list"></div>
+        <div style="display:flex;gap:.5rem;margin-top:.9rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('bulk-review-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveAllBulkReview('${spId||''}')">💾 Guardar todos</button>
+        </div>
+      </div>
+    </div>`);
+  renderBulkReviewList(spId);
+}
+
+const _BULK_TIPOS = ['Libro','Artículo científico','Paper','Guía clínica','Tesis','Manual','Radiología','Farmacopea','Formulario','Otro'];
+
+function renderBulkReviewList(spId) {
+  const listEl = document.getElementById('bulk-review-list');
+  if (!listEl) return;
+  listEl.innerHTML = _bulkReviewItems.map((it, i) => {
+    const m = it.meta || {};
+    const titleVal = (it.saved?.titulo ?? m.title ?? it.file.name.replace(/\.pdf$/i,'')).replace(/"/g,'&quot;');
+    const authorVal = (it.saved?.autores ?? m.author ?? '').replace(/"/g,'&quot;');
+    const yearVal = (it.saved?.año ?? m.year ?? '');
+    const tipoVal = it.saved?.tipo || 'Paper';
+    const detected = m.title || m.author;
+    const status = it.saved
+      ? `<span style="font-size:.62rem;background:var(--g5);color:white;border-radius:20px;padding:.05rem .4rem">✓ Guardado</span>`
+      : (detected
+          ? `<span style="font-size:.62rem;background:var(--g1);color:var(--g7);border-radius:20px;padding:.05rem .4rem">✓ Metadatos detectados</span>`
+          : `<span style="font-size:.62rem;background:var(--am1);color:#3d2000;border-radius:20px;padding:.05rem .4rem">⚠ Revisar manualmente</span>`);
+    return `
+      <div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.6rem;margin-bottom:.6rem;background:${it.saved?'var(--g0)':'var(--sur2)'}" id="bulk-review-item-${i}">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:.4rem;margin-bottom:.4rem">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.8rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📄 ${it.file.name}</div>
+            ${it.saved?'':`<div style="font-size:.68rem;color:var(--txt3);margin-top:.15rem">${status}</div>`}
+          </div>
+          ${it.saved?'':`
+          <div style="display:flex;gap:.3rem;flex-shrink:0">
+            <button onclick="viewBulkPdf(${i})" class="btn btn-secondary btn-sm" style="font-size:.68rem;padding:.15rem .4rem">👁 Ver PDF</button>
+            <button onclick="saveBulkReviewOne(${i},'${spId||''}')" class="btn btn-admin btn-sm" style="font-size:.68rem;padding:.15rem .4rem">💾 Guardar</button>
+          </div>`}
+        </div>
+        ${it.saved?`
+          <div style="font-size:.75rem;color:var(--g7)">📖 ${it.saved.titulo||'Sin título'}${it.saved.autores?` · ${it.saved.autores}${it.saved.año?' · '+it.saved.año:''}`:''}</div>`
+        :`
+        <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.2rem">
+          <input id="bulk-title-${i}" class="form-control" value="${titleVal}" placeholder="Título *" style="flex:2;min-width:150px;font-size:.75rem">
+          <input id="bulk-author-${i}" class="form-control" value="${authorVal}" placeholder="Autores" style="flex:1;min-width:110px;font-size:.75rem">
+          <input id="bulk-year-${i}" class="form-control" value="${yearVal}" placeholder="Año" type="number" style="width:80px;font-size:.75rem">
+        </div>
+        <div style="display:flex;gap:.35rem;margin-top:.35rem;align-items:center">
+          <select id="bulk-tipo-${i}" class="form-control" style="font-size:.75rem;flex:1">
+            ${_BULK_TIPOS.map(t=>`<option ${tipoVal===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>`}
+      </div>`;
+  }).join('');
+}
+
+function viewBulkPdf(i) {
+  const it = _bulkReviewItems[i];
+  if (!it) return;
+  if (it.base64) openPdfViewer(it.base64, it.file.name);
+  else toast('⚠ PDF no disponible');
+}
+
+function _bulkReadFields(i) {
+  return {
+    titulo:  document.getElementById(`bulk-title-${i}`)?.value.trim() || _bulkReviewItems[i].file.name.replace(/\.pdf$/i,''),
+    autores: document.getElementById(`bulk-author-${i}`)?.value.trim() || '',
+    año:     document.getElementById(`bulk-year-${i}`)?.value || '',
+    tipo:    document.getElementById(`bulk-tipo-${i}`)?.value || 'Paper'
+  };
+}
+
+async function _bulkBuildPdfObj(it, spId) {
+  let pdfObj = { name: it.file.name, data: it.base64 };
+  const uid = fbUid();
+  if (storage && uid && it.base64) {
+    try {
+      const safeName = it.file.name.replace(/[^a-zA-Z0-9._\-() ]/g, '_');
       const timestamp = Date.now();
+      const path = spId
+        ? `biblioteca/${uid}/${spId}/${timestamp}_${safeName}`
+        : `biblioteca/${uid}/general/${timestamp}_${safeName}`;
+      const url = await uploadToStorage(it.base64, path);
+      pdfObj = { name: it.file.name, url, inStorage: true };
+    } catch(e) {
+      console.warn('Storage upload error:', e.message);
+    }
+  }
+  return pdfObj;
+}
 
-      // Intentar subir a Storage
-      let pdfObj = { name: file.name, data: base64 };
-      if (storage && uid) {
-        try {
-          const path = spId
-            ? `biblioteca/${uid}/${spId}/${timestamp}_${safeName}`
-            : `biblioteca/${uid}/general/${timestamp}_${safeName}`;
-          const url = await uploadToStorage(base64, path);
-          pdfObj = { name: file.name, url, inStorage: true };
-        } catch(e) {
-          console.warn('Storage upload error:', e.message);
-          // Fallback: guardar base64 localmente
-        }
-      }
+async function saveBulkReviewOne(i, spId) {
+  const it = _bulkReviewItems[i];
+  if (!it || it.saved) return;
+  const f = _bulkReadFields(i);
+  if (!f.titulo) { toast('⚠ El título es obligatorio'); return; }
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳...'; }
+  try {
+    const pdfObj = await _bulkBuildPdfObj(it, spId);
+    const ref = {
+      titulo:  f.titulo,
+      autores: f.autores,
+      año:     f.año,
+      tipo:    f.tipo,
+      url:     '',
+      notas:   '',
+      pdf:     pdfObj,
+      importado: true,
+      fechaImport: new Date().toISOString()
+    };
+    if (spId) {
+      if (!BIBLIOTECA_DB[spId]) BIBLIOTECA_DB[spId] = [];
+      BIBLIOTECA_DB[spId].push(ref);
+      await saveBiblioteca();
+    } else {
+      BIBLIOTECA_GENERAL.push(ref);
+      await saveBibliotecaGeneral();
+    }
+    it.saved = { titulo: f.titulo, autores: f.autores, año: f.año, tipo: f.tipo };
+    renderBulkReviewList(spId);
+    toast(`✓ Guardado: ${f.titulo}`);
+  } catch(e) {
+    console.error(e);
+    toast('⚠ Error al guardar');
+    if (btn) { btn.disabled = false; btn.textContent = '💾 Guardar'; }
+  }
+}
 
-      // Crear registro con nombre del archivo como título
-      const nameWithoutExt = file.name.replace(/\.pdf$/i, '');
+async function saveAllBulkReview(spId) {
+  const items = _bulkReviewItems.map((it,i)=>({it,i})).filter(x=>!x.it.saved);
+  if (!items.length) { toast('✓ Todo guardado'); document.getElementById('bulk-review-modal')?.remove(); renderBiblioteca(); return; }
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando todos...'; }
+  let done = 0; let errors = 0;
+  for (const {it,i} of items) {
+    try {
+      const f = _bulkReadFields(i);
+      const pdfObj = await _bulkBuildPdfObj(it, spId);
       const ref = {
-        titulo:  nameWithoutExt,
-        autores: '',
-        año:     '',
-        tipo:    'Paper',
+        titulo:  f.titulo || it.file.name.replace(/\.pdf$/i,''),
+        autores: f.autores,
+        año:     f.año,
+        tipo:    f.tipo || 'Paper',
         url:     '',
         notas:   '',
         pdf:     pdfObj,
         importado: true,
         fechaImport: new Date().toISOString()
       };
-
-      // Guardar en la colección correspondiente
       if (spId) {
         if (!BIBLIOTECA_DB[spId]) BIBLIOTECA_DB[spId] = [];
         BIBLIOTECA_DB[spId].push(ref);
       } else {
         BIBLIOTECA_GENERAL.push(ref);
       }
-
+      it.saved = { titulo: f.titulo, autores: f.autores, año: f.año, tipo: f.tipo };
       done++;
-      if (progressBar) progressBar.style.width = Math.round(done/total*100) + '%';
-
-      // Actualizar el ítem en la lista visual
-      const itemEl = document.getElementById(`bulk-item-${_bulkFiles.indexOf(file)}`);
-      if (itemEl) {
-        itemEl.style.background = 'var(--g1)';
-        itemEl.querySelector('span').textContent = '✅ ' + file.name;
-      }
-
     } catch(e) {
       errors++;
-      console.error('Error importando', file.name, e);
+      console.error('Error guardando', it.file.name, e);
     }
   }
-
-  // Guardar todo de una vez al final
-  if (spId) {
-    await saveBiblioteca();
-  } else {
-    await saveBibliotecaGeneral();
-  }
-
-  if (progressLbl) progressLbl.textContent = `✓ ${done} archivo(s) importado(s)${errors ? ` · ${errors} error(es)` : ''}`;
-  if (progressBar) progressBar.style.background = 'var(--g5)';
-
-  // Esperar un momento para que el usuario vea el resultado
-  await new Promise(r => setTimeout(r, 1200));
-
-  document.getElementById('bulk-pdf-modal')?.remove();
+  if (spId) await saveBiblioteca();
+  else await saveBibliotecaGeneral();
+  toast(`✓ ${done} guardado(s)${errors ? ` · ${errors} error(es)` : ''}`);
+  document.getElementById('bulk-review-modal')?.remove();
   renderBiblioteca();
-  toast(`✓ ${done} PDF(s) importados a la biblioteca`);
-  _bulkFiles = [];
 }
 
 function _getAllSistsLabel(sistId) {
