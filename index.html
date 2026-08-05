@@ -500,6 +500,7 @@ textarea.form-control{resize:vertical;min-height:70px}
       <div id="enriq-admin-btns" style="display:none;display:flex;gap:.35rem">
         <button class="btn btn-secondary btn-sm" onclick="openGroupsManager()" style="margin-right:.3rem">🗂 Grupos</button>
         <button class="btn btn-secondary btn-sm" onclick="openSpeciesHistoryManager()">📋 Historial</button>
+        <button class="btn btn-secondary btn-sm" onclick="openMultiDeleteEnriquecimiento()">🗑 Varios</button>
         <button class="btn btn-admin btn-sm" onclick="openAddEnriquecimiento()">+ Agregar</button>
       </div>
     </div>
@@ -525,6 +526,7 @@ textarea.form-control{resize:vertical;min-height:70px}
       <h2 style="font-size:1.1rem;font-weight:700">🏠 Recintos</h2>
       <div id="recinto-admin-btns" style="display:none;display:flex;gap:.35rem">
         <button class="btn btn-secondary btn-sm" onclick="shareRecintosWithEmail()">🔗 Compartir</button>
+        <button class="btn btn-secondary btn-sm" onclick="openMultiDeleteRecintos()">🗑 Varios</button>
         <button class="btn btn-admin btn-sm" onclick="openAddRecinto()">+ Agregar recinto</button>
       </div>
     </div>
@@ -562,11 +564,14 @@ textarea.form-control{resize:vertical;min-height:70px}
     </div>
   </div>
 
-  <!-- HISTORIAS -->  <!-- HISTORIAS -->
+  <!-- HISTORIAS -->
   <div id="screen-historias" class="screen">
     <div class="flex-between mb-2">
       <h2 style="font-size:1.1rem;font-weight:700">Historias Clínicas</h2>
-      <button class="btn btn-primary" onclick="openNewRecord()">+ Nueva</button>
+      <div style="display:flex;gap:.4rem">
+        <button class="btn btn-secondary" onclick="openMultiDeleteRecords()">🗑 Varios</button>
+        <button class="btn btn-primary" onclick="openNewRecord()">+ Nueva</button>
+      </div>
     </div>
     <input type="text" class="form-control" placeholder="Buscar por nombre, especie..." oninput="filterRecords(this.value)" style="margin-bottom:1rem">
     <div id="records-list"></div>
@@ -727,6 +732,7 @@ textarea.form-control{resize:vertical;min-height:70px}
     <div id="enfgen-admin-btns" style="display:none;gap:.35rem;flex-wrap:wrap">
       <button class="btn btn-admin btn-sm" onclick="openNuevaEnfGen()">+ Nueva enfermedad</button>
       <button class="btn btn-secondary btn-sm" onclick="openAddCategoriaGen()">+ Categoría</button>
+      <button class="btn btn-secondary btn-sm" onclick="openMultiDeleteEnfGen()">🗑 Varios</button>
     </div>
   </div>
   <!-- Subsecciones por clase taxonómica -->
@@ -1458,6 +1464,7 @@ async function finishGoogleLogin(profile) {
   await loadData();
   await loadBiblioteca();
   await loadBibliotecaGeneral();
+  await loadBibliotecaCategorias();
   await loadEnriquecimientos();
   await loadSpeciesGroups();
   await loadRecintos();
@@ -7661,7 +7668,40 @@ function _renderVadDrugs(el, isAdmin) {
       (isAdmin ? `<button onclick="openAddDrug()" class="btn btn-primary btn-sm" style="width:100%;margin-top:.5rem">+ Agregar fármaco</button>` : '');
     return;
   }
-  el.innerHTML = infoHtml + items.map(d => _buildVadDrugCard(d, isAdmin, false)).join('');
+  const multiBtn = isAdmin
+    ? `<div style="display:flex;justify-content:flex-end;margin-bottom:.4rem"><button onclick="openMultiDeleteVademecum()" class="btn btn-secondary btn-sm" style="font-size:.7rem">🗑 Eliminar varios</button></div>`
+    : '';
+  el.innerHTML = multiBtn + infoHtml + items.map(d => _buildVadDrugCard(d, isAdmin, false)).join('');
+}
+
+function openMultiDeleteVademecum() {
+  let items = VADEMECUM_DB.filter(d => {
+    if (_vadCatActiva && _vadCatActiva !== '__all__') {
+      if (d.cat_vad !== _vadCatActiva) {
+        const catLabel = VADEMECUM_CATS[_vadCatActiva]?.label || '';
+        if (!(d.cats||[]).includes(catLabel) && d.category !== catLabel) return false;
+      }
+    }
+    if (_vadSubcatActiva) {
+      const subLabel = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva]?.label || '';
+      if (d.subcat_vad !== _vadSubcatActiva && d.cat_esp !== subLabel && d.subcat_vad !== subLabel) return false;
+    }
+    if (_vadSubSubcatActiva) {
+      const ssLabel = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva]?.subcats?.[_vadSubSubcatActiva]?.label || '';
+      if (d.subsubcat_vad !== _vadSubSubcatActiva && d.subsubcat_vad !== ssLabel) return false;
+    }
+    return true;
+  });
+  openMultiDelete({
+    title: 'Fármacos del vademécum',
+    items: items.map(d => ({ id: d.id, label: d.drug || d.active || 'Sin nombre', sub: `${(d.species_doses||[]).length} especie(s) ${d.active?'· '+d.active:''}` })),
+    onConfirm: async (ids) => {
+      const toDel = new Set(ids);
+      for (const id of ids) { try { await dbDeleteSync('vademecum', id); } catch(e) {} }
+      VADEMECUM_DB = VADEMECUM_DB.filter(d => !toDel.has(d.id));
+      renderVademecum();
+    }
+  });
 }
 
 // ── Shared drug card builder ──
@@ -8394,6 +8434,23 @@ async function deleteRecord(id) {
   renderRecordsList();
   toast('Historia clínica eliminada');
 }
+function openMultiDeleteRecords() {
+  if (!clinicalRecords.length) { toast('Sin historias para eliminar'); return; }
+  openMultiDelete({
+    title: 'Historias clínicas',
+    items: clinicalRecords.map(r => ({
+      id: r.id,
+      label: r.name || 'Sin nombre',
+      sub: `${r.species||''} · ${new Date(r.date).toLocaleDateString('es-CO')} · ${r.institution||''}`
+    })),
+    onConfirm: async (ids) => {
+      const toDel = new Set(ids);
+      for (const id of ids) { try { await dbDeleteSync('records', id); } catch(e) {} }
+      clinicalRecords = clinicalRecords.filter(rc => !toDel.has(rc.id));
+      renderRecordsList();
+    }
+  });
+}
 function exportRecordPDF(id) {
   const r = clinicalRecords.find(rc=>rc.id===id);
   if (!r) return;
@@ -8436,7 +8493,10 @@ function renderInventoryList() {
   list.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
       <span style="font-size:.72rem;color:var(--txt3);font-weight:600;text-transform:uppercase">${active} · ${filtered.length} especie(s)</span>
-      ${isAdmin?`<button onclick="renameInstitution('${active}')" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem">✏️ Renombrar</button>`:''}
+      <div style="display:flex;gap:.4rem">
+        ${isAdmin?`<button onclick="openMultiDeleteInventory('${active}')" class="btn btn-secondary btn-sm" style="font-size:.7rem">🗑 Varios</button>`:''}
+        ${isAdmin?`<button onclick="renameInstitution('${active}')" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem">✏️ Renombrar</button>`:''}
+      </div>
     </div>` +
   (filtered.map(item=>{
     const sp = SPECIES_DB.find(s=>s.id===item.speciesId);
@@ -8630,6 +8690,24 @@ async function removeInventory(id) {
   inventoryItems = inventoryItems.filter(i=>i.id!==id);
   renderInventoryList();
   toast('Registro eliminado del inventario');
+}
+
+function openMultiDeleteInventory(inst) {
+  const items = inventoryItems.filter(i=>(i.institution||'General')===inst);
+  openMultiDelete({
+    title: 'Inventario — ' + inst,
+    items: items.map(item => {
+      const sp = SPECIES_DB.find(s=>s.id===item.speciesId);
+      const nombre = item.nombreComun || sp?.name || item.speciesName || 'Especie';
+      return { id: item.id, label: nombre, sub: `${item.machos||0}♂ · ${item.hembras||0}♀ ${item.notes?'· '+item.notes:''}` };
+    }),
+    onConfirm: async (ids) => {
+      const toDel = new Set(ids);
+      for (const id of ids) { try { await dbDeleteSync('inventory', id); } catch(e) {} }
+      inventoryItems = inventoryItems.filter(i => !toDel.has(i.id));
+      renderInventoryList();
+    }
+  });
 }
 
 // ═══════════════════════════════════
@@ -8846,6 +8924,35 @@ function openImageFull(src) {
 let BIBLIOTECA_GENERAL = []; // referencias sin especie específica
 let _refPDFData = null; // PDF adjunto temporal en el formulario de referencia
 
+// Categorías de biblioteca (organización por tipo de documento)
+const BIBLIOTECA_CATS_DEFAULT = ['Vademécums','Enfermedades','Fármacos','Papers','Radiología','Guías'];
+let BIBLIOTECA_CATEGORIAS = [...BIBLIOTECA_CATS_DEFAULT, 'Otros'];
+let _bibCatActiva = '';   // '' = Todas
+let _bibClaseActiva = ''; // '' = Todas las clases
+let _bibEspAbiertas = {}; // especies abiertas en la vista agrupada
+
+async function loadBibliotecaCategorias() {
+  const saved = await dbGet('settings', 'biblioteca_categorias');
+  if (saved?.value?.length) BIBLIOTECA_CATEGORIAS = [...new Set([...BIBLIOTECA_CATS_DEFAULT, ...saved.value])];
+}
+
+async function saveBibliotecaCategorias() {
+  await dbPut('settings', { key: 'biblioteca_categorias', value: BIBLIOTECA_CATEGORIAS });
+  if (firestore && fbUid()) {
+    try { await firestore.collection('settings').doc('biblioteca_categorias').set({ value: BIBLIOTECA_CATEGORIAS }); } catch(e) {}
+  }
+}
+
+function getRefCategoria(r) {
+  if (r?.categoria) return r.categoria;
+  const tipo = r?.tipo || '';
+  if (/farmacopea|formulario/i.test(tipo)) return 'Vademécums';
+  if (/gu[ií]a|manual/i.test(tipo)) return 'Guías';
+  if (/paper|art[ií]culo/i.test(tipo)) return 'Papers';
+  if (/radiolog/i.test(tipo)) return 'Radiología';
+  return 'Otros';
+}
+
 async function loadBibliotecaGeneral() {
   const saved = await dbGet('settings', 'biblioteca_general');
   BIBLIOTECA_GENERAL = saved?.value || [];
@@ -8901,17 +9008,45 @@ function renderBiblioteca() {
   if (!el) return;
   const isAdmin = currentUser?.role === 'admin';
 
-  // ── Sección general (siempre abierta) ──
-  let html = `<div class="info-card" style="margin-bottom:1rem;border-left:3px solid var(--g5)">
+  // ── Pills de categoría (tipo de documento) ──
+  const catIcons = { 'Vademécums':'📖','Enfermedades':'🦠','Fármacos':'💊','Papers':'📄','Radiología':'🩻','Guías':'🏥' };
+  let html = `<div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.5rem">`;
+  html += `<button onclick="bibSetCategoria('',this)" class="bib-cat-pill tab-filter-btn${!_bibCatActiva?' active':''}" style="font-size:.72rem">Todos</button>`;
+  BIBLIOTECA_CATEGORIAS.forEach(c => {
+    html += `<button onclick="bibSetCategoria('${c}',this)" class="bib-cat-pill tab-filter-btn${_bibCatActiva===c?' active':''}" style="font-size:.72rem">${catIcons[c]||'📚'} ${c}</button>`;
+  });
+  if (isAdmin) html += `<button onclick="bibManageCategorias()" class="btn btn-secondary btn-sm" style="font-size:.65rem" title="Gestionar categorías">➕ Categorías</button>`;
+  html += `</div>`;
+
+  // ── Pills de clase taxonómica ──
+  const CLASS_ICONS = {
+    'Mammalia':'🦁','Aves':'🦜','Reptilia':'🐊','Amphibia':'🐸',
+    'Actinopterygii':'🐟','Chondrichthyes':'🦈','Insecta':'🐛',
+    'Arachnida':'🕷','Arthropoda':'🦀','Peces':'🐠'
+  };
+  const clases = [...new Set(SPECIES_DB.map(s=>s.clase).filter(Boolean))].sort();
+  html += `<div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.8rem">`;
+  html += `<button onclick="bibSetClase('',this)" class="bib-clase-pill tab-filter-btn${!_bibClaseActiva?' active':''}" style="font-size:.72rem">🐾 Todas las clases</button>`;
+  clases.forEach(c => {
+    html += `<button onclick="bibSetClase('${c}',this)" class="bib-clase-pill tab-filter-btn${_bibClaseActiva===c?' active':''}" style="font-size:.72rem">${CLASS_ICONS[c]||'🐾'} ${c}</button>`;
+  });
+  html += `</div>`;
+
+  // ── Referencias Generales ──
+  const genFiltradas = BIBLIOTECA_GENERAL.filter(r => !_bibCatActiva || getRefCategoria(r) === _bibCatActiva);
+  html += `<div class="info-card" style="margin-bottom:1rem;border-left:3px solid var(--g5)">
     <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
-      <span>📖 Referencias Generales</span>
+      <span>📖 Referencias Generales${_bibCatActiva?` — ${_bibCatActiva}`:''} <span style="font-size:.7rem;background:var(--g1);color:var(--g7);border-radius:20px;padding:.05rem .4rem">${genFiltradas.length}</span></span>
       <div style="display:flex;gap:.3rem">
+        ${isAdmin?`<button onclick="openMultiDeleteBibliotecaGen()" class="btn btn-secondary btn-sm" style="font-size:.7rem" title="Eliminar varias referencias">🗑 Varios</button>`:''}
         ${isAdmin?`<button onclick="openBulkPdfImport(null)" class="btn btn-secondary btn-sm" style="font-size:.7rem" title="Importar varios PDFs a la vez">📥 Importar PDFs</button>`:''}
         ${isAdmin?`<button onclick="openAddRefGeneral()" class="btn btn-admin btn-sm">+ Agregar</button>`:''}
       </div>
     </div>
     <p style="font-size:.75rem;color:var(--txt3);margin-bottom:.5rem">Libros de fármacos, guías, radiología y documentos para múltiples especies</p>
-    ${BIBLIOTECA_GENERAL.length ? BIBLIOTECA_GENERAL.map((r,i)=>`
+    ${genFiltradas.length ? genFiltradas.map((r,i)=>{
+      const realIdx = BIBLIOTECA_GENERAL.indexOf(r);
+      return `
     <div style="padding:.4rem .5rem;border-left:3px solid var(--g4);margin-bottom:.4rem;background:var(--sur2);border-radius:0 var(--rxs) var(--rxs) 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="flex:1">
@@ -8919,25 +9054,37 @@ function renderBiblioteca() {
           ${r.autores?`<div style="font-size:.75rem;color:var(--txt3)">${r.autores}${r.año?' · '+r.año:''}</div>`:''}
           <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
             ${r.tipo?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>`:''}
+            ${getRefCategoria(r)?`<span style="font-size:.65rem;background:var(--g0);color:var(--g6);padding:.05rem .35rem;border-radius:var(--rxs)">${getRefCategoria(r)}</span>`:''}
             ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
-            ${r.pdf ? refPdfButtons(r, '', i) : ''}
+            ${r.pdf ? refPdfButtons(r, '', realIdx) : ''}
           </div>
         </div>
         ${isAdmin?`<div style="display:flex;gap:.3rem">
-          <button onclick="openEditRefGeneral(${i})" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem">✏️</button>
-          <button onclick="removeRefGeneral(${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>
+          <button onclick="openEditRefGeneral(${realIdx})" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem">✏️</button>
+          <button onclick="removeRefGeneral(${realIdx})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>
         </div>`:''}
       </div>
-    </div>`).join('') : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin referencias generales.</p>`}
+    </div>`;}).join('') : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin referencias generales${_bibCatActiva?' en esta categoría':''}.</p>`}
   </div>`;
 
-  // ── Secciones por especie (colapsables) ──
-  if (SPECIES_DB.length) {
-    html += SPECIES_DB.map(sp => {
-      const refs = BIBLIOTECA_DB[sp.id] || [];
-      const isOpen = false; // todas cerradas por defecto - clic para abrir
-      return `
-      <div class="info-card" style="margin-bottom:.6rem" id="bib-card-${sp.id}">
+  // ── Especies agrupadas por clase taxonómica ──
+  const clasesVisibles = _bibClaseActiva ? [_bibClaseActiva] : clases;
+  clasesVisibles.forEach(clase => {
+    const espClase = SPECIES_DB.filter(sp => sp.clase === clase);
+    if (!espClase.length) return;
+    const espConRefs = espClase.filter(sp => (BIBLIOTECA_DB[sp.id]||[]).some(r => !_bibCatActiva || getRefCategoria(r) === _bibCatActiva));
+    if (!espConRefs.length && !isAdmin) return;
+    const icon = CLASS_ICONS[clase] || '🐾';
+    html += `<div style="margin-bottom:.6rem">
+      <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
+        <span style="font-size:.82rem;font-weight:700;color:var(--g6)">${icon} ${clase}</span>
+        <span style="flex:1;height:1px;background:var(--bor)"></span>
+      </div>`;
+    espClase.forEach(sp => {
+      const refs = (BIBLIOTECA_DB[sp.id]||[]).filter(r => !_bibCatActiva || getRefCategoria(r) === _bibCatActiva);
+      const isOpen = _bibEspAbiertas[sp.id] || false;
+      html += `
+      <div class="info-card" style="margin-bottom:.5rem" id="bib-card-${sp.id}">
         <div style="display:flex;align-items:center;gap:.5rem;cursor:pointer;padding:.1rem 0"
              onclick="toggleBibCard('${sp.id}')">
           ${sp.cover_photo?`<img src="${sp.cover_photo}" style="width:36px;height:28px;object-fit:cover;border-radius:var(--rxs);flex-shrink:0">`:''}
@@ -8948,10 +9095,13 @@ function renderBiblioteca() {
           <span style="font-size:.7rem;background:${refs.length?'var(--g5)':'var(--sur2)'};color:${refs.length?'white':'var(--txt3)'};border-radius:20px;padding:.1rem .45rem;margin-right:.3rem">${refs.length}</span>
           ${isAdmin?`<button onclick="event.stopPropagation();openAddRef('${sp.id}')" class="btn btn-admin btn-sm" style="font-size:.68rem;padding:.15rem .4rem">+ Agregar</button>`:''}
           ${isAdmin?`<button onclick="event.stopPropagation();openBulkPdfImport('${sp.id}')" class="btn btn-secondary btn-sm" style="font-size:.65rem;padding:.15rem .35rem" title="Importar varios PDFs">📥</button>`:''}
+          ${isAdmin?`<button onclick="event.stopPropagation();openMultiDeleteBibliotecaSp('${sp.id}')" class="btn btn-secondary btn-sm" style="font-size:.65rem;padding:.15rem .35rem" title="Eliminar varias referencias">🗑</button>`:''}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="bib-chev-${sp.id}" style="flex-shrink:0;transition:transform .2s;transform:${isOpen?'rotate(180deg)':'rotate(0deg)'}"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
         <div id="bib-body-${sp.id}" style="display:${isOpen?'block':'none'};margin-top:.4rem">
-          ${refs.length ? refs.map((r,i)=>`
+          ${refs.length ? refs.map((r,i)=>{
+            const realIdx = (BIBLIOTECA_DB[sp.id]||[]).indexOf(r);
+            return `
           <div style="padding:.4rem .5rem;border-left:3px solid var(--g5);margin-bottom:.4rem;background:var(--sur2);border-radius:0 var(--rxs) var(--rxs) 0">
             <div style="display:flex;justify-content:space-between;align-items:flex-start">
               <div style="flex:1">
@@ -8959,21 +9109,219 @@ function renderBiblioteca() {
                 ${r.autores?`<div style="font-size:.75rem;color:var(--txt3)">${r.autores}${r.año?' · '+r.año:''}</div>`:''}
                 <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
                   ${r.tipo?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>`:''}
+                  ${getRefCategoria(r)?`<span style="font-size:.65rem;background:var(--g0);color:var(--g6);padding:.05rem .35rem;border-radius:var(--rxs)">${getRefCategoria(r)}</span>`:''}
                   ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
-                  ${r.pdf ? refPdfButtons(r, sp.id, i) : ''}
+                  ${r.pdf ? refPdfButtons(r, sp.id, realIdx) : ''}
                 </div>
               </div>
               ${isAdmin?`<div style="display:flex;gap:.3rem">
-                <button onclick="openEditRef('${sp.id}',${i})" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem">✏️</button>
-                <button onclick="removeRef('${sp.id}',${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>
+                <button onclick="openEditRef('${sp.id}',${realIdx})" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem">✏️</button>
+                <button onclick="removeRef('${sp.id}',${realIdx})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>
               </div>`:''}
             </div>
-          </div>`).join('') : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic;padding:.2rem 0">Sin referencias — ${isAdmin?'toca + Agregar':''}</p>`}
+          </div>`;}).join('') : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic;padding:.2rem 0">Sin referencias${_bibCatActiva?' en esta categoría':''} — ${isAdmin?'toca + Agregar':''}</p>`}
         </div>
       </div>`;
-    }).join('');
-  }
+    });
+    html += `</div>`;
+  });
   el.innerHTML = html;
+}
+
+function bibSetCategoria(cat, btn) {
+  _bibCatActiva = cat;
+  document.querySelectorAll('#biblioteca-list .bib-cat-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderBiblioteca();
+}
+
+function bibSetClase(clase, btn) {
+  _bibClaseActiva = clase;
+  document.querySelectorAll('#biblioteca-list .bib-clase-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderBiblioteca();
+}
+
+function bibManageCategorias() {
+  const cats = BIBLIOTECA_CATEGORIAS.filter(c => !BIBLIOTECA_CATS_DEFAULT.includes(c));
+  document.getElementById('bib-cats-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="bib-cats-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:85vh;overflow-y:auto">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">📚 Gestionar categorías de biblioteca</div>
+        <p style="font-size:.75rem;color:var(--txt3);margin-bottom:.6rem">Las categorías agrupan referencias por tipo de documento.</p>
+        <div style="display:flex;gap:.4rem;margin-bottom:.8rem">
+          <input id="bib-new-cat" class="form-control" placeholder="Nueva categoría..." style="flex:1">
+          <button class="btn btn-admin btn-sm" onclick="bibAddCategoria()">+ Agregar</button>
+        </div>
+        <div id="bib-cats-list">
+          ${cats.length ? cats.map((c,i)=>`
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:.45rem .5rem;border:1px solid var(--bor);border-radius:var(--rxs);margin-bottom:.35rem;background:var(--sur2)">
+              <span style="font-size:.82rem">${c}</span>
+              <button onclick="bibDelCategoria('${c}')" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.7rem;padding:.15rem .4rem">✕ Eliminar</button>
+            </div>`).join('') : `<p style="font-size:.75rem;color:var(--txt3);font-style:italic">Sin categorías personalizadas.</p>`}
+        </div>
+        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+          <button class="btn btn-primary" style="flex:1" onclick="document.getElementById('bib-cats-modal').remove()">Listo</button>
+        </div>
+      </div>
+    </div>`);
+  document.getElementById('bib-new-cat')?.focus();
+}
+
+function bibAddCategoria() {
+  const inp = document.getElementById('bib-new-cat');
+  const nombre = inp?.value.trim();
+  if (!nombre) { toast('⚠ Escribe un nombre'); return; }
+  if (BIBLIOTECA_CATEGORIAS.includes(nombre)) { toast('⚠ Ya existe'); return; }
+  BIBLIOTECA_CATEGORIAS.push(nombre);
+  saveBibliotecaCategorias();
+  bibManageCategorias();
+  renderBiblioteca();
+  toast('✓ Categoría agregada');
+}
+
+async function bibDelCategoria(nombre) {
+  const usos = BIBLIOTECA_GENERAL.filter(r => getRefCategoria(r) === nombre).length
+    + Object.values(BIBLIOTECA_DB).reduce((n, refs) => n + refs.filter(r => getRefCategoria(r) === nombre).length, 0);
+  const ok = await confirmDelete('¿Eliminar categoría?',
+    `Se eliminará la categoría "${nombre}". ${usos?`${usos} referencia(s) pasarán a "Otros".`:''}`, '📚');
+  if (!ok) return;
+  BIBLIOTECA_CATEGORIAS = BIBLIOTECA_CATEGORIAS.filter(c => c !== nombre);
+  BIBLIOTECA_GENERAL.forEach(r => { if (getRefCategoria(r) === nombre) r.categoria = 'Otros'; });
+  Object.values(BIBLIOTECA_DB).forEach(refs => refs.forEach(r => { if (getRefCategoria(r) === nombre) r.categoria = 'Otros'; }));
+  await saveBiblioteca();
+  await saveBibliotecaGeneral();
+  await saveBibliotecaCategorias();
+  if (_bibCatActiva === nombre) _bibCatActiva = '';
+  bibManageCategorias();
+  renderBiblioteca();
+  toast('✓ Categoría eliminada');
+}
+
+function openMultiDeleteBibliotecaGen() {
+  openMultiDelete({
+    title: 'Referencias Generales',
+    items: BIBLIOTECA_GENERAL.map((r, i) => ({ id: 'g' + i, label: r.titulo || 'Sin título', sub: (r.autores ? r.autores + ' ' : '') + (r.año || '') })),
+    onConfirm: async (ids) => {
+      const idxs = ids.map(s => parseInt(String(s).slice(1))).filter(n => !isNaN(n));
+      const toDel = new Set(idxs);
+      BIBLIOTECA_GENERAL = BIBLIOTECA_GENERAL.filter((r, i) => !toDel.has(i));
+      await saveBibliotecaGeneral();
+      renderBiblioteca();
+    }
+  });
+}
+
+function openMultiDeleteBibliotecaSp(spId) {
+  const refs = BIBLIOTECA_DB[spId] || [];
+  openMultiDelete({
+    title: 'Referencias de especie',
+    items: refs.map((r, i) => ({ id: String(i), label: r.titulo || 'Sin título', sub: (r.autores ? r.autores + ' ' : '') + (r.año || '') })),
+    onConfirm: async (ids) => {
+      const toDel = new Set(ids);
+      BIBLIOTECA_DB[spId] = refs.filter((r, i) => !toDel.has(String(i)));
+      await saveBiblioteca();
+      renderBiblioteca();
+    }
+  });
+}
+
+// ═══════════════════════════════════
+// BORRADO MÚLTIPLE GENÉRICO
+// Abre un modal con checkboxes; onConfirm recibe los ids seleccionados
+// ═══════════════════════════════════
+function openMultiDelete(opts) {
+  document.getElementById('multi-del-modal')?.remove();
+  const items = opts.items || [];
+  const sel = new Set();
+  let q = '';
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="multi-del-modal" style="position:fixed;inset:0;z-index:1450;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:92vh;display:flex;flex-direction:column;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
+          <div style="font-weight:700;font-size:.95rem">🗑 ${opts.title||'Eliminar varios'}</div>
+          <button onclick="document.getElementById('multi-del-modal').remove()" style="background:none;border:none;color:var(--txt3);font-size:1.2rem;cursor:pointer">✕</button>
+        </div>
+        <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.7rem">Marca los elementos a eliminar y confirma al final.</div>
+        <div style="display:flex;gap:.4rem;margin-bottom:.5rem">
+          <input id="multi-del-search" class="form-control" placeholder="Buscar..." style="flex:1;font-size:.78rem" oninput="_multiDelFilter(this.value)">
+          <button class="btn btn-secondary btn-sm" onclick="_multiDelToggleAll(true)">Todo</button>
+          <button class="btn btn-secondary btn-sm" onclick="_multiDelToggleAll(false)">Nada</button>
+        </div>
+        <div id="multi-del-list" style="flex:1;overflow-y:auto;min-height:120px;border:1px solid var(--bor);border-radius:var(--rsm);padding:.3rem">
+          ${_multiDelRender(items, sel, q)}
+        </div>
+        <div style="display:flex;gap:.5rem;margin-top:.8rem;align-items:center">
+          <span id="multi-del-count" style="font-size:.75rem;color:var(--txt3);flex:1">0 seleccionados</span>
+          <button class="btn btn-secondary" onclick="document.getElementById('multi-del-modal').remove()">Cancelar</button>
+          <button class="btn btn-danger" id="multi-del-go" onclick="_multiDelConfirm()" style="background:var(--r5);color:white;border:none;border-radius:var(--rsm);padding:.5rem 1rem;font-size:.82rem;font-weight:600">Eliminar</button>
+        </div>
+      </div>
+    </div>`);
+  window._multiDelState = { items, sel, onConfirm: opts.onConfirm };
+  document.getElementById('multi-del-search')?.focus();
+}
+
+function _multiDelRender(items, sel, q) {
+  const filtered = q ? items.filter(it => (it.label||'').toLowerCase().includes(q.toLowerCase()) || (it.sub||'').toLowerCase().includes(q.toLowerCase())) : items;
+  if (!filtered.length) return `<p style="font-size:.78rem;color:var(--txt3);text-align:center;padding:1rem 0">Sin resultados.</p>`;
+  return filtered.map((it, fi) => {
+    const id = String(it.id);
+    const checked = sel.has(id);
+    return `
+    <div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .4rem;border-radius:var(--rxs);cursor:pointer;${checked?'background:var(--g0);':''}" onclick="if(event.target.tagName!=='INPUT')_multiDelToggle('${String(it.id).replace(/'/g,"\\'").replace(/"/g,'&quot;')}',this)">
+      <input type="checkbox" ${checked?'checked':''} onchange="_multiDelToggle('${String(it.id).replace(/'/g,"\\'").replace(/"/g,'&quot;')}',this.closest('div'))" style="accent-color:var(--g5);width:16px;height:16px;flex-shrink:0">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.8rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.label||'Sin título'}</div>
+        ${it.sub?`<div style="font-size:.68rem;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.sub}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _multiDelToggle(id, rowEl) {
+  const st = window._multiDelState;
+  if (!st) return;
+  if (st.sel.has(id)) st.sel.delete(id); else st.sel.add(id);
+  if (rowEl) {
+    const cb = rowEl.querySelector('input');
+    if (cb) cb.checked = st.sel.has(id);
+    rowEl.style.background = st.sel.has(id) ? 'var(--g0)' : '';
+  }
+  const c = document.getElementById('multi-del-count');
+  if (c) c.textContent = `${st.sel.size} seleccionado(s)`;
+  const go = document.getElementById('multi-del-go');
+  if (go) go.textContent = st.sel.size ? `🗑 Eliminar ${st.sel.size}` : 'Eliminar';
+}
+
+function _multiDelFilter(q) {
+  const st = window._multiDelState;
+  if (!st) return;
+  document.getElementById('multi-del-list').innerHTML = _multiDelRender(st.items, st.sel, q.trim());
+}
+
+function _multiDelToggleAll(select) {
+  const st = window._multiDelState;
+  if (!st) return;
+  st.sel = select ? new Set(st.items.map(it => String(it.id))) : new Set();
+  const q = document.getElementById('multi-del-search')?.value?.trim() || '';
+  document.getElementById('multi-del-list').innerHTML = _multiDelRender(st.items, st.sel, q);
+  const c = document.getElementById('multi-del-count');
+  if (c) c.textContent = `${st.sel.size} seleccionado(s)`;
+  const go = document.getElementById('multi-del-go');
+  if (go) go.textContent = st.sel.size ? `🗑 Eliminar ${st.sel.size}` : 'Eliminar';
+}
+
+async function _multiDelConfirm() {
+  const st = window._multiDelState;
+  if (!st || !st.sel.size) { toast('⚠ Selecciona al menos uno'); return; }
+  const ids = [...st.sel];
+  const ok = await confirmDelete('¿Eliminar seleccionados?', `Se eliminarán ${ids.length} elemento(s). Esta acción no se puede deshacer.`, '🗑');
+  if (!ok) return;
+  document.getElementById('multi-del-modal')?.remove();
+  await st.onConfirm(ids);
+  toast(`✓ ${ids.length} elemento(s) eliminados`);
 }
 
 function toggleBibCard(spId) {
@@ -8983,6 +9331,7 @@ function toggleBibCard(spId) {
   const open = body.style.display === 'none';
   body.style.display = open ? 'block' : 'none';
   if (chev) chev.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
+  _bibEspAbiertas[spId] = open;
 }
 
 
@@ -9007,6 +9356,7 @@ function openEditRef(spId, idx) {
     const s=(id,v)=>{const el=document.getElementById(id);if(el&&v!==undefined)el.value=v;};
     s('ref-titulo',r.titulo);s('ref-autores',r.autores);s('ref-año',r.año);s('ref-url',r.url);s('ref-notas',r.notas);
     if(r.tipo){const sel=document.getElementById('ref-tipo');if(sel)for(const o of sel.options)if(o.value===r.tipo){o.selected=true;break;}}
+    if(document.getElementById('ref-categoria')){const catSel=document.getElementById('ref-categoria');const rc=getRefCategoria(r);for(const o of catSel.options)if(o.value===rc){o.selected=true;break;}}
     if(r.pdf){
       const n=document.getElementById('ref-pdf-name');if(n)n.textContent='📎 '+r.pdf.name;
       const a=document.getElementById('ref-pdf-actions');if(a)a.style.display='inline-flex';
@@ -9027,6 +9377,7 @@ async function updateRef(spId, idx) {
     autores: document.getElementById('ref-autores')?.value.trim()||'',
     año:     document.getElementById('ref-año')?.value||'',
     tipo:    document.getElementById('ref-tipo')?.value||'Libro',
+    categoria: document.getElementById('ref-categoria')?.value || getRefCategoria(BIBLIOTECA_DB[spId][idx]),
     url:     document.getElementById('ref-url')?.value.trim()||'',
     notas:   document.getElementById('ref-notas')?.value.trim()||'',
     pdf:     newPdf
@@ -9066,6 +9417,7 @@ function openEditRefGeneral(idx) {
     const s=(id,v)=>{const el=document.getElementById(id);if(el&&v!==undefined)el.value=v;};
     s('ref-titulo',r.titulo);s('ref-autores',r.autores);s('ref-año',r.año);s('ref-url',r.url);s('ref-notas',r.notas);
     if(r.tipo){const sel=document.getElementById('ref-tipo');if(sel)for(const o of sel.options)if(o.value===r.tipo){o.selected=true;break;}}
+    if(document.getElementById('ref-categoria')){const catSel=document.getElementById('ref-categoria');const rc=getRefCategoria(r);for(const o of catSel.options)if(o.value===rc){o.selected=true;break;}}
     if(r.pdf){
       const n=document.getElementById('ref-pdf-name');if(n)n.textContent='📎 '+r.pdf.name;
       const a=document.getElementById('ref-pdf-actions');if(a)a.style.display='inline-flex';
@@ -9085,6 +9437,7 @@ async function updateRefGeneral(idx) {
     autores: document.getElementById('ref-autores')?.value.trim()||'',
     año:     document.getElementById('ref-año')?.value||'',
     tipo:    document.getElementById('ref-tipo')?.value||'Libro',
+    categoria: document.getElementById('ref-categoria')?.value || getRefCategoria(BIBLIOTECA_GENERAL[idx]),
     url:     document.getElementById('ref-url')?.value.trim()||'',
     notas:   document.getElementById('ref-notas')?.value.trim()||'',
     pdf:     newPdf
@@ -9131,6 +9484,13 @@ function buildRefFormHTML() {
           <option>Libro</option><option>Artículo científico</option><option>Paper</option><option>Guía clínica</option><option>Tesis</option><option>Manual</option><option>Formulario</option><option>Radiología</option><option>Farmacopea</option><option>Otro</option>
         </select>
       </div>
+      <div class="form-group"><label>Categoría</label>
+        <select id="ref-categoria" class="form-control">
+          ${BIBLIOTECA_CATEGORIAS.map(c=>`<option value="${c}">${c}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
       <div class="form-group"><label>URL / DOI</label><input id="ref-url" class="form-control" placeholder="https://..."></div>
     </div>
     <div class="form-group"><label>Notas</label><textarea id="ref-notas" class="form-control" style="min-height:50px"></textarea></div>
@@ -9272,6 +9632,7 @@ async function saveRefGeneral() {
     autores: document.getElementById('ref-autores')?.value.trim()||'',
     año:     document.getElementById('ref-año')?.value||'',
     tipo:    document.getElementById('ref-tipo')?.value||'Libro',
+    categoria: document.getElementById('ref-categoria')?.value || 'Otros',
     url:     document.getElementById('ref-url')?.value.trim()||'',
     notas:   document.getElementById('ref-notas')?.value.trim()||'',
     pdf:     _refPDFData || null
@@ -10045,6 +10406,24 @@ async function removeEnriquecimiento(i) {
   renderEnriquecimientoScreen();
 }
 
+function openMultiDeleteEnriquecimiento() {
+  if (!ENRIQUECIMIENTOS_DB.length) { toast('Sin enriquecimientos para eliminar'); return; }
+  openMultiDelete({
+    title: 'Enriquecimiento ambiental',
+    items: ENRIQUECIMIENTOS_DB.map((enr, i) => ({
+      id: String(i),
+      label: enr.nombre || 'Sin nombre',
+      sub: (enr.categorias||[enr.categoria||'alimenticio']).map(c=>{const ct=ENRIQ_CATS.find(x=>x.id===c);return ct?ct.label:c;}).join(' · ')
+    })),
+    onConfirm: async (ids) => {
+      const toDel = new Set(ids);
+      ENRIQUECIMIENTOS_DB = ENRIQUECIMIENTOS_DB.filter((enr, i) => !toDel.has(String(i)));
+      await saveEnriquecimientos();
+      renderEnriquecimientoScreen();
+    }
+  });
+}
+
 // También mostrar en ficha de especie (pestaña nueva)
 // se agrega en renderTab via "enriquecimiento" tab
 
@@ -10272,6 +10651,24 @@ async function removeRecinto(i) {
   RECINTOS_DB.splice(i, 1);
   await saveRecintos();
   renderRecintosScreen();
+}
+
+function openMultiDeleteRecintos() {
+  if (!RECINTOS_DB.length) { toast('Sin recintos para eliminar'); return; }
+  openMultiDelete({
+    title: 'Recintos',
+    items: RECINTOS_DB.map((r, i) => ({
+      id: String(i),
+      label: r.nombre || 'Sin nombre',
+      sub: `${r.institucion||''} ${r.especie?'· '+r.especie:''}`
+    })),
+    onConfirm: async (ids) => {
+      const toDel = new Set(ids);
+      RECINTOS_DB = RECINTOS_DB.filter((r, i) => !toDel.has(String(i)));
+      await saveRecintos();
+      renderRecintosScreen();
+    }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -11768,6 +12165,13 @@ function openAddRef(spId) {
               <option>Guía clínica</option><option>Tesis</option><option>Manual</option><option>Otro</option>
             </select>
           </div>
+          <div class="form-group"><label>Categoría</label>
+            <select id="ref-categoria" class="form-control">
+              ${BIBLIOTECA_CATEGORIAS.map(c=>`<option value="${c}">${c}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
           <div class="form-group"><label>URL / DOI</label><input id="ref-url" class="form-control" placeholder="https://..."></div>
         </div>
         <div class="form-group"><label>Notas</label><textarea id="ref-notas" class="form-control" placeholder="Capítulos relevantes, páginas, observaciones..." style="min-height:50px"></textarea></div>
@@ -11803,6 +12207,7 @@ async function saveRef(spId) {
     autores: document.getElementById('ref-autores')?.value.trim() || '',
     año:     document.getElementById('ref-año')?.value || '',
     tipo:    document.getElementById('ref-tipo')?.value || 'Libro',
+    categoria: document.getElementById('ref-categoria')?.value || 'Otros',
     url:     document.getElementById('ref-url')?.value.trim() || '',
     notas:   document.getElementById('ref-notas')?.value.trim() || '',
     pdf:     _refPDFData || null
@@ -12955,6 +13360,36 @@ async function _enfGenEliminar(sistId, enfIdx) {
   await saveEnfermedadesGenerales();
   renderEnfGenContent();
   toast('✓ Enfermedad eliminada');
+}
+
+function openMultiDeleteEnfGen() {
+  const items = [];
+  Object.entries(ENFERMEDADES_GENERALES).forEach(([clase, claseData]) => {
+    Object.entries(claseData?.sistemas||{}).forEach(([sistId, sist]) => {
+      (sist?.enfermedades||[]).forEach((enf, i) => {
+        items.push({ id: `${clase}|${sistId}|${i}`, label: enf?.nombre || 'Sin nombre', sub: `${clase} · ${_getAllSistsLabel(sistId)||sistId}` });
+      });
+    });
+  });
+  if (!items.length) { toast('Sin enfermedades registradas'); return; }
+  openMultiDelete({
+    title: 'Enfermedades',
+    items,
+    onConfirm: async (ids) => {
+      const paths = ids.map(id => {
+        const [clase, sistId, i] = id.split('|');
+        return { clase, sistId, i: parseInt(i) };
+      }).filter(p => p.clase && p.sistId && !isNaN(p.i));
+      const removeSet = new Set(paths.map(p => p.clase+'|'+p.sistId+'|'+p.i));
+      Object.entries(ENFERMEDADES_GENERALES).forEach(([clase, claseData]) => {
+        Object.entries(claseData?.sistemas||{}).forEach(([sistId, sist]) => {
+          sist.enfermedades = (sist.enfermedades||[]).filter((enf, i) => !removeSet.has(clase+'|'+sistId+'|'+i));
+        });
+      });
+      await saveEnfermedadesGenerales();
+      renderEnfGenContent();
+    }
+  });
 }
 
 
@@ -14765,6 +15200,9 @@ function renderBulkReviewList(spId) {
           <select id="bulk-tipo-${i}" class="form-control" style="font-size:.75rem;flex:1">
             ${_BULK_TIPOS.map(t=>`<option ${tipoVal===t?'selected':''}>${t}</option>`).join('')}
           </select>
+          <select id="bulk-cat-${i}" class="form-control" style="font-size:.75rem;flex:1">
+            ${BIBLIOTECA_CATEGORIAS.map(c=>`<option value="${c}" ${(it.saved?.categoria||m.categoria||'')===c?'selected':''}>${c}</option>`).join('')}
+          </select>
         </div>`}
       </div>`;
   }).join('');
@@ -14782,7 +15220,8 @@ function _bulkReadFields(i) {
     titulo:  document.getElementById(`bulk-title-${i}`)?.value.trim() || _bulkReviewItems[i].file.name.replace(/\.pdf$/i,''),
     autores: document.getElementById(`bulk-author-${i}`)?.value.trim() || '',
     año:     document.getElementById(`bulk-year-${i}`)?.value || '',
-    tipo:    document.getElementById(`bulk-tipo-${i}`)?.value || 'Paper'
+    tipo:    document.getElementById(`bulk-tipo-${i}`)?.value || 'Paper',
+    categoria: document.getElementById(`bulk-cat-${i}`)?.value || 'Otros'
   };
 }
 
@@ -14819,6 +15258,7 @@ async function saveBulkReviewOne(i, spId) {
       autores: f.autores,
       año:     f.año,
       tipo:    f.tipo,
+      categoria: f.categoria,
       url:     '',
       notas:   '',
       pdf:     pdfObj,
@@ -14833,7 +15273,7 @@ async function saveBulkReviewOne(i, spId) {
       BIBLIOTECA_GENERAL.push(ref);
       await saveBibliotecaGeneral();
     }
-    it.saved = { titulo: f.titulo, autores: f.autores, año: f.año, tipo: f.tipo };
+    it.saved = { titulo: f.titulo, autores: f.autores, año: f.año, tipo: f.tipo, categoria: f.categoria };
     renderBulkReviewList(spId);
     toast(`✓ Guardado: ${f.titulo}`);
   } catch(e) {
@@ -14858,6 +15298,7 @@ async function saveAllBulkReview(spId) {
         autores: f.autores,
         año:     f.año,
         tipo:    f.tipo || 'Paper',
+        categoria: f.categoria || 'Otros',
         url:     '',
         notas:   '',
         pdf:     pdfObj,
@@ -14870,7 +15311,7 @@ async function saveAllBulkReview(spId) {
       } else {
         BIBLIOTECA_GENERAL.push(ref);
       }
-      it.saved = { titulo: f.titulo, autores: f.autores, año: f.año, tipo: f.tipo };
+      it.saved = { titulo: f.titulo, autores: f.autores, año: f.año, tipo: f.tipo, categoria: f.categoria };
       done++;
     } catch(e) {
       errors++;
