@@ -8930,6 +8930,9 @@ let BIBLIOTECA_CATEGORIAS = [...BIBLIOTECA_CATS_DEFAULT, 'Otros'];
 let _bibCatActiva = '';   // '' = Todas
 let _bibClaseActiva = ''; // '' = Todas las clases
 let _bibEspAbiertas = {}; // especies abiertas en la vista agrupada
+let _bibBusqueda = '';    // búsqueda global
+let _bibFavOnly = false;  // mostrar solo favoritas
+let _bibOrden = 'recientes'; // 'recientes' | 'titulo' | 'anioDesc' | 'anioAsc'
 
 async function loadBibliotecaCategorias() {
   const saved = await dbGet('settings', 'biblioteca_categorias');
@@ -9008,9 +9011,20 @@ function renderBiblioteca() {
   if (!el) return;
   const isAdmin = currentUser?.role === 'admin';
 
+  // ── Barra: búsqueda global + ordenar + solo favoritas ──
+  const ordenLabels = { recientes:'🕓 Recientes', titulo:'🔤 Título', anioDesc:'📅 Año ↓', anioAsc:'📅 Año ↑' };
+  html = `
+    <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.5rem;align-items:center">
+      <input id="bib-buscar" class="form-control" placeholder="🔍 Buscar por título, autor, materia, notas, palabras clave..." value="${_bibBusqueda.replace(/"/g,'&quot;')}" oninput="bibSetBusqueda(this.value)" style="flex:1;min-width:170px;font-size:.75rem">
+      <select id="bib-orden" class="form-control" onchange="bibSetOrden(this.value)" style="width:auto;font-size:.72rem;flex-shrink:0">
+        ${Object.entries(ordenLabels).map(([v,l])=>`<option value="${v}" ${_bibOrden===v?'selected':''}>${l}</option>`).join('')}
+      </select>
+      <button onclick="bibToggleFavOnly()" class="tab-filter-btn${_bibFavOnly?' active':''}" style="font-size:.72rem;flex-shrink:0">⭐ Favoritas</button>
+    </div>`;
+
   // ── Pills de categoría (tipo de documento) ──
   const catIcons = { 'Vademécums':'📖','Enfermedades':'🦠','Fármacos':'💊','Papers':'📄','Radiología':'🩻','Guías':'🏥' };
-  let html = `<div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.5rem">`;
+  html += `<div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.5rem">`;
   html += `<button onclick="bibSetCategoria('',this)" class="bib-cat-pill tab-filter-btn${!_bibCatActiva?' active':''}" style="font-size:.72rem">Todos</button>`;
   BIBLIOTECA_CATEGORIAS.forEach(c => {
     html += `<button onclick="bibSetCategoria('${c}',this)" class="bib-cat-pill tab-filter-btn${_bibCatActiva===c?' active':''}" style="font-size:.72rem">${catIcons[c]||'📚'} ${c}</button>`;
@@ -9032,8 +9046,22 @@ function renderBiblioteca() {
   });
   html += `</div>`;
 
+  const bibFiltra = refs => refs.filter(r =>
+    (!_bibCatActiva || getRefCategoria(r) === _bibCatActiva)
+    && (!_bibFavOnly || r.fav)
+    && (!_bibBusqueda.trim() || bibMatchQ(r, _bibBusqueda))
+  );
+  const bibSort = refs => {
+    const arr = [...refs];
+    if (_bibOrden === 'titulo') arr.sort((a,b)=>String(a.titulo||'').localeCompare(String(b.titulo||'')));
+    else if (_bibOrden === 'anioDesc') arr.sort((a,b)=>String(b.año||'').localeCompare(String(a.año||'')));
+    else if (_bibOrden === 'anioAsc') arr.sort((a,b)=>String(a.año||'').localeCompare(String(b.año||'')));
+    else arr.sort((a,b)=>String(b.fechaImport||'').localeCompare(String(a.fechaImport||'')));
+    return arr;
+  };
+
   // ── Referencias Generales ──
-  const genFiltradas = BIBLIOTECA_GENERAL.filter(r => !_bibCatActiva || getRefCategoria(r) === _bibCatActiva);
+  const genFiltradas = bibSort(bibFiltra(BIBLIOTECA_GENERAL));
   html += `<div class="info-card" style="margin-bottom:1rem;border-left:3px solid var(--g5)">
     <div class="info-card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>📖 Referencias Generales${_bibCatActiva?` — ${_bibCatActiva}`:''} <span style="font-size:.7rem;background:var(--g1);color:var(--g7);border-radius:20px;padding:.05rem .4rem">${genFiltradas.length}</span></span>
@@ -9046,25 +9074,8 @@ function renderBiblioteca() {
     <p style="font-size:.75rem;color:var(--txt3);margin-bottom:.5rem">Libros de fármacos, guías, radiología y documentos para múltiples especies</p>
     ${genFiltradas.length ? genFiltradas.map((r,i)=>{
       const realIdx = BIBLIOTECA_GENERAL.indexOf(r);
-      return `
-    <div style="padding:.4rem .5rem;border-left:3px solid var(--g4);margin-bottom:.4rem;background:var(--sur2);border-radius:0 var(--rxs) var(--rxs) 0">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div style="flex:1">
-          <div style="font-size:.82rem;font-weight:600">${r.titulo||'Sin título'}</div>
-          ${r.autores?`<div style="font-size:.75rem;color:var(--txt3)">${r.autores}${r.año?' · '+r.año:''}</div>`:''}
-          <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
-            ${r.tipo?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>`:''}
-            ${getRefCategoria(r)?`<span style="font-size:.65rem;background:var(--g0);color:var(--g6);padding:.05rem .35rem;border-radius:var(--rxs)">${getRefCategoria(r)}</span>`:''}
-            ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
-            ${r.pdf ? refPdfButtons(r, '', realIdx) : ''}
-          </div>
-        </div>
-        ${isAdmin?`<div style="display:flex;gap:.3rem">
-          <button onclick="openEditRefGeneral(${realIdx})" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem">✏️</button>
-          <button onclick="removeRefGeneral(${realIdx})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>
-        </div>`:''}
-      </div>
-    </div>`;}).join('') : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin referencias generales${_bibCatActiva?' en esta categoría':''}.</p>`}
+      return bibRefCardHTML(r, '', realIdx, isAdmin, 'var(--g4)');
+    }).join('') : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin referencias generales${_bibCatActiva?' en esta categoría':''}${_bibBusqueda?' que coincidan con la búsqueda':''}.</p>`}
   </div>`;
 
   // ── Especies agrupadas por clase taxonómica ──
@@ -9072,7 +9083,7 @@ function renderBiblioteca() {
   clasesVisibles.forEach(clase => {
     const espClase = SPECIES_DB.filter(sp => sp.clase === clase);
     if (!espClase.length) return;
-    const espConRefs = espClase.filter(sp => (BIBLIOTECA_DB[sp.id]||[]).some(r => !_bibCatActiva || getRefCategoria(r) === _bibCatActiva));
+    const espConRefs = espClase.filter(sp => bibFiltra(BIBLIOTECA_DB[sp.id]||[]).length > 0);
     if (!espConRefs.length && !isAdmin) return;
     const icon = CLASS_ICONS[clase] || '🐾';
     html += `<div style="margin-bottom:.6rem">
@@ -9081,7 +9092,7 @@ function renderBiblioteca() {
         <span style="flex:1;height:1px;background:var(--bor)"></span>
       </div>`;
     espClase.forEach(sp => {
-      const refs = (BIBLIOTECA_DB[sp.id]||[]).filter(r => !_bibCatActiva || getRefCategoria(r) === _bibCatActiva);
+      const refs = bibSort(bibFiltra(BIBLIOTECA_DB[sp.id]||[]));
       const isOpen = _bibEspAbiertas[sp.id] || false;
       html += `
       <div class="info-card" style="margin-bottom:.5rem" id="bib-card-${sp.id}">
@@ -9101,31 +9112,83 @@ function renderBiblioteca() {
         <div id="bib-body-${sp.id}" style="display:${isOpen?'block':'none'};margin-top:.4rem">
           ${refs.length ? refs.map((r,i)=>{
             const realIdx = (BIBLIOTECA_DB[sp.id]||[]).indexOf(r);
-            return `
-          <div style="padding:.4rem .5rem;border-left:3px solid var(--g5);margin-bottom:.4rem;background:var(--sur2);border-radius:0 var(--rxs) var(--rxs) 0">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start">
-              <div style="flex:1">
-                <div style="font-size:.82rem;font-weight:600">${r.titulo||'Sin título'}</div>
-                ${r.autores?`<div style="font-size:.75rem;color:var(--txt3)">${r.autores}${r.año?' · '+r.año:''}</div>`:''}
-                <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem">
-                  ${r.tipo?`<span style="font-size:.65rem;background:var(--g1);color:var(--g7);padding:.05rem .35rem;border-radius:var(--rxs)">${r.tipo}</span>`:''}
-                  ${getRefCategoria(r)?`<span style="font-size:.65rem;background:var(--g0);color:var(--g6);padding:.05rem .35rem;border-radius:var(--rxs)">${getRefCategoria(r)}</span>`:''}
-                  ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
-                  ${r.pdf ? refPdfButtons(r, sp.id, realIdx) : ''}
-                </div>
-              </div>
-              ${isAdmin?`<div style="display:flex;gap:.3rem">
-                <button onclick="openEditRef('${sp.id}',${realIdx})" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem">✏️</button>
-                <button onclick="removeRef('${sp.id}',${realIdx})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>
-              </div>`:''}
-            </div>
-          </div>`;}).join('') : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic;padding:.2rem 0">Sin referencias${_bibCatActiva?' en esta categoría':''} — ${isAdmin?'toca + Agregar':''}</p>`}
+            return bibRefCardHTML(r, sp.id, realIdx, isAdmin, 'var(--g5)');
+          }).join('') : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic;padding:.2rem 0">Sin referencias${_bibCatActiva?' en esta categoría':''}${_bibBusqueda?' que coincidan con la búsqueda':''} — ${isAdmin?'toca + Agregar':''}</p>`}
         </div>
       </div>`;
     });
     html += `</div>`;
   });
   el.innerHTML = html;
+}
+
+// Coincidencia de búsqueda global (título, autor, materia, notas, palabras clave, url, año)
+function bibMatchQ(r, q) {
+  const hay = [r.titulo, r.autores, r.subject, r.keywords, r.notas, r.url, r.año]
+    .map(v=>String(v||'').toLowerCase()).join(' ');
+  return hay.includes(String(q).toLowerCase());
+}
+
+// Tarjeta de referencia reutilizable (general y especie) con chips de metadatos y favorito
+function bibRefCardHTML(r, spKey, realIdx, isAdmin, accent) {
+  const chips = [];
+  if (r.subject)  chips.push(`<span title="Materia / Asunto" style="font-size:.63rem;background:var(--g1);color:var(--g7);padding:.05rem .4rem;border-radius:var(--rxs)">🏷 ${r.subject}</span>`);
+  if (r.keywords) chips.push(`<span title="Palabras clave" style="font-size:.63rem;background:var(--g1);color:var(--g7);padding:.05rem .4rem;border-radius:var(--rxs)">🔑 ${r.keywords}</span>`);
+  if (r.numPages) chips.push(`<span title="Páginas" style="font-size:.63rem;background:var(--g0);color:var(--g6);padding:.05rem .4rem;border-radius:var(--rxs)">📄 ${r.numPages} pág.</span>`);
+  if (r.producer) chips.push(`<span title="Productor / Creador" style="font-size:.63rem;background:var(--g0);color:var(--g6);padding:.05rem .4rem;border-radius:var(--rxs)">🖨 ${r.producer}</span>`);
+  if (r.modYear) chips.push(`<span title="Año de modificación" style="font-size:.63rem;background:var(--g0);color:var(--g6);padding:.05rem .4rem;border-radius:var(--rxs)">📅 ${r.modYear}</span>`);
+  const edit = spKey === ''
+    ? `onclick="openEditRefGeneral(${realIdx})"`
+    : `onclick="openEditRef('${spKey}',${realIdx})"`;
+  const del = spKey === ''
+    ? `onclick="removeRefGeneral(${realIdx})"`
+    : `onclick="removeRef('${spKey}',${realIdx})"`;
+  return `
+    <div style="padding:.4rem .5rem;border-left:3px solid ${accent};margin-bottom:.4rem;background:var(--sur2);border-radius:0 var(--rxs) var(--rxs) 0">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="flex:1">
+          <div style="font-size:.82rem;font-weight:600">${r.titulo||'Sin título'}</div>
+          ${r.autores?`<div style="font-size:.75rem;color:var(--txt3)">${r.autores}${r.año?' · '+r.año:''}</div>`:''}
+          <div style="display:flex;gap:.35rem;flex-wrap:wrap;align-items:center;margin-top:.2rem">
+            ${chips.join('')}
+            ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
+            ${r.pdf ? refPdfButtons(r, spKey, realIdx) : ''}
+          </div>
+          ${r.notas?`<div style="font-size:.68rem;color:var(--txt3);margin-top:.2rem">${r.notas}</div>`:''}
+        </div>
+        <div style="display:flex;gap:.3rem;flex-shrink:0">
+          <button onclick="bibToggleFav('${spKey}',${realIdx})" title="${r.fav?'Quitar de favoritas':'Marcar como favorita'}" style="background:none;border:none;cursor:pointer;font-size:.85rem;color:${r.fav?'var(--am)':'var(--txt3)'}">${r.fav?'★':'☆'}</button>
+          ${isAdmin?`<button ${edit} style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem">✏️</button>`:''}
+          ${isAdmin?`<button ${del} style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>`:''}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Búsqueda global, orden y favoritas ──
+function bibSetBusqueda(v) {
+  _bibBusqueda = v;
+  renderBiblioteca();
+  const inp = document.getElementById('bib-buscar');
+  if (inp) { inp.focus(); inp.setSelectionRange(v.length, v.length); }
+}
+function bibSetOrden(v) {
+  _bibOrden = v;
+  renderBiblioteca();
+}
+function bibToggleFavOnly() {
+  _bibFavOnly = !_bibFavOnly;
+  renderBiblioteca();
+}
+async function bibToggleFav(spKey, realIdx) {
+  const refs = spKey === '' ? BIBLIOTECA_GENERAL : (BIBLIOTECA_DB[spKey]||[]);
+  const r = refs[realIdx];
+  if (!r) return;
+  r.fav = !r.fav;
+  if (spKey === '') await saveBibliotecaGeneral();
+  else await saveBiblioteca();
+  renderBiblioteca();
+  toast(r.fav ? '⭐ Añadida a favoritas' : 'Quitada de favoritas');
 }
 
 function bibSetCategoria(cat, btn) {
@@ -9177,6 +9240,42 @@ function bibAddCategoria() {
   BIBLIOTECA_CATEGORIAS.push(nombre);
   saveBibliotecaCategorias();
   bibManageCategorias();
+  renderBiblioteca();
+  toast('✓ Categoría agregada');
+}
+
+// Agregar categoría desde un formulario de referencia (botón ➕ junto al select)
+function bibAddCatFromForm(selectId) {
+  document.getElementById('bib-addcat-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="bib-addcat-modal" style="position:fixed;inset:0;z-index:1460;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:400px;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">➕ Nueva categoría de biblioteca</div>
+        <input id="bib-addcat-input" class="form-control" placeholder="Nombre de la categoría (ej: Fisiología)" style="margin-bottom:.75rem">
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('bib-addcat-modal').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="bibConfirmAddCatFromForm('${selectId}')">+ Agregar categoría</button>
+        </div>
+      </div>
+    </div>`);
+  document.getElementById('bib-addcat-input')?.focus();
+}
+
+async function bibConfirmAddCatFromForm(selectId) {
+  const inp = document.getElementById('bib-addcat-input');
+  const nombre = inp?.value.trim();
+  if (!nombre) { toast('⚠ Escribe un nombre'); return; }
+  if (BIBLIOTECA_CATEGORIAS.includes(nombre)) { toast('⚠ Ya existe'); return; }
+  BIBLIOTECA_CATEGORIAS.push(nombre);
+  await saveBibliotecaCategorias();
+  document.getElementById('bib-addcat-modal')?.remove();
+  // Repoblar el select del formulario con la nueva categoría seleccionada
+  const sel = document.getElementById(selectId);
+  if (sel) {
+    sel.innerHTML = BIBLIOTECA_CATEGORIAS.map(c=>`<option value="${c}">${c}</option>`).join('');
+    sel.value = nombre;
+  }
+  // Si el modal de edición de refs está abierto, re-renderizar pills de biblioteca detrás
   renderBiblioteca();
   toast('✓ Categoría agregada');
 }
@@ -9344,7 +9443,7 @@ function openEditRef(spId, idx) {
     <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">✏️ Editar referencia</div>
-        ${buildRefFormHTML()}
+        ${buildRefFormHTML(false)}
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
           <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
           <button class="btn btn-primary" style="flex:2" onclick="updateRef('${spId}',${idx})">💾 Guardar cambios</button>
@@ -9354,8 +9453,7 @@ function openEditRef(spId, idx) {
   // Rellenar campos
   setTimeout(()=>{
     const s=(id,v)=>{const el=document.getElementById(id);if(el&&v!==undefined)el.value=v;};
-    s('ref-titulo',r.titulo);s('ref-autores',r.autores);s('ref-año',r.año);s('ref-url',r.url);s('ref-notas',r.notas);
-    if(r.tipo){const sel=document.getElementById('ref-tipo');if(sel)for(const o of sel.options)if(o.value===r.tipo){o.selected=true;break;}}
+    s('ref-titulo',r.titulo);s('ref-autores',r.autores);s('ref-año',r.año);s('ref-subject',r.subject);s('ref-keywords',r.keywords);s('ref-url',r.url);s('ref-notas',r.notas);
     if(document.getElementById('ref-categoria')){const catSel=document.getElementById('ref-categoria');const rc=getRefCategoria(r);for(const o of catSel.options)if(o.value===rc){o.selected=true;break;}}
     if(r.pdf){
       const n=document.getElementById('ref-pdf-name');if(n)n.textContent='📎 '+r.pdf.name;
@@ -9371,15 +9469,20 @@ async function updateRef(spId, idx) {
   const newPdf = _refPDFData && !isStorageUrl(_refPDFData.url || _refPDFData.data)
     ? { name: _refPDFData.name, data: _refPDFData.data }
     : BIBLIOTECA_DB[spId][idx].pdf;
+  const meta = _refPDFData?.meta || {};
   BIBLIOTECA_DB[spId][idx] = {
     ...BIBLIOTECA_DB[spId][idx],
     titulo,
     autores: document.getElementById('ref-autores')?.value.trim()||'',
     año:     document.getElementById('ref-año')?.value||'',
-    tipo:    document.getElementById('ref-tipo')?.value||'Libro',
-    categoria: document.getElementById('ref-categoria')?.value || getRefCategoria(BIBLIOTECA_DB[spId][idx]),
+    subject: document.getElementById('ref-subject')?.value.trim()||'',
+    keywords:document.getElementById('ref-keywords')?.value.trim()||'',
     url:     document.getElementById('ref-url')?.value.trim()||'',
     notas:   document.getElementById('ref-notas')?.value.trim()||'',
+    numPages: meta.numPages || BIBLIOTECA_DB[spId][idx].numPages || 0,
+    producer: meta.producer || BIBLIOTECA_DB[spId][idx].producer || '',
+    creator: meta.creator || BIBLIOTECA_DB[spId][idx].creator || '',
+    modYear: meta.modYear || BIBLIOTECA_DB[spId][idx].modYear || '',
     pdf:     newPdf
   };
   _refPDFData = null;
@@ -9406,7 +9509,7 @@ function openEditRefGeneral(idx) {
     <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">✏️ Editar referencia general</div>
-        ${buildRefFormHTML()}
+        ${buildRefFormHTML(true)}
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
           <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
           <button class="btn btn-primary" style="flex:2" onclick="updateRefGeneral(${idx})">💾 Guardar cambios</button>
@@ -9415,8 +9518,7 @@ function openEditRefGeneral(idx) {
     </div>`);
   setTimeout(()=>{
     const s=(id,v)=>{const el=document.getElementById(id);if(el&&v!==undefined)el.value=v;};
-    s('ref-titulo',r.titulo);s('ref-autores',r.autores);s('ref-año',r.año);s('ref-url',r.url);s('ref-notas',r.notas);
-    if(r.tipo){const sel=document.getElementById('ref-tipo');if(sel)for(const o of sel.options)if(o.value===r.tipo){o.selected=true;break;}}
+    s('ref-titulo',r.titulo);s('ref-autores',r.autores);s('ref-año',r.año);s('ref-subject',r.subject);s('ref-keywords',r.keywords);s('ref-url',r.url);s('ref-notas',r.notas);
     if(document.getElementById('ref-categoria')){const catSel=document.getElementById('ref-categoria');const rc=getRefCategoria(r);for(const o of catSel.options)if(o.value===rc){o.selected=true;break;}}
     if(r.pdf){
       const n=document.getElementById('ref-pdf-name');if(n)n.textContent='📎 '+r.pdf.name;
@@ -9431,15 +9533,21 @@ async function updateRefGeneral(idx) {
   const newPdf = _refPDFData && !isStorageUrl(_refPDFData.url || _refPDFData.data)
     ? { name: _refPDFData.name, data: _refPDFData.data }
     : BIBLIOTECA_GENERAL[idx].pdf;
+  const meta = _refPDFData?.meta || {};
   BIBLIOTECA_GENERAL[idx] = {
     ...BIBLIOTECA_GENERAL[idx],
     titulo,
     autores: document.getElementById('ref-autores')?.value.trim()||'',
     año:     document.getElementById('ref-año')?.value||'',
-    tipo:    document.getElementById('ref-tipo')?.value||'Libro',
+    subject: document.getElementById('ref-subject')?.value.trim()||'',
+    keywords:document.getElementById('ref-keywords')?.value.trim()||'',
     categoria: document.getElementById('ref-categoria')?.value || getRefCategoria(BIBLIOTECA_GENERAL[idx]),
     url:     document.getElementById('ref-url')?.value.trim()||'',
     notas:   document.getElementById('ref-notas')?.value.trim()||'',
+    numPages: meta.numPages || BIBLIOTECA_GENERAL[idx].numPages || 0,
+    producer: meta.producer || BIBLIOTECA_GENERAL[idx].producer || '',
+    creator: meta.creator || BIBLIOTECA_GENERAL[idx].creator || '',
+    modYear: meta.modYear || BIBLIOTECA_GENERAL[idx].modYear || '',
     pdf:     newPdf
   };
   _refPDFData = null;
@@ -9462,7 +9570,7 @@ function openAddRefGeneral() {
     <div id="ref-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.75rem">📖 Agregar referencia general</div>
-        ${buildRefFormHTML()}
+        ${buildRefFormHTML(true)}
         <div style="display:flex;gap:.5rem;margin-top:.75rem">
           <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-modal').remove()">Cancelar</button>
           <button class="btn btn-primary" style="flex:2" onclick="saveRefGeneral()">💾 Guardar</button>
@@ -9471,7 +9579,19 @@ function openAddRefGeneral() {
     </div>`);
 }
 
-function buildRefFormHTML() {
+function buildRefFormHTML(withCategoria) {
+  const catSel = withCategoria
+    ? `<div class="form-row">
+        <div class="form-group"><label>Categoría *</label>
+          <div style="display:flex;gap:.35rem;align-items:center">
+            <select id="ref-categoria" class="form-control">
+              ${BIBLIOTECA_CATEGORIAS.map(c=>`<option value="${c}">${c}</option>`).join('')}
+            </select>
+            <button type="button" onclick="bibAddCatFromForm('ref-categoria')" class="btn btn-secondary btn-sm" style="flex-shrink:0;font-size:.75rem" title="Agregar categoría nueva">➕</button>
+          </div>
+        </div>
+      </div>`
+    : '';
   return `
     <div class="form-group"><label>Título *</label><input id="ref-titulo" class="form-control" placeholder="Ej: Wild Mammal Husbandry, Formulario AAZV..."></div>
     <div class="form-row">
@@ -9479,19 +9599,12 @@ function buildRefFormHTML() {
       <div class="form-group"><label>Año</label><input id="ref-año" class="form-control" type="number" placeholder="2023" style="width:80px"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Tipo</label>
-        <select id="ref-tipo" class="form-control">
-          <option>Libro</option><option>Artículo científico</option><option>Paper</option><option>Guía clínica</option><option>Tesis</option><option>Manual</option><option>Formulario</option><option>Radiología</option><option>Farmacopea</option><option>Otro</option>
-        </select>
-      </div>
-      <div class="form-group"><label>Categoría</label>
-        <select id="ref-categoria" class="form-control">
-          ${BIBLIOTECA_CATEGORIAS.map(c=>`<option value="${c}">${c}</option>`).join('')}
-        </select>
-      </div>
+      <div class="form-group"><label>Materia / Asunto</label><input id="ref-subject" class="form-control" placeholder="Tema del documento"></div>
+      <div class="form-group"><label>Palabras clave</label><input id="ref-keywords" class="form-control" placeholder="Separadas por comas"></div>
     </div>
+    ${catSel}
     <div class="form-row">
-      <div class="form-group"><label>URL / DOI</label><input id="ref-url" class="form-control" placeholder="https://..."></div>
+      <div class="form-group"><label>URL / DOI <span style="font-size:.7rem;color:var(--txt3)">(si no hay PDF)</span></label><input id="ref-url" class="form-control" placeholder="https://..."></div>
     </div>
     <div class="form-group"><label>Notas</label><textarea id="ref-notas" class="form-control" style="min-height:50px"></textarea></div>
     <div class="form-group">
@@ -9532,7 +9645,8 @@ async function handleRefPDF(input) {
     toast('📄 PDF adjuntado');
     // Extraer metadatos y autocompletar el formulario
     const meta = await extractPDFMetadata(dataUrl);
-    if (meta && (meta.title || meta.author || meta.year)) {
+    if (meta) _refPDFData.meta = meta;
+    if (meta && (meta.title || meta.author || meta.year || meta.subject || meta.keywords)) {
       const setVal = (id, val) => {
         const el = document.getElementById(id);
         if (el && val && !el.value.trim()) el.value = val;
@@ -9540,7 +9654,9 @@ async function handleRefPDF(input) {
       setVal('ref-titulo', meta.title);
       setVal('ref-autores', meta.author);
       setVal('ref-año', meta.year);
-      if (meta.title || meta.author) toast('✨ Metadatos extraídos del PDF');
+      setVal('ref-subject', meta.subject);
+      setVal('ref-keywords', meta.keywords);
+      if (meta.title || meta.author || meta.subject || meta.keywords) toast('✨ Metadatos extraídos del PDF');
     }
   } catch(e) {
     console.warn('handleRefPDF:', e);
@@ -9548,7 +9664,8 @@ async function handleRefPDF(input) {
   }
 }
 
-// Extraer título/autor/año del Info dictionary usando pdf.js
+// Extraer título/autor/año/materia/palabras clave del Info dictionary usando pdf.js
+// Los campos que no se puedan extraer se devuelven en blanco para saber qué falta.
 async function extractPDFMetadata(dataUrl) {
   if (!dataUrl || !dataUrl.startsWith('data:application/pdf')) return null;
   if (typeof pdfjsLib === 'undefined') return null;
@@ -9558,15 +9675,23 @@ async function extractPDFMetadata(dataUrl) {
     const bytes = new Uint8Array(bin.length);
     for (let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
     const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
-    let title='', author='', year='';
+    let title='', author='', year='', subject='', keywords='', producer='', creator='', modYear='';
+    let numPages = pdf.numPages || 0;
     try {
       const meta = await pdf.getMetadata();
       const info = meta?.info || {};
-      title  = cleanPdfText(info.Title);
-      author = cleanPdfText(info.Author);
+      title     = cleanPdfText(info.Title);
+      author    = cleanPdfText(info.Author);
+      subject   = cleanPdfText(info.Subject);
+      keywords  = cleanPdfText(info.Keywords);
+      producer  = cleanPdfText(info.Producer);
+      creator   = cleanPdfText(info.Creator);
       const cd = String(info.CreationDate||'');
       const ym = cd.match(/D:(\d{4})/);
       if (ym) year = ym[1];
+      const md = String(info.ModDate||'');
+      const ym2 = md.match(/D:(\d{4})/);
+      if (ym2) modYear = ym2[1];
     } catch(e) {}
     // Fallback: intentar leer título desde la primera página
     if (!title) {
@@ -9577,7 +9702,7 @@ async function extractPDFMetadata(dataUrl) {
         if (lines.length) title = cleanPdfText(lines[0]).slice(0,150);
       } catch(e) {}
     }
-    return { title, author, year };
+    return { title, author, year, subject, keywords, producer, creator, modYear, numPages };
   } catch(e) {
     console.warn('extractPDFMetadata:', e.message);
     return null;
@@ -9627,14 +9752,20 @@ function downloadRefPDF() {
 async function saveRefGeneral() {
   const titulo = document.getElementById('ref-titulo')?.value.trim();
   if (!titulo) { toast('⚠ El título es obligatorio'); return; }
+  const meta = _refPDFData?.meta || {};
   BIBLIOTECA_GENERAL.push({
     titulo,
     autores: document.getElementById('ref-autores')?.value.trim()||'',
     año:     document.getElementById('ref-año')?.value||'',
-    tipo:    document.getElementById('ref-tipo')?.value||'Libro',
+    subject: document.getElementById('ref-subject')?.value.trim()||'',
+    keywords:document.getElementById('ref-keywords')?.value.trim()||'',
     categoria: document.getElementById('ref-categoria')?.value || 'Otros',
     url:     document.getElementById('ref-url')?.value.trim()||'',
     notas:   document.getElementById('ref-notas')?.value.trim()||'',
+    numPages: meta.numPages||0,
+    producer: meta.producer||'',
+    creator: meta.creator||'',
+    modYear: meta.modYear||'',
     pdf:     _refPDFData || null
   });
   if (storage && _refPDFData?.data && !isStorageUrl(_refPDFData.data)) {
@@ -12159,25 +12290,16 @@ function openAddRef(spId) {
           <div class="form-group"><label>Año</label><input id="ref-año" class="form-control" type="number" placeholder="2023" style="width:80px"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>Tipo</label>
-            <select id="ref-tipo" class="form-control">
-              <option>Libro</option><option>Artículo científico</option><option>Paper</option>
-              <option>Guía clínica</option><option>Tesis</option><option>Manual</option><option>Otro</option>
-            </select>
-          </div>
-          <div class="form-group"><label>Categoría</label>
-            <select id="ref-categoria" class="form-control">
-              ${BIBLIOTECA_CATEGORIAS.map(c=>`<option value="${c}">${c}</option>`).join('')}
-            </select>
-          </div>
+          <div class="form-group"><label>Materia / Asunto</label><input id="ref-subject" class="form-control" placeholder="Tema del documento"></div>
+          <div class="form-group"><label>Palabras clave</label><input id="ref-keywords" class="form-control" placeholder="Separadas por comas"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>URL / DOI</label><input id="ref-url" class="form-control" placeholder="https://..."></div>
+          <div class="form-group"><label>URL / DOI <span style="font-size:.7rem;color:var(--txt3)">(si no hay PDF)</span></label><input id="ref-url" class="form-control" placeholder="https://..."></div>
         </div>
         <div class="form-group"><label>Notas</label><textarea id="ref-notas" class="form-control" placeholder="Capítulos relevantes, páginas, observaciones..." style="min-height:50px"></textarea></div>
 
         <div class="form-group">
-          <label>PDF adjunto <span style="font-size:.7rem;color:var(--txt3)">(se extrae título/autor automáticamente)</span></label>
+          <label>PDF adjunto <span style="font-size:.7rem;color:var(--txt3)">(se extraen título, autores, año, materia y palabras clave)</span></label>
           <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
             <label for="ref-pdf-extra-sp" class="btn btn-secondary btn-sm" style="cursor:pointer">📎 Adjuntar PDF</label>
             <input type="file" id="ref-pdf-extra-sp" accept=".pdf" style="display:none" onchange="handleRefPDF(this)">
@@ -12202,14 +12324,19 @@ async function saveRef(spId) {
   const titulo = document.getElementById('ref-titulo')?.value.trim();
   if (!titulo) { toast('⚠ El título es obligatorio'); return; }
   if (!BIBLIOTECA_DB[spId]) BIBLIOTECA_DB[spId] = [];
+  const meta = _refPDFData?.meta || {};
   BIBLIOTECA_DB[spId].push({
     titulo,
     autores: document.getElementById('ref-autores')?.value.trim() || '',
     año:     document.getElementById('ref-año')?.value || '',
-    tipo:    document.getElementById('ref-tipo')?.value || 'Libro',
-    categoria: document.getElementById('ref-categoria')?.value || 'Otros',
+    subject: document.getElementById('ref-subject')?.value.trim() || '',
+    keywords: document.getElementById('ref-keywords')?.value.trim() || '',
     url:     document.getElementById('ref-url')?.value.trim() || '',
     notas:   document.getElementById('ref-notas')?.value.trim() || '',
+    numPages: meta.numPages||0,
+    producer: meta.producer||'',
+    creator: meta.creator||'',
+    modYear: meta.modYear||'',
     pdf:     _refPDFData || null
   });
   // Si hay Storage disponible, subir PDF y guardar solo la URL
@@ -14989,7 +15116,7 @@ function openBulkPdfImport(spId) {
     <div id="bulk-pdf-modal" style="position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.3rem">📥 Importar PDFs masivamente</div>
-        <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.85rem">Destino: <strong>${destLabel}</strong> · Se extraerán título, autores y año de cada PDF automáticamente para que los revises antes de guardar.</div>
+        <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.85rem">Destino: <strong>${destLabel}</strong> · Se extraerán título, autores, año, materia/asunto y palabras clave de cada PDF automáticamente para que los revises antes de guardar. Lo que no se pueda extraer queda en blanco.</div>
 
         <!-- Zona de soltar archivos -->
         <div id="bulk-dropzone"
@@ -15102,13 +15229,13 @@ async function startBulkUpload(spId) {
         reader.readAsDataURL(file);
       });
 
-      // Extraer metadatos (título, autores, año) con pdf.js
+      // Extraer metadatos (título, autores, año, materia, palabras clave) con pdf.js
       const meta = await extractPDFMetadata(base64);
 
       _bulkReviewItems.push({
         file,
         base64,
-        meta: meta || { title:'', author:'', year:'' }
+        meta: meta || { title:'', author:'', year:'', subject:'', keywords:'', numPages:0, producer:'' }
       });
 
       done++;
@@ -15118,7 +15245,7 @@ async function startBulkUpload(spId) {
       console.error('Error procesando', file.name, e);
       _bulkReviewItems.push({
         file, base64: null,
-        meta: { title:'', author:'', year:'' }
+        meta: { title:'', author:'', year:'', subject:'', keywords:'', numPages:0, producer:'' }
       });
       done++;
       if (progressBar) progressBar.style.width = Math.round(done/total*100) + '%';
@@ -15147,8 +15274,7 @@ function openBulkReviewModal(spId) {
     <div id="bulk-review-modal" style="position:fixed;inset:0;z-index:1450;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
         <div style="font-weight:700;font-size:.95rem;margin-bottom:.3rem">🔍 Revisar PDFs extraídos</div>
-        <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.85rem">Destino: <strong>${destLabel}</strong> · Verifica y edita la información de cada PDF. Guarda <strong>uno por uno</strong> o <strong>todos</strong> si está correcto.</div>
-        <div id="bulk-review-list"></div>
+        <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.85rem">Destino: <strong>${destLabel}</strong> · Verifica y edita la información de cada PDF. Guarda <strong>uno por uno</strong> o <strong>todos</strong> si está correcto.</div>        <div id="bulk-review-list"></div>
         <div style="display:flex;gap:.5rem;margin-top:.9rem">
           <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('bulk-review-modal').remove()">Cancelar</button>
           <button class="btn btn-primary" style="flex:2" onclick="saveAllBulkReview('${spId||''}')">💾 Guardar todos</button>
@@ -15158,8 +15284,6 @@ function openBulkReviewModal(spId) {
   renderBulkReviewList(spId);
 }
 
-const _BULK_TIPOS = ['Libro','Artículo científico','Paper','Guía clínica','Tesis','Manual','Radiología','Farmacopea','Formulario','Otro'];
-
 function renderBulkReviewList(spId) {
   const listEl = document.getElementById('bulk-review-list');
   if (!listEl) return;
@@ -15168,8 +15292,19 @@ function renderBulkReviewList(spId) {
     const titleVal = (it.saved?.titulo ?? m.title ?? it.file.name.replace(/\.pdf$/i,'')).replace(/"/g,'&quot;');
     const authorVal = (it.saved?.autores ?? m.author ?? '').replace(/"/g,'&quot;');
     const yearVal = (it.saved?.año ?? m.year ?? '');
-    const tipoVal = it.saved?.tipo || 'Paper';
-    const detected = m.title || m.author;
+    const subjectVal = (it.saved?.subject ?? m.subject ?? '').replace(/"/g,'&quot;');
+    const keywordsVal = (it.saved?.keywords ?? m.keywords ?? '').replace(/"/g,'&quot;');
+    const urlVal = (it.saved?.url ?? '').replace(/"/g,'&quot;');
+    const notasVal = (it.saved?.notas ?? '').replace(/"/g,'&quot;');
+    const catId = `bulk-cat-${i}`;
+    const catSel = !spId ? `
+      <div style="display:flex;gap:.35rem;align-items:center;margin-top:.35rem">
+        <select id="${catId}" class="form-control" style="font-size:.75rem;flex:1">
+          ${BIBLIOTECA_CATEGORIAS.map(c=>`<option value="${c}" ${(it.saved?.categoria||m.categoria||'')===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+        <button type="button" onclick="bibAddCatFromForm('${catId}')" class="btn btn-secondary btn-sm" style="flex-shrink:0;font-size:.75rem" title="Agregar categoría nueva">➕</button>
+      </div>` : '';
+    const detected = m.title || m.author || m.subject || m.keywords;
     const status = it.saved
       ? `<span style="font-size:.62rem;background:var(--g5);color:white;border-radius:20px;padding:.05rem .4rem">✓ Guardado</span>`
       : (detected
@@ -15196,14 +15331,15 @@ function renderBulkReviewList(spId) {
           <input id="bulk-author-${i}" class="form-control" value="${authorVal}" placeholder="Autores" style="flex:1;min-width:110px;font-size:.75rem">
           <input id="bulk-year-${i}" class="form-control" value="${yearVal}" placeholder="Año" type="number" style="width:80px;font-size:.75rem">
         </div>
-        <div style="display:flex;gap:.35rem;margin-top:.35rem;align-items:center">
-          <select id="bulk-tipo-${i}" class="form-control" style="font-size:.75rem;flex:1">
-            ${_BULK_TIPOS.map(t=>`<option ${tipoVal===t?'selected':''}>${t}</option>`).join('')}
-          </select>
-          <select id="bulk-cat-${i}" class="form-control" style="font-size:.75rem;flex:1">
-            ${BIBLIOTECA_CATEGORIAS.map(c=>`<option value="${c}" ${(it.saved?.categoria||m.categoria||'')===c?'selected':''}>${c}</option>`).join('')}
-          </select>
-        </div>`}
+        <div style="display:flex;gap:.35rem;margin-top:.35rem">
+          <input id="bulk-subject-${i}" class="form-control" value="${subjectVal}" placeholder="Materia / Asunto" style="flex:1;font-size:.75rem">
+          <input id="bulk-keywords-${i}" class="form-control" value="${keywordsVal}" placeholder="Palabras clave" style="flex:1;font-size:.75rem">
+        </div>
+        <div style="display:flex;gap:.35rem;margin-top:.35rem">
+          <input id="bulk-url-${i}" class="form-control" value="${urlVal}" placeholder="URL / DOI (si no hay PDF)" style="flex:1;font-size:.75rem">
+          <input id="bulk-notas-${i}" class="form-control" value="${notasVal}" placeholder="Notas" style="flex:1;font-size:.75rem">
+        </div>
+        ${catSel}`}
       </div>`;
   }).join('');
 }
@@ -15215,13 +15351,16 @@ function viewBulkPdf(i) {
   else toast('⚠ PDF no disponible');
 }
 
-function _bulkReadFields(i) {
+function _bulkReadFields(i, spId) {
   return {
     titulo:  document.getElementById(`bulk-title-${i}`)?.value.trim() || _bulkReviewItems[i].file.name.replace(/\.pdf$/i,''),
     autores: document.getElementById(`bulk-author-${i}`)?.value.trim() || '',
     año:     document.getElementById(`bulk-year-${i}`)?.value || '',
-    tipo:    document.getElementById(`bulk-tipo-${i}`)?.value || 'Paper',
-    categoria: document.getElementById(`bulk-cat-${i}`)?.value || 'Otros'
+    subject: document.getElementById(`bulk-subject-${i}`)?.value.trim() || '',
+    keywords: document.getElementById(`bulk-keywords-${i}`)?.value.trim() || '',
+    url:     document.getElementById(`bulk-url-${i}`)?.value.trim() || '',
+    notas:   document.getElementById(`bulk-notas-${i}`)?.value.trim() || '',
+    categoria: (!spId ? (document.getElementById(`bulk-cat-${i}`)?.value || 'Otros') : '')
   };
 }
 
@@ -15247,24 +15386,30 @@ async function _bulkBuildPdfObj(it, spId) {
 async function saveBulkReviewOne(i, spId) {
   const it = _bulkReviewItems[i];
   if (!it || it.saved) return;
-  const f = _bulkReadFields(i);
+  const f = _bulkReadFields(i, spId);
   if (!f.titulo) { toast('⚠ El título es obligatorio'); return; }
   const btn = event?.target;
   if (btn) { btn.disabled = true; btn.textContent = '⏳...'; }
   try {
     const pdfObj = await _bulkBuildPdfObj(it, spId);
+    const mm = it.meta || {};
     const ref = {
       titulo:  f.titulo,
       autores: f.autores,
       año:     f.año,
-      tipo:    f.tipo,
-      categoria: f.categoria,
-      url:     '',
-      notas:   '',
+      subject: f.subject,
+      keywords:f.keywords,
+      url:     f.url,
+      notas:   f.notas,
+      numPages: mm.numPages||0,
+      producer: mm.producer||'',
+      creator: mm.creator||'',
+      modYear: mm.modYear||'',
       pdf:     pdfObj,
       importado: true,
       fechaImport: new Date().toISOString()
     };
+    if (!spId) ref.categoria = f.categoria;
     if (spId) {
       if (!BIBLIOTECA_DB[spId]) BIBLIOTECA_DB[spId] = [];
       BIBLIOTECA_DB[spId].push(ref);
@@ -15273,7 +15418,7 @@ async function saveBulkReviewOne(i, spId) {
       BIBLIOTECA_GENERAL.push(ref);
       await saveBibliotecaGeneral();
     }
-    it.saved = { titulo: f.titulo, autores: f.autores, año: f.año, tipo: f.tipo, categoria: f.categoria };
+    it.saved = { titulo: f.titulo, autores: f.autores, año: f.año, subject: f.subject, keywords: f.keywords, url: f.url, notas: f.notas, categoria: f.categoria };
     renderBulkReviewList(spId);
     toast(`✓ Guardado: ${f.titulo}`);
   } catch(e) {
@@ -15291,27 +15436,33 @@ async function saveAllBulkReview(spId) {
   let done = 0; let errors = 0;
   for (const {it,i} of items) {
     try {
-      const f = _bulkReadFields(i);
+      const f = _bulkReadFields(i, spId);
       const pdfObj = await _bulkBuildPdfObj(it, spId);
+      const mm = it.meta || {};
       const ref = {
         titulo:  f.titulo || it.file.name.replace(/\.pdf$/i,''),
         autores: f.autores,
         año:     f.año,
-        tipo:    f.tipo || 'Paper',
-        categoria: f.categoria || 'Otros',
-        url:     '',
-        notas:   '',
+        subject: f.subject,
+        keywords:f.keywords,
+        url:     f.url,
+        notas:   f.notas,
+        numPages: mm.numPages||0,
+        producer: mm.producer||'',
+        creator: mm.creator||'',
+        modYear: mm.modYear||'',
         pdf:     pdfObj,
         importado: true,
         fechaImport: new Date().toISOString()
       };
+      if (!spId) ref.categoria = f.categoria || 'Otros';
       if (spId) {
         if (!BIBLIOTECA_DB[spId]) BIBLIOTECA_DB[spId] = [];
         BIBLIOTECA_DB[spId].push(ref);
       } else {
         BIBLIOTECA_GENERAL.push(ref);
       }
-      it.saved = { titulo: f.titulo, autores: f.autores, año: f.año, tipo: f.tipo, categoria: f.categoria };
+      it.saved = { titulo: f.titulo, autores: f.autores, año: f.año, subject: f.subject, keywords: f.keywords, url: f.url, notas: f.notas, categoria: f.categoria };
       done++;
     } catch(e) {
       errors++;
