@@ -131,7 +131,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 
 /* DETAIL */
 #species-detail{display:none;padding-bottom:calc(env(safe-area-inset-bottom,16px) + 1.5rem)}
-.detail-header{background:var(--g9);padding:.4rem .75rem;display:flex;align-items:center;gap:.35rem;position:relative;z-index:10;box-shadow:0 1px 0 rgba(78,180,110,.2);flex-wrap:nowrap;min-height:44px;max-height:56px;overflow:hidden}
+.detail-header{background:var(--g9);padding:.4rem .75rem;display:flex;align-items:center;gap:.35rem;position:relative;z-index:10;box-shadow:0 1px 0 rgba(78,180,110,.2);flex-wrap:wrap;min-height:44px;max-height:none}
+.detail-actions{display:flex;gap:.35rem;align-items:center;flex-shrink:0;margin-left:auto}
+#export-menu{display:none;position:absolute;right:0;top:100%;z-index:9999;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rsm);box-shadow:0 8px 24px rgba(0,0,0,.18);min-width:200px;margin-top:.25rem;overflow:hidden}
+#export-menu button{display:flex;align-items:center;gap:.5rem;width:100%;padding:.6rem .8rem;background:none;border:none;cursor:pointer;font-size:.85rem;text-align:left;color:var(--txt)}
+#export-menu button:hover{background:var(--g1)}
 .back-btn{background:rgba(78,180,110,.2);border:none;color:var(--g3);width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .detail-name{color:white;font-size:.95rem;font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .detail-sci{color:var(--g2);font-size:.7rem;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -692,11 +696,15 @@ textarea.form-control{resize:vertical;min-height:70px}
       <div class="detail-sci" id="detail-sci">Nombre científico</div>
     </div>
     <span id="detail-uicn-badge" class="badge" style="flex-shrink:0"></span>
-    <button id="detail-edit-btn" onclick="editCurrentSpecies()" style="display:none;flex-shrink:0" class="btn btn-admin btn-sm">✏️</button>
-    <div style="display:flex;gap:.25rem;flex-shrink:0">
-      <button onclick="exportSpeciesWord(currentSpecies)" title="Word" style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .4rem;cursor:pointer;font-size:.65rem;font-family:var(--sans)">📄</button>
-      <button onclick="exportSpeciesPDF(currentSpecies)" title="PDF" style="background:rgba(78,180,110,.2);border:none;color:var(--g3);border-radius:var(--rxs);padding:.3rem .4rem;cursor:pointer;font-size:.65rem;font-family:var(--sans)">🖨</button>
-
+    <div class="detail-actions">
+      <button id="detail-edit-btn" onclick="editCurrentSpecies()" style="display:none" class="btn btn-admin btn-sm">✏️ Editar</button>
+      <div style="position:relative">
+        <button id="export-menu-btn" class="btn btn-primary btn-sm" onclick="toggleExportMenu()" style="flex-shrink:0">⬇️ Descargar ▾</button>
+        <div id="export-menu">
+          <button onclick="exportSpeciesWord(currentSpecies);toggleExportMenu()">📄 Descargar Word (.doc)</button>
+          <button onclick="exportSpeciesPDF(currentSpecies);toggleExportMenu()">🖨️ Descargar PDF</button>
+        </div>
+      </div>
     </div>
   </div>
   <div class="tabs-scroll">
@@ -1717,6 +1725,31 @@ function buildSpeciesExportHTML(sp) {
       ? `<ul style="margin:0;padding-left:14pt">${dietaLista.map(a=>`<li style="font-size:9.5pt">${esc(a)}</li>`).join('')}</ul>`
       : ND);
 
+  // Fotos (parte del tab General)
+  html += secHeader('Fotos');
+  const allPh = [...(sp.cover_photos||[])];
+  if (sp.cover_photo && !allPh.find(p=>p.data===sp.cover_photo)) allPh.unshift({data:sp.cover_photo});
+  let fotoCell = '';
+  if (allPh.length) {
+    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:0 0 3pt">Fotos generales (${allPh.length})</p>`;
+    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:6pt;margin-bottom:10pt">${allPh.map(p=>img(p.data,null,null,true)).join('')}</div>`;
+  }
+  if ((sp.dimorfismo_fotos||[]).length) {
+    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:6pt 0 3pt">Dimorfismo sexual</p>`;
+    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:6pt;margin-bottom:10pt">${sp.dimorfismo_fotos.map(f=>`<div style="text-align:center">${img(f.data,null,null,true)}<br><span style="font-size:7pt;color:#666">${esc(f.label||'')}</span></div>`).join('')}</div>`;
+  }
+  if ((sp.dental_fotos||[]).length) {
+    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:6pt 0 3pt">Fotos dentales</p>`;
+    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:6pt;margin-bottom:10pt">${sp.dental_fotos.map(f=>img(f.data,null,null,true)).join('')}</div>`;
+  }
+  if ((sp.dist_maps||[]).length) {
+    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:6pt 0 3pt">Mapas de distribución</p>`;
+    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:6pt">${sp.dist_maps.map(m=>img(m.data,null,null,true)).join('')}</div>`;
+  }
+  if (!fotoCell) fotoCell = ND;
+  html += row(55, 'Fotos', fotoCell);
+  // Note: img() uses original data URLs for maximum quality in export
+
   // 36-41: Fisiología
   html += secHeader('Fisiología y parámetros clínicos');
   html += row(36, 'Temperatura corporal',    v2h(v.temp));
@@ -1876,31 +1909,6 @@ function buildSpeciesExportHTML(sp) {
   html += row(53, 'Comportamiento bajo estrés',             v2h(behGet('estres')));
   html += row(54, 'Comportamiento reproductivo',            v2h(behGet('reproductivo')));
 
-  // 55: Fotos
-  html += secHeader('Fotos');
-  const allPh = [...(sp.cover_photos||[])];
-  if (sp.cover_photo && !allPh.find(p=>p.data===sp.cover_photo)) allPh.unshift({data:sp.cover_photo});
-  let fotoCell = '';
-  if (allPh.length) {
-    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:0 0 3pt">Fotos generales (${allPh.length})</p>`;
-    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:6pt;margin-bottom:10pt">${allPh.map(p=>img(p.data,null,null,true)).join('')}</div>`;
-  }
-  if ((sp.dimorfismo_fotos||[]).length) {
-    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:6pt 0 3pt">Dimorfismo sexual</p>`;
-    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:6pt;margin-bottom:10pt">${sp.dimorfismo_fotos.map(f=>`<div style="text-align:center">${img(f.data,null,null,true)}<br><span style="font-size:7pt;color:#666">${esc(f.label||'')}</span></div>`).join('')}</div>`;
-  }
-  if ((sp.dental_fotos||[]).length) {
-    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:6pt 0 3pt">Fotos dentales</p>`;
-    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:6pt;margin-bottom:10pt">${sp.dental_fotos.map(f=>img(f.data,null,null,true)).join('')}</div>`;
-  }
-  if ((sp.dist_maps||[]).length) {
-    fotoCell += `<p style="font-weight:600;font-size:9pt;color:#1a6b3f;margin:6pt 0 3pt">Mapas de distribución</p>`;
-    fotoCell += `<div style="display:flex;flex-wrap:wrap;gap:6pt">${sp.dist_maps.map(m=>img(m.data,null,null,true)).join('')}</div>`;
-  }
-  if (!fotoCell) fotoCell = ND;
-  html += row(55, 'Fotos', fotoCell);
-  // Note: img() uses original data URLs for maximum quality in export
-
   // Medicamentos y Protocolos al final (secciones extra)
   if ((sp.drugs||[]).length || (sp.protocols||[]).length) {
     html += secHeader('Medicamentos y protocolos (información adicional)');
@@ -1945,6 +1953,58 @@ function buildSpeciesExportHTML(sp) {
       });
       html += row('', 'Protocolos anestésicos', protHtml);
     }
+  }
+
+  // ── Fluidoterapia (tab Fluidoterapia) ──
+  const fluidLiq = (sp.liquidos_iv && sp.liquidos_iv.length) ? sp.liquidos_iv : DEFAULT_LIQUIDOS;
+  if (fluidLiq && fluidLiq.length) {
+    const liqRows = fluidLiq.map(l => `<tr>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:700">${esc(l.nombre)}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(l.tipo||'')}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(l.osmolaridad||'')}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(l.composicion||'')}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(l.indicaciones||'')}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(l.contraindicaciones||'')}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(l.dosis||'')}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-size:8.5pt;color:#555">${esc(l.notas||'')}</td>
+    </tr>`).join('');
+    html += secHeader('Fluidoterapia — Líquidos IV de referencia');
+    html += row('', 'Líquidos intravenosos',
+      tblInner(['Líquido','Tipo','Osmolaridad','Composición','Indicaciones','Contraindicaciones','Dosis','Notas'], liqRows));
+    if (sp.fluid_nota) html += row('', 'Nota clínica de fluidoterapia', `<div class="note">${esc(sp.fluid_nota).replace(/\n/g,'<br>')}</div>`);
+  }
+
+  // ── Enriquecimiento ambiental (tab Enriquecimiento) ──
+  const spLowerE = (sp.name||'').toLowerCase();
+  const sciLowerE = (sp.sci||'').toLowerCase();
+  const spEnriqE = (ENRIQUECIMIENTOS_DB||[]).filter(e => {
+    if (!e.especie && !(e.especies?.length)) return true;
+    const lista = e.especies?.length ? e.especies : [{especie:e.especie,sci:e.sci}];
+    return lista.some(ep =>
+      (ep?.especie||'').toLowerCase().includes(spLowerE) ||
+      (ep?.sci||'').toLowerCase().includes(sciLowerE) ||
+      spLowerE.includes((ep?.especie||'').toLowerCase())
+    );
+  });
+  if (spEnriqE.length) {
+    const enriqCatsMap = {};
+    (ENRIQ_CATS||[]).forEach(c => { enriqCatsMap[c.id] = c; });
+    let enriqHtml = '';
+    (ENRIQ_CATS||[]).forEach(cat => {
+      const items = spEnriqE.filter(e => e.categoria === cat.id);
+      if (!items.length) return;
+      enriqHtml += `<p style="font-weight:700;font-size:10pt;color:#0f3d22;margin:6pt 0 3pt">${esc(cat.icon||'')} ${esc(cat.label||cat.id)}</p>`;
+      items.forEach(enr => {
+        const foto = _getFotoSrc(enr.fotos?.[0]);
+        enriqHtml += `<div style="border:0.5pt solid #c2f0d3;border-radius:3pt;padding:5pt 7pt;margin-bottom:5pt">
+          <p style="font-weight:700;font-size:10pt;color:#1a6b3f;margin:0 0 2pt">${esc(enr.nombre)}</p>
+          ${enr.descripcion?`<p style="font-size:9pt;margin:2pt 0">${esc(enr.descripcion)}</p>`:''}
+          ${foto?`<div style="margin-top:4pt">${img(foto,'90px','70px')}</div>`:''}
+        </div>`;
+      });
+    });
+    html += secHeader('Enriquecimiento ambiental');
+    html += row('', 'Enriquecimientos de la especie', enriqHtml);
   }
 
   // Dietas calculadas desde calculadora nutricional
@@ -2658,13 +2718,22 @@ function openSpecies(id, trackNav=true) {
   const badge = document.getElementById('detail-uicn-badge');
   badge.textContent = currentSpecies.uicn_world;
   badge.className = 'badge badge-'+currentSpecies.uicn_world.toLowerCase();
-  document.getElementById('detail-edit-btn').style.display = currentUser?.role==='admin' ? 'flex' : 'none';
+  document.getElementById('detail-edit-btn').style.display = 'flex';
   showTab('general');
   if (trackNav) pushNav({ type: 'species', id });
   window.scrollTo({top:0, behavior:'instant'});
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
 }
+function toggleExportMenu() {
+  const m = document.getElementById('export-menu');
+  if (m) m.style.display = m.style.display === 'block' ? 'none' : 'block';
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('#export-menu-btn')) return;
+  const m = document.getElementById('export-menu');
+  if (m && !e.target.closest('#export-menu')) m.style.display = 'none';
+});
 function showTab(tab) {
   const tabs = ['general','fisiologia','nutricion','enfermedades','comportamiento','medicamentos','protocolos','fluidoterapia','enriquecimiento'];
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',tabs[i]===tab));
