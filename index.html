@@ -1633,6 +1633,25 @@ function toggleCardDownloadMenu(id, btn) {
   setTimeout(()=> document.addEventListener('click', close), 0);
 }
 
+function _enriqAplicaEspecie(enr, sp) {
+  // Retorna true si el enriquecimiento aplica a la especie sp (o es genérico)
+  const spLower = (sp.name||'').toLowerCase();
+  const sciLower = (sp.sci||'').toLowerCase();
+  if (!enr?.nombre) return false;
+  const lista = enr.especies?.length
+    ? enr.especies
+    : (enr.especie ? [{sp:enr.especie, sci:enr.sci||''}] : []);
+  if (!lista.length) return true; // genérico → aplica a todas
+  return lista.some(ep => {
+    const nm = (ep?.sp || ep?.especie || '').toLowerCase();
+    const sc = (ep?.sci || '').toLowerCase();
+    if (nm === 'all') return true;
+    if (nm && (nm === spLower || nm.includes(spLower) || spLower.includes(nm))) return true;
+    if (sc && (sc === sciLower || sc.includes(sciLower) || sciLower.includes(sc))) return true;
+    return false;
+  });
+}
+
 function buildSpeciesExportHTML(sp) {
   const n    = sp.nutrition || {};
   const beh  = sp.behavior  || {};
@@ -1757,12 +1776,12 @@ function buildSpeciesExportHTML(sp) {
   // 39: Venopunción
   const vpRows = (sp.venopuncion_lista||[]).map(vp=>
     `<tr>
-      <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:600">${esc(vp.sitio||vp[0]||'')}</td>
-      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(vp.vol||vp[1]||'—')}</td>
-      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(vp.indicacion||vp[2]||'—')}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:600">${esc(vp.sitio||'')}</td>
+      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(vp.volumen||'—')}</td>
+      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(vp.indicacion||'—')}</td>
     </tr>`).join('');
   html += row(39, 'Sitios de venopunción',
-    tblInner(['Nombre vena','Rango vol. min-max','Indicación'], vpRows));
+    tblInner(['Nombre vena','Volumen máximo (ml)','Indicación'], vpRows));
 
   // 40: Hematología
   const hemoRows = (sp.hematology||[]).map(h=>
@@ -1823,8 +1842,8 @@ function buildSpeciesExportHTML(sp) {
   const dentRows = (sp.denticion||[]).map(d=>
     `<tr>
       <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(d.tipo||d[0]||'')}</td>
-      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(String(d.superior||d[1]||''))}</td>
-      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(String(d.inferior||d[2]||''))}</td>
+      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(String(d.sup??d.superior??d[1]??''))}</td>
+      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(String(d.inf??d.inferior??d[2]??''))}</td>
       <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(d.funcion||d[3]||'')}</td>
     </tr>`).join('');
   html += row(47, 'Fórmula dentaria',
@@ -1841,46 +1860,64 @@ function buildSpeciesExportHTML(sp) {
 
   // 49: Enfermedades
   html += secHeader('Enfermedades frecuentes bajo cuidado profesional');
-  const SISTEMAS_EXP = [
-    {id:'dental',label:'Dentales'},{id:'gastro',label:'Gastrointestinales'},
-    {id:'renal',label:'Renales / Urinarias'},{id:'cardiaco',label:'Cardíacas'},
-    {id:'respiratorio',label:'Respiratorias'},{id:'nervioso',label:'Sistema Nervioso'},
-    {id:'musculo',label:'Músculo-esqueléticas'},{id:'dermatol',label:'Dermatológicas'},
-    {id:'infeccioso',label:'Infecciosas / Parasitarias'},{id:'otro',label:'Otras'}
-  ];
-  const todosEnf = [...SISTEMAS_EXP, ...(sp.enfermedades_categorias||[])];
   const sistData = sp.enfermedades_sistemas || {};
-  let enfCell = '';
-  let hasEnf = false;
-  todosEnf.forEach(sist => {
-    const enfs = sistData[sist.id]?.enfermedades || [];
-    if (!enfs.length) return;
-    hasEnf = true;
-    enfCell += `<p style="font-weight:700;font-size:10pt;color:#0f3d22;margin:8pt 0 3pt;border-bottom:0.5pt solid #c2f0d3;padding-bottom:2pt">Sistema: ${esc(sist.label||sist.id)}</p>`;
-    const notas = sistData[sist.id]?.notas;
-    if (notas) enfCell += `<p style="font-size:9pt;background:#fef3cd;padding:3pt 6pt;margin:0 0 4pt;border-left:2pt solid #e8a020">${esc(notas)}</p>`;
-    enfs.forEach(e => {
-      const signos = (e.signos_lista||[e.signos||'']).filter(Boolean).join('; ');
-      const dxItems = (e.dx_lista||[]).length ? e.dx_lista : [{metodo:e.dx||'',esperado:'',imagenes:[]}];
-      const txStr = (e.tx_lista||[e.tx||'']).filter(Boolean).join('; ');
-      const vias = [...(e.vias||[]), e.vias_extra].filter(Boolean).join(', ');
-      enfCell += `<div style="border:0.5pt solid #ddd;border-radius:3pt;padding:5pt 7pt;margin-bottom:6pt">
-        <p style="font-weight:700;font-size:10pt;color:#1a6b3f;margin:0 0 3pt">${esc(e.nombre)}</p>
-        <table style="border-collapse:collapse;width:100%;font-size:9pt">
-          ${e.agente  ? `<tr><td style="width:30%;font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Agente causal</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(e.agente)}</td></tr>` : ''}
-          ${vias      ? `<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Vías de transmisión</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(vias)}</td></tr>` : ''}
-          ${signos    ? `<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Signos clínicos</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(signos)}</td></tr>` : ''}
-          ${dxItems.filter(d=>d.metodo).map(d=>`<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Diagnóstico</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(d.metodo)}${d.esperado?` — <em>Hallazgo esperado: ${esc(d.esperado)}</em>`:''}</td></tr>`).join('')}
-          ${txStr     ? `<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Tratamiento</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(txStr)}</td></tr>` : ''}
-          ${e.notas   ? `<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Notas</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(e.notas)}</td></tr>` : ''}
-        </table>
-        ${(e.dx_lista||[]).some(d=>(d.imagenes||[]).length)
-          ? `<div style="margin-top:4pt">${(e.dx_lista||[]).flatMap(d=>(d.imagenes||[]).map(im=>img(im.data,'90px','70px'))).join('')}</div>`
-          : ''}
-      </div>`;
+  // Recoger todas las enfermedades sin duplicar (primera aparición por nombre)
+  const allEnfs = [];
+  Object.entries(sistData).forEach(([sistId, sData]) => {
+    (sData.enfermedades || []).forEach(enf => {
+      if (!allEnfs.some(e => e.enf.nombre === enf.nombre)) allEnfs.push({ enf, sistId, sistNotas: sData.notas || '' });
     });
   });
-  if (!hasEnf) enfCell = ND;
+  const _sistLabel = id => {
+    const f = SISTEMAS_ENFERMEDAD.find(s=>s.id===id);
+    if (f) return f.label;
+    for (const claseData of Object.values(ENFERMEDADES_GENERALES||{})) {
+      const found = (claseData.categorias_extra||[]).find(s=>s.id===id);
+      if (found) return found.label;
+    }
+    if (id && id.startsWith('custom_')) return 'Categoría personalizada';
+    return id || '';
+  };
+  let enfCell = '';
+  if (allEnfs.length) {
+    const porSist = {};
+    allEnfs.forEach(({ enf, sistId, sistNotas }) => {
+      const grpId = (enf.sistemas_afectados && enf.sistemas_afectados[0]) || sistId || 'otro';
+      if (!porSist[grpId]) porSist[grpId] = { label: _sistLabel(grpId), notas: sistNotas, items: [] };
+      porSist[grpId].items.push({ enf, sistId });
+    });
+    Object.entries(porSist).forEach(([grpId, grp]) => {
+      enfCell += `<p style="font-weight:700;font-size:10pt;color:#0f3d22;margin:8pt 0 3pt;border-bottom:0.5pt solid #c2f0d3;padding-bottom:2pt">${esc(grp.label)}</p>`;
+      const gNotas = sistData[grpId]?.notas;
+      if (gNotas) enfCell += `<p style="font-size:9pt;background:#fef3cd;padding:3pt 6pt;margin:0 0 4pt;border-left:2pt solid #e8a020">${esc(gNotas)}</p>`;
+      grp.items.forEach(({ enf }) => {
+        const signosArr = (enf.signos_lista||[]).map(s => (s && typeof s === 'object') ? (s.signo||'') : (s||'')).filter(Boolean);
+        const signos = signosArr.length ? signosArr.join(', ') : (enf.signos||'');
+        const dxItems = (enf.dx_lista||[]).length ? enf.dx_lista : [{metodo:enf.dx||'',esperado:''}];
+        const txItems = (enf.tx_lista||[]).length ? enf.tx_lista.map(t=>t.nombre||t).join('; ') : (enf.tx||'');
+        const vias = [...(enf.vias||[]), enf.vias_extra].filter(Boolean).join(', ');
+        const sistAf = (enf.sistemas_afectados||[grpId]).map(_sistLabel).filter(Boolean).join(', ');
+        enfCell += `<div style="border:0.5pt solid #ddd;border-radius:3pt;padding:5pt 7pt;margin-bottom:6pt">
+          <p style="font-weight:700;font-size:10pt;color:#1a6b3f;margin:0 0 3pt">${esc(enf.nombre)}</p>
+          <table style="border-collapse:collapse;width:100%;font-size:9pt">
+            ${sistAf ? `<tr><td style="width:30%;font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Sistemas afectados</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(sistAf)}</td></tr>` : ''}
+            ${enf.agente ? `<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Agente causal</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(enf.agente)}${enf.agente_tipo?` <em style="color:#888">(${esc(enf.agente_tipo)})</em>`:''}</td></tr>` : ''}
+            ${enf.tipo ? `<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Tipo</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(enf.tipo)}${enf.subtipo?` — ${esc(enf.subtipo)}`:''}${enf.zoonosis==='si'?' — ⚠️ Zoonótica':''}</td></tr>` : ''}
+            ${vias      ? `<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Vías de transmisión</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(vias)}</td></tr>` : ''}
+            ${signos    ? `<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Signos clínicos</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(signos)}</td></tr>` : ''}
+            ${dxItems.filter(d=>d.metodo).map(d=>`<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Diagnóstico</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(d.metodo)}${d.esperado?` — <em>Hallazgo esperado: ${esc(d.esperado)}</em>`:''}</td></tr>`).join('')}
+            ${txItems   ? `<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Tratamiento</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(txItems)}</td></tr>` : ''}
+            ${enf.notas ? `<tr><td style="font-weight:600;padding:2pt 5pt;border:0.5pt solid #eee;background:#f9fffe">Notas</td><td style="padding:2pt 5pt;border:0.5pt solid #eee">${esc(enf.notas)}</td></tr>` : ''}
+          </table>
+          ${(enf.dx_lista||[]).some(d=>(d.imagenes||[]).length)
+            ? `<div style="margin-top:4pt">${(enf.dx_lista||[]).flatMap(d=>(d.imagenes||[]).map(im=>img(im.data,'90px','70px'))).join('')}</div>`
+            : ''}
+        </div>`;
+      });
+    });
+  } else {
+    enfCell = ND;
+  }
   html += row(49, 'Enfermedades frecuentes bajo cuidado profesional', enfCell);
 
   // 50-54: Comportamiento
@@ -2002,22 +2039,12 @@ function buildSpeciesExportHTML(sp) {
   }
 
   // Enriquecimiento ambiental (pestaña Enriquecimiento)
-  const spLowerE = (sp.name||'').toLowerCase();
-  const sciLowerE = (sp.sci||'').toLowerCase();
-  const spEnriq = (ENRIQUECIMIENTOS_DB||[]).filter(e => {
-    if (!e.especie && !(e.especies?.length)) return true; // genérico
-    const lista = e.especies?.length ? e.especies : [{especie:e.especie,sci:e.sci}];
-    return lista.some(ep =>
-      (ep?.especie||'').toLowerCase().includes(spLowerE) ||
-      (ep?.sci||'').toLowerCase().includes(sciLowerE) ||
-      spLowerE.includes((ep?.especie||'').toLowerCase())
-    );
-  });
+  const spEnriq = (ENRIQUECIMIENTOS_DB||[]).filter(e => _enriqAplicaEspecie(e, sp));
   if (spEnriq.length) {
     html += secHeader('Enriquecimiento ambiental');
     let enrHtml = '';
     ENRIQ_CATS.forEach(cat => {
-      const items = spEnriq.filter(e => e.categoria === cat.id);
+      const items = spEnriq.filter(e => (e.categorias||[e.categoria]).includes(cat.id));
       if (!items.length) return;
       items.forEach(enr => {
         const foto = _getFotoSrc(enr.fotos?.[0]);
@@ -8937,17 +8964,7 @@ async function removePhotoFromSpecies(btn, photoId) {
 function renderEnriquecimientoTab(el, sp) {
   const isAdmin = currentUser?.role === 'admin';
   // Filtrar enriquecimientos de esta especie
-  const spLower = sp.name.toLowerCase();
-  const sciLower = (sp.sci||'').toLowerCase();
-  const spEnriq = ENRIQUECIMIENTOS_DB.filter(e => {
-    if (!e.especie && !(e.especies?.length)) return true; // genérico
-    const lista = e.especies?.length ? e.especies : [{especie:e.especie,sci:e.sci}];
-    return lista.some(ep =>
-      (ep?.especie||'').toLowerCase().includes(spLower) ||
-      (ep?.sci||'').toLowerCase().includes(sciLower) ||
-      spLower.includes((ep?.especie||'').toLowerCase())
-    );
-  });
+  const spEnriq = ENRIQUECIMIENTOS_DB.filter(e => _enriqAplicaEspecie(e, sp));
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
       <div class="sec-title" style="margin-bottom:0">Enriquecimiento Ambiental</div>
@@ -8957,7 +8974,7 @@ function renderEnriquecimientoTab(el, sp) {
       </div>
     </div>
     ${ENRIQ_CATS.map(cat => {
-      const items = spEnriq.filter(e => e.categoria === cat.id);
+      const items = spEnriq.filter(e => (e.categorias||[e.categoria]).includes(cat.id));
       if (!items.length) return `<div style="padding:.4rem;border-radius:var(--rsm);background:var(--sur2);margin-bottom:.4rem">
         <div style="font-size:.75rem;color:var(--txt3)">${cat.icon} ${cat.label} — Sin enriquecimientos</div>
       </div>`;
