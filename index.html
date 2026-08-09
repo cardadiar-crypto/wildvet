@@ -1634,20 +1634,20 @@ function toggleCardDownloadMenu(id, btn) {
 }
 
 function _enriqAplicaEspecie(enr, sp) {
-  // Retorna true si el enriquecimiento aplica a la especie sp (o es genérico)
-  const spLower = (sp.name||'').toLowerCase();
-  const sciLower = (sp.sci||'').toLowerCase();
+  // Retorna true solo si el enriquecimiento lista exactamente esa especie
+  // (por nombre común o científico, sin tildes ni espacios extra)
   if (!enr?.nombre) return false;
+  const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+  const spLower = norm(sp.name);
+  const sciLower = norm(sp.sci);
   const lista = enr.especies?.length
     ? enr.especies
     : (enr.especie ? [{sp:enr.especie, sci:enr.sci||''}] : []);
-  if (!lista.length) return true; // genérico → aplica a todas
+  if (!lista.length) return false; // sin especie asignada → no aplica
   return lista.some(ep => {
-    const nm = (ep?.sp || ep?.especie || '').toLowerCase();
-    const sc = (ep?.sci || '').toLowerCase();
-    if (nm === 'all') return true;
-    if (nm && (nm === spLower || nm.includes(spLower) || spLower.includes(nm))) return true;
-    if (sc && (sc === sciLower || sc.includes(sciLower) || sciLower.includes(sc))) return true;
+    const nm = norm(ep?.sp || ep?.especie || '');
+    const sc = norm(ep?.sci || '');
+    if (nm === spLower || sc === sciLower) return true;
     return false;
   });
 }
