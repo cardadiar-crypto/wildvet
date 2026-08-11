@@ -2043,17 +2043,22 @@ function buildSpeciesExportHTML(sp) {
   if (spEnriq.length) {
     html += secHeader('Enriquecimiento ambiental');
     let enrHtml = '';
-    ENRIQ_CATS.forEach(cat => {
-      const items = spEnriq.filter(e => (e.categorias||[e.categoria]).includes(cat.id));
-      if (!items.length) return;
-      items.forEach(enr => {
-        const foto = _getFotoSrc(enr.fotos?.[0]);
-        enrHtml += `<div style="border:0.5pt solid #c2f0d3;border-radius:3pt;padding:5pt 7pt;margin-bottom:6pt">
-          <p style="font-weight:700;font-size:10pt;color:#1a6b3f;margin:0 0 2pt">${cat.icon} ${esc(enr.nombre)}</p>
-          ${foto ? `<div style="margin:3pt 0">${img(foto,'110px','80px')}</div>` : ''}
-          ${enr.descripcion ? `<p style="font-size:9pt;margin:2pt 0;color:#444">${esc(enr.descripcion)}</p>` : ''}
-        </div>`;
-      });
+    spEnriq.forEach(enr => {
+      const cats = (enr.categorias||[enr.categoria||'alimenticio']).map(cid => ENRIQ_CATS.find(cc=>cc.id===cid)).filter(Boolean);
+      const cat = cats[0] || ENRIQ_CATS[0];
+      const foto = _getFotoSrc(enr.fotos?.[0]);
+      const catBadges = cats.map(ct => `<span style="display:inline-block;font-size:8pt;background:${ct.color}18;border:1px solid ${ct.color}44;border-radius:12pt;padding:1pt 6pt;color:${ct.color};margin-right:3pt">${ct.icon} ${esc(ct.label)}</span>`).join('');
+      const espBadges = (enr.especies||[]).filter(e=>e?.sp||e?.especie).map(e =>
+        `<span style="display:inline-block;font-size:7.5pt;background:#e8faf0;border:1px solid #b2ddc0;border-radius:12pt;padding:1pt 6pt;color:#1a6b3f;margin-right:3pt">${esc(e.sp||e.especie||'')}${e.sci?` <em style="opacity:.7">${esc(e.sci)}</em>`:''}</span>`
+      ).join('');
+      enrHtml += `<div style="border:0.5pt solid #c2f0d3;border-radius:3pt;padding:5pt 7pt;margin-bottom:6pt">
+        <p style="font-weight:700;font-size:10pt;color:#1a6b3f;margin:0 0 2pt">${cat.icon} ${esc(enr.nombre)}</p>
+        ${(catBadges||espBadges) ? `<div style="margin:2pt 0 3pt">${catBadges}${espBadges}</div>` : ''}
+        ${foto ? `<div style="margin:3pt 0">${img(foto,'110px','80px')}</div>` : ''}
+        ${enr.descripcion ? `<p style="font-size:9pt;margin:2pt 0;color:#444">${esc(enr.descripcion)}</p>` : ''}
+        ${enr.objetivo ? `<p style="font-size:9pt;margin:2pt 0;color:#555"><strong>Objetivo:</strong> ${esc(enr.objetivo)}</p>` : ''}
+        ${(enr.materiales||[]).length ? `<p style="font-size:9pt;margin:2pt 0;color:#555"><strong>Materiales:</strong> ${esc((enr.materiales||[]).join(', '))}</p>` : ''}
+      </div>`;
     });
     html += row('', 'Enriquecimientos ambientales', enrHtml);
   }
@@ -8973,27 +8978,29 @@ function renderEnriquecimientoTab(el, sp) {
         ${isAdmin?`<button onclick="openAddEnriquecimiento()" class="btn btn-admin btn-sm">+ Agregar</button>`:''}
       </div>
     </div>
-    ${ENRIQ_CATS.map(cat => {
-      const items = spEnriq.filter(e => (e.categorias||[e.categoria]).includes(cat.id));
-      if (!items.length) return `<div style="padding:.4rem;border-radius:var(--rsm);background:var(--sur2);margin-bottom:.4rem">
-        <div style="font-size:.75rem;color:var(--txt3)">${cat.icon} ${cat.label} — Sin enriquecimientos</div>
-      </div>`;
-      return `<div style="margin-bottom:.75rem">
-        <div style="font-size:.7rem;font-weight:700;color:${cat.color};text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">${cat.icon} ${cat.label}</div>
-        ${items.map((enr,i)=>{
-          const realIdx = ENRIQUECIMIENTOS_DB.indexOf(enr);
-          const foto = _getFotoSrc(enr.fotos?.[0]);
-          return `<div style="display:flex;gap:.5rem;padding:.5rem;border:1px solid var(--bor);border-radius:var(--rsm);margin-bottom:.3rem;background:var(--sur)">
-            ${foto?`<img src="${foto}" style="width:56px;height:44px;object-fit:cover;border-radius:var(--rxs);flex-shrink:0;cursor:pointer" onclick="openImageFull('${foto}')">`:
-              `<div style="width:56px;height:44px;background:${cat.color}20;border-radius:var(--rxs);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">${cat.icon}</div>`}
-            <div style="flex:1;min-width:0">
-              <div style="font-weight:600;font-size:.85rem">${enr.nombre}</div>
-              ${enr.descripcion?`<div style="font-size:.75rem;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${enr.descripcion}</div>`:''}
-            </div>
-          </div>`;
-        }).join('')}
-      </div>`;
-    }).join('')}`;
+    ${spEnriq.length ? `<div style="display:flex;flex-direction:column;gap:.4rem">
+      ${spEnriq.map((enr)=>{
+        const realIdx = ENRIQUECIMIENTOS_DB.indexOf(enr);
+        const cats = (enr.categorias||[enr.categoria||'alimenticio']).map(cid => ENRIQ_CATS.find(cc=>cc.id===cid)).filter(Boolean);
+        const cat = cats[0] || ENRIQ_CATS[0];
+        const foto = _getFotoSrc(enr.fotos?.[0]);
+        const catBadges = cats.map(ct=>`<span style="font-size:.63rem;background:${ct.color}18;border:1px solid ${ct.color}44;border-radius:20px;padding:.08rem .4rem;color:${ct.color}">${ct.icon} ${ct.label}</span>`).join('');
+        const espBadges = (enr.especies||[]).filter(e=>e?.sp||e?.especie).map(e =>
+          `<span style="font-size:.6rem;background:var(--g0);border:1px solid var(--g3);border-radius:20px;padding:.08rem .35rem;color:var(--g6)">${e.sp||e.especie||''}${e.sci?` <em style="opacity:.7">${e.sci}</em>`:''}</span>`
+        ).join('');
+        return `<div style="display:flex;gap:.5rem;padding:.5rem;border:1px solid var(--bor);border-radius:var(--rsm);background:var(--sur)">
+          ${foto?`<img src="${foto}" style="width:56px;height:44px;object-fit:cover;border-radius:var(--rxs);flex-shrink:0;cursor:pointer" onclick="openImageFull('${foto}')">`:
+            `<div style="width:56px;height:44px;background:${cat.color}20;border-radius:var(--rxs);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">${cat.icon}</div>`}
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:.85rem">${enr.nombre}</div>
+            ${(catBadges||espBadges)?`<div style="display:flex;gap:.2rem;flex-wrap:wrap;margin-top:.2rem">${catBadges}${espBadges}</div>`:''}
+            ${enr.descripcion?`<div style="font-size:.75rem;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${enr.descripcion}</div>`:''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : `<div style="padding:.4rem;border-radius:var(--rsm);background:var(--sur2);margin-bottom:.4rem">
+      <div style="font-size:.75rem;color:var(--txt3)">Sin enriquecimientos para esta especie</div>
+    </div>`}`;
 }
 async function addDistMap(input) {
   if (!input.files?.[0] || !currentSpecies) return;
