@@ -821,6 +821,17 @@ textarea.form-control{resize:vertical;min-height:70px}
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-hc-maps">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🗺 Mapas de lesiones</div>
+    <div id="modal-hc-maps-form"></div>
+    <div style="display:flex;gap:.5rem;margin-top:.6rem">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeModal('modal-hc-maps')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <!-- MODAL CONFIRMACIÓN GLOBAL -->
@@ -972,11 +983,11 @@ let pinBuffer = '';
 let db;
 function initDB() {
   return new Promise(resolve => {
-    const req = indexedDB.open('WildVetDB', 4);
+    const req = indexedDB.open('WildVetDB', 5);
     req.onupgradeneeded = e => {
       const d = e.target.result;
       if (d.objectStoreNames.contains('inventory')) d.deleteObjectStore('inventory');
-      ['records','settings','species','vademecum'].forEach(s => {
+      ['records','settings','species','vademecum','hc_mapimg'].forEach(s => {
         if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, {keyPath:'id'});
       });
       // Store de usuarios locales (v3)
@@ -2224,6 +2235,7 @@ async function loadData() {
   // ── Opciones personalizadas de historias clínicas ──
   await loadHCOptions();
   await loadHCGroups();
+  await loadHCMapImages();
 
   renderRecordsList();
   renderVademecum();
@@ -8234,6 +8246,7 @@ function renderHcGroupsAdmin() {
       <input class="form-control" style="width:76px;font-size:.72rem;flex-shrink:0" value="${g.vitals.temp||''}" data-f="temp" data-i="${i}" placeholder="T°">
       <input class="form-control" style="width:66px;font-size:.72rem;flex-shrink:0" value="${g.vitals.fr||''}" data-f="fr" data-i="${i}" placeholder="Fr">
       <input class="form-control" style="width:66px;font-size:.72rem;flex-shrink:0" value="${g.vitals.fc||''}" data-f="fc" data-i="${i}" placeholder="Fc">
+      <button class="btn btn-secondary btn-sm" style="flex-shrink:0;font-size:.72rem" onclick="hcMapsAdmin('${g.id}')" title="Subir/quitar mapas de lesiones de este grupo">🗺</button>
       <button class="btn btn-danger btn-sm" style="flex-shrink:0" onclick="delHcGroup('${g.id}')" title="Eliminar grupo">✕</button>
     </div>`).join('');
 }
@@ -8335,22 +8348,31 @@ const HC_LESION_VIEWS = {
 };
 function hcViewsForGroup(groupId) {
   const g = hcGroupById(groupId);
-  return HC_LESION_VIEWS[(g && g.viewType) || 'mamifero'] || HC_LESION_VIEWS.mamifero;
+  const base = HC_LESION_VIEWS[(g && g.viewType) || 'mamifero'] || HC_LESION_VIEWS.mamifero;
+  const custom = (g && Array.isArray(g.customViews)) ? g.customViews : [];
+  return [...base, ...custom];
 }
 function hcLesionSvg(groupId, markers, viewId, readonly) {
   const views = hcViewsForGroup(groupId);
   const view = views.find(v=>v.id===viewId) || views[0];
   const mks = (markers||[]).filter(m=>m.vista===view.id);
+  const mapImg = HC_MAP_IMAGES[groupId] ? HC_MAP_IMAGES[groupId][view.id] : null;
+  const W = mapImg && mapImg.w ? mapImg.w : view.w;
+  const H = mapImg && mapImg.h ? mapImg.h : view.h;
+  const vb = (mapImg && mapImg.w) ? `0 0 ${W} ${H}` : view.vb;
   const clickAttr = readonly ? '' : ' onclick="hcAddMarker(event)"';
   const mkHtml = mks.map(m=>{
-    const cx = (m.x/100*view.w).toFixed(1), cy = (m.y/100*view.h).toFixed(1);
+    const cx = (m.x/100*W).toFixed(1), cy = (m.y/100*H).toFixed(1);
     const mclick = readonly ? '' : ` onclick="event.stopPropagation();hcEditMarker(${m._i})"`;
     return `<g transform="translate(${cx},${cy})"${mclick} style="cursor:pointer"><circle r="10" fill="#ef4444" stroke="#fff" stroke-width="2"/><text x="0" y="3.6" text-anchor="middle" font-size="11" font-weight="700" fill="#fff" style="pointer-events:none">${m.num}</text></g>`;
   }).join('');
+  const body = mapImg && mapImg.url
+    ? `<image href="${mapImg.url}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="none" style="pointer-events:none"/>`
+    : `<g fill="#dbeafe" stroke="#1e3a8a" stroke-width="2">${view.svg||''}</g>
+      <style>svg .m-eye{fill:#1e3a8a;stroke:none} svg .m-body{fill:none;stroke:#dbeafe;stroke-width:30;stroke-linecap:round} svg .m-grid{stroke:#cbd5e1;stroke-width:1;stroke-dasharray:4 4;fill:none}</style>${view.svg?'':`<rect x="1" y="1" width="${W-2}" height="${H-2}" fill="none" stroke="#cbd5e1" stroke-dasharray="6 4"/><text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="12" fill="#94a3b8">Vista personalizada — sube su imagen en Admin → 🗺</text>`}`;
   return `<div style="position:relative;width:100%">
-    <svg viewBox="${view.vb}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="width:100%;height:auto;display:block;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;touch-action:manipulation"${clickAttr}>
-      <g fill="#dbeafe" stroke="#1e3a8a" stroke-width="2">${view.svg}</g>
-      <style>svg .m-eye{fill:#1e3a8a;stroke:none} svg .m-body{fill:none;stroke:#dbeafe;stroke-width:30;stroke-linecap:round} svg .m-grid{stroke:#cbd5e1;stroke-width:1;stroke-dasharray:4 4;fill:none}</style>
+    <svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="width:100%;height:auto;display:block;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;touch-action:manipulation"${clickAttr}>
+      ${body}
       ${mkHtml}
     </svg>
   </div>`;
@@ -8372,7 +8394,23 @@ function hcRenderLesionMap() {
       <button type="button" class="btn btn-secondary btn-sm" onclick="hcClearLesions()" style="font-size:.7rem">🗑 Limpiar</button>
     </div>
     ${hcLesionSvg(_hcCurrentGroup, _lesionMarkers, _hcCurrentView, false)}
-    ${_lesionMarkers.length?`<div style="font-size:.72rem;color:var(--txt3);margin-top:.35rem">${_lesionMarkers.length} marcador(es). Toca un número para editar/borrar su nota.</div>`:''}`;
+    ${_lesionMarkers.length?`<div style="margin-top:.5rem;border-top:1px dashed var(--bor);padding-top:.4rem">
+      <div style="font-size:.72rem;font-weight:600;color:var(--txt2);margin-bottom:.3rem">Lesiones del mapa (${_lesionMarkers.length}):</div>
+      ${_lesionMarkers.map((m,i)=>{
+        const vn = views.find(x=>x.id===m.vista)?.name || m.vista || '';
+        return `<div style="display:flex;align-items:center;gap:.4rem;font-size:.74rem;padding:.22rem 0">
+          <span style="color:var(--g6);font-weight:700;min-width:18px">${m.num}.</span>
+          <span style="color:var(--txt3);flex-shrink:0">${vn}</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.nota||'—'}</span>
+          <button type="button" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.72rem;padding:0 .2rem" onclick="hcEditMarker(${i})" title="Editar nota">✏️</button>
+          <button type="button" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.72rem;padding:0 .2rem" onclick="hcDelMarker(${i})" title="Borrar lesión">✕</button>
+        </div>`;}).join('')}
+    </div>`:`<div style="font-size:.72rem;color:var(--txt3);margin-top:.35rem">Sin lesiones marcadas. Toca el mapa para agregar.</div>`}`;
+}
+function hcDelMarker(i) {
+  _lesionMarkers.splice(i,1);
+  _lesionMarkers.forEach((mk,idx)=>mk.num=idx+1);
+  hcRenderLesionMap();
 }
 function hcSetLesionView(vid) {
   _hcCurrentView = vid;
@@ -8432,6 +8470,140 @@ function hcLesionMapPdfHtml(lesiones, grupo) {
     html += mks.map(m=>`<div style="font-size:12px;margin:2px 0">${m.num}. ${m.nota||'—'}</div>`).join('');
   });
   return html;
+}
+// ═══════════════════════════════════
+// MAPAS DE LESIONES: imágenes propias por grupo/vista (v15)
+// ═══════════════════════════════════
+let HC_MAP_IMAGES = {}; // groupId -> { viewId: {url,w,h} }
+
+async function loadHCMapImages() {
+  HC_MAP_IMAGES = {};
+  const local = await dbGetAll('hc_mapimg');
+  local.forEach(r => { if (r && r.images) HC_MAP_IMAGES[r.id] = r.images; });
+  if (firestore && fbUid()) {
+    try {
+      const fsImgs = await fsGetAll('hc_mapimg');
+      for (const r of (fsImgs||[])) {
+        if (!r || !r.images) continue;
+        const localRec = local.find(l => l && l.id === r.id);
+        if (localRec && localRec.images) {
+          // Preferir lo local (fuente de edición) y corregir la nube si difiere
+          if (JSON.stringify(localRec.images) !== JSON.stringify(r.images)) {
+            try { await firestore.collection('hc_mapimg').doc(r.id).set({ id: r.id, images: localRec.images }); } catch(e) {}
+          }
+        } else {
+          HC_MAP_IMAGES[r.id] = r.images;
+          dbPut('hc_mapimg', { id: r.id, images: r.images });
+        }
+      }
+    } catch(e) {}
+  }
+}
+async function saveHCMapImages(gid) {
+  const rec = { id: gid, images: HC_MAP_IMAGES[gid] || {} };
+  await dbPut('hc_mapimg', rec);
+  if (!firestore || !fbUid()) return;
+  try { await firestore.collection('hc_mapimg').doc(gid).set({ id: gid, images: rec.images }); } catch(e) { console.warn('Firestore map images:', e.message); }
+}
+function hcMapImagesForGroup(gid) { return HC_MAP_IMAGES[gid] || {}; }
+function hcProcessMapImage(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 900;
+        const sc = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * sc));
+        const h = Math.max(1, Math.round(img.height * sc));
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, w, h);
+        if (file.type === 'image/png') {
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve({ url: canvas.toDataURL('image/png'), w, h });
+        } else {
+          ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve({ url: canvas.toDataURL('image/jpeg', 0.85), w, h });
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = reader.result;
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+function hcMapsAdmin(gid) {
+  const g = hcGroupById(gid);
+  if (!g) return;
+  const views = hcViewsForGroup(gid);
+  const imgs = hcMapImagesForGroup(gid);
+  document.getElementById('modal-hc-maps-form').innerHTML = `
+    <div style="font-size:.82rem;font-weight:600;margin-bottom:.4rem">${g.emoji||'🐾'} ${g.name}</div>
+    <p style="font-size:.72rem;color:var(--txt3);margin-bottom:.6rem">Sube una imagen por cada vista (PNG transparente recomendado, o JPG/WebP/SVG). Los marcadores se guardan en % sobre la imagen.</p>
+    ${views.map(v=>{
+      const im = imgs[v.id];
+      const isCustom = String(v.id).indexOf('cv_')===0;
+      return `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem 0;border-bottom:1px solid var(--bor)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.76rem;font-weight:600">${v.name} ${isCustom?'<span style="font-size:.62rem;color:var(--txt3)">(personalizada)</span>':''}</div>
+          ${im && im.url ? `<img src="${im.url}" style="max-width:120px;max-height:70px;border-radius:6px;border:1px solid var(--bor);margin-top:.25rem;display:block;background:#f8fafc">` : `<span style="font-size:.7rem;color:var(--txt3)">${isCustom?'Sin imagen — sube una para poder marcar lesiones aquí':'Sin imagen — se usa el dibujo predeterminado'}</span>`}
+        </div>
+        <label class="btn btn-secondary btn-sm" style="font-size:.7rem;cursor:pointer;flex-shrink:0">📤 Subir<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none" onchange="hcMapUpload(this,'${gid}','${v.id}')"></label>
+        ${im ? `<button class="btn btn-danger btn-sm" style="flex-shrink:0" onclick="hcMapRemove('${gid}','${v.id}')" title="Quitar imagen">✕</button>` : ''}
+        ${isCustom ? `<button class="btn btn-danger btn-sm" style="flex-shrink:0" onclick="hcDelMapView('${gid}','${v.id}')" title="Eliminar esta vista">🗑</button>` : ''}
+      </div>`;
+    }).join('')}
+    <div style="margin-top:.6rem;display:flex;gap:.5rem;align-items:center">
+      <button class="btn btn-secondary btn-sm" style="flex-shrink:0;font-size:.72rem" onclick="hcAddMapView('${gid}')">➕ Agregar vista</button>
+      <span style="font-size:.68rem;color:var(--txt3)">Añade vistas extra (ej: cabeza, cola, palma).</span>
+    </div>`;
+  document.getElementById('modal-hc-maps').classList.add('open');
+}
+async function hcAddMapView(gid) {
+  const g = hcGroupById(gid);
+  if (!g) return;
+  const nombre = (prompt('Nombre de la nueva vista (ej: "Cabeza", "Cola", "Planta del pie"):')||'').trim();
+  if (!nombre) return;
+  if (!g.customViews) g.customViews = [];
+  if (g.customViews.some(v=>v.name.toLowerCase()===nombre.toLowerCase())) { toast('⚠ Esa vista ya existe'); return; }
+  g.customViews.push({ id:'cv_'+Date.now(), name:nombre, w:400, h:200, vb:'0 0 400 200', svg:'' });
+  await saveHCGroups();
+  toast('✓ Vista agregada');
+  hcMapsAdmin(gid);
+}
+async function hcDelMapView(gid, vid) {
+  const g = hcGroupById(gid);
+  if (!g || !Array.isArray(g.customViews)) return;
+  const v = g.customViews.find(x=>x.id===vid);
+  const ok = await confirmDelete('¿Eliminar vista?', `Se eliminará la vista "${v?v.name:vid}" del grupo y su imagen si la tiene.`, '🗺');
+  if (!ok) return;
+  g.customViews = g.customViews.filter(x=>x.id!==vid);
+  if (HC_MAP_IMAGES[gid]) delete HC_MAP_IMAGES[gid][vid];
+  await Promise.all([saveHCGroups(), saveHCMapImages(gid)]);
+  toast('Vista eliminada');
+  hcMapsAdmin(gid);
+}
+async function hcMapUpload(input, gid, viewId) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const proc = await hcProcessMapImage(file);
+  if (!proc) { toast('⚠ No se pudo leer la imagen'); input.value=''; return; }
+  HC_MAP_IMAGES[gid] = HC_MAP_IMAGES[gid] || {};
+  HC_MAP_IMAGES[gid][viewId] = proc;
+  await saveHCMapImages(gid);
+  toast('✓ Mapa guardado');
+  hcMapsAdmin(gid);
+}
+async function hcMapRemove(gid, viewId) {
+  const ok = await confirmDelete('¿Quitar imagen del mapa?', 'El grupo volverá a usar el dibujo predeterminado.', '🗺');
+  if (!ok) return;
+  if (HC_MAP_IMAGES[gid]) delete HC_MAP_IMAGES[gid][viewId];
+  await saveHCMapImages(gid);
+  hcMapsAdmin(gid);
 }
 function hcMMChipsHtml() {
   const base = ['Rosas','Pálidas','Húmedas','Secas','Brillantes','Opacas'];
