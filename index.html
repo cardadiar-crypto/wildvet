@@ -222,14 +222,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 .record-meta{font-size:.75rem;color:var(--txt3)}
 .record-chip{display:inline-flex;align-items:center;font-size:.7rem;background:var(--sur2);border-radius:12px;padding:.15rem .5rem;color:var(--txt2);margin-top:.3rem}
 
-/* INVENTORY */
-.inventory-item{display:flex;align-items:center;gap:.75rem;padding:.75rem;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rsm);margin-bottom:.5rem}
-.inv-icon{width:36px;height:36px;border-radius:var(--rxs);background:var(--g0);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
-@media(prefers-color-scheme:dark){.inv-icon{background:rgba(34,139,82,.15)}}
-.inv-name{font-size:.875rem;font-weight:600}
-.inv-meta{font-size:.75rem;color:var(--txt3)}
-.inv-count{font-size:1.1rem;font-weight:700;color:var(--g6);margin-left:auto;font-family:var(--mono)}
-
 /* VADEMECUM */
 .vademecum-item{background:var(--sur);border:1px solid var(--bor);border-radius:var(--rsm);padding:.75rem;margin-bottom:.5rem}
 .vad-drug{font-weight:600;font-size:.9rem}
@@ -437,7 +429,7 @@ textarea.form-control{resize:vertical;min-height:70px}
   <div id="screen-home" class="screen active">
     <div class="hero">
       <div class="hero-title">🌿 Fauna Silvestre</div>
-      <div class="hero-sub">Calculadoras clínicas · Historias · Inventario</div>
+      <div class="hero-sub">Calculadoras clínicas · Historias · Vademécum</div>
       <div class="search-box">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="text" id="main-search" placeholder="Buscar especie, fármaco..." oninput="handleSearch(this.value)">
@@ -448,10 +440,6 @@ textarea.form-control{resize:vertical;min-height:70px}
       <div class="quick-card" onclick="showScreen('historias')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         <span>Historias</span>
-      </div>
-      <div class="quick-card" onclick="showScreen('inventario')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
-        <span>Inventario</span>
       </div>
       <div class="quick-card" onclick="showScreen('vademecum')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
@@ -584,19 +572,6 @@ textarea.form-control{resize:vertical;min-height:70px}
     <div id="records-list"></div>
   </div>
 
-  <!-- INVENTARIO -->
-  <div id="screen-inventario" class="screen">
-    <div class="flex-between mb-2">
-      <h2 style="font-size:1.1rem;font-weight:700">Inventario Institucional</h2>
-      <div style="display:flex;gap:.4rem" id="inventory-admin-btns">
-        <button class="btn btn-secondary btn-sm" id="inv-share-btn" style="display:none" onclick="shareInventoryWith()">🔗 Compartir</button>
-        <button class="btn btn-primary btn-sm" onclick="openAddInventory()">+ Agregar</button>
-      </div>
-    </div>
-    <div id="institution-tabs" style="overflow-x:auto;white-space:nowrap;margin-bottom:1rem;padding-bottom:.3rem"></div>
-    <div id="inventory-list"></div>
-  </div>
-
   <!-- VADEMECUM -->
   <div id="screen-vademecum" class="screen">
     <div class="flex-between mb-2">
@@ -661,6 +636,37 @@ textarea.form-control{resize:vertical;min-height:70px}
         <button class="btn btn-secondary btn-sm" style="margin-top:.4rem;width:100%" id="btn-add-my-account" onclick="addAdminEmail(true)">
           ✓ Agregar mi cuenta actual
         </button>
+      </div>
+      <!-- Opciones personalizadas de historias clínicas -->
+      <div style="padding:.6rem 0">
+        <div style="font-size:.8rem;font-weight:600;margin-bottom:.4rem">Opciones de historias clínicas (Actividad / Comportamiento)</div>
+        <p class="text-muted" style="margin-bottom:.5rem;font-size:.75rem">Opciones globales visibles para todos los usuarios. Se sincronizan local y en la nube.</p>
+        <div style="display:flex;gap:.4rem;margin-bottom:.5rem">
+          <input id="admin-hcopt-input" class="form-control" placeholder="Nueva opción..." style="flex:1;font-size:.82rem"
+            onkeydown="if(event.key==='Enter')addHcOption()">
+          <select id="admin-hcopt-field" class="form-control" style="width:160px;flex-shrink:0;font-size:.82rem">
+            <option value="actividad">Actividad</option>
+            <option value="comportamiento">Comportamiento</option>
+            <option value="mm">Membranas mucosas</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="addHcOption()">+ Agregar</button>
+        </div>
+        <div style="display:flex;gap:.4rem;margin-bottom:.4rem">
+          <button class="btn btn-secondary btn-sm" style="flex:1" onclick="openHcOptsManage('actividad')">🗂 Gestionar Actividad</button>
+          <button class="btn btn-secondary btn-sm" style="flex:1" onclick="openHcOptsManage('comportamiento')">🗂 Gestionar Comportamiento</button>
+          <button class="btn btn-secondary btn-sm" style="flex:1" onclick="openHcOptsManage('mm')">🗂 Gestionar MM</button>
+        </div>
+        <div id="admin-hcopt-list" style="margin-top:.4rem"></div>
+      </div>
+      <!-- Grupos anatómicos / fisiológicos de historias clínicas -->
+      <div style="padding:.6rem 0;border-top:1px solid var(--bor)">
+        <div style="font-size:.8rem;font-weight:600;margin-bottom:.4rem">Grupos anatómicos / fisiológicos (HC)</div>
+        <p class="text-muted" style="margin-bottom:.5rem;font-size:.75rem">Valores de referencia T°/Fr/Fc por grupo, su lista de sistemas y su mapa de lesiones. Se sincronizan local y en la nube.</p>
+        <div style="display:flex;gap:.4rem;margin-bottom:.5rem">
+          <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveHcGroupsVitals()">💾 Guardar referencias</button>
+          <button class="btn btn-secondary btn-sm" onclick="addHcGroup()">+ Agregar grupo</button>
+        </div>
+        <div id="admin-hcgroups-list" style="margin-top:.4rem"></div>
       </div>
     </div>
 
@@ -760,55 +766,6 @@ textarea.form-control{resize:vertical;min-height:70px}
     <div class="modal-handle"></div>
     <div class="modal-title" id="modal-record-title">Nueva Historia Clínica</div>
     <div id="modal-record-form"></div>
-  </div>
-</div>
-
-<!-- MODAL INVENTORY -->
-<div class="modal-overlay" id="modal-inventory">
-  <div class="modal" style="max-height:90vh;overflow-y:auto">
-    <div class="modal-handle"></div>
-    <div class="modal-title" id="inv-modal-title">Agregar al Inventario</div>
-    <input type="hidden" id="inv-edit-id" value="">
-    <div class="form-group">
-      <label>Institución *</label>
-      <input type="text" id="inv-institution" class="form-control" placeholder="Ej: CRRFS Cali, Zoológico de Cali..." list="inv-inst-list">
-      <datalist id="inv-inst-list"></datalist>
-    </div>
-    <div class="form-group">
-      <label>Especie registrada</label>
-      <select id="inv-species" class="form-control" onchange="syncInvSpeciesFields()">
-        <option value="">— No registrada / Ingresar manualmente —</option>
-      </select>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Nombre común *</label>
-        <input type="text" id="inv-nombre-comun" class="form-control" placeholder="Ej: Jaguar" list="sp-hist-dl" oninput="autofillSci(this,'inv-nombre-cientifico')" onchange="autofillSci(this,'inv-nombre-cientifico')">
-      </div>
-      <div class="form-group">
-        <label>Nombre científico</label>
-        <input type="text" id="inv-nombre-cientifico" class="form-control" placeholder="Panthera onca">
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Machos</label>
-        <input type="number" id="inv-machos" class="form-control" value="0" min="0" placeholder="0">
-      </div>
-      <div class="form-group">
-        <label>Hembras</label>
-        <input type="number" id="inv-hembras" class="form-control" value="0" min="0" placeholder="0">
-      </div>
-      <div class="form-group">
-        <label>Indeterminados</label>
-        <input type="number" id="inv-indet" class="form-control" value="0" min="0" placeholder="0">
-      </div>
-    </div>
-    <div class="form-group"><label>Notas</label><textarea id="inv-notes" class="form-control" placeholder="Procedencia, condición, fecha ingreso..."></textarea></div>
-    <div style="display:flex;gap:.5rem;margin-top:1rem">
-      <button class="btn btn-secondary" onclick="closeModal('modal-inventory')">Cancelar</button>
-      <button class="btn btn-primary" style="flex:1" onclick="saveInventoryItem()">Guardar</button>
-    </div>
   </div>
 </div>
 
@@ -1004,7 +961,6 @@ let VADEMECUM_DB = [];
 // _initVadDrugs — empty by default; admin builds from UI
 let VADEMECUM_CATS = {};
 let clinicalRecords = [];
-let inventoryItems = [];
 let deferredPrompt = null;
 let ADMIN_PIN = '1234';
 let pinContext = '';
@@ -1016,10 +972,11 @@ let pinBuffer = '';
 let db;
 function initDB() {
   return new Promise(resolve => {
-    const req = indexedDB.open('WildVetDB', 3);
+    const req = indexedDB.open('WildVetDB', 4);
     req.onupgradeneeded = e => {
       const d = e.target.result;
-      ['records','inventory','settings','species','vademecum'].forEach(s => {
+      if (d.objectStoreNames.contains('inventory')) d.deleteObjectStore('inventory');
+      ['records','settings','species','vademecum'].forEach(s => {
         if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, {keyPath:'id'});
       });
       // Store de usuarios locales (v3)
@@ -1193,7 +1150,7 @@ function fbUid() {
 }
 
 // Colecciones globales (compartidas entre todos los usuarios)
-const FS_GLOBAL = ['species', 'vademecum', 'inventory', 'settings'];
+const FS_GLOBAL = ['species', 'vademecum', 'settings'];
 
 // Guardar documento en Firestore
 async function fsPut(collection, doc) {
@@ -1512,7 +1469,6 @@ async function manualSync() {
       };
       await uploadBatch('species',   SPECIES_DB);
       await uploadBatch('vademecum', VADEMECUM_DB);
-      await uploadBatch('inventory', inventoryItems);
       // Records con uid
       for (const r of clinicalRecords) await fsPut('records', { ...r, uid: fbUid() });
     }
@@ -2210,28 +2166,10 @@ async function loadData() {
         for (const r of clinicalRecords) await fsPut('records', { ...r, uid: fbUid() });
       }
 
-      // ── Inventario ──
-      const fsInvAll = await fsGetAll('inventory');
-      const myUid = fbUid();
-      if (fsInvAll?.length) {
-        // Mostrar solo los propios + los compartidos conmigo
-        inventoryItems = fsInvAll.filter(i =>
-          !i.owner ||                           // legados sin owner
-          i.owner === myUid ||                  // mis items
-          (i.sharedWith||[]).includes(myUid) || // compartidos conmigo
-          (i.sharedWith||[]).includes(currentUser?.email) // compartidos por email
-        );
-        for (const i of inventoryItems) await dbPut('inventory', i);
-      } else {
-        inventoryItems = await dbGetAll('inventory');
-        for (const i of inventoryItems) await fsPut('inventory', { ...i, owner: myUid, sharedWith: [] });
-      }
-
     } catch(e) {
       console.warn('Firestore error, usando cache local:', e.message);
       toast('⚠ Sin conexión — usando datos locales');
       clinicalRecords = await dbGetAll('records');
-      inventoryItems  = await dbGetAll('inventory');
       const ls = await dbGetAll('species');
       SPECIES_DB = ls.length ? ls : [...DEFAULT_SPECIES];
       const lv = await dbGetAll('vademecum');
@@ -2242,7 +2180,6 @@ async function loadData() {
   } else {
     // ── Sin Firestore: solo cache local ──
     clinicalRecords = await dbGetAll('records');
-    inventoryItems  = await dbGetAll('inventory');
     const savedSpecies = await dbGetAll('species');
     SPECIES_DB = savedSpecies.length ? savedSpecies : [...DEFAULT_SPECIES];
     if (!savedSpecies.length) { for (const s of DEFAULT_SPECIES) await dbPut('species', s); }
@@ -2284,8 +2221,11 @@ async function loadData() {
   const pinSaved = await dbGet('settings', 'admin_pin');
   if (pinSaved?.value) ADMIN_PIN = pinSaved.value;
 
+  // ── Opciones personalizadas de historias clínicas ──
+  await loadHCOptions();
+  await loadHCGroups();
+
   renderRecordsList();
-  renderInventoryList();
   renderVademecum();
   // Cargar dietas calculadas y calculadoras personalizadas
   await loadCalcCustom();
@@ -2293,6 +2233,17 @@ async function loadData() {
   await loadEnfermedadesGenerales();
   await loadEnfermedadesPendientes();
   _reconstruirHistoriales(); // Reconstruir historiales desde datos existentes
+  purgeInventoryLegacy(); // Limpieza única tras la eliminación del Inventario
+}
+async function purgeInventoryLegacy() {
+  try {
+    if (!firestore || !fbUid()) return;
+    const flag = await dbGet('settings', 'inventory_purged');
+    if (flag?.value) return;
+    const snap = await firestore.collection('inventory').get();
+    await Promise.all(snap.docs.map(doc => doc.ref.delete()));
+    await dbPut('settings', { id: 'inventory_purged', value: true });
+  } catch(e) { /* silencioso */ }
 }
 function updateUserUI() {
   if (!currentUser) return;
@@ -2342,12 +2293,11 @@ async function exportarDatos() {
     const species   = await dbGetAll('species');
     const vademecum = await dbGetAll('vademecum');
     const records   = await dbGetAll('records');
-    const inventory = await dbGetAll('inventory');
     const backup = {
-      version: '2.0',
+      version: '3.0',
       fecha: new Date().toISOString(),
       usuario: currentUser?.email || 'demo',
-      species, vademecum, records, inventory
+      species, vademecum, records
     };
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
@@ -2376,12 +2326,11 @@ async function importarDatos(input) {
   try {
     const text   = await input.files[0].text();
     const backup = JSON.parse(text);
-    let imported = { species: 0, vademecum: 0, records: 0, inventory: 0 };
+    let imported = { species: 0, vademecum: 0, records: 0 };
 
     for (const sp of backup.species   || []) { await dbPutSync('species',   sp); SPECIES_DB.push(sp);   imported.species++;   }
     for (const vd of backup.vademecum || []) { await dbPutSync('vademecum', vd); VADEMECUM_DB.push(vd); imported.vademecum++; }
     for (const rc of backup.records   || []) { await dbPutSync('records',   rc); clinicalRecords.push(rc); imported.records++;  }
-    for (const iv of backup.inventory || []) { await dbPutSync('inventory', iv); inventoryItems.push(iv);  imported.inventory++; }
 
     renderSpeciesGrid();
     renderVademecum();
@@ -2426,14 +2375,13 @@ function showScreen(name, trackNav=true) {
     if (name !== 'home') navHistory.push({ type: 'screen', name });
   }
   if (name==='home') document.getElementById('bnav-home').classList.add('active');
-  if (name==='admin') { renderAdminSpeciesList(); loadAdminEmails().then(renderAdminEmailsList); }
+  if (name==='admin') { renderAdminSpeciesList(); loadAdminEmails().then(renderAdminEmailsList); renderHcOptsAdmin(); renderHcGroupsAdmin(); }
   if (name==='biblioteca') { loadBibliotecaGeneral().then(renderBiblioteca); }
   if (name==='enfermedades-gen') { loadEnfermedadesGenerales().then(renderEnfGenContent); }
   if (name==='enriquecimiento') { renderEnriquecimientoScreen(); }
   if (name==='recintos') { renderRecintosScreen(); }
   if (name==='nutricion-calc') { renderNutricionCalcScreen(); }
   if (name==='historias') renderRecordsList();
-  if (name==='inventario') { renderInventoryList(); const sh=document.getElementById('inv-share-btn'); if(sh) sh.style.display=currentUser?.role==='admin'?'block':'none'; }
   if (name==='vademecum') { syncAndRenderVademecum(); }
 }
 function goHome() { showScreen('home'); }
@@ -8060,8 +8008,491 @@ function renderRecordsList(filter='') {
 }
 function filterRecords(val) { renderRecordsList(val.toLowerCase()); }
 
+// Opciones personalizadas de Actividad / Comportamiento / MM (cambios 3 y 5)
+let HC_OPTS_ACT = [];
+let HC_OPTS_BEH = [];
+let HC_OPTS_MM = [];
+async function loadHCOptions() {
+  const local = await dbGet('settings', 'hc_opts');
+  HC_OPTS_ACT = local?.value?.actividad || [];
+  HC_OPTS_BEH = local?.value?.comportamiento || [];
+  HC_OPTS_MM = local?.value?.mm || [];
+  if (firestore && fbUid()) {
+    try {
+      const snap = await firestore.collection('settings').doc('hc_opts').get();
+      if (snap.exists && snap.data()?.value) {
+        HC_OPTS_ACT = snap.data().value.actividad || HC_OPTS_ACT;
+        HC_OPTS_BEH = snap.data().value.comportamiento || HC_OPTS_BEH;
+        HC_OPTS_MM = snap.data().value.mm || HC_OPTS_MM;
+      }
+    } catch(e) {}
+  }
+}
+async function saveHCOptions() {
+  const value = { actividad: HC_OPTS_ACT, comportamiento: HC_OPTS_BEH, mm: HC_OPTS_MM };
+  await dbPut('settings', { id:'hc_opts', value });
+  if (!firestore || !fbUid()) return;
+  try { await firestore.collection('settings').doc('hc_opts').set({ value }); } catch(e) {}
+}
+function hcOptsSelect(field, id) {
+  const base = field==='actividad' ? ['Calmado','Activo','Excitado'] : ['Deprimido','Alerta','Agresivo','Aprehensivo'];
+  const extra = field==='actividad' ? HC_OPTS_ACT : HC_OPTS_BEH;
+  const opts = [...base, ...extra].map(o=>`<option value="${o.replace(/"/g,'&quot;')}">${o}</option>`).join('');
+  return `<select id="${id}" class="form-control" onchange="hcOptsChange('${field}','${id}',this)">
+    <option value="">Seleccionar</option>${opts}
+    <option value="__add__">➕ Agregar nueva...</option>
+    ${extra.length?`<option value="__del__">🗑 Administrar opciones...</option>`:''}
+  </select>`;
+}
+async function hcOptsChange(field, id, el) {
+  const v = el.value;
+  if (v === '__add__') {
+    const nombre = (prompt('Nueva opción de ' + (field==='actividad'?'Actividad':'Comportamiento') + ':')||'').trim();
+    if (nombre) {
+      const arr = field==='actividad' ? HC_OPTS_ACT : HC_OPTS_BEH;
+      if (!arr.some(o=>o.toLowerCase()===nombre.toLowerCase())) {
+        arr.push(nombre);
+        await saveHCOptions();
+        document.getElementById(id).outerHTML = hcOptsSelect(field, id);
+        document.getElementById(id).value = nombre;
+        toast('✓ Opción guardada');
+        return;
+      }
+      toast('⚠ Esa opción ya existe');
+    }
+    document.getElementById(id).value = '';
+    return;
+  }
+  if (v === '__del__') {
+    const arr = field==='actividad' ? HC_OPTS_ACT : HC_OPTS_BEH;
+    openMultiDelete({
+      title: field==='actividad' ? 'Actividad — opciones guardadas' : 'Comportamiento — opciones guardadas',
+      items: arr.map((o,i)=>({ id:String(i), label:o })),
+      onConfirm: async (ids) => {
+        const toDel = new Set(ids);
+        const newArr = arr.filter((_,i)=>!toDel.has(String(i)));
+        if (field==='actividad') HC_OPTS_ACT = newArr; else HC_OPTS_BEH = newArr;
+        await saveHCOptions();
+        document.getElementById(id).outerHTML = hcOptsSelect(field, id);
+        document.getElementById(id).value = '';
+      }
+    });
+    return;
+  }
+}
+
+function renderHcOptsAdmin() {
+  const el = document.getElementById('admin-hcopt-list');
+  if (!el) return;
+  const act = HC_OPTS_ACT, beh = HC_OPTS_BEH, mm = HC_OPTS_MM;
+  if (!act.length && !beh.length && !mm.length) { el.innerHTML = '<p class="text-muted" style="font-size:.75rem">Sin opciones personalizadas guardadas.</p>'; return; }
+  el.innerHTML = '<div style="font-size:.72rem;color:var(--txt3);margin-bottom:.3rem">Guardadas: <strong style="color:var(--txt2)">Actividad</strong> '+(act.length?act.join(', '):'—')+' · <strong style="color:var(--txt2)">Comportamiento</strong> '+(beh.length?beh.join(', '):'—')+' · <strong style="color:var(--txt2)">MM</strong> '+(mm.length?mm.join(', '):'—')+'</div>';
+}
+async function addHcOption() {
+  const inp = document.getElementById('admin-hcopt-input');
+  const field = document.getElementById('admin-hcopt-field')?.value || 'actividad';
+  const nombre = (inp?.value||'').trim();
+  if (!nombre) { toast('⚠ Escribe el nombre de la opción'); return; }
+  const arr = field==='actividad' ? HC_OPTS_ACT : field==='comportamiento' ? HC_OPTS_BEH : HC_OPTS_MM;
+  if (arr.some(o=>o.toLowerCase()===nombre.toLowerCase())) { toast('⚠ Esa opción ya existe'); return; }
+  arr.push(nombre);
+  await saveHCOptions();
+  if (inp) inp.value = '';
+  renderHcOptsAdmin();
+  toast('✓ Opción guardada');
+}
+function openHcOptsManage(field) {
+  const arr = field==='actividad' ? HC_OPTS_ACT : field==='comportamiento' ? HC_OPTS_BEH : HC_OPTS_MM;
+  if (!arr.length) { toast('No hay opciones personalizadas de '+(field==='actividad'?'Actividad':field==='comportamiento'?'Comportamiento':'Membranas mucosas')); return; }
+  openMultiDelete({
+    title: field==='actividad' ? 'Actividad — opciones guardadas' : field==='comportamiento' ? 'Comportamiento — opciones guardadas' : 'Membranas mucosas — opciones guardadas',
+    items: arr.map((o,i)=>({ id:String(i), label:o })),
+    onConfirm: async (ids) => {
+      const toDel = new Set(ids);
+      const newArr = arr.filter((_,i)=>!toDel.has(String(i)));
+      if (field==='actividad') HC_OPTS_ACT = newArr; else if (field==='comportamiento') HC_OPTS_BEH = newArr; else HC_OPTS_MM = newArr;
+      await saveHCOptions();
+      renderHcOptsAdmin();
+      toast('✓ Opciones actualizadas');
+    }
+  });
+}
+
+// ═══════════════════════════════════
+// CAMBIO 4: Grupos anatómicos / fisiológicos (19)
+// ═══════════════════════════════════
+const HC_SYS_DEFAULT = ['Aspecto general','Piel y anexos','Mucosas','Ojos','Oídos','Boca / pico / dientes','Respiratorio','Cardiovascular','Gastrointestinal','Músculo esquelético','Endocrino','Linfático','Urogenital','Nervioso'];
+const DEFAULT_HC_GROUPS = [
+  { id:'felidos',     name:'Félidos',            emoji:'🐆', taxon:{families:['Felidae']},                        vitals:{temp:'38.5–39.5', fr:'24–36',  fc:'110–130'}, systems:[...HC_SYS_DEFAULT], viewType:'mamifero' },
+  { id:'canidos',     name:'Cánidos',            emoji:'🐕', taxon:{families:['Canidae']},                        vitals:{temp:'38.0–39.2', fr:'16–32',  fc:'90–160'},  systems:[...HC_SYS_DEFAULT], viewType:'mamifero' },
+  { id:'primates',    name:'Primates',           emoji:'🐒', taxon:{orders:['Primates']},                         vitals:{temp:'37.5–38.5', fr:'20–40',  fc:'150–220'}, systems:[...HC_SYS_DEFAULT], viewType:'primate' },
+  { id:'ungulados',   name:'Ungulados',          emoji:'🦌', taxon:{orders:['Perissodactyla','Artiodactyla','Cetartiodactyla']}, vitals:{temp:'37.5–38.5', fr:'15–30', fc:'40–80'}, systems:[...HC_SYS_DEFAULT], viewType:'mamifero' },
+  { id:'roedores',    name:'Roedores / Lagomorfos', emoji:'🐹', taxon:{orders:['Rodentia','Lagomorpha']},          vitals:{temp:'36.5–38.5', fr:'80–160', fc:'220–400'}, systems:[...HC_SYS_DEFAULT], viewType:'mamifero' },
+  { id:'rapaces-diurnas', name:'Rapaces diurnas',  emoji:'🦅', taxon:{orders:['Accipitriformes','Falconiformes']}, vitals:{temp:'38.0–41.0', fr:'25–50',  fc:'180–350'}, systems:[...HC_SYS_DEFAULT,'Plumas / plumaje'], viewType:'ave' },
+  { id:'rapaces-nocturnas', name:'Rapaces nocturnas', emoji:'🦉', taxon:{orders:['Strigiformes']},                  vitals:{temp:'38.0–41.0', fr:'25–50',  fc:'180–350'}, systems:[...HC_SYS_DEFAULT,'Plumas / plumaje'], viewType:'ave' },
+  { id:'psitacidos',  name:'Psitácidos',         emoji:'🦜', taxon:{orders:['Psittaciformes']},                    vitals:{temp:'39.0–41.0', fr:'35–60',  fc:'180–350'}, systems:[...HC_SYS_DEFAULT,'Plumas / plumaje'], viewType:'ave' },
+  { id:'acuaticas',   name:'Aves acuáticas',     emoji:'🦆', taxon:{orders:['Anseriformes','Pelecaniformes','Charadriiformes','Suliformes']}, vitals:{temp:'38.5–41.0', fr:'30–60', fc:'180–350'}, systems:[...HC_SYS_DEFAULT,'Plumas / plumaje'], viewType:'ave' },
+  { id:'galliformes', name:'Galliformes',        emoji:'🐔', taxon:{orders:['Galliformes']},                       vitals:{temp:'39.5–41.5', fr:'30–60',  fc:'180–350'}, systems:[...HC_SYS_DEFAULT,'Plumas / plumaje'], viewType:'ave' },
+  { id:'ratites',     name:'Ratites',            emoji:'🦤', taxon:{orders:['Struthioniformes','Rheiformes','Casuariiformes']}, vitals:{temp:'38.0–40.0', fr:'20–40', fc:'140–220'}, systems:[...HC_SYS_DEFAULT,'Plumas / plumaje'], viewType:'ave' },
+  { id:'serpientes',  name:'Serpientes',         emoji:'🐍', taxon:{orders:['Squamata'],keywords:['serpientes','ophidia','boidae','colubridae','viperidae','python']}, vitals:{temp:'25–32', fr:'6–20', fc:'40–90'}, systems:['Aspecto general','Escamas / muda','Mucosas','Ojos','Boca / mandíbulas','Respiratorio','Cardiovascular','Gastrointestinal','Músculo esquelético','Endocrino','Linfático / hemolinfático','Urogenital','Nervioso','Cola / cloaca'], viewType:'serpiente' },
+  { id:'tortugas',    name:'Tortugas',           emoji:'🐢', taxon:{orders:['Testudines']},                        vitals:{temp:'25–32', fr:'4–15',    fc:'20–60'},  systems:['Aspecto general','Caparazón / plastrón','Piel','Mucosas','Ojos','Oídos','Boca / pico','Respiratorio','Cardiovascular','Gastrointestinal','Músculo esquelético','Endocrino','Linfático','Urogenital','Nervioso'], viewType:'tortuga' },
+  { id:'lagartos',    name:'Lagartos',           emoji:'🦎', taxon:{orders:['Squamata'],keywords:['lagartos','sauria','lacertilia','iguanidae','teiidae','gecko','varanidae','helodermatidae']}, vitals:{temp:'26–33', fr:'10–30', fc:'60–120'}, systems:['Aspecto general','Escamas','Piel','Mucosas','Ojos','Oídos','Boca / mandíbulas','Respiratorio','Cardiovascular','Gastrointestinal','Músculo esquelético','Endocrino','Linfático','Urogenital','Nervioso','Cola'], viewType:'lagarto' },
+  { id:'cocodrilianos', name:'Cocodrilianos',    emoji:'🐊', taxon:{orders:['Crocodilia'],families:['Crocodylidae','Alligatoridae']}, vitals:{temp:'28–35', fr:'4–8', fc:'30–50'}, systems:['Aspecto general','Escamas / osteodermos','Mucosas','Ojos','Oídos','Boca / mandíbulas','Respiratorio','Cardiovascular','Gastrointestinal','Músculo esquelético','Endocrino','Linfático','Urogenital','Nervioso','Cola'], viewType:'cocodrilo' },
+  { id:'anuros',      name:'Anuros',             emoji:'🐸', taxon:{orders:['Anura']},                              vitals:{temp:'20–28', fr:'10–40',   fc:'40–120'},  systems:['Aspecto general','Piel (cutánea)','Mucosas','Ojos','Oído (membrana timpánica)','Boca','Respiratorio (pulmones/piel)','Cardiovascular','Gastrointestinal','Músculo esquelético','Endocrino','Linfático','Urogenital','Nervioso'], viewType:'anuro' },
+  { id:'urodelos',    name:'Urodelos',           emoji:'🦎', taxon:{orders:['Caudata','Urodela']},                  vitals:{temp:'16–24', fr:'10–40',   fc:'40–120'},  systems:['Aspecto general','Piel (cutánea)','Mucosas','Ojos','Boca','Respiratorio (branquias/piel)','Cardiovascular','Gastrointestinal','Músculo esquelético','Endocrino','Linfático','Urogenital','Nervioso','Cola'], viewType:'urodelo' },
+  { id:'peces-oseos', name:'Peces óseos',        emoji:'🐟', taxon:{clases:['Actinopterygii']},                      vitals:{temp:'22–28', fr:'20–80',   fc:'40–100'},  systems:['Aspecto general','Escamas / piel','Mucosas / mucus','Ojos','Branquias','Aletas','Cola','Respiratorio','Cardiovascular','Gastrointestinal','Músculo esquelético','Endocrino','Linfático / riñón','Urogenital','Nervioso'], viewType:'pez' },
+  { id:'elasmobranquios', name:'Elasmobranquios', emoji:'🦈', taxon:{clases:['Chondrichthyes','Elasmobranchii']},   vitals:{temp:'18–26', fr:'10–30',   fc:'30–60'},   systems:['Aspecto general','Piel / dentículos','Mucosas','Ojos','Espiráculos / branquias','Aletas','Cola','Respiratorio','Cardiovascular','Gastrointestinal','Músculo esquelético','Endocrino','Linfático / riñón','Urogenital','Nervioso'], viewType:'elasmobranquio' }
+];
+let HC_GROUPS_DB = JSON.parse(JSON.stringify(DEFAULT_HC_GROUPS));
+
+let _hcCurrentGroup = null;
+let _hcCurrentView = null;
+let _lesionMarkers = [];
+
+function hcGroupById(id) { return HC_GROUPS_DB.find(g=>g.id===id) || null; }
+function hcMatchTaxon(sp, g) {
+  if (!sp) return false;
+  const fam = (sp.family||'').toLowerCase(), ord = (sp.order||'').toLowerCase(), cla = (sp.clase||'').toLowerCase();
+  const T = g.taxon || {};
+  if (T.families && T.families.some(f=>fam===f.toLowerCase())) return true;
+  if (T.orders && T.orders.some(o=>ord===o.toLowerCase())) return true;
+  if (T.clases && T.clases.some(c=>cla===c.toLowerCase())) return true;
+  if (T.keywords && T.keywords.some(k=>cla.includes(k.toLowerCase())||ord.includes(k.toLowerCase())||fam.includes(k.toLowerCase()))) return true;
+  return false;
+}
+function hcAutoGroupForSpecies(sp) {
+  if (!sp) return _hcCurrentGroup || null;
+  if (sp.clinical_group && HC_GROUPS_DB.some(g=>g.id===sp.clinical_group)) return sp.clinical_group;
+  const hit = HC_GROUPS_DB.find(g=>hcMatchTaxon(sp,g));
+  return hit ? hit.id : null;
+}
+function hcSystemsHtml(groupId) {
+  const g = hcGroupById(groupId);
+  const systems = (g && g.systems && g.systems.length) ? g.systems : HC_SYS_DEFAULT;
+  return systems.map(s=>`
+  <div class="form-group">
+    <label>${s}</label>
+    <div style="display:flex;gap:.4rem">
+      <select class="form-control" id="rps-${s.toLowerCase().replace(/[^a-z]/g,'')}" data-label="${s}" style="width:130px;flex-shrink:0">
+        <option value="">Evaluación</option><option value="Normal">Normal</option><option value="Anormal">Anormal</option><option value="Sin evaluar">Sin evaluar</option>
+      </select>
+      <input class="form-control" id="rps-${s.toLowerCase().replace(/[^a-z]/g,'')}-n" placeholder="Hallazgos..." style="flex:1">
+    </div>
+  </div>`).join('');
+}
+function hcGroupChipsHtml() {
+  return HC_GROUPS_DB.map(g=>`<button type="button" class="hc-group-chip" data-gid="${g.id}" onclick="hcSelectGroup('${g.id}')" style="font-size:.72rem;padding:.3rem .55rem;border-radius:20px;border:1px solid var(--bor);background:var(--sur);color:var(--txt2);cursor:pointer">${g.emoji||'🐾'} ${g.name}</button>`).join('');
+}
+function hcSelectGroup(gid) {
+  _hcCurrentGroup = gid;
+  document.querySelectorAll('.hc-group-chip').forEach(c=>{ c.style.background = c.dataset.gid===gid ? 'var(--g6)' : 'var(--sur)'; c.style.color = c.dataset.gid===gid ? '#fff' : 'var(--txt2)'; c.style.borderColor = c.dataset.gid===gid ? 'var(--g6)' : 'var(--bor)'; });
+  const rps = document.getElementById('rps-section');
+  if (rps) rps.innerHTML = hcSystemsHtml(gid);
+  const g = hcGroupById(gid);
+  if (g) {
+    const t=document.getElementById('rec-temp'); if(t) t.placeholder = g.vitals.temp || '38.5';
+    const fr=document.getElementById('rec-fr');  if(fr) fr.placeholder = g.vitals.fr || '20';
+    const fc=document.getElementById('rec-fc');  if(fc) fc.placeholder = g.vitals.fc || '80';
+  }
+  _lesionMarkers = [];
+  _hcCurrentView = null;
+  hcRenderLesionMap();
+  const sid = document.getElementById('rec-species-id')?.value;
+  const sp = sid ? SPECIES_DB.find(s=>s.id===sid) : null;
+  if (sp && sp.clinical_group!==gid) {
+    sp.clinical_group = gid;
+    dbPut('species', sp).then(()=>{ if(firestore && fbUid()) fsPut('species', sp); });
+  }
+}
+async function loadHCGroups() {
+  const local = await dbGet('settings', 'hc_groups');
+  if (local?.value?.length) { HC_GROUPS_DB = JSON.parse(JSON.stringify(local.value)); return; }
+  if (firestore && fbUid()) {
+    try {
+      const snap = await firestore.collection('settings').doc('hc_groups').get();
+      if (snap.exists && snap.data()?.value?.length) {
+        HC_GROUPS_DB = JSON.parse(JSON.stringify(snap.data().value));
+        await dbPut('settings', { id:'hc_groups', value: JSON.parse(JSON.stringify(HC_GROUPS_DB)) });
+        return;
+      }
+    } catch(e) {}
+  }
+  HC_GROUPS_DB = JSON.parse(JSON.stringify(DEFAULT_HC_GROUPS));
+  await dbPut('settings', { id:'hc_groups', value: JSON.parse(JSON.stringify(HC_GROUPS_DB)) });
+}
+async function saveHCGroups() {
+  await dbPut('settings', { id:'hc_groups', value: JSON.parse(JSON.stringify(HC_GROUPS_DB)) });
+  if (!firestore || !fbUid()) return;
+  try { await firestore.collection('settings').doc('hc_groups').set({ value: JSON.parse(JSON.stringify(HC_GROUPS_DB)) }); } catch(e) {}
+}
+function renderHcGroupsAdmin() {
+  const el = document.getElementById('admin-hcgroups-list');
+  if (!el) return;
+  el.innerHTML = HC_GROUPS_DB.map((g,i)=>`
+    <div style="display:flex;gap:.3rem;align-items:center;padding:.35rem 0;border-bottom:1px solid var(--bor)">
+      <span style="font-size:.72rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${g.name}">${g.emoji||'🐾'} ${g.name}</span>
+      <input class="form-control" style="width:76px;font-size:.72rem;flex-shrink:0" value="${g.vitals.temp||''}" data-f="temp" data-i="${i}" placeholder="T°">
+      <input class="form-control" style="width:66px;font-size:.72rem;flex-shrink:0" value="${g.vitals.fr||''}" data-f="fr" data-i="${i}" placeholder="Fr">
+      <input class="form-control" style="width:66px;font-size:.72rem;flex-shrink:0" value="${g.vitals.fc||''}" data-f="fc" data-i="${i}" placeholder="Fc">
+      <button class="btn btn-danger btn-sm" style="flex-shrink:0" onclick="delHcGroup('${g.id}')" title="Eliminar grupo">✕</button>
+    </div>`).join('');
+}
+async function saveHcGroupsVitals() {
+  document.querySelectorAll('#admin-hcgroups-list input[data-f]').forEach(inp=>{
+    const g = HC_GROUPS_DB[+inp.dataset.i];
+    if (g) g.vitals[inp.dataset.f] = inp.value.trim();
+  });
+  await saveHCGroups();
+  renderHcGroupsAdmin();
+  toast('✓ Referencias guardadas');
+}
+async function addHcGroup() {
+  const nombre = (prompt('Nombre del nuevo grupo anatómico (ej: "Marsupiales"):')||'').trim();
+  if (!nombre) return;
+  const gid = 'grp_'+Date.now();
+  HC_GROUPS_DB.push({ id:gid, name:nombre, emoji:'🐾', taxon:{keywords:[nombre.toLowerCase()]}, vitals:{temp:'',fr:'',fc:''}, systems:[...HC_SYS_DEFAULT], viewType:'mamifero' });
+  await saveHCGroups();
+  renderHcGroupsAdmin();
+  toast('✓ Grupo agregado');
+}
+async function delHcGroup(id) {
+  const g = hcGroupById(id);
+  const ok = await confirmDelete('¿Eliminar grupo anatómico?', `Se eliminará "${g?.name||''}" de los grupos de historias clínicas. Las HC ya guardadas conservan sus datos.`, '🧬');
+  if (!ok) return;
+  HC_GROUPS_DB = HC_GROUPS_DB.filter(x=>x.id!==id);
+  await saveHCGroups();
+  renderHcGroupsAdmin();
+  toast('Grupo eliminado');
+}
+
+// ═══════════════════════════════════
+// CAMBIO 6: Mapas de lesiones SVG por grupo
+// ═══════════════════════════════════
+const HC_LESION_VIEWS = {
+  mamifero: [
+    { id:'latD', name:'Lateral derecho', vb:'0 0 400 220', w:400, h:220, svg:`<ellipse cx="185" cy="95" rx="100" ry="52"/><ellipse cx="308" cy="68" rx="34" ry="28"/><ellipse cx="342" cy="74" rx="22" ry="14"/><path d="M270,60 Q300,52 308,68 L320,84 Q290,90 270,80 Z"/><path d="M96,70 Q70,95 78,120 L92,112 Q88,100 98,92 Z"/><path d="M115,140 L130,196 L146,196 L150,140 Z"/><path d="M180,140 L190,196 L206,196 L212,140 Z"/><path d="M250,140 L258,196 L274,196 L280,140 Z"/><path d="M290,132 L298,196 L314,196 L318,132 Z"/><circle cx="316" cy="60" r="3" class="m-eye"/><path d="M290,42 L298,24 L308,40 Z"/>` },
+    { id:'latI', name:'Lateral izquierdo', vb:'0 0 400 220', w:400, h:220, svg:`<g transform="translate(400,0) scale(-1,1)"><ellipse cx="185" cy="95" rx="100" ry="52"/><ellipse cx="308" cy="68" rx="34" ry="28"/><ellipse cx="342" cy="74" rx="22" ry="14"/><path d="M270,60 Q300,52 308,68 L320,84 Q290,90 270,80 Z"/><path d="M96,70 Q70,95 78,120 L92,112 Q88,100 98,92 Z"/><path d="M115,140 L130,196 L146,196 L150,140 Z"/><path d="M180,140 L190,196 L206,196 L212,140 Z"/><path d="M250,140 L258,196 L274,196 L280,140 Z"/><path d="M290,132 L298,196 L314,196 L318,132 Z"/><circle cx="316" cy="60" r="3" class="m-eye"/><path d="M290,42 L298,24 L308,40 Z"/></g>` },
+    { id:'dorsal', name:'Dorsal', vb:'0 0 400 220', w:400, h:220, svg:`<ellipse cx="200" cy="115" rx="115" ry="60"/><ellipse cx="200" cy="34" rx="34" ry="20"/><ellipse cx="172" cy="20" rx="14" ry="8"/><ellipse cx="228" cy="20" rx="14" ry="8"/><path d="M200,173 L182,208 L218,208 Z"/><rect x="92" y="150" width="16" height="44" rx="6"/><rect x="148" y="155" width="16" height="44" rx="6"/><rect x="252" y="155" width="16" height="44" rx="6"/><rect x="306" y="150" width="16" height="44" rx="6"/>` },
+    { id:'ventral', name:'Ventral', vb:'0 0 400 220', w:400, h:220, svg:`<ellipse cx="200" cy="115" rx="115" ry="60"/><ellipse cx="200" cy="34" rx="30" ry="17"/><path d="M200,173 L182,208 L218,208 Z"/><rect x="92" y="150" width="16" height="44" rx="6"/><rect x="148" y="155" width="16" height="44" rx="6"/><rect x="252" y="155" width="16" height="44" rx="6"/><rect x="306" y="150" width="16" height="44" rx="6"/><path d="M140,115 L200,140 L260,115" fill="none"/>` }
+  ],
+  primate: [
+    { id:'latD', name:'Lateral derecho', vb:'0 0 400 260', w:400, h:260, svg:`<circle cx="200" cy="52" r="30"/><ellipse cx="200" cy="140" rx="58" ry="72"/><ellipse cx="200" cy="228" rx="42" ry="20"/><rect x="252" y="112" width="16" height="60" rx="8" transform="rotate(22 260 143)"/><rect x="238" y="196" width="16" height="46" rx="8"/><rect x="150" y="112" width="16" height="60" rx="8" transform="rotate(-22 158 143)"/><rect x="144" y="196" width="16" height="46" rx="8"/><path d="M96,150 Q70,180 80,210 L96,200 Q92,182 104,170 Z"/><circle cx="188" cy="46" r="3" class="m-eye"/>` },
+    { id:'latI', name:'Lateral izquierdo', vb:'0 0 400 260', w:400, h:260, svg:`<g transform="translate(400,0) scale(-1,1)"><circle cx="200" cy="52" r="30"/><ellipse cx="200" cy="140" rx="58" ry="72"/><ellipse cx="200" cy="228" rx="42" ry="20"/><rect x="252" y="112" width="16" height="60" rx="8" transform="rotate(22 260 143)"/><rect x="238" y="196" width="16" height="46" rx="8"/><rect x="150" y="112" width="16" height="60" rx="8" transform="rotate(-22 158 143)"/><rect x="144" y="196" width="16" height="46" rx="8"/><path d="M96,150 Q70,180 80,210 L96,200 Q92,182 104,170 Z"/><circle cx="188" cy="46" r="3" class="m-eye"/></g>` },
+    { id:'dorsal', name:'Dorsal', vb:'0 0 400 260', w:400, h:260, svg:`<circle cx="200" cy="44" r="28"/><ellipse cx="200" cy="130" rx="60" ry="75"/><ellipse cx="200" cy="222" rx="44" ry="20"/><rect x="240" y="120" width="16" height="56" rx="8"/><rect x="140" y="120" width="16" height="56" rx="8"/><rect x="252" y="196" width="16" height="44" rx="8"/><rect x="132" y="196" width="16" height="44" rx="8"/><path d="M200,240 L186,256 L214,256 Z"/>` },
+    { id:'ventral', name:'Ventral', vb:'0 0 400 260', w:400, h:260, svg:`<circle cx="200" cy="44" r="26"/><ellipse cx="200" cy="130" rx="60" ry="75"/><ellipse cx="200" cy="222" rx="44" ry="20"/><rect x="240" y="120" width="16" height="56" rx="8"/><rect x="140" y="120" width="16" height="56" rx="8"/><rect x="252" y="196" width="16" height="44" rx="8"/><rect x="132" y="196" width="16" height="44" rx="8"/><path d="M200,240 L186,256 L214,256 Z"/><circle cx="200" cy="120" r="4" class="m-navel"/>` }
+  ],
+  ave: [
+    { id:'latD', name:'Lateral derecho', vb:'0 0 400 220', w:400, h:220, svg:`<ellipse cx="180" cy="95" rx="85" ry="48"/><circle cx="288" cy="62" r="26"/><path d="M312,58 L342,64 L312,72 Z"/><ellipse cx="185" cy="105" rx="52" ry="26"/><path d="M100,60 L52,40 L70,95 L55,140 L105,120 Z"/><path d="M150,140 L156,180 L170,180 L176,140 Z"/><path d="M205,140 L212,180 L226,180 L232,140 Z"/><circle cx="296" cy="56" r="3" class="m-eye"/>` },
+    { id:'latI', name:'Lateral izquierdo', vb:'0 0 400 220', w:400, h:220, svg:`<g transform="translate(400,0) scale(-1,1)"><ellipse cx="180" cy="95" rx="85" ry="48"/><circle cx="288" cy="62" r="26"/><path d="M312,58 L342,64 L312,72 Z"/><ellipse cx="185" cy="105" rx="52" ry="26"/><path d="M100,60 L52,40 L70,95 L55,140 L105,120 Z"/><path d="M150,140 L156,180 L170,180 L176,140 Z"/><path d="M205,140 L212,180 L226,180 L232,140 Z"/><circle cx="296" cy="56" r="3" class="m-eye"/></g>` },
+    { id:'dorsal', name:'Dorsal', vb:'0 0 400 220', w:400, h:220, svg:`<ellipse cx="200" cy="115" rx="90" ry="52"/><circle cx="200" cy="42" r="24"/><ellipse cx="200" cy="118" rx="55" ry="28"/><path d="M116,100 L58,66 L80,118 Z"/><path d="M284,100 L342,66 L320,118 Z"/><path d="M200,165 L178,200 L200,194 L222,200 Z"/><path d="M192,36 L200,16 L208,36 Z"/>` },
+    { id:'ventral', name:'Ventral', vb:'0 0 400 220', w:400, h:220, svg:`<ellipse cx="200" cy="115" rx="90" ry="52"/><circle cx="200" cy="42" r="22"/><path d="M116,100 L58,66 L80,118 Z"/><path d="M284,100 L342,66 L320,118 Z"/><path d="M200,165 L178,200 L200,194 L222,200 Z"/>` }
+  ],
+  serpiente: [
+    { id:'latD', name:'Lateral derecho', vb:'0 0 400 130', w:400, h:130, svg:`<path d="M30,65 Q80,25 130,60 Q180,95 230,62 Q285,28 335,60 Q365,75 380,62" class="m-body"/><ellipse cx="381" cy="62" rx="14" ry="10"/><path d="M28,62 L10,58 L14,72 Z"/><circle cx="384" cy="58" r="3" class="m-eye"/>` },
+    { id:'latI', name:'Lateral izquierdo', vb:'0 0 400 130', w:400, h:130, svg:`<g transform="translate(400,0) scale(-1,1)"><path d="M30,65 Q80,25 130,60 Q180,95 230,62 Q285,28 335,60 Q365,75 380,62" class="m-body"/><ellipse cx="381" cy="62" rx="14" ry="10"/><path d="M28,62 L10,58 L14,72 Z"/><circle cx="384" cy="58" r="3" class="m-eye"/></g>` },
+    { id:'dorsal', name:'Dorsal (tercios)', vb:'0 0 400 120', w:400, h:120, svg:`<path d="M20,60 Q80,30 140,60 Q200,90 260,58 Q320,28 380,58" class="m-body"/><ellipse cx="381" cy="58" rx="13" ry="9"/><path d="M18,58 L2,52 L6,66 Z"/><path d="M133,20 L133,100" class="m-grid"/><path d="M266,20 L266,100" class="m-grid"/>` }
+  ],
+  tortuga: [
+    { id:'dorsal', name:'Caparazón (dorsal)', vb:'0 0 400 230', w:400, h:230, svg:`<ellipse cx="200" cy="125" rx="110" ry="72"/><ellipse cx="200" cy="125" rx="78" ry="48"/><path d="M200,77 L200,173 M122,125 L278,125 M122,125 L200,77 M200,77 L278,125 M122,125 L200,173 M200,173 L278,125"/><circle cx="200" cy="34" r="22"/><ellipse cx="118" cy="162" rx="26" ry="12"/><ellipse cx="282" cy="162" rx="26" ry="12"/><path d="M200,197 L192,216 L208,216 Z"/><circle cx="194" cy="30" r="3" class="m-eye"/>` },
+    { id:'ventral', name:'Plastrón (ventral)', vb:'0 0 400 230', w:400, h:230, svg:`<ellipse cx="200" cy="120" rx="105" ry="70"/><ellipse cx="200" cy="120" rx="75" ry="46"/><path d="M200,50 L200,190 M125,120 L275,120 M125,120 L200,50 M200,50 L275,120 M125,120 L200,190 M200,190 L275,120"/>` },
+    { id:'latD', name:'Lateral derecho', vb:'0 0 400 200', w:400, h:200, svg:`<path d="M120,95 Q160,55 240,60 Q300,64 320,100 L300,120 Q250,145 170,140 Q120,135 110,105 Z"/><circle cx="330" cy="78" r="20"/><ellipse cx="120" cy="150" rx="24" ry="10"/><path d="M255,132 L262,168 L276,168 L282,132 Z"/><path d="M160,138 L166,170 L180,170 L186,138 Z"/><circle cx="334" cy="74" r="3" class="m-eye"/>` },
+    { id:'latI', name:'Lateral izquierdo', vb:'0 0 400 200', w:400, h:200, svg:`<g transform="translate(400,0) scale(-1,1)"><path d="M120,95 Q160,55 240,60 Q300,64 320,100 L300,120 Q250,145 170,140 Q120,135 110,105 Z"/><circle cx="330" cy="78" r="20"/><ellipse cx="120" cy="150" rx="24" ry="10"/><path d="M255,132 L262,168 L276,168 L282,132 Z"/><path d="M160,138 L166,170 L180,170 L186,138 Z"/><circle cx="334" cy="74" r="3" class="m-eye"/></g>` }
+  ],
+  lagarto: [
+    { id:'dorsal', name:'Dorsal', vb:'0 0 400 200', w:400, h:200, svg:`<ellipse cx="200" cy="110" rx="90" ry="42"/><ellipse cx="320" cy="80" rx="40" ry="22"/><path d="M350,78 L382,82 L350,86 Z"/><path d="M115,115 L58,130 L88,148 Z"/><rect x="132" y="145" width="16" height="34" rx="6"/><rect x="212" y="150" width="16" height="34" rx="6"/><rect x="272" y="140" width="16" height="34" rx="6"/><rect x="302" y="132" width="16" height="30" rx="6"/><circle cx="330" cy="74" r="3" class="m-eye"/>` },
+    { id:'ventral', name:'Ventral', vb:'0 0 400 200', w:400, h:200, svg:`<ellipse cx="200" cy="110" rx="90" ry="42"/><ellipse cx="320" cy="80" rx="36" ry="20"/><path d="M350,78 L380,82 L350,86 Z"/><path d="M115,115 L58,130 L88,148 Z"/><rect x="132" y="145" width="16" height="34" rx="6"/><rect x="212" y="150" width="16" height="34" rx="6"/><rect x="272" y="140" width="16" height="34" rx="6"/><rect x="302" y="132" width="16" height="30" rx="6"/>` },
+    { id:'latD', name:'Lateral derecho', vb:'0 0 400 200', w:400, h:200, svg:`<ellipse cx="185" cy="105" rx="90" ry="42"/><ellipse cx="300" cy="78" rx="36" ry="24"/><path d="M332,74 L366,80 L332,86 Z"/><path d="M100,110 L48,128 L80,148 Z"/><rect x="120" y="140" width="16" height="40" rx="6"/><rect x="190" y="145" width="16" height="40" rx="6"/><rect x="250" y="140" width="16" height="38" rx="6"/><rect x="288" y="128" width="16" height="34" rx="6"/><circle cx="310" cy="72" r="3" class="m-eye"/>` },
+    { id:'latI', name:'Lateral izquierdo', vb:'0 0 400 200', w:400, h:200, svg:`<g transform="translate(400,0) scale(-1,1)"><ellipse cx="185" cy="105" rx="90" ry="42"/><ellipse cx="300" cy="78" rx="36" ry="24"/><path d="M332,74 L366,80 L332,86 Z"/><path d="M100,110 L48,128 L80,148 Z"/><rect x="120" y="140" width="16" height="40" rx="6"/><rect x="190" y="145" width="16" height="40" rx="6"/><rect x="250" y="140" width="16" height="38" rx="6"/><rect x="288" y="128" width="16" height="34" rx="6"/><circle cx="310" cy="72" r="3" class="m-eye"/></g>` }
+  ],
+  cocodrilo: [
+    { id:'dorsal', name:'Dorsal', vb:'0 0 400 200', w:400, h:200, svg:`<ellipse cx="190" cy="112" rx="105" ry="42"/><path d="M285,92 L362,88 L380,100 L362,112 L288,116 Z"/><path d="M95,118 L42,132 L70,156 Z"/><rect x="132" y="146" width="16" height="34" rx="6"/><rect x="212" y="150" width="16" height="34" rx="6"/><rect x="262" y="144" width="16" height="32" rx="6"/><rect x="290" y="134" width="16" height="30" rx="6"/><circle cx="348" cy="94" r="3" class="m-eye"/><path d="M150,76 L118,92 L150,88 Z"/><path d="M176,72 L148,86 L176,82 Z"/>` },
+    { id:'ventral', name:'Ventral', vb:'0 0 400 200', w:400, h:200, svg:`<ellipse cx="190" cy="112" rx="105" ry="42"/><path d="M285,92 L362,88 L380,100 L362,112 L288,116 Z"/><path d="M95,118 L42,132 L70,156 Z"/><rect x="132" y="146" width="16" height="34" rx="6"/><rect x="212" y="150" width="16" height="34" rx="6"/><rect x="262" y="144" width="16" height="32" rx="6"/><rect x="290" y="134" width="16" height="30" rx="6"/>` },
+    { id:'latD', name:'Lateral derecho', vb:'0 0 400 200', w:400, h:200, svg:`<ellipse cx="180" cy="105" rx="100" ry="40"/><path d="M270,85 L360,78 L382,92 L360,104 L276,104 Z"/><path d="M88,112 L40,128 L70,152 Z"/><rect x="120" y="140" width="16" height="40" rx="6"/><rect x="190" y="145" width="16" height="40" rx="6"/><rect x="250" y="138" width="16" height="38" rx="6"/><rect x="284" y="126" width="16" height="34" rx="6"/><circle cx="348" cy="84" r="3" class="m-eye"/><path d="M150,72 L128,84 L150,80 Z"/>` },
+    { id:'latI', name:'Lateral izquierdo', vb:'0 0 400 200', w:400, h:200, svg:`<g transform="translate(400,0) scale(-1,1)"><ellipse cx="180" cy="105" rx="100" ry="40"/><path d="M270,85 L360,78 L382,92 L360,104 L276,104 Z"/><path d="M88,112 L40,128 L70,152 Z"/><rect x="120" y="140" width="16" height="40" rx="6"/><rect x="190" y="145" width="16" height="40" rx="6"/><rect x="250" y="138" width="16" height="38" rx="6"/><rect x="284" y="126" width="16" height="34" rx="6"/><circle cx="348" cy="84" r="3" class="m-eye"/><path d="M150,72 L128,84 L150,80 Z"/></g>` }
+  ],
+  anuro: [
+    { id:'dorsal', name:'Dorsal', vb:'0 0 400 220', w:400, h:220, svg:`<ellipse cx="200" cy="120" rx="82" ry="60"/><circle cx="163" cy="72" r="10" class="m-eye"/><circle cx="237" cy="72" r="10" class="m-eye"/><path d="M122,100 Q88,122 94,152 L116,144 Q120,130 142,122 Z"/><path d="M278,100 Q312,122 306,152 L284,144 Q280,130 258,122 Z"/><path d="M160,180 Q200,208 240,180 L230,168 Q200,186 170,168 Z"/><path d="M155,52 L200,36 L245,52 Z"/>` },
+    { id:'ventral', name:'Ventral', vb:'0 0 400 220', w:400, h:220, svg:`<ellipse cx="200" cy="120" rx="82" ry="60"/><ellipse cx="200" cy="118" rx="52" ry="38"/><circle cx="163" cy="72" r="10" class="m-eye"/><circle cx="237" cy="72" r="10" class="m-eye"/><path d="M122,100 Q88,122 94,152 L116,144 Q120,130 142,122 Z"/><path d="M278,100 Q312,122 306,152 L284,144 Q280,130 258,122 Z"/><path d="M160,180 Q200,208 240,180 L230,168 Q200,186 170,168 Z"/><path d="M155,52 L200,36 L245,52 Z"/>` },
+    { id:'latD', name:'Lateral derecho', vb:'0 0 400 220', w:400, h:220, svg:`<ellipse cx="195" cy="118" rx="70" ry="62"/><circle cx="268" cy="72" r="16"/><path d="M282,70 L308,74 L282,78 Z"/><path d="M130,100 Q95,125 102,158 L124,150 Q128,134 150,124 Z"/><path d="M238,170 Q200,205 160,178 L170,164 Q200,186 226,160 Z"/><path d="M160,55 L160,30 Q170,26 176,34 Z"/><circle cx="262" cy="68" r="3" class="m-eye"/>` },
+    { id:'latI', name:'Lateral izquierdo', vb:'0 0 400 220', w:400, h:220, svg:`<g transform="translate(400,0) scale(-1,1)"><ellipse cx="195" cy="118" rx="70" ry="62"/><circle cx="268" cy="72" r="16"/><path d="M282,70 L308,74 L282,78 Z"/><path d="M130,100 Q95,125 102,158 L124,150 Q128,134 150,124 Z"/><path d="M238,170 Q200,205 160,178 L170,164 Q200,186 226,160 Z"/><path d="M160,55 L160,30 Q170,26 176,34 Z"/><circle cx="262" cy="68" r="3" class="m-eye"/></g>` }
+  ],
+  urodelo: [
+    { id:'dorsal', name:'Dorsal', vb:'0 0 400 200', w:400, h:200, svg:`<ellipse cx="200" cy="100" rx="85" ry="38"/><circle cx="300" cy="80" r="20"/><path d="M120,105 L44,124 L74,150 Z"/><rect x="140" y="130" width="14" height="30" rx="6"/><rect x="200" y="134" width="14" height="30" rx="6"/><rect x="255" y="124" width="14" height="28" rx="6"/><circle cx="306" cy="75" r="3" class="m-eye"/>` },
+    { id:'ventral', name:'Ventral', vb:'0 0 400 200', w:400, h:200, svg:`<ellipse cx="200" cy="100" rx="85" ry="38"/><circle cx="300" cy="80" r="18"/><path d="M120,105 L44,124 L74,150 Z"/><rect x="140" y="130" width="14" height="30" rx="6"/><rect x="200" y="134" width="14" height="30" rx="6"/><rect x="255" y="124" width="14" height="28" rx="6"/>` },
+    { id:'latD', name:'Lateral derecho', vb:'0 0 400 200', w:400, h:200, svg:`<ellipse cx="190" cy="105" rx="85" ry="38"/><circle cx="295" cy="78" r="20"/><path d="M110,112 L44,132 L76,156 Z"/><rect x="140" y="136" width="14" height="32" rx="6"/><rect x="215" y="140" width="14" height="32" rx="6"/><rect x="262" y="126" width="14" height="30" rx="6"/><circle cx="300" cy="73" r="3" class="m-eye"/>` },
+    { id:'latI', name:'Lateral izquierdo', vb:'0 0 400 200', w:400, h:200, svg:`<g transform="translate(400,0) scale(-1,1)"><ellipse cx="190" cy="105" rx="85" ry="38"/><circle cx="295" cy="78" r="20"/><path d="M110,112 L44,132 L76,156 Z"/><rect x="140" y="136" width="14" height="32" rx="6"/><rect x="215" y="140" width="14" height="32" rx="6"/><rect x="262" y="126" width="14" height="30" rx="6"/><circle cx="300" cy="73" r="3" class="m-eye"/></g>` }
+  ],
+  pez: [
+    { id:'latD', name:'Lateral derecho', vb:'0 0 400 180', w:400, h:180, svg:`<ellipse cx="190" cy="95" rx="105" ry="55"/><path d="M295,85 L360,95 L295,108 Z"/><path d="M190,40 L210,14 L232,44 Z"/><path d="M205,150 L220,172 L238,148 Z"/><path d="M170,110 L180,150 L196,112 Z"/><path d="M120,30 L138,64 L150,30 Z"/><circle cx="262" cy="85" r="3" class="m-eye"/><path d="M250,70 Q262,80 250,95" fill="none"/>` },
+    { id:'latI', name:'Lateral izquierdo', vb:'0 0 400 180', w:400, h:180, svg:`<g transform="translate(400,0) scale(-1,1)"><ellipse cx="190" cy="95" rx="105" ry="55"/><path d="M295,85 L360,95 L295,108 Z"/><path d="M190,40 L210,14 L232,44 Z"/><path d="M205,150 L220,172 L238,148 Z"/><path d="M170,110 L180,150 L196,112 Z"/><path d="M120,30 L138,64 L150,30 Z"/><circle cx="262" cy="85" r="3" class="m-eye"/><path d="M250,70 Q262,80 250,95" fill="none"/></g>` },
+    { id:'dorsal', name:'Dorsal', vb:'0 0 400 180', w:400, h:180, svg:`<ellipse cx="195" cy="95" rx="105" ry="52"/><path d="M300,85 L362,95 L300,108 Z"/><path d="M190,45 L205,18 L228,48 Z"/><path d="M205,148 L220,168 L238,146 Z"/><circle cx="270" cy="85" r="3" class="m-eye"/>` }
+  ],
+  elasmobranquio: [
+    { id:'latD', name:'Lateral derecho', vb:'0 0 400 180', w:400, h:180, svg:`<ellipse cx="190" cy="100" rx="110" ry="38"/><path d="M298,88 L372,76 L372,112 L298,104 Z"/><path d="M180,62 L205,28 L235,64 Z"/><path d="M120,80 Q80,102 58,142 L110,120 Q130,104 140,94 Z"/><path d="M128,122 Q170,142 212,132 L206,118 Q176,126 150,112 Z"/><circle cx="262" cy="92" r="3" class="m-eye"/><path d="M248,86 L242,78 M256,92 L250,84 M264,98 L258,90" fill="none"/>` },
+    { id:'latI', name:'Lateral izquierdo', vb:'0 0 400 180', w:400, h:180, svg:`<g transform="translate(400,0) scale(-1,1)"><ellipse cx="190" cy="100" rx="110" ry="38"/><path d="M298,88 L372,76 L372,112 L298,104 Z"/><path d="M180,62 L205,28 L235,64 Z"/><path d="M120,80 Q80,102 58,142 L110,120 Q130,104 140,94 Z"/><path d="M128,122 Q170,142 212,132 L206,118 Q176,126 150,112 Z"/><circle cx="262" cy="92" r="3" class="m-eye"/><path d="M248,86 L242,78 M256,92 L250,84 M264,98 L258,90" fill="none"/></g>` },
+    { id:'dorsal', name:'Dorsal', vb:'0 0 400 180', w:400, h:180, svg:`<ellipse cx="195" cy="95" rx="108" ry="46"/><path d="M303,86 L374,72 L374,108 L303,100 Z"/><path d="M185,52 L205,18 L232,56 Z"/><path d="M120,95 L62,120 L96,132 L150,108 Z"/><path d="M270,95 L330,120 L296,132 L250,108 Z"/><circle cx="270" cy="82" r="3" class="m-eye"/>` }
+  ]
+};
+function hcViewsForGroup(groupId) {
+  const g = hcGroupById(groupId);
+  return HC_LESION_VIEWS[(g && g.viewType) || 'mamifero'] || HC_LESION_VIEWS.mamifero;
+}
+function hcLesionSvg(groupId, markers, viewId, readonly) {
+  const views = hcViewsForGroup(groupId);
+  const view = views.find(v=>v.id===viewId) || views[0];
+  const mks = (markers||[]).filter(m=>m.vista===view.id);
+  const clickAttr = readonly ? '' : ' onclick="hcAddMarker(event)"';
+  const mkHtml = mks.map(m=>{
+    const cx = (m.x/100*view.w).toFixed(1), cy = (m.y/100*view.h).toFixed(1);
+    const mclick = readonly ? '' : ` onclick="event.stopPropagation();hcEditMarker(${m._i})"`;
+    return `<g transform="translate(${cx},${cy})"${mclick} style="cursor:pointer"><circle r="10" fill="#ef4444" stroke="#fff" stroke-width="2"/><text x="0" y="3.6" text-anchor="middle" font-size="11" font-weight="700" fill="#fff" style="pointer-events:none">${m.num}</text></g>`;
+  }).join('');
+  return `<div style="position:relative;width:100%">
+    <svg viewBox="${view.vb}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="width:100%;height:auto;display:block;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;touch-action:manipulation"${clickAttr}>
+      <g fill="#dbeafe" stroke="#1e3a8a" stroke-width="2">${view.svg}</g>
+      <style>svg .m-eye{fill:#1e3a8a;stroke:none} svg .m-body{fill:none;stroke:#dbeafe;stroke-width:30;stroke-linecap:round} svg .m-grid{stroke:#cbd5e1;stroke-width:1;stroke-dasharray:4 4;fill:none}</style>
+      ${mkHtml}
+    </svg>
+  </div>`;
+}
+function hcRenderLesionMap() {
+  const el = document.getElementById('lesion-map-wrap');
+  if (!el) return;
+  const views = hcViewsForGroup(_hcCurrentGroup);
+  if (!_hcCurrentView || !views.some(v=>v.id===_hcCurrentView)) _hcCurrentView = views[0].id;
+  const chips = views.map(v=>`<button type="button" onclick="hcSetLesionView('${v.id}')" style="font-size:.72rem;padding:.28rem .55rem;border-radius:18px;border:1px solid ${v.id===_hcCurrentView?'var(--g6)':'var(--bor)'};background:${v.id===_hcCurrentView?'var(--g6)':'var(--sur)'};color:${v.id===_hcCurrentView?'#fff':'var(--txt2)'};cursor:pointer">${v.name}</button>`).join('');
+  const groupName = hcGroupById(_hcCurrentGroup)?.name || 'Genérico';
+  _lesionMarkers.forEach((m,i)=>m._i=i);
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap">
+      <span style="font-size:.78rem;font-weight:600;color:var(--g6)">Mapa: ${groupName}</span>
+      <span style="font-size:.72rem;color:var(--txt3)">Toca el punto de la lesión</span>
+      ${chips}
+      <span style="flex:1"></span>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="hcClearLesions()" style="font-size:.7rem">🗑 Limpiar</button>
+    </div>
+    ${hcLesionSvg(_hcCurrentGroup, _lesionMarkers, _hcCurrentView, false)}
+    ${_lesionMarkers.length?`<div style="font-size:.72rem;color:var(--txt3);margin-top:.35rem">${_lesionMarkers.length} marcador(es). Toca un número para editar/borrar su nota.</div>`:''}`;
+}
+function hcSetLesionView(vid) {
+  _hcCurrentView = vid;
+  hcRenderLesionMap();
+}
+function hcAddMarker(e) {
+  const svg = e.currentTarget;
+  const rect = svg.getBoundingClientRect();
+  const x = Math.min(100, Math.max(0, ((e.clientX-rect.left)/rect.width)*100));
+  const y = Math.min(100, Math.max(0, ((e.clientY-rect.top)/rect.height)*100));
+  const nota = (prompt('Nota de la lesión (opcional):','')||'').trim();
+  if (nota.toLowerCase()==='delete') return;
+  _lesionMarkers.push({ x:+x.toFixed(1), y:+y.toFixed(1), vista:_hcCurrentView, nota });
+  _lesionMarkers.forEach((m,i)=>m.num=i+1);
+  hcRenderLesionMap();
+}
+function hcEditMarker(i) {
+  const m = _lesionMarkers[i];
+  if (!m) return;
+  const r = prompt('Editar nota de la lesión (escribe "DELETE" para borrarla):', m.nota||'');
+  if (r===null) return;
+  if (r.trim().toUpperCase()==='DELETE') { _lesionMarkers.splice(i,1); }
+  else { m.nota = r.trim(); }
+  _lesionMarkers.forEach((mk,idx)=>mk.num=idx+1);
+  hcRenderLesionMap();
+}
+function hcClearLesions() {
+  if (!_lesionMarkers.length) return;
+  _lesionMarkers = [];
+  hcRenderLesionMap();
+}
+function hcLesionMapDetailHtml(lesiones, grupo, readonly) {
+  if (!lesiones?.length) return '';
+  const views = hcViewsForGroup(grupo);
+  const byView = {};
+  lesiones.forEach(m=>{ const v=m.vista||'latD'; (byView[v]=byView[v]||[]).push(m); });
+  let html = `<div class="info-card"><div class="info-card-title">Mapa de lesiones</div>`;
+  Object.entries(byView).forEach(([vid, mks])=>{
+    const v = views.find(x=>x.id===vid);
+    html += `<div style="font-size:.75rem;font-weight:600;color:var(--g6);margin:.5rem 0 .3rem">${v?v.name:vid}</div>`;
+    html += hcLesionSvg(grupo, mks, vid, true);
+    html += mks.map(m=>`<div class="info-row"><span class="info-label">${m.num}.</span><span class="info-value">${m.nota||'—'}</span></div>`).join('');
+  });
+  html += `</div>`;
+  return html;
+}
+function hcLesionMapPdfHtml(lesiones, grupo) {
+  if (!lesiones?.length) return '';
+  const views = hcViewsForGroup(grupo);
+  const byView = {};
+  lesiones.forEach(m=>{ const v=m.vista||'latD'; (byView[v]=byView[v]||[]).push(m); });
+  let html = '';
+  Object.entries(byView).forEach(([vid, mks])=>{
+    const v = views.find(x=>x.id===vid);
+    html += `<div style="margin:8px 0 4px;font-weight:bold">${v?v.name:vid}</div>`;
+    html += hcLesionSvg(grupo, mks, vid, true);
+    html += mks.map(m=>`<div style="font-size:12px;margin:2px 0">${m.num}. ${m.nota||'—'}</div>`).join('');
+  });
+  return html;
+}
+function hcMMChipsHtml() {
+  const base = ['Rosas','Pálidas','Húmedas','Secas','Brillantes','Opacas'];
+  const all = [...base, ...HC_OPTS_MM];
+  return all.map(o=>`<button type="button" class="mm-chip" data-val="${o.replace(/"/g,'&quot;')}" onclick="hcToggleMM(this)" style="font-size:.72rem;padding:.3rem .6rem;border-radius:20px;border:1px solid var(--bor);background:var(--sur);color:var(--txt2);cursor:pointer">${o}</button>`).join('')
+    + `<button type="button" onclick="hcAddMM()" style="font-size:.72rem;padding:.3rem .6rem;border-radius:20px;border:1px dashed var(--g5);background:var(--g0);color:var(--g6);cursor:pointer">➕ Agregar</button>`;
+}
+function hcToggleMM(btn) {
+  btn.classList.toggle('mm-active');
+  const active = btn.classList.contains('mm-active');
+  btn.style.background = active ? 'var(--g6)' : 'var(--sur)';
+  btn.style.color = active ? '#fff' : 'var(--txt2)';
+  btn.style.borderColor = active ? 'var(--g6)' : 'var(--bor)';
+}
+async function hcAddMM() {
+  const nombre = (prompt('Nueva característica de membranas mucosas:')||'').trim();
+  if (!nombre) return;
+  if (HC_OPTS_MM.some(o=>o.toLowerCase()===nombre.toLowerCase())) { toast('⚠ Esa opción ya existe'); return; }
+  HC_OPTS_MM.push(nombre);
+  await saveHCOptions();
+  const el = document.getElementById('mm-chips');
+  if (el) el.innerHTML = hcMMChipsHtml();
+  toast('✓ Opción guardada');
+}
+
+// Lista unificada de especies para la HC (fichas + enriquecimientos) (cambio 1)
+function hcSpeciesOptions() {
+  const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+  const map = {};
+  SPECIES_DB.forEach(s => { if (s.name) map[norm(s.name)] = { id:s.id, nombre:s.name, sci:s.sci||'' }; });
+  (ENRIQUECIMIENTOS_DB||[]).forEach(enr => {
+    const rows = (enr.especies && enr.especies.length) ? enr.especies : (enr.especie ? [{sp:enr.especie, sci:enr.sci||''}] : []);
+    rows.forEach(r => {
+      const n = (r.sp||'').trim();
+      if (!n) return;
+      const k = norm(n);
+      if (!map[k]) map[k] = { id:'', nombre:n, sci:r.sci||'' };
+    });
+  });
+  return Object.values(map).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+}
+function hcApplySpecies() {
+  const nombre = (document.getElementById('rec-species')?.value||'').trim();
+  const opt = hcSpeciesOptions().find(o=>o.nombre.toLowerCase()===nombre.toLowerCase());
+  const idEl = document.getElementById('rec-species-id');
+  const sciEl = document.getElementById('rec-sci');
+  if (idEl) idEl.value = opt ? (opt.id||'') : '';
+  if (sciEl && opt && !sciEl.dataset.edited) sciEl.value = opt.sci || '';
+  const sp = opt?.id ? SPECIES_DB.find(s=>s.id===opt.id) : null;
+  const wField = document.getElementById('rec-weight');
+  if (sp && wField && !wField.value) wField.value = sp.weight_avg;
+  document.querySelectorAll('.treat-peso').forEach(el=>{ if(!el.value&&sp) el.value=sp.weight_avg; });
+  if (opt) {
+    const gid = hcAutoGroupForSpecies(sp);
+    if (gid && gid!==_hcCurrentGroup) hcSelectGroup(gid);
+  }
+}
+
 function openNewRecord() {
-  const speciesOpts = SPECIES_DB.map(s=>`<option value="${s.id}">${s.name} — ${s.sci}</option>`).join('');
+  const hcSpecies = hcSpeciesOptions();
+  const speciesDl = hcSpecies.map(o=>`<option value="${o.nombre.replace(/"/g,'&quot;')}">`).join('');
   const hcNum = 'HC-'+(Date.now()+'').slice(-6);
   document.getElementById('modal-record-title').textContent = 'Nueva Historia Clínica';
   document.getElementById('modal-record-form').innerHTML = `
@@ -8073,9 +8504,9 @@ function openNewRecord() {
     <div class="form-group"><label>Número de ID / Microchip</label><input id="rec-id" class="form-control" placeholder="ID-001, chip #..."></div>
   </div>
   <div class="form-group"><label>Nombre del individuo</label><input id="rec-name" class="form-control" placeholder="Ej: Tapir #001, Puma hembra..."></div>
-  <div class="form-group"><label>Especie</label><select id="rec-species" class="form-control"><option value="">Seleccionar...</option>${speciesOpts}</select></div>
+  <div class="form-group"><label>Especie</label><input id="rec-species" class="form-control" list="rec-species-dl" placeholder="Buscar especie (por nombre común)..." autocomplete="off" oninput="hcApplySpecies()" onchange="hcApplySpecies()"><datalist id="rec-species-dl">${speciesDl}</datalist><input type="hidden" id="rec-species-id"></div>
   <div class="form-row">
-    <div class="form-group"><label>Nombre científico (auto)</label><input id="rec-sci" class="form-control" placeholder="Se llena al seleccionar especie" readonly style="color:var(--txt3)"></div>
+    <div class="form-group"><label>Nombre científico</label><input id="rec-sci" class="form-control" placeholder="Escribir o se llena al seleccionar especie" oninput="this.dataset.edited='1'"></div>
     <div class="form-group"><label>Sexo</label>
       <select id="rec-sex" class="form-control">
         <option value="">Desconocido</option><option>Macho</option><option>Hembra</option><option>Indeterminado</option>
@@ -8108,7 +8539,7 @@ function openNewRecord() {
     </div>
     <div class="form-group"><label>Puntuación CC (ej: 3/5 o 7/10)</label>
       <div style="display:flex;align-items:center;gap:.3rem">
-        <input id="rec-cc-num" class="form-control" type="number" min="1" max="10" placeholder="3" style="width:55px;flex-shrink:0">
+        <input id="rec-cc-num" class="form-control" type="number" min="1" max="10" step="0.5" placeholder="3" style="width:55px;flex-shrink:0">
         <span style="color:var(--txt3)">/</span>
         <input id="rec-cc-den" class="form-control" type="number" min="5" max="10" step="5" placeholder="5" style="width:55px;flex-shrink:0">
       </div>
@@ -8116,17 +8547,13 @@ function openNewRecord() {
   </div>
   <div class="form-row">
     <div class="form-group"><label>Peso (kg)</label><input id="rec-weight" class="form-control" type="number" step="0.001" min="0.001" placeholder="0.001"></div>
-    <div class="form-group"><label>Actividad</label>
-      <select id="rec-actividad" class="form-control">
-        <option value="">Seleccionar</option><option>Calmado</option><option>Activo</option><option>Excitado</option>
-      </select>
-    </div>
+    <div class="form-group"><label>Actividad</label>${hcOptsSelect('actividad','rec-actividad')}</div>
   </div>
-  <div class="form-group"><label>Comportamiento</label>
-    <select id="rec-comportamiento" class="form-control">
-      <option value="">Seleccionar</option><option>Deprimido</option><option>Alerta</option><option>Agresivo</option><option>Aprehensivo</option>
-    </select>
-  </div>
+  <div class="form-group"><label>Comportamiento</label>${hcOptsSelect('comportamiento','rec-comportamiento')}
+
+  <div class="form-section-title">Grupo anatómico / fisiológico</div>
+  <p class="text-muted" style="font-size:.72rem;margin-bottom:.5rem">Se auto-selecciona según la taxonomía de la especie. Ajustable a mano; define constantes de referencia, revisión por sistemas y mapa de lesiones. Los grupos se gestionan en el panel admin.</p>
+  <div id="hc-group-chips" style="display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.75rem">${hcGroupChipsHtml()}</div>
 
   <div class="form-section-title">Constantes fisiológicas</div>
   <div class="form-row">
@@ -8145,18 +8572,13 @@ function openNewRecord() {
       </select>
     </div>
   </div>
+  <div class="form-group"><label>Membranas mucosas</label><div id="mm-chips" style="display:flex;flex-wrap:wrap;gap:.35rem">${hcMMChipsHtml()}</div></div>
 
   <div class="form-section-title">Revisión por sistemas</div>
-  ${['Aspecto general','Piel y anexos','Mucosas','Ojos','Oídos','Boca / pico / dientes','Respiratorio','Cardiovascular','Gastrointestinal','Músculo esquelético','Endocrino','Linfático','Urogenital','Nervioso'].map(s=>`
-  <div class="form-group">
-    <label>${s}</label>
-    <div style="display:flex;gap:.4rem">
-      <select class="form-control" id="rps-${s.toLowerCase().replace(/[^a-z]/g,'')}" style="width:130px;flex-shrink:0">
-        <option value="">Evaluación</option><option value="Normal">Normal</option><option value="Anormal">Anormal</option><option value="Sin evaluar">Sin evaluar</option>
-      </select>
-      <input class="form-control" id="rps-${s.toLowerCase().replace(/[^a-z]/g,'')}-n" placeholder="Hallazgos..." style="flex:1">
-    </div>
-  </div>`).join('')}
+  <div id="rps-section">${hcSystemsHtml(null)}</div>
+
+  <div class="form-section-title">Mapa de lesiones</div>
+  <div id="lesion-map-wrap"></div>
 
   <div class="form-section-title">Abordaje diagnóstico</div>
   <div class="form-group">
@@ -8247,16 +8669,10 @@ function openNewRecord() {
   </div>
   <input type="hidden" id="rec-hc-num" value="${hcNum}">`;
 
-  // Auto-fill nombre científico cuando se selecciona especie
-  document.getElementById('rec-species').addEventListener('change', function() {
-    const sp = SPECIES_DB.find(s=>s.id===this.value);
-    document.getElementById('rec-sci').value = sp?.sci||'';
-    // Auto-llenar peso promedio
-    const wField = document.getElementById('rec-weight');
-    if (sp && !wField.value) wField.value = sp.weight_avg;
-    // Auto-llenar peso en tratamientos
-    document.querySelectorAll('.treat-peso').forEach(el=>{ if(!el.value&&sp) el.value=sp.weight_avg; });
-  });
+  _hcCurrentGroup = null;
+  _hcCurrentView = null;
+  _lesionMarkers = [];
+  hcRenderLesionMap();
 
   document.getElementById('modal-record').classList.add('open');
 }
@@ -8333,16 +8749,20 @@ function calcTreatDose(input) {
 async function saveRecord() {
   const name = document.getElementById('rec-name').value.trim();
   if (!name) { toast('⚠ Ingresa el nombre del individuo'); return; }
-  const speciesId = document.getElementById('rec-species').value;
-  const sp = SPECIES_DB.find(s=>s.id===speciesId);
+  const speciesName = (document.getElementById('rec-species')?.value||'').trim();
+  const speciesId = document.getElementById('rec-species-id')?.value || '';
+  const sp = speciesId ? SPECIES_DB.find(s=>s.id===speciesId) : null;
 
   // Recopilar revisión por sistemas
   const sistemas = {};
-  ['aspectogeneral','pielanexos','mucosas','ojos','oidos','bocapicodientes','respiratorio','cardiovascular','gastrointestinal','musculoesqueletico','endocrino','linfatico','urogenital','nervioso'].forEach(s=>{
-    const sel = document.getElementById('rps-'+s)?.value;
-    const nota = document.getElementById('rps-'+s+'-n')?.value;
-    if (sel||nota) sistemas[s] = {status:sel||'', nota:nota||''};
+  document.querySelectorAll('#rps-section select[id^="rps-"]').forEach(sel=>{
+    const key = sel.id.slice(4);
+    const nota = document.getElementById(key+'-n')?.value;
+    if (sel.value||nota) sistemas[key] = {status:sel.value||'', nota:nota||'', label:sel.dataset.label||''};
   });
+
+  // Membranas mucosas (multiselección)
+  const mm = Array.from(document.querySelectorAll('#mm-chips .mm-chip.mm-active')).map(c=>c.dataset.val);
 
   // Recopilar problemas
   const problems = [];
@@ -8390,8 +8810,8 @@ async function saveRecord() {
     fecha: document.getElementById('rec-fecha')?.value,
     id_individuo: document.getElementById('rec-id')?.value,
     name, speciesId,
-    species: sp?.name||'',
-    sci: document.getElementById('rec-sci')?.value||sp?.sci||'',
+    species: sp?.name || speciesName,
+    sci: document.getElementById('rec-sci')?.value?.trim() || sp?.sci || '',
     sex: document.getElementById('rec-sex')?.value,
     dob: document.getElementById('rec-dob')?.value,
     age_num: document.getElementById('rec-age-num')?.value,
@@ -8419,7 +8839,10 @@ async function saveRecord() {
     presuntivo: document.getElementById('rec-presuntivo')?.value,
     exams, definitivo: document.getElementById('rec-definitivo')?.value,
     treatments, plan: document.getElementById('rec-plan')?.value,
-    customFields, date: new Date().toISOString(), userId: currentUser.uid
+    customFields, date: new Date().toISOString(), userId: currentUser.uid,
+    grupo: _hcCurrentGroup || '',
+    grupo_name: hcGroupById(_hcCurrentGroup)?.name || '',
+    mm, lesiones: JSON.parse(JSON.stringify(_lesionMarkers))
   };
   await dbPutSync('records', record);
   clinicalRecords.unshift(record);
@@ -8465,8 +8888,9 @@ function openRecord(id) {
     ${r.chief_complaint?`<div class="info-card"><div class="info-card-title">Motivo de consulta</div><p class="text-sm">${r.chief_complaint}</p></div>`:''}
     ${r.history?`<div class="info-card"><div class="info-card-title">Anamnesis</div><p class="text-sm">${r.history}</p></div>`:''}
 
-    ${(ccStr||r.actividad||r.comportamiento)?`
+    ${(ccStr||r.actividad||r.comportamiento||r.grupo_name)?`
     <div class="info-card"><div class="info-card-title">Evaluación clínica</div>
+      ${r.grupo_name?row('Grupo anatómico',r.grupo_name):''}
       ${ccStr?row('Condición corporal',ccStr):''}
       ${r.actividad?row('Actividad',r.actividad):''}
       ${r.comportamiento?row('Comportamiento',r.comportamiento):''}
@@ -8480,16 +8904,19 @@ function openRecord(id) {
       ${r.constantes.tllc?row('TLLC',r.constantes.tllc+' seg'):''}
       ${r.constantes.rpc?row('RPC',r.constantes.rpc+' seg'):''}
       ${r.constantes.deshid?row('Deshidratación',r.constantes.deshid+'%'):''}
+      ${r.mm?.length?row('Membranas mucosas',r.mm.map(m=>`<span class="mm-badge" style="font-size:.72rem;padding:.1rem .45rem;border-radius:20px;background:var(--g0);color:var(--g7);margin-right:.25rem">${m}</span>`).join('')):''}
     </div>`:''}
 
     ${r.sistemas&&Object.keys(r.sistemas).length?`
     <div class="info-card"><div class="info-card-title">Revisión por sistemas</div>
       ${Object.entries(r.sistemas).map(([k,v])=>`
         <div class="info-row">
-          <span class="info-label">${sysNames[k]||k}</span>
+          <span class="info-label">${v.label||sysNames[k]||k}</span>
           <span class="info-value"><span style="font-size:.72rem;padding:.1rem .4rem;border-radius:20px;margin-right:.3rem;${v.status==='Normal'?'background:#dcfce7;color:#166534':v.status==='Anormal'?'background:#fee2e2;color:#991b1b':'background:var(--sur2);color:var(--txt3)'}">${v.status||'—'}</span>${v.nota}</span>
         </div>`).join('')}
     </div>`:''}
+
+    ${hcLesionMapDetailHtml(r.lesiones, r.grupo, true)}
 
     ${r.problems?.length?`
     <div class="info-card"><div class="info-card-title">Lista de problemas</div>
@@ -8569,6 +8996,7 @@ function openMultiDeleteRecords() {
     }
   });
 }
+const SYS_NAMES = {aspectogeneral:'Aspecto general',pielanexos:'Piel y anexos',mucosas:'Mucosas',ojos:'Ojos',oidos:'Oídos',bocapicodientes:'Boca/pico/dientes',respiratorio:'Respiratorio',cardiovascular:'Cardiovascular',gastrointestinal:'Gastrointestinal',musculoesqueletico:'Músculo esquelético',endocrino:'Endocrino',linfatico:'Linfático',urogenital:'Urogenital',nervioso:'Nervioso'};
 function exportRecordPDF(id) {
   const r = clinicalRecords.find(rc=>rc.id===id);
   if (!r) return;
@@ -8581,206 +9009,16 @@ function exportRecordPDF(id) {
   <p><strong>Nombre:</strong> ${r.name}<br><strong>Especie:</strong> ${r.species}<br><strong>Edad:</strong> ${r.age||'N/D'}<br><strong>Sexo:</strong> ${r.sex||'N/D'}<br><strong>Peso:</strong> ${r.weight||'N/D'} kg</p>
   ${r.chief_complaint?`<h2>Motivo de consulta</h2><p>${r.chief_complaint}</p>`:''}
   ${r.history?`<h2>Anamnesis</h2><p>${r.history}</p>`:''}
+  ${r.grupo_name?`<h2>Grupo anatómico / fisiológico</h2><p>${r.grupo_name}</p>`:''}
+  ${r.mm?.length?`<h2>Membranas mucosas</h2><p>${r.mm.join(', ')}</p>`:''}
   ${r.exam?`<h2>Examen físico</h2><p>${r.exam}</p>`:''}
   ${r.plan?`<h2>Plan / Tratamiento</h2><p>${r.plan}</p>`:''}
+  ${r.sistemas&&Object.keys(r.sistemas).length?`<h2>Revisión por sistemas</h2><table style="width:100%;border-collapse:collapse">${Object.entries(r.sistemas).map(([k,v])=>`<tr><td style="padding:4px;border-bottom:1px solid #eee;font-weight:bold;width:200px">${v.label||SYS_NAMES[k]||k}</td><td style="padding:4px;border-bottom:1px solid #eee">${v.status||''} ${v.nota||''}</td></tr>`).join('')}</table>`:''}
+  ${r.lesiones?.length?`<h2>Mapa de lesiones</h2>${hcLesionMapPdfHtml(r.lesiones, r.grupo)}`:''}
   ${r.customFields?.map(f=>`<h2>${f.label}</h2><p>${f.value}</p>`).join('')||''}
   <hr><p style="font-size:11px;color:#888">WildVet — Plataforma clínica para fauna silvestre</p>
   <script>window.print();<\/script></body></html>`);
   win.document.close();
-}
-
-// ═══════════════════════════════════
-// INVENTORY
-// ═══════════════════════════════════
-function renderInventoryList() {
-  const list = document.getElementById('inventory-list');
-  const tabDiv = document.getElementById('institution-tabs');
-  if (!list) return;
-  if (!inventoryItems.length) {
-    tabDiv.innerHTML='';
-    list.innerHTML=`<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg><p>Sin registros de inventario.</p></div>`; return;
-  }
-  const institutions = [...new Set(inventoryItems.map(i=>i.institution||'General'))];
-  let active = tabDiv.dataset.active || institutions[0];
-  if (!institutions.includes(active)) active = institutions[0];
-  tabDiv.innerHTML = institutions.map(inst=>`<button class="tab-btn ${inst===active?'active':''}" onclick="filterInventory('${inst}')">${inst}</button>`).join('');
-  tabDiv.dataset.active = active;
-  const filtered = inventoryItems.filter(i=>(i.institution||'General')===active);
-  // Header de institución con botón renombrar
-  const isAdmin = currentUser?.role==='admin';
-  list.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
-      <span style="font-size:.72rem;color:var(--txt3);font-weight:600;text-transform:uppercase">${active} · ${filtered.length} especie(s)</span>
-      <div style="display:flex;gap:.4rem">
-        ${isAdmin?`<button onclick="openMultiDeleteInventory('${active}')" class="btn btn-secondary btn-sm" style="font-size:.7rem">🗑 Varios</button>`:''}
-        ${isAdmin?`<button onclick="renameInstitution('${active}')" style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem">✏️ Renombrar</button>`:''}
-      </div>
-    </div>` +
-  (filtered.map(item=>{
-    const sp = SPECIES_DB.find(s=>s.id===item.speciesId);
-    const machos  = item.machos  != null ? item.machos  : Math.round((item.count||0)/2);
-    const hembras = item.hembras != null ? item.hembras : (item.count||0) - machos;
-    const indet   = item.indet   || 0;
-    const nombre  = item.nombreComun || sp?.name || item.speciesName || 'Especie';
-    const sci     = item.nombreCientifico || sp?.sci || '';
-    return `<div class="inventory-item" style="align-items:flex-start">
-      <div class="inv-icon" style="overflow:hidden;padding:0;background:var(--sur2);display:flex;align-items:center;justify-content:center;flex-shrink:0">${sp?.cover_photo?`<img src="${sp.cover_photo}" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-size:1.3rem">🐾</span>`}</div>
-      <div style="flex:1;min-width:0">
-        <div class="inv-name">${nombre}</div>
-        <div class="inv-meta" style="font-style:italic">${sci}</div>
-        <div style="display:flex;gap:.5rem;margin-top:.2rem;flex-wrap:wrap">
-          <span style="font-size:.72rem;background:var(--g1);color:var(--g7);border-radius:20px;padding:.1rem .45rem">♂ ${machos}</span>
-          <span style="font-size:.72rem;background:var(--r1);color:var(--r5);border-radius:20px;padding:.1rem .45rem">♀ ${hembras}</span>
-          ${indet?`<span style="font-size:.72rem;background:var(--sur2);border-radius:20px;padding:.1rem .45rem">? ${indet}</span>`:''}
-          <span style="font-size:.72rem;color:var(--txt3)">Total: ${(item.count||machos+hembras+indet)}</span>
-        </div>
-        ${item.notes?`<div class="inv-meta" style="margin-top:.15rem">${item.notes}</div>`:''}
-      </div>
-      <div style="display:flex;flex-direction:column;gap:.2rem;flex-shrink:0">
-        ${isAdmin?`<button onclick="openAddInventory('${item.id}')" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);cursor:pointer;font-size:.7rem;padding:.2rem .35rem">✏️</button>`:''}
-        <button onclick="removeInventory('${item.id}')" style="background:none;border:none;color:var(--txt3);cursor:pointer;padding:.2rem;font-size:.85rem">✕</button>
-      </div>
-    </div>`;
-  }).join('')||`<div class="empty-state"><p>Sin animales en ${active}</p></div>`);
-}
-function filterInventory(inst) {
-  document.getElementById('institution-tabs').dataset.active = inst;
-  renderInventoryList();
-}
-function openAddInventory(editId=null) {
-  // Poblar select de especies
-  const sel = document.getElementById('inv-species');
-  sel.innerHTML = '<option value="">— No registrada / Ingresar manualmente —</option>' +
-    SPECIES_DB.map(s=>`<option value="${s.id}">${s.name} (${s.sci||''})</option>`).join('');
-  // Poblar datalist de instituciones
-  const dl = document.getElementById('inv-inst-list');
-  if (dl) {
-    const insts = [...new Set(inventoryItems.map(i=>i.institution||'').filter(Boolean))];
-    dl.innerHTML = insts.map(i=>`<option value="${i}">`).join('');
-  }
-  // Limpiar / rellenar si es edición
-  const editIdEl = document.getElementById('inv-edit-id');
-  const titleEl  = document.getElementById('inv-modal-title');
-  if (editId) {
-    const item = inventoryItems.find(x=>x.id===editId);
-    if (!item) return;
-    if (editIdEl) editIdEl.value = editId;
-    if (titleEl) titleEl.textContent = 'Editar registro';
-    const set = (id,v) => { const el=document.getElementById(id); if(el) el.value=v||''; };
-    set('inv-institution',   item.institution);
-    set('inv-nombre-comun',  item.speciesName||item.nombreComun||'');
-    set('inv-nombre-cientifico', item.nombreCientifico||'');
-    set('inv-machos',  item.machos||0);
-    set('inv-hembras', item.hembras||0);
-    set('inv-indet',   item.indet||0);
-    set('inv-notes',   item.notes||'');
-    // Seleccionar la especie si está registrada
-    if (item.speciesId) {
-      for (const opt of sel.options) { if (opt.value===item.speciesId){opt.selected=true;break;} }
-    }
-  } else {
-    if (editIdEl) editIdEl.value = '';
-    if (titleEl) titleEl.textContent = 'Agregar al Inventario';
-    ['inv-institution','inv-nombre-comun','inv-nombre-cientifico','inv-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-    ['inv-machos','inv-hembras','inv-indet'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0';});
-    sel.value='';
-  }
-  document.getElementById('modal-inventory').classList.add('open');
-}
-
-function syncInvSpeciesFields() {
-  const sel = document.getElementById('inv-species');
-  if (!sel.value) return;
-  const sp = SPECIES_DB.find(s=>s.id===sel.value);
-  if (!sp) return;
-  const nc = document.getElementById('inv-nombre-comun');
-  const sci = document.getElementById('inv-nombre-cientifico');
-  if (nc && !nc.value) nc.value = sp.name;
-  if (sci && !sci.value) sci.value = sp.sci||'';
-}
-async function saveInventoryItem() {
-  const inst         = document.getElementById('inv-institution')?.value.trim() || 'General';
-  const speciesId    = document.getElementById('inv-species')?.value || '';
-  const nombreComun  = document.getElementById('inv-nombre-comun')?.value.trim();
-  const nombreCient  = document.getElementById('inv-nombre-cientifico')?.value.trim()||'';
-  const machos       = parseInt(document.getElementById('inv-machos')?.value)||0;
-  const hembras      = parseInt(document.getElementById('inv-hembras')?.value)||0;
-  const indet        = parseInt(document.getElementById('inv-indet')?.value)||0;
-  const notes        = document.getElementById('inv-notes')?.value||'';
-  const editId       = document.getElementById('inv-edit-id')?.value||'';
-
-  if (!nombreComun) { toast('⚠ Ingresa el nombre común'); return; }
-
-  const sp = speciesId ? SPECIES_DB.find(s=>s.id===speciesId) : null;
-  const total = machos + hembras + indet;
-
-  if (editId) {
-    // Editar registro existente
-    const existing = inventoryItems.find(x=>x.id===editId);
-    if (existing) {
-      Object.assign(existing, { institution:inst, speciesId, speciesName:nombreComun,
-        nombreComun, nombreCientifico:nombreCient, machos, hembras, indet, count:total, notes });
-      await dbPutSync('inventory', existing);
-    }
-  } else {
-    // Verificar si ya existe mismo inst+especie para sumar
-    const dup = inventoryItems.find(i=>i.institution===inst && (i.speciesId===speciesId||i.nombreComun===nombreComun));
-    if (dup) {
-      dup.machos  = (dup.machos||0)  + machos;
-      dup.hembras = (dup.hembras||0) + hembras;
-      dup.indet   = (dup.indet||0)   + indet;
-      dup.count   = (dup.machos||0)  + (dup.hembras||0) + (dup.indet||0);
-      if (notes) dup.notes = (dup.notes ? dup.notes+'; ' : '') + notes;
-      await dbPutSync('inventory', dup);
-    } else {
-      const item = {
-        id: 'inv_'+Date.now(), institution:inst, speciesId, speciesName:nombreComun,
-        nombreComun, nombreCientifico:nombreCient, machos, hembras, indet,
-        count: total, notes, date: new Date().toISOString(),
-        owner: fbUid() || 'local',
-        sharedWith: []
-      };
-      inventoryItems.push(item);
-      await dbPutSync('inventory', item);
-    }
-  }
-  closeModal('modal-inventory');
-  renderInventoryList();
-  toast('✓ Inventario ' + (editId?'actualizado':'guardado'));
-}
-
-async function renameInstitution(oldName) {
-  const newName = prompt('Nuevo nombre para la institución:', oldName);
-  if (!newName || newName === oldName) return;
-  let changed = 0;
-  for (const item of inventoryItems) {
-    if (item.institution === oldName) {
-      item.institution = newName;
-      await dbPutSync('inventory', item);
-      changed++;
-    }
-  }
-  document.getElementById('institution-tabs').dataset.active = newName;
-  renderInventoryList();
-  toast('✓ Institución renombrada — ' + changed + ' registro(s) actualizados');
-}
-
-async function shareInventoryWith() {
-  const email = prompt('Correo electrónico con quien compartir el inventario:');
-  if (!email || !email.includes('@')) { toast('⚠ Correo inválido'); return; }
-  const myUid = fbUid();
-  let count = 0;
-  for (const item of inventoryItems) {
-    if (item.owner === myUid) {
-      if (!item.sharedWith) item.sharedWith = [];
-      if (!item.sharedWith.includes(email)) {
-        item.sharedWith.push(email);
-        await dbPutSync('inventory', item);
-        count++;
-      }
-    }
-  }
-  toast('✓ Inventario compartido con ' + email + ' (' + count + ' registros)');
 }
 
 async function shareRecintosWithEmail() {
@@ -8799,35 +9037,6 @@ async function shareRecintosWithEmail() {
   await saveRecintos();
   toast('✓ Recintos compartidos con ' + email + ' (' + count + ' registros)');
 }
-async function removeInventory(id) {
-  const item = inventoryItems.find(x=>x.id===id);
-  const sp = SPECIES_DB.find(s=>s.id===item?.speciesId);
-  const ok = await confirmDelete('¿Eliminar del inventario?', `Se eliminará el registro de "${sp?.name||item?.speciesName||''}" en ${item?.institution||'institución desconocida'}.`);
-  if (!ok) return;
-  await dbDeleteSync('inventory', id);
-  inventoryItems = inventoryItems.filter(i=>i.id!==id);
-  renderInventoryList();
-  toast('Registro eliminado del inventario');
-}
-
-function openMultiDeleteInventory(inst) {
-  const items = inventoryItems.filter(i=>(i.institution||'General')===inst);
-  openMultiDelete({
-    title: 'Inventario — ' + inst,
-    items: items.map(item => {
-      const sp = SPECIES_DB.find(s=>s.id===item.speciesId);
-      const nombre = item.nombreComun || sp?.name || item.speciesName || 'Especie';
-      return { id: item.id, label: nombre, sub: `${item.machos||0}♂ · ${item.hembras||0}♀ ${item.notes?'· '+item.notes:''}` };
-    }),
-    onConfirm: async (ids) => {
-      const toDel = new Set(ids);
-      for (const id of ids) { try { await dbDeleteSync('inventory', id); } catch(e) {} }
-      inventoryItems = inventoryItems.filter(i => !toDel.has(i.id));
-      renderInventoryList();
-    }
-  });
-}
-
 // ═══════════════════════════════════
 // VADEMECUM SYNC + RENDER
 // ═══════════════════════════════════
