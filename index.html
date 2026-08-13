@@ -8542,24 +8542,28 @@ function hcMapsAdmin(gid) {
   const views = hcViewsForGroup(gid);
   const imgs = hcMapImagesForGroup(gid);
   document.getElementById('modal-hc-maps-form').innerHTML = `
-    <div style="font-size:.82rem;font-weight:600;margin-bottom:.4rem">${g.emoji||'🐾'} ${g.name}</div>
-    <p style="font-size:.72rem;color:var(--txt3);margin-bottom:.6rem">Sube una imagen por cada vista (PNG transparente recomendado, o JPG/WebP/SVG). Los marcadores se guardan en % sobre la imagen.</p>
+    <div style="font-size:.82rem;font-weight:600;margin-bottom:.4rem">${g.emoji||'🐾'} ${g.name} — mapas de lesiones</div>
+    <p style="font-size:.72rem;color:var(--txt3);margin-bottom:.6rem">Sube una imagen por vista (PNG transparente recomendado, o JPG/WebP/SVG). Los marcadores se guardan en % sobre la imagen.</p>
     ${views.map(v=>{
       const im = imgs[v.id];
       const isCustom = String(v.id).indexOf('cv_')===0;
-      return `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem 0;border-bottom:1px solid var(--bor)">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:.76rem;font-weight:600">${v.name} ${isCustom?'<span style="font-size:.62rem;color:var(--txt3)">(personalizada)</span>':''}</div>
-          ${im && im.url ? `<img src="${im.url}" style="max-width:120px;max-height:70px;border-radius:6px;border:1px solid var(--bor);margin-top:.25rem;display:block;background:#f8fafc">` : `<span style="font-size:.7rem;color:var(--txt3)">${isCustom?'Sin imagen — sube una para poder marcar lesiones aquí':'Sin imagen — se usa el dibujo predeterminado'}</span>`}
+      const thumb = im && im.url ? `<div style="position:relative;display:inline-block;margin-top:.3rem">
+          <img src="${im.url}" style="max-width:170px;max-height:105px;border-radius:8px;border:1px solid var(--bor);display:block;background:#f8fafc">
+          <button type="button" onclick="hcMapRemove('${gid}','${v.id}')" title="Eliminar esta imagen" style="position:absolute;top:-7px;left:-7px;width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:var(--r5);color:#fff;font-size:.7rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.3)">✕</button>
+        </div>`
+        : `<div style="margin-top:.3rem;padding:.5rem;border:1px dashed var(--bor);border-radius:8px;font-size:.7rem;color:var(--txt3)">${isCustom?'Sin imagen — sube una para poder marcar lesiones en esta vista':'Sin imagen — se usa el dibujo predeterminado'}</div>`;
+      return `<div style="padding:.5rem 0;border-bottom:1px solid var(--bor)">
+        <div style="font-size:.76rem;font-weight:600">${v.name} ${isCustom?'<span style="font-size:.62rem;color:var(--txt3)">(personalizada)</span>':''}</div>
+        ${thumb}
+        <div style="margin-top:.35rem;display:flex;gap:.4rem;flex-wrap:wrap">
+          <label class="btn btn-secondary btn-sm" style="font-size:.7rem;cursor:pointer;margin:0">📤 Agregar imagen<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none" onchange="hcMapUpload(this,'${gid}','${v.id}')"></label>
+          ${isCustom ? `<button type="button" class="btn btn-danger btn-sm" style="font-size:.7rem;margin:0" onclick="hcDelMapView('${gid}','${v.id}')" title="Eliminar esta vista y su imagen">🗑 Eliminar vista</button>` : ''}
         </div>
-        <label class="btn btn-secondary btn-sm" style="font-size:.7rem;cursor:pointer;flex-shrink:0">📤 Subir<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none" onchange="hcMapUpload(this,'${gid}','${v.id}')"></label>
-        ${im ? `<button class="btn btn-danger btn-sm" style="flex-shrink:0" onclick="hcMapRemove('${gid}','${v.id}')" title="Quitar imagen">✕</button>` : ''}
-        ${isCustom ? `<button class="btn btn-danger btn-sm" style="flex-shrink:0" onclick="hcDelMapView('${gid}','${v.id}')" title="Eliminar esta vista">🗑</button>` : ''}
       </div>`;
     }).join('')}
-    <div style="margin-top:.6rem;display:flex;gap:.5rem;align-items:center">
-      <button class="btn btn-secondary btn-sm" style="flex-shrink:0;font-size:.72rem" onclick="hcAddMapView('${gid}')">➕ Agregar vista</button>
-      <span style="font-size:.68rem;color:var(--txt3)">Añade vistas extra (ej: cabeza, cola, palma).</span>
+    <div style="margin-top:.7rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+      <button type="button" class="btn btn-primary btn-sm" style="flex-shrink:0;font-size:.74rem" onclick="hcAddMapView('${gid}')">➕ Agregar vista nueva</button>
+      <span style="font-size:.68rem;color:var(--txt3)">Añade vistas extra (ej: cabeza, cola, palma, ala) y sube su imagen.</span>
     </div>`;
   document.getElementById('modal-hc-maps').classList.add('open');
 }
