@@ -8666,6 +8666,185 @@ function hcApplySpecies() {
   }
 }
 
+// ═══════════════════════════════════
+// CAMBIO 9: formato numérico con coma (2,5) y sin decimales .00
+// ═══════════════════════════════════
+function parseNum(v) {
+  if (v===null || v===undefined) return NaN;
+  return parseFloat(String(v).replace(/,/g, '.'));
+}
+function fmtNum(v) {
+  if (v===null || v===undefined || v==='') return '';
+  const n = parseNum(v);
+  if (isNaN(n)) return String(v);
+  return n.toFixed(2).replace(/\.?0+$/,'').replace('.', ',');
+}
+function fmtInput(el) {
+  if (!el || el.value==='') return;
+  el.value = fmtNum(parseNum(el.value));
+}
+function toRoman(n) {
+  const m=[1000,900,500,400,100,90,50,40,10,9,5,4,1];
+  const s=['M','CM','D','CD','C','XC','L','XL','X','IX','V','IV','I'];
+  let out='', i=0;
+  n = Math.max(1, Math.floor(n));
+  while(n>0){ while(n>=m[i]){ out+=s[i]; n-=m[i]; } i++; }
+  return out;
+}
+// ═══════════════════════════════════
+// CAMBIO 8: unidades de concentración (numerador/denominador) con "+" persistente
+// ═══════════════════════════════════
+let HC_UNITS_EXTRA = { num:[], den:[] };
+try { const saved = JSON.parse(localStorage.getItem('hc_units_extra')||'null'); if (saved && saved.num && saved.den) HC_UNITS_EXTRA = saved; } catch(e) {}
+function hcSaveUnits() { try { localStorage.setItem('hc_units_extra', JSON.stringify(HC_UNITS_EXTRA)); } catch(e) {} }
+function hcUnitOpts(which, placeholder) {
+  const defs = which==='num' ? ['mg','µg','UI','g','mEq'] : ['ml','tab','cap','got','sachet'];
+  const extra = HC_UNITS_EXTRA[which] || [];
+  return `<option value="">${placeholder}</option>` + [...defs, ...extra].map(u=>`<option value="${u}">${u}</option>`).join('');
+}
+function hcRefreshUnits(which) {
+  document.querySelectorAll('.treat-conc-'+which).forEach(sel=>{
+    const keep = sel.value;
+    sel.innerHTML = hcUnitOpts(which, sel.dataset.ph || (which==='num'?'mg/µg/UI...':'ml/tab/cap...'));
+    sel.value = keep;
+  });
+}
+function hcAddUnit(btn, which) {
+  const u = (prompt(which==='num' ? 'Nueva unidad de numerador (ej: mEq, mmol):' : 'Nueva unidad de denominador (ej: sachet, ampolla):')||'').trim();
+  if (!u) return;
+  const list = HC_UNITS_EXTRA[which] || (HC_UNITS_EXTRA[which]=[]);
+  if (list.some(x=>x.toLowerCase()===u.toLowerCase())) { toast('⚠ Esa unidad ya existe'); return; }
+  list.push(u);
+  hcSaveUnits();
+  hcRefreshUnits(which);
+  toast('✓ Unidad '+u+' agregada');
+}
+function hcConcChanged(sel) {
+  const row = sel.closest('[id^=treat-row]');
+  if (!row) return;
+  const num = row.querySelector('.treat-conc-num')?.value || '';
+  const den = row.querySelector('.treat-conc-den')?.value || '';
+  const tu = row.querySelector('.treat-total-u');
+  if (tu) tu.value = den;
+  const du = row.querySelector('.treat-dosis-u');
+  if (du) du.textContent = num ? '('+num+'/kg)' : '';
+  calcTreatDose(sel);
+}
+// ═══════════════════════════════════
+// CAMBIO 8: fila de tratamiento rediseñada
+// ═══════════════════════════════════
+function hcTreatRowHtml(i) {
+  return `<div id="treat-row-${i}" style="background:var(--sur2);border-radius:var(--rsm);padding:.6rem;margin-bottom:.5rem;border:1px solid var(--bor)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+        <span style="font-size:.72rem;font-weight:600;color:var(--txt3);text-transform:uppercase">Medicamento ${i}</span>
+        <button type="button" class="icon-btn danger" style="width:22px;height:22px;font-size:.65rem" onclick="this.closest('[id^=treat-row]').remove()" title="Quitar medicamento">✕</button>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:.4rem"><label style="font-size:.72rem">Principio activo</label><input class="form-control treat-pa" placeholder="Ketamina..."></div>
+        <div class="form-group" style="margin-bottom:.4rem"><label style="font-size:.72rem">Nombre comercial</label><input class="form-control treat-nc" placeholder="Ketaset..."></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;margin-bottom:.4rem">
+        <div><label style="font-size:.72rem;color:var(--txt3)">Concentración</label><input class="form-control treat-conc" type="text" inputmode="decimal" placeholder="Ej: 100" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
+        <div><label style="font-size:.72rem;color:var(--txt3)">Unidad numerador</label><div style="display:flex;gap:.2rem"><select class="form-control treat-conc-num" style="flex:1;font-size:.82rem" data-ph="mg/µg/UI..." onchange="hcConcChanged(this)">${hcUnitOpts('num','mg/µg/UI...')}</select><button type="button" class="icon-btn" style="width:30px;height:34px;flex-shrink:0" onclick="hcAddUnit(this,'num')" title="Agregar unidad al numerador">+</button></div></div>
+        <div><label style="font-size:.72rem;color:var(--txt3)">Unidad denominador</label><div style="display:flex;gap:.2rem"><select class="form-control treat-conc-den" style="flex:1;font-size:.82rem" data-ph="ml/tab/cap..." onchange="hcConcChanged(this)">${hcUnitOpts('den','ml/tab/cap...')}</select><button type="button" class="icon-btn" style="width:30px;height:34px;flex-shrink:0" onclick="hcAddUnit(this,'den')" title="Agregar unidad al denominador">+</button></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.4rem">
+        <div><label style="font-size:.72rem;color:var(--txt3)">Dosis básica <span class="treat-dosis-u" style="color:var(--txt3);font-weight:400">(mg/kg)</span></label><input class="form-control treat-dosis" type="text" inputmode="decimal" placeholder="Ej: 2" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
+        <div><label style="font-size:.72rem;color:var(--txt3)">Peso (kg)</label><input class="form-control treat-peso" type="text" inputmode="decimal" placeholder="kg" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;margin-bottom:.4rem">
+        <div><label style="font-size:.72rem;color:var(--txt3)">Dosis total <span style="font-size:.62rem;color:var(--txt3)">(auto)</span></label><input class="form-control treat-total" type="text" inputmode="decimal" placeholder="auto" style="font-size:.82rem" oninput="fmtInput(this)" onblur="fmtInput(this)"></div>
+        <div><label style="font-size:.72rem;color:var(--txt3)">Unidad dosis total</label><input class="form-control treat-total-u" value="" readonly placeholder="ml/tab/cap..." style="font-size:.82rem;background:var(--sur)"></div>
+        <div><label style="font-size:.72rem;color:var(--txt3)">Vía</label>
+          <select class="form-control treat-via" style="font-size:.82rem">
+            <option value="">Vía</option><option>IM</option><option>IV</option><option>SC</option><option>VO</option><option>Tópico</option><option>IN</option><option>Inhalatorio</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.4rem">
+        <div><label style="font-size:.72rem;color:var(--txt3)">Frecuencia</label><input class="form-control treat-freq" placeholder="SID, BID, TID..." style="font-size:.82rem"></div>
+        <div><label style="font-size:.72rem;color:var(--txt3)">Duración (días)</label><input class="form-control treat-dur" type="text" inputmode="decimal" placeholder="7" style="font-size:.82rem" onblur="fmtInput(this)"></div>
+      </div>
+      <div><label style="font-size:.72rem;color:var(--txt3)">Notas</label><input class="form-control treat-notas" placeholder="Observaciones de administración..." style="font-size:.82rem"></div>
+    </div>`;
+}
+function calcTreatDose(input) {
+  const row = (input && input.closest) ? input.closest('[id^=treat-row]') : (input||null);
+  if (!row) return;
+  const dosis = parseNum(row.querySelector('.treat-dosis')?.value)||0;
+  const peso = parseNum(row.querySelector('.treat-peso')?.value)||0;
+  const conc = parseNum(row.querySelector('.treat-conc')?.value)||0;
+  const den = row.querySelector('.treat-conc-den')?.value || '';
+  if (dosis>0 && peso>0 && conc>0) {
+    const total = dosis*peso/conc;
+    const tot = row.querySelector('.treat-total');
+    if (tot) tot.value = fmtNum(total);
+    const tu = row.querySelector('.treat-total-u');
+    if (tu && den) tu.value = den;
+  }
+}
+// ═══════════════════════════════════
+// CAMBIO 7: lista maestra, DDx y presuntivo dinámicos
+// ═══════════════════════════════════
+function addMasterRow() {
+  masterCount++;
+  document.getElementById('extra-master').insertAdjacentHTML('beforeend',
+    `<div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
+      <span style="font-family:var(--mono);font-size:.8rem;color:var(--g6);min-width:28px">${toRoman(masterCount)}.</span>
+      <input class="form-control" id="master-${masterCount}" placeholder="N.° problemas agrupados (ej: 1,2,3)">
+      <button type="button" class="icon-btn danger btn-sm" style="width:28px;height:28px" onclick="this.parentElement.remove()">✕</button>
+    </div>`);
+}
+function addDdxRow() {
+  ddxCount++;
+  document.getElementById('extra-ddx').insertAdjacentHTML('beforeend',
+    `<div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
+      <span style="font-family:var(--mono);font-size:.8rem;color:var(--g6);min-width:28px">${toRoman(ddxCount)}.</span>
+      <input class="form-control" id="ddx-${ddxCount}" placeholder="Diagnósticos compatibles con grupo ${toRoman(ddxCount)}...">
+      <button type="button" class="icon-btn danger btn-sm" style="width:28px;height:28px" onclick="this.parentElement.remove()">✕</button>
+    </div>`);
+}
+function addPresuntivoRow() {
+  presCount++;
+  document.getElementById('extra-presuntivo').insertAdjacentHTML('beforeend',
+    `<div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
+      <span style="font-family:var(--mono);font-size:.8rem;color:var(--txt3);min-width:16px">${presCount}.</span>
+      <textarea class="form-control" id="pres-${presCount}" placeholder="Diagnóstico ${presCount}..."></textarea>
+      <button type="button" class="icon-btn danger btn-sm" style="width:28px;height:28px" onclick="this.parentElement.remove()">✕</button>
+    </div>`);
+}
+// Compatibilidad con datos antiguos (master/ddx como objeto {I,II,III}, presuntivo texto)
+function hcMasterEntries(r) {
+  if (Array.isArray(r.master)) return r.master.filter(x=>x && x.text);
+  return Object.entries(r.master||{}).map(([n,text])=>({n,text})).filter(x=>x.text);
+}
+function hcDdxEntries(r) {
+  if (Array.isArray(r.ddx)) return r.ddx.filter(x=>x && x.text);
+  return Object.entries(r.ddx||{}).map(([n,text])=>({n,text})).filter(x=>x.text);
+}
+function hcPresuntivos(r) {
+  if (Array.isArray(r.presuntivo)) return r.presuntivo.filter(x=>x && String(x).trim());
+  return r.presuntivo ? [r.presuntivo] : [];
+}
+function treatDesc(t) {
+  const arr = [];
+  if (t.conc_num) {
+    arr.push(['Concentración', `${fmtNum(t.conc)} ${t.conc_num}/${t.conc_den}`]);
+    if (t.dosis) arr.push(['Dosis básica', `${fmtNum(t.dosis)} ${t.conc_num}/kg`]);
+    if (t.total) arr.push(['Dosis total', `${fmtNum(t.total)} ${t.total_u||t.conc_den||''}`]);
+  } else {
+    if (t.conc) arr.push(['Concentración', t.conc]);
+    if (t.dosis) arr.push(['Dosis', `${fmtNum(t.dosis)} mg/kg`]);
+    if (t.total) arr.push(['Total', `${fmtNum(t.total)} mg`]);
+    if (t.vol) arr.push(['Vol', fmtNum(t.vol)]);
+  }
+  if (t.peso) arr.push(['Peso', `${fmtNum(t.peso)} kg`]);
+  if (t.via) arr.push(['Vía', t.via]);
+  if (t.freq) arr.push(['Frecuencia', t.freq]);
+  if (t.dur) arr.push(['Duración', `${fmtNum(t.dur)} días`]);
+  if (t.notas) arr.push(['Notas', t.notas]);
+  return arr;
+}
 function openNewRecord() {
   const hcSpecies = hcSpeciesOptions();
   const speciesDl = hcSpecies.map(o=>`<option value="${o.nombre.replace(/"/g,'&quot;')}">`).join('');
@@ -8772,24 +8951,41 @@ function openNewRecord() {
   <div class="form-group">
     <label>Lista maestra <span style="font-size:.72rem;color:var(--txt3)">(numeración romana — agrupación de problemas)</span></label>
     <div id="master-list">
-      ${['I','II','III'].map(r=>`
+      ${[1,2,3].map(i=>`
       <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
-        <span style="font-family:var(--mono);font-size:.8rem;color:var(--g6);min-width:28px">${r}.</span>
-        <input class="form-control" id="master-${r}" placeholder="N.° problemas agrupados (ej: 1,2,3)">
+        <span style="font-family:var(--mono);font-size:.8rem;color:var(--g6);min-width:28px">${toRoman(i)}.</span>
+        <input class="form-control" id="master-${i}" placeholder="N.° problemas agrupados (ej: 1,2,3)">
+        <button type="button" class="icon-btn danger btn-sm" style="width:28px;height:28px" onclick="this.parentElement.remove()">✕</button>
       </div>`).join('')}
     </div>
+    <div id="extra-master"></div>
+    <button type="button" class="btn btn-secondary btn-sm" style="margin-top:.3rem" onclick="addMasterRow()">+ Agregar grupo</button>
   </div>
   <div class="form-group">
     <label>Diagnósticos diferenciales <span style="font-size:.72rem;color:var(--txt3)">(por lista maestra)</span></label>
     <div id="diffdx-list">
-      ${['I','II','III'].map(r=>`
+      ${[1,2,3].map(i=>`
       <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
-        <span style="font-family:var(--mono);font-size:.8rem;color:var(--g6);min-width:28px">${r}.</span>
-        <input class="form-control" id="ddx-${r}" placeholder="Diagnósticos compatibles con grupo ${r}...">
+        <span style="font-family:var(--mono);font-size:.8rem;color:var(--g6);min-width:28px">${toRoman(i)}.</span>
+        <input class="form-control" id="ddx-${i}" placeholder="Diagnósticos compatibles con grupo ${toRoman(i)}...">
+        <button type="button" class="icon-btn danger btn-sm" style="width:28px;height:28px" onclick="this.parentElement.remove()">✕</button>
       </div>`).join('')}
     </div>
+    <div id="extra-ddx"></div>
+    <button type="button" class="btn btn-secondary btn-sm" style="margin-top:.3rem" onclick="addDdxRow()">+ Agregar diagnóstico</button>
   </div>
-  <div class="form-group"><label>Diagnóstico presuntivo</label><textarea id="rec-presuntivo" class="form-control" placeholder="Diagnóstico más probable basado en los hallazgos..."></textarea></div>
+  <div class="form-group">
+    <label>Diagnóstico(s) presuntivo(s)</label>
+    <div id="presuntivo-list">
+      <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
+        <span style="font-family:var(--mono);font-size:.8rem;color:var(--txt3);min-width:16px">1.</span>
+        <textarea class="form-control" id="pres-1" placeholder="Diagnóstico 1..."></textarea>
+        <button type="button" class="icon-btn danger btn-sm" style="width:28px;height:28px" onclick="this.parentElement.remove()">✕</button>
+      </div>
+    </div>
+    <div id="extra-presuntivo"></div>
+    <button type="button" class="btn btn-secondary btn-sm" style="margin-top:.3rem" onclick="addPresuntivoRow()">+ Agregar diagnóstico presuntivo</button>
+  </div>
 
   <div class="form-section-title">Exámenes complementarios</div>
   <div id="exams-list">
@@ -8804,33 +9000,7 @@ function openNewRecord() {
   <div class="form-group"><label>Diagnóstico definitivo</label><textarea id="rec-definitivo" class="form-control" placeholder="Diagnóstico final confirmado..."></textarea></div>
 
   <div class="form-section-title">Tratamiento</div>
-  <div id="treatment-list">
-    <div id="treat-row-0" style="background:var(--sur2);border-radius:var(--rsm);padding:.6rem;margin-bottom:.5rem;border:1px solid var(--bor)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
-        <span style="font-size:.72rem;font-weight:600;color:var(--txt3);text-transform:uppercase">Medicamento 1</span>
-        <button class="icon-btn danger" style="width:22px;height:22px;font-size:.65rem" onclick="this.closest('[id^=treat-row]').remove()">✕</button>
-      </div>
-      <div class="form-row">
-        <div class="form-group" style="margin-bottom:.4rem"><label style="font-size:.72rem">Principio activo</label><input class="form-control treat-pa" placeholder="Ketamina..."></div>
-        <div class="form-group" style="margin-bottom:.4rem"><label style="font-size:.72rem">Nombre comercial</label><input class="form-control treat-nc" placeholder="Ketaset..."></div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.3rem;margin-bottom:.4rem">
-        <div><label style="font-size:.72rem;color:var(--txt3)">Concentración</label><input class="form-control treat-conc" placeholder="mg/ml, mg/tab..." style="font-size:.82rem"></div>
-        <div><label style="font-size:.72rem;color:var(--txt3)">Dosis (mg/kg)</label><input class="form-control treat-dosis" type="number" step="0.001" placeholder="2.0" style="font-size:.82rem" oninput="calcTreatDose(this)"></div>
-        <div><label style="font-size:.72rem;color:var(--txt3)">Peso (kg)</label><input class="form-control treat-peso" type="number" step="0.001" placeholder="kg" style="font-size:.82rem" oninput="calcTreatDose(this)"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.3rem;margin-bottom:.4rem">
-        <div><label style="font-size:.72rem;color:var(--txt3)">Dosis total (mg)</label><input class="form-control treat-total" placeholder="auto" readonly style="background:var(--g0);font-family:var(--mono);font-size:.82rem;color:var(--g6)"></div>
-        <div><label style="font-size:.72rem;color:var(--txt3)">Vol/tab/cáp</label><input class="form-control treat-vol" type="number" step="0.01" placeholder="auto" readonly style="background:var(--g0);font-family:var(--mono);font-size:.82rem;color:var(--g6)"></div>
-        <div><label style="font-size:.72rem;color:var(--txt3)">Vía</label>
-          <select class="form-control treat-via" style="font-size:.82rem">
-            <option value="">Vía</option><option>IM</option><option>IV</option><option>SC</option><option>VO</option><option>Tópico</option><option>IN</option><option>Inhalatorio</option>
-          </select>
-        </div>
-      </div>
-      <div><label style="font-size:.72rem;color:var(--txt3)">Frecuencia</label><input class="form-control treat-freq" placeholder="SID, BID, TID x 7 días..."></div>
-    </div>
-  </div>
+  <div id="treatment-list">${hcTreatRowHtml(1)}</div>
   <button class="btn btn-secondary btn-block btn-sm" onclick="addTreatmentRow()">+ Agregar medicamento</button>
 
   <div class="form-section-title">Planes</div>
@@ -8853,7 +9023,7 @@ function openNewRecord() {
   document.getElementById('modal-record').classList.add('open');
 }
 
-let problemCount = 3, examCount = 1, treatCount = 1;
+let problemCount = 3, examCount = 1, treatCount = 1, masterCount = 3, ddxCount = 3, presCount = 1;
 function addProblemRow() {
   problemCount++;
   document.getElementById('extra-problems').insertAdjacentHTML('beforeend',
@@ -8878,48 +9048,12 @@ function addTreatmentRow() {
   treatCount++;
   const i = treatCount;
   const el = document.createElement('div');
-  el.id = 'treat-row-'+i;
-  el.style.cssText = 'background:var(--sur2);border-radius:var(--rsm);padding:.6rem;margin-bottom:.5rem;border:1px solid var(--bor)';
-  el.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
-      <span style="font-size:.72rem;font-weight:600;color:var(--txt3);text-transform:uppercase">Medicamento ${i}</span>
-      <button class="icon-btn danger" style="width:22px;height:22px;font-size:.65rem" onclick="this.closest('[id^=treat-row]').remove()">✕</button>
-    </div>
-    <div class="form-row">
-      <div class="form-group" style="margin-bottom:.4rem"><label style="font-size:.72rem">Principio activo</label><input class="form-control treat-pa" placeholder="Fármaco..."></div>
-      <div class="form-group" style="margin-bottom:.4rem"><label style="font-size:.72rem">Nombre comercial</label><input class="form-control treat-nc" placeholder="Nombre comercial..."></div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.3rem;margin-bottom:.4rem">
-      <div><label style="font-size:.72rem;color:var(--txt3)">Concentración</label><input class="form-control treat-conc" placeholder="mg/ml..." style="font-size:.82rem"></div>
-      <div><label style="font-size:.72rem;color:var(--txt3)">Dosis (mg/kg)</label><input class="form-control treat-dosis" type="number" step="0.001" placeholder="2.0" style="font-size:.82rem" oninput="calcTreatDose(this)"></div>
-      <div><label style="font-size:.72rem;color:var(--txt3)">Peso (kg)</label><input class="form-control treat-peso" type="number" step="0.001" placeholder="kg" style="font-size:.82rem" oninput="calcTreatDose(this)"></div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.3rem;margin-bottom:.4rem">
-      <div><label style="font-size:.72rem;color:var(--txt3)">Dosis total (mg)</label><input class="form-control treat-total" placeholder="auto" readonly style="background:var(--g0);font-family:var(--mono);font-size:.82rem;color:var(--g6)"></div>
-      <div><label style="font-size:.72rem;color:var(--txt3)">Vol/tab/cáp</label><input class="form-control treat-vol" type="number" step="0.01" placeholder="auto" readonly style="background:var(--g0);font-family:var(--mono);font-size:.82rem;color:var(--g6)"></div>
-      <div><label style="font-size:.72rem;color:var(--txt3)">Vía</label>
-        <select class="form-control treat-via" style="font-size:.82rem">
-          <option>IM</option><option>IV</option><option>SC</option><option>VO</option><option>Tópico</option><option>IN</option>
-        </select>
-      </div>
-    </div>
-    <div><label style="font-size:.72rem;color:var(--txt3)">Frecuencia</label><input class="form-control treat-freq" placeholder="SID, BID x 7 días..."></div>`;
-  document.getElementById('treatment-list').appendChild(el);
+  el.innerHTML = hcTreatRowHtml(i);
+  const row = el.firstElementChild;
+  document.getElementById('treatment-list').appendChild(row);
   // Auto-llenar peso
   const peso = document.getElementById('rec-weight')?.value;
-  if (peso) el.querySelector('.treat-peso').value = peso;
-}
-function calcTreatDose(input) {
-  const row = input.closest('[id^=treat-row]');
-  if (!row) return;
-  const dosis = parseFloat(row.querySelector('.treat-dosis')?.value)||0;
-  const peso = parseFloat(row.querySelector('.treat-peso')?.value)||0;
-  const conc = parseFloat(row.querySelector('.treat-conc')?.value)||0;
-  const total = dosis * peso;
-  if (total > 0) {
-    row.querySelector('.treat-total').value = total.toFixed(3);
-    if (conc > 0) row.querySelector('.treat-vol').value = (total/conc).toFixed(3);
-  }
+  if (peso) row.querySelector('.treat-peso').value = peso;
 }
 
 async function saveRecord() {
@@ -8947,6 +9081,23 @@ async function saveRecord() {
     if (v) problems.push({n:i,text:v});
   }
 
+  // Recopilar lista maestra, DDx y presuntivos (cambio 7)
+  const master = [];
+  for (let i=1;i<=masterCount;i++) {
+    const v = document.getElementById('master-'+i)?.value.trim();
+    if (v) master.push({ n: toRoman(i), text: v });
+  }
+  const ddx = [];
+  for (let i=1;i<=ddxCount;i++) {
+    const v = document.getElementById('ddx-'+i)?.value.trim();
+    if (v) ddx.push({ n: toRoman(i), text: v });
+  }
+  const presuntivo = [];
+  document.querySelectorAll('[id^="pres-"]').forEach(el=>{
+    const v = (el.value||'').trim();
+    if (v) presuntivo.push(v);
+  });
+
   // Recopilar exámenes
   const exams = [];
   document.querySelectorAll('[id^="exam-row-"]').forEach(row=>{
@@ -8957,18 +9108,24 @@ async function saveRecord() {
     if (t) exams.push({fecha:f,tipo:t,resultado:r});
   });
 
-  // Recopilar tratamientos
+  // Recopilar tratamientos (cambio 8)
   const treatments = [];
   document.querySelectorAll('[id^="treat-row-"]').forEach(row=>{
     const pa = row.querySelector('.treat-pa')?.value.trim();
     if (pa) treatments.push({
-      pa, nc: row.querySelector('.treat-nc')?.value,
+      pa,
+      nc: row.querySelector('.treat-nc')?.value,
       conc: row.querySelector('.treat-conc')?.value,
+      conc_num: row.querySelector('.treat-conc-num')?.value,
+      conc_den: row.querySelector('.treat-conc-den')?.value,
       dosis: row.querySelector('.treat-dosis')?.value,
+      peso: row.querySelector('.treat-peso')?.value,
       total: row.querySelector('.treat-total')?.value,
-      vol: row.querySelector('.treat-vol')?.value,
+      total_u: row.querySelector('.treat-total-u')?.value,
       via: row.querySelector('.treat-via')?.value,
-      freq: row.querySelector('.treat-freq')?.value
+      freq: row.querySelector('.treat-freq')?.value,
+      dur: row.querySelector('.treat-dur')?.value,
+      notas: row.querySelector('.treat-notas')?.value
     });
   });
 
@@ -9010,9 +9167,7 @@ async function saveRecord() {
       deshid: document.getElementById('rec-deshid')?.value
     },
     sistemas, problems,
-    master: { I: document.getElementById('master-I')?.value, II: document.getElementById('master-II')?.value, III: document.getElementById('master-III')?.value },
-    ddx: { I: document.getElementById('ddx-I')?.value, II: document.getElementById('ddx-II')?.value, III: document.getElementById('ddx-III')?.value },
-    presuntivo: document.getElementById('rec-presuntivo')?.value,
+    master, ddx, presuntivo,
     exams, definitivo: document.getElementById('rec-definitivo')?.value,
     treatments, plan: document.getElementById('rec-plan')?.value,
     customFields, date: new Date().toISOString(), userId: currentUser.uid,
@@ -9022,7 +9177,7 @@ async function saveRecord() {
   };
   await dbPutSync('records', record);
   clinicalRecords.unshift(record);
-  problemCount = 3; examCount = 1; treatCount = 1;
+  problemCount = 3; examCount = 1; treatCount = 1; masterCount = 3; ddxCount = 3; presCount = 1;
   closeModal('modal-record');
   renderRecordsList();
   toast('✓ Historia clínica '+record.hc_num+' guardada');
@@ -9099,16 +9254,23 @@ function openRecord(id) {
       ${r.problems.map(p=>`<div class="info-row"><span class="info-label">${p.n}.</span><span class="info-value">${p.text}</span></div>`).join('')}
     </div>`:''}
 
-    ${(r.master?.I||r.master?.II||r.master?.III)?`
+    ${hcMasterEntries(r).length || hcDdxEntries(r).length ? `
     <div class="info-card"><div class="info-card-title">Lista maestra & Diagnósticos diferenciales</div>
-      ${['I','II','III'].filter(k=>r.master?.[k]).map(k=>`
+      ${[...new Set([...hcMasterEntries(r).map(m=>m.n), ...hcDdxEntries(r).map(d=>d.n)])].map(k=>{
+        const m = hcMasterEntries(r).find(x=>x.n===k);
+        const d = hcDdxEntries(r).find(x=>x.n===k);
+        return `
         <div style="padding:.4rem 0;border-bottom:1px solid var(--bor)">
-          <div style="font-size:.75rem;font-weight:600;color:var(--g6)">Grupo ${k}: Problemas ${r.master[k]}</div>
-          ${r.ddx?.[k]?`<div style="font-size:.82rem;color:var(--txt2);margin-top:.2rem">DDx: ${r.ddx[k]}</div>`:''}
-        </div>`).join('')}
+          <div style="font-size:.75rem;font-weight:600;color:var(--g6)">${k}. ${m?m.text:'—'}</div>
+          ${d?`<div style="font-size:.82rem;color:var(--txt2);margin-top:.2rem">DDx: ${d.text}</div>`:''}
+        </div>`;
+      }).join('')}
     </div>`:''}
 
-    ${r.presuntivo?`<div class="info-card"><div class="info-card-title">Diagnóstico presuntivo</div><p class="text-sm">${r.presuntivo}</p></div>`:''}
+    ${hcPresuntivos(r).length ? `
+    <div class="info-card"><div class="info-card-title">Diagnóstico(s) presuntivo(s)</div>
+      ${hcPresuntivos(r).map((p,i)=>`<div class="info-row"><span class="info-label">${i+1}.</span><span class="info-value">${p}</span></div>`).join('')}
+    </div>`:''}
 
     ${r.exams?.length?`
     <div class="info-card"><div class="info-card-title">Exámenes complementarios</div>
@@ -9125,13 +9287,8 @@ function openRecord(id) {
       ${r.treatments.map((t,i)=>`
         <div style="padding:.5rem 0;border-bottom:1px solid var(--bor)">
           <div style="font-weight:600;font-size:.85rem;margin-bottom:.25rem">${i+1}. ${t.pa} ${t.nc?'('+t.nc+')':''}</div>
-          <div style="font-size:.78rem;color:var(--txt2);display:flex;gap:.5rem;flex-wrap:wrap">
-            ${t.conc?`<span>Conc: ${t.conc}</span>`:''}
-            ${t.dosis?`<span>Dosis: ${t.dosis} mg/kg</span>`:''}
-            ${t.total?`<span style="color:var(--g6);font-family:var(--mono)">Total: ${t.total} mg</span>`:''}
-            ${t.vol?`<span style="color:var(--g6);font-family:var(--mono)">Vol: ${t.vol}</span>`:''}
-            ${t.via?`<span>Vía: ${t.via}</span>`:''}
-            ${t.freq?`<span>${t.freq}</span>`:''}
+          <div style="font-size:.78rem;color:var(--txt2)">
+            ${treatDesc(t).map(([l,v])=>`<div class="info-row" style="padding:.12rem 0"><span class="info-label">${l}</span><span class="info-value">${v}</span></div>`).join('')}
           </div>
         </div>`).join('')}
     </div>`:''}
@@ -9191,6 +9348,12 @@ function exportRecordPDF(id) {
   ${r.plan?`<h2>Plan / Tratamiento</h2><p>${r.plan}</p>`:''}
   ${r.sistemas&&Object.keys(r.sistemas).length?`<h2>Revisión por sistemas</h2><table style="width:100%;border-collapse:collapse">${Object.entries(r.sistemas).map(([k,v])=>`<tr><td style="padding:4px;border-bottom:1px solid #eee;font-weight:bold;width:200px">${v.label||SYS_NAMES[k]||k}</td><td style="padding:4px;border-bottom:1px solid #eee">${v.status||''} ${v.nota||''}</td></tr>`).join('')}</table>`:''}
   ${r.lesiones?.length?`<h2>Mapa de lesiones</h2>${hcLesionMapPdfHtml(r.lesiones, r.grupo)}`:''}
+  ${r.problems?.length?`<h2>Lista de problemas</h2>${r.problems.map(p=>`<p style="margin:2px 0">${p.n}. ${p.text}</p>`).join('')}`:''}
+  ${hcMasterEntries(r).length||hcDdxEntries(r).length?`<h2>Lista maestra & Diagnósticos diferenciales</h2>${[...new Set([...hcMasterEntries(r).map(m=>m.n),...hcDdxEntries(r).map(d=>d.n)])].map(k=>{const m=hcMasterEntries(r).find(x=>x.n===k);const d=hcDdxEntries(r).find(x=>x.n===k);return `<p style="margin:2px 0"><strong>${k}.</strong> ${m?m.text:'—'}${d?`<br><em>DDx:</em> ${d.text}`:''}</p>`;}).join('')}`:''}
+  ${hcPresuntivos(r).length?`<h2>Diagnóstico(s) presuntivo(s)</h2>${hcPresuntivos(r).map((p,i)=>`<p style="margin:2px 0">${i+1}. ${p}</p>`).join('')}`:''}
+  ${r.exams?.length?`<h2>Exámenes complementarios</h2>${r.exams.map(e=>`<p style="margin:2px 0"><strong>${e.fecha||''}</strong> ${e.tipo} — ${e.resultado||''}</p>`).join('')}`:''}
+  ${r.definitivo?`<h2>Diagnóstico definitivo</h2><p>${r.definitivo}</p>`:''}
+  ${r.treatments?.length?`<h2>Tratamiento</h2>${r.treatments.map((t,i)=>`<p style="margin:6px 0"><strong>${i+1}. ${t.pa}</strong>${t.nc?' ('+t.nc+')':''}<br>${treatDesc(t).map(([l,v])=>`${l}: ${v}`).join(' · ')}</p>`).join('')}`:''}
   ${r.customFields?.map(f=>`<h2>${f.label}</h2><p>${f.value}</p>`).join('')||''}
   <hr><p style="font-size:11px;color:#888">WildVet — Plataforma clínica para fauna silvestre</p>
   <script>window.print();<\/script></body></html>`);
