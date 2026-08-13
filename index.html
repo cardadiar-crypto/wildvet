@@ -8753,8 +8753,8 @@ function hcTreatRowHtml(i) {
         <div><label style="font-size:.72rem;color:var(--txt3)">Peso (kg)</label><input class="form-control treat-peso" type="text" inputmode="decimal" placeholder="kg" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;margin-bottom:.4rem">
-        <div><label style="font-size:.72rem;color:var(--txt3)">Dosis total <span style="font-size:.62rem;color:var(--txt3)">(auto)</span></label><input class="form-control treat-total" type="text" inputmode="decimal" placeholder="auto" style="font-size:.82rem" oninput="fmtInput(this)" onblur="fmtInput(this)"></div>
-        <div><label style="font-size:.72rem;color:var(--txt3)">Unidad dosis total</label><input class="form-control treat-total-u" value="" readonly placeholder="ml/tab/cap..." style="font-size:.82rem;background:var(--sur)"></div>
+        <div><label style="font-size:.72rem;color:var(--txt3)">Dosis práctica <span style="font-size:.62rem;color:var(--txt3)">(editable)</span></label><input class="form-control treat-total" type="text" inputmode="decimal" placeholder="auto / manual" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
+        <div><label style="font-size:.72rem;color:var(--txt3)">Unidad dosis práctica</label><input class="form-control treat-total-u" value="" readonly placeholder="ml/tab/cap..." style="font-size:.82rem;background:var(--sur)"></div>
         <div><label style="font-size:.72rem;color:var(--txt3)">Vía</label>
           <select class="form-control treat-via" style="font-size:.82rem">
             <option value="">Vía</option><option>IM</option><option>IV</option><option>SC</option><option>VO</option><option>Tópico</option><option>IN</option><option>Inhalatorio</option>
@@ -8771,16 +8771,31 @@ function hcTreatRowHtml(i) {
 function calcTreatDose(input) {
   const row = (input && input.closest) ? input.closest('[id^=treat-row]') : (input||null);
   if (!row) return;
-  const dosis = parseNum(row.querySelector('.treat-dosis')?.value)||0;
-  const peso = parseNum(row.querySelector('.treat-peso')?.value)||0;
-  const conc = parseNum(row.querySelector('.treat-conc')?.value)||0;
-  const den = row.querySelector('.treat-conc-den')?.value || '';
-  if (dosis>0 && peso>0 && conc>0) {
-    const total = dosis*peso/conc;
-    const tot = row.querySelector('.treat-total');
-    if (tot) tot.value = fmtNum(total);
-    const tu = row.querySelector('.treat-total-u');
-    if (tu && den) tu.value = den;
+  const elDosis = row.querySelector('.treat-dosis');
+  const elPeso = row.querySelector('.treat-peso');
+  const elConc = row.querySelector('.treat-conc');
+  const elTotal = row.querySelector('.treat-total');
+  const elNum = row.querySelector('.treat-conc-num');
+  const elDen = row.querySelector('.treat-conc-den');
+  if (!elDosis || !elPeso || !elConc || !elTotal) return;
+  if (input === elTotal) row.dataset.last = 'total';
+  else if (input === elDosis) row.dataset.last = 'dosis';
+  const peso = parseNum(elPeso.value)||0;
+  const conc = parseNum(elConc.value)||0;
+  const den = elDen?.value || '';
+  const num = elNum?.value || '';
+  const tu = row.querySelector('.treat-total-u');
+  if (tu && den) tu.value = den;
+  const du = row.querySelector('.treat-dosis-u');
+  if (du) du.textContent = num ? '('+num+'/kg)' : '';
+  if (row.dataset.last === 'total') {
+    const total = parseNum(elTotal.value)||0;
+    if (total>0 && peso>0 && conc>0) { elDosis.value = fmtNum(total*conc/peso); row.dataset.calc = 'manual'; }
+    else elDosis.value = '';
+  } else {
+    const dosis = parseNum(elDosis.value)||0;
+    if (dosis>0 && peso>0 && conc>0) { elTotal.value = fmtNum(dosis*peso/conc); row.dataset.calc = 'calc'; }
+    else elTotal.value = '';
   }
 }
 // ═══════════════════════════════════
@@ -8831,11 +8846,11 @@ function treatDesc(t) {
   if (t.conc_num) {
     arr.push(['Concentración', `${fmtNum(t.conc)} ${t.conc_num}/${t.conc_den}`]);
     if (t.dosis) arr.push(['Dosis básica', `${fmtNum(t.dosis)} ${t.conc_num}/kg`]);
-    if (t.total) arr.push(['Dosis total', `${fmtNum(t.total)} ${t.total_u||t.conc_den||''}`]);
+    if (t.total) arr.push(['Dosis práctica', `${fmtNum(t.total)} ${t.total_u||t.conc_den||''}`]);
   } else {
     if (t.conc) arr.push(['Concentración', t.conc]);
     if (t.dosis) arr.push(['Dosis', `${fmtNum(t.dosis)} mg/kg`]);
-    if (t.total) arr.push(['Total', `${fmtNum(t.total)} mg`]);
+    if (t.total) arr.push(['Dosis práctica', `${fmtNum(t.total)} ${t.total_u||'mg'}`]);
     if (t.vol) arr.push(['Vol', fmtNum(t.vol)]);
   }
   if (t.peso) arr.push(['Peso', `${fmtNum(t.peso)} kg`]);
@@ -8843,7 +8858,51 @@ function treatDesc(t) {
   if (t.freq) arr.push(['Frecuencia', t.freq]);
   if (t.dur) arr.push(['Duración', `${fmtNum(t.dur)} días`]);
   if (t.notas) arr.push(['Notas', t.notas]);
+  if (t.calc) arr.push(['Cálculo', t.calc==='manual'?'manual':'calculada']);
   return arr;
+}
+// ═══════════════════════════════════
+// CAMBIO 11: planes múltiples (título + texto + estado) y CAMBIO 12: notas/observaciones
+// ═══════════════════════════════════
+function planRowHtml(i) {
+  return `<div id="plan-row-${i}" style="background:var(--sur2);border-radius:var(--rsm);padding:.6rem;margin-bottom:.5rem;border:1px solid var(--bor)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+      <span style="font-size:.72rem;font-weight:600;color:var(--txt3);text-transform:uppercase">Plan ${i}</span>
+      <button type="button" class="icon-btn danger" style="width:22px;height:22px;font-size:.65rem" onclick="this.closest('[id^=plan-row]').remove()" title="Quitar plan">✕</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="margin-bottom:.4rem"><label style="font-size:.72rem">Título</label><input class="form-control plan-titulo" placeholder="Ej: Plan farmacológico, Seguimiento..."></div>
+      <div class="form-group" style="margin-bottom:.4rem"><label style="font-size:.72rem">Estado</label>
+        <select class="form-control plan-estado">
+          <option value="pendiente">Pendiente</option><option value="en curso">En curso</option><option value="cumplido">Cumplido</option>
+        </select>
+      </div>
+    </div>
+    <div><label style="font-size:.72rem;color:var(--txt3)">Descripción</label><textarea class="form-control plan-texto" style="min-height:80px" placeholder="Detalle del plan, objetivos, instrucciones..."></textarea></div>
+  </div>`;
+}
+function addPlanRow() {
+  planCount++;
+  document.getElementById('plans-list').insertAdjacentHTML('beforeend', planRowHtml(planCount));
+}
+// Compatibilidad: r.plans (array) o r.plan (texto antiguo)
+function hcPlans(r) {
+  if (Array.isArray(r.plans) && r.plans.length) return r.plans;
+  if (r.plan && String(r.plan).trim()) return [{titulo:'', texto:r.plan, estado:''}];
+  return [];
+}
+function hcPlanBadge(e) {
+  const s = (e||'').toLowerCase();
+  if (s.includes('cumpl')) return 'background:#dcfce7;color:#166534';
+  if (s.includes('en curso')) return 'background:#dbeafe;color:#1e40af';
+  return 'background:#fef3c7;color:#92400e';
+}
+// Notas u observaciones (nuevo) + campos personalizados antiguos
+function hcNotas(r) {
+  const parts = [];
+  if (r.notas && String(r.notas).trim()) parts.push(r.notas);
+  if (r.customFields?.length) parts.push(r.customFields.map(f=>f.label ? f.label+': '+(f.value||'') : (f.value||'')).join('\n'));
+  return parts.join('\n\n').trim();
 }
 function openNewRecord() {
   const hcSpecies = hcSpeciesOptions();
@@ -9004,10 +9063,11 @@ function openNewRecord() {
   <button class="btn btn-secondary btn-block btn-sm" onclick="addTreatmentRow()">+ Agregar medicamento</button>
 
   <div class="form-section-title">Planes</div>
-  <div class="form-group"><label>Plan terapéutico / Seguimiento</label><textarea id="rec-plan" class="form-control" style="min-height:100px" placeholder="Plan de monitoreo, próxima cita, instrucciones de manejo, objetivos de tratamiento..."></textarea></div>
+  <div id="plans-list">${planRowHtml(1)}</div>
+  <button type="button" class="btn btn-secondary btn-sm" style="margin-bottom:.75rem" onclick="addPlanRow()">+ Agregar plan</button>
 
-  <div id="custom-fields"></div>
-  <button class="btn btn-secondary btn-sm" style="margin-bottom:.75rem;width:100%" onclick="addCustomField()">+ Campo personalizado</button>
+  <div class="form-section-title">Notas u observaciones</div>
+  <div class="form-group"><textarea id="rec-notas" class="form-control" style="min-height:110px" placeholder="Notas adicionales, observaciones generales, sugerencias de manejo..."></textarea></div>
 
   <div style="display:flex;gap:.5rem;margin-top:.5rem">
     <button class="btn btn-secondary" onclick="closeModal('modal-record')">Cancelar</button>
@@ -9023,7 +9083,7 @@ function openNewRecord() {
   document.getElementById('modal-record').classList.add('open');
 }
 
-let problemCount = 3, examCount = 1, treatCount = 1, masterCount = 3, ddxCount = 3, presCount = 1;
+let problemCount = 3, examCount = 1, treatCount = 1, masterCount = 3, ddxCount = 3, presCount = 1, planCount = 1;
 function addProblemRow() {
   problemCount++;
   document.getElementById('extra-problems').insertAdjacentHTML('beforeend',
@@ -9125,16 +9185,17 @@ async function saveRecord() {
       via: row.querySelector('.treat-via')?.value,
       freq: row.querySelector('.treat-freq')?.value,
       dur: row.querySelector('.treat-dur')?.value,
-      notas: row.querySelector('.treat-notas')?.value
+      notas: row.querySelector('.treat-notas')?.value,
+      calc: row.dataset.calc || 'calc'
     });
   });
 
-  // Campos personalizados
-  const customFields = [];
-  document.querySelectorAll('#custom-fields > div').forEach(div=>{
-    const l = div.querySelector('[id$="_l"]')?.value;
-    const v = div.querySelector('[id$="_v"]')?.value;
-    if (l) customFields.push({label:l,value:v});
+  // Planes (cambio 11)
+  const plans = [];
+  document.querySelectorAll('[id^="plan-row-"]').forEach(row=>{
+    const titulo = row.querySelector('.plan-titulo')?.value.trim();
+    const texto = row.querySelector('.plan-texto')?.value.trim();
+    if (titulo || texto) plans.push({titulo, texto, estado: row.querySelector('.plan-estado')?.value || 'pendiente'});
   });
 
   const record = {
@@ -9169,29 +9230,18 @@ async function saveRecord() {
     sistemas, problems,
     master, ddx, presuntivo,
     exams, definitivo: document.getElementById('rec-definitivo')?.value,
-    treatments, plan: document.getElementById('rec-plan')?.value,
-    customFields, date: new Date().toISOString(), userId: currentUser.uid,
+    treatments, plans, notas: document.getElementById('rec-notas')?.value,
+    customFields: [], date: new Date().toISOString(), userId: currentUser.uid,
     grupo: _hcCurrentGroup || '',
     grupo_name: hcGroupById(_hcCurrentGroup)?.name || '',
     mm, lesiones: JSON.parse(JSON.stringify(_lesionMarkers))
   };
   await dbPutSync('records', record);
   clinicalRecords.unshift(record);
-  problemCount = 3; examCount = 1; treatCount = 1; masterCount = 3; ddxCount = 3; presCount = 1;
+  problemCount = 3; examCount = 1; treatCount = 1; masterCount = 3; ddxCount = 3; presCount = 1; planCount = 1;
   closeModal('modal-record');
   renderRecordsList();
   toast('✓ Historia clínica '+record.hc_num+' guardada');
-}
-function addCustomField() {
-  const id = 'cf_'+Date.now();
-  document.getElementById('custom-fields').insertAdjacentHTML('beforeend', `
-    <div class="form-group" id="${id}">
-      <div style="display:flex;gap:.5rem;margin-bottom:.3rem">
-        <input class="form-control" placeholder="Nombre del campo" style="flex:1" id="${id}_l">
-        <button class="btn btn-danger btn-sm" onclick="document.getElementById('${id}').remove()">✕</button>
-      </div>
-      <textarea class="form-control" placeholder="Valor..." id="${id}_v"></textarea>
-    </div>`);
 }
 function openRecord(id) {
   const r = clinicalRecords.find(rc=>rc.id===id);
@@ -9293,8 +9343,18 @@ function openRecord(id) {
         </div>`).join('')}
     </div>`:''}
 
-    ${r.plan?`<div class="info-card"><div class="info-card-title">Planes</div><p class="text-sm">${r.plan}</p></div>`:''}
-    ${r.customFields?.map(f=>`<div class="info-card"><div class="info-card-title">${f.label}</div><p class="text-sm">${f.value}</p></div>`).join('')||''}
+    ${hcPlans(r).length?`
+    <div class="info-card"><div class="info-card-title">Planes</div>
+      ${hcPlans(r).map((p,i)=>`
+        <div style="padding:.5rem 0;border-bottom:1px solid var(--bor)">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.2rem">
+            <span style="font-weight:600;font-size:.82rem">${p.titulo?p.titulo:'Plan '+(i+1)}</span>
+            ${p.estado?`<span style="font-size:.65rem;padding:.1rem .45rem;border-radius:20px;${hcPlanBadge(p.estado)}">${p.estado}</span>`:''}
+          </div>
+          ${p.texto?`<p class="text-sm" style="margin-top:.2rem">${p.texto}</p>`:''}
+        </div>`).join('')}
+    </div>`:''}
+    ${hcNotas(r)?`<div class="info-card"><div class="info-card-title">Notas u observaciones</div><p class="text-sm" style="white-space:pre-wrap">${hcNotas(r)}</p></div>`:''}
 
     <div style="display:flex;gap:.5rem;margin-top:.75rem">
       <button class="btn btn-danger btn-sm" onclick="deleteRecord('${r.id}')">Eliminar</button>
@@ -9345,7 +9405,7 @@ function exportRecordPDF(id) {
   ${r.grupo_name?`<h2>Grupo anatómico / fisiológico</h2><p>${r.grupo_name}</p>`:''}
   ${r.mm?.length?`<h2>Membranas mucosas</h2><p>${r.mm.join(', ')}</p>`:''}
   ${r.exam?`<h2>Examen físico</h2><p>${r.exam}</p>`:''}
-  ${r.plan?`<h2>Plan / Tratamiento</h2><p>${r.plan}</p>`:''}
+  ${hcPlans(r).length?`<h2>Planes</h2>${hcPlans(r).map((p,i)=>`<p style="margin:6px 0"><strong>${p.titulo?p.titulo:'Plan '+(i+1)}</strong>${p.estado?' — '+p.estado:''}<br>${p.texto||''}</p>`).join('')}`:''}
   ${r.sistemas&&Object.keys(r.sistemas).length?`<h2>Revisión por sistemas</h2><table style="width:100%;border-collapse:collapse">${Object.entries(r.sistemas).map(([k,v])=>`<tr><td style="padding:4px;border-bottom:1px solid #eee;font-weight:bold;width:200px">${v.label||SYS_NAMES[k]||k}</td><td style="padding:4px;border-bottom:1px solid #eee">${v.status||''} ${v.nota||''}</td></tr>`).join('')}</table>`:''}
   ${r.lesiones?.length?`<h2>Mapa de lesiones</h2>${hcLesionMapPdfHtml(r.lesiones, r.grupo)}`:''}
   ${r.problems?.length?`<h2>Lista de problemas</h2>${r.problems.map(p=>`<p style="margin:2px 0">${p.n}. ${p.text}</p>`).join('')}`:''}
@@ -9354,7 +9414,7 @@ function exportRecordPDF(id) {
   ${r.exams?.length?`<h2>Exámenes complementarios</h2>${r.exams.map(e=>`<p style="margin:2px 0"><strong>${e.fecha||''}</strong> ${e.tipo} — ${e.resultado||''}</p>`).join('')}`:''}
   ${r.definitivo?`<h2>Diagnóstico definitivo</h2><p>${r.definitivo}</p>`:''}
   ${r.treatments?.length?`<h2>Tratamiento</h2>${r.treatments.map((t,i)=>`<p style="margin:6px 0"><strong>${i+1}. ${t.pa}</strong>${t.nc?' ('+t.nc+')':''}<br>${treatDesc(t).map(([l,v])=>`${l}: ${v}`).join(' · ')}</p>`).join('')}`:''}
-  ${r.customFields?.map(f=>`<h2>${f.label}</h2><p>${f.value}</p>`).join('')||''}
+  ${hcNotas(r)?`<h2>Notas u observaciones</h2><p style="white-space:pre-wrap">${hcNotas(r)}</p>`:''}
   <hr><p style="font-size:11px;color:#888">WildVet — Plataforma clínica para fauna silvestre</p>
   <script>window.print();<\/script></body></html>`);
   win.document.close();
