@@ -8013,6 +8013,7 @@ function renderRecordsList(filter='') {
         <div style="text-align:right">
           <div style="font-size:.7rem;color:var(--txt3)">${new Date(r.date).toLocaleDateString('es-CO')}</div>
           <div class="record-chip">${r.institution||'Sin institución'}</div>
+          <button type="button" class="btn btn-secondary btn-sm" style="margin-top:.3rem;font-size:.68rem" onclick="event.stopPropagation();exportRecordPDF('${r.id}')" title="Descargar PDF">⬇ PDF</button>
         </div>
       </div>
       ${r.chief_complaint ? `<div class="text-sm text-muted" style="padding-left:54px">📋 ${r.chief_complaint}</div>` : ''}
@@ -8138,7 +8139,10 @@ const DEFAULT_HC_GROUPS = [
   { id:'felidos',     name:'Félidos',            emoji:'🐆', taxon:{families:['Felidae']},                        vitals:{temp:'38.5–39.5', fr:'24–36',  fc:'110–130'}, systems:[...HC_SYS_DEFAULT], viewType:'mamifero' },
   { id:'canidos',     name:'Cánidos',            emoji:'🐕', taxon:{families:['Canidae']},                        vitals:{temp:'38.0–39.2', fr:'16–32',  fc:'90–160'},  systems:[...HC_SYS_DEFAULT], viewType:'mamifero' },
   { id:'primates',    name:'Primates',           emoji:'🐒', taxon:{orders:['Primates']},                         vitals:{temp:'37.5–38.5', fr:'20–40',  fc:'150–220'}, systems:[...HC_SYS_DEFAULT], viewType:'primate' },
-  { id:'ungulados',   name:'Ungulados',          emoji:'🦌', taxon:{orders:['Perissodactyla','Artiodactyla','Cetartiodactyla']}, vitals:{temp:'37.5–38.5', fr:'15–30', fc:'40–80'}, systems:[...HC_SYS_DEFAULT], viewType:'mamifero' },
+  { id:'cervidos',       name:'Cérvidos',        emoji:'🦌', taxon:{families:['Cervidae']}, vitals:{temp:'37.5–38.9', fr:'15–30', fc:'40–80'}, systems:[...HC_SYS_DEFAULT], viewType:'mamifero' },
+  { id:'bovidos',        name:'Bóvidos',         emoji:'🐄', taxon:{families:['Bovidae']}, vitals:{temp:'38.0–39.3', fr:'16–30', fc:'48–84'}, systems:[...HC_SYS_DEFAULT], viewType:'mamifero' },
+  { id:'equinos',        name:'Equinos',         emoji:'🐎', taxon:{families:['Equidae']}, vitals:{temp:'37.2–38.5', fr:'12–20', fc:'28–44'}, systems:[...HC_SYS_DEFAULT], viewType:'mamifero' },
+  { id:'otros-ungulados', name:'Otros ungulados', emoji:'🦙', taxon:{orders:['Perissodactyla','Artiodactyla','Cetartiodactyla'],keywords:['tapiridae','camelidae','suidae','tayassuidae','tragulidae','moschidae','giraffidae','antilocapridae','rhinocerotidae']}, vitals:{temp:'36.5–38.5', fr:'10–30', fc:'35–90'}, systems:[...HC_SYS_DEFAULT], viewType:'mamifero' },
   { id:'roedores',    name:'Roedores / Lagomorfos', emoji:'🐹', taxon:{orders:['Rodentia','Lagomorpha']},          vitals:{temp:'36.5–38.5', fr:'80–160', fc:'220–400'}, systems:[...HC_SYS_DEFAULT], viewType:'mamifero' },
   { id:'rapaces-diurnas', name:'Rapaces diurnas',  emoji:'🦅', taxon:{orders:['Accipitriformes','Falconiformes']}, vitals:{temp:'38.0–41.0', fr:'25–50',  fc:'180–350'}, systems:[...HC_SYS_DEFAULT,'Plumas / plumaje'], viewType:'ave' },
   { id:'rapaces-nocturnas', name:'Rapaces nocturnas', emoji:'🦉', taxon:{orders:['Strigiformes']},                  vitals:{temp:'38.0–41.0', fr:'25–50',  fc:'180–350'}, systems:[...HC_SYS_DEFAULT,'Plumas / plumaje'], viewType:'ave' },
@@ -8200,6 +8204,8 @@ function hcSelectGroup(gid) {
   document.querySelectorAll('.hc-group-chip').forEach(c=>{ c.style.background = c.dataset.gid===gid ? 'var(--g6)' : 'var(--sur)'; c.style.color = c.dataset.gid===gid ? '#fff' : 'var(--txt2)'; c.style.borderColor = c.dataset.gid===gid ? 'var(--g6)' : 'var(--bor)'; });
   const rps = document.getElementById('rps-section');
   if (rps) rps.innerHTML = hcSystemsHtml(gid);
+  const bb = document.getElementById('btn-blank-hc');
+  if (bb && g) bb.textContent = '🖨 Descargar formato en blanco (PDF) — ' + g.name;
   const g = hcGroupById(gid);
   if (g) {
     const t=document.getElementById('rec-temp'); if(t) t.placeholder = g.vitals.temp || '38.5';
@@ -8910,8 +8916,6 @@ function openNewRecord() {
   const hcNum = 'HC-'+(Date.now()+'').slice(-6);
   document.getElementById('modal-record-title').textContent = 'Nueva Historia Clínica';
   document.getElementById('modal-record-form').innerHTML = `
-  <div style="background:var(--g0);border-radius:var(--rsm);padding:.6rem .75rem;margin-bottom:.75rem;font-size:.8rem;color:var(--g7);font-family:var(--mono)">N° ${hcNum}</div>
-
   <div class="form-section-title" style="border-top:none;padding-top:0;margin-top:0">Identificación del individuo</div>
   <div class="form-row">
     <div class="form-group"><label>Fecha</label><input id="rec-fecha" class="form-control" type="date" value="${new Date().toISOString().split('T')[0]}"></div>
@@ -9068,6 +9072,8 @@ function openNewRecord() {
 
   <div class="form-section-title">Notas u observaciones</div>
   <div class="form-group"><textarea id="rec-notas" class="form-control" style="min-height:110px" placeholder="Notas adicionales, observaciones generales, sugerencias de manejo..."></textarea></div>
+
+  <button type="button" class="btn btn-secondary btn-block" style="margin:.5rem 0" id="btn-blank-hc" onclick="exportBlankHCPDF()">🖨 Descargar formato en blanco (PDF)</button>
 
   <div style="display:flex;gap:.5rem;margin-top:.5rem">
     <button class="btn btn-secondary" onclick="closeModal('modal-record')">Cancelar</button>
@@ -9418,6 +9424,107 @@ function exportRecordPDF(id) {
   <hr><p style="font-size:11px;color:#888">WildVet — Plataforma clínica para fauna silvestre</p>
   <script>window.print();<\/script></body></html>`);
   win.document.close();
+}
+
+function exportBlankHCPDF() {
+  const gid = _hcCurrentGroup || null;
+  const g = gid ? hcGroupById(gid) : null;
+  const views = hcViewsForGroup(gid);
+  const systems = (g && g.systems && g.systems.length) ? g.systems : HC_SYS_DEFAULT;
+  const win = window.open('','_blank');
+  if (!win) { toast('⚠ Activa las ventanas emergentes'); return; }
+  const line = (h) => `<div style="border-bottom:1px solid #999;height:${h||20}px"></div>`;
+  const field = (label, w) => `<div style="display:inline-block;vertical-align:bottom;margin:0 14px 8px 0;width:${w||220}px"><span style="font-size:11px;color:#444">${label}</span>${line(16)}</div>`;
+  const sysRows = systems.map(s=>`<tr><td style="padding:7px 4px;border-bottom:1px solid #ccc;font-size:11px;width:190px">${s}</td><td style="padding:7px 4px;border-bottom:1px solid #ccc;font-size:11px;width:150px">☐ Normal&nbsp;&nbsp;☐ Anormal</td><td style="padding:0 4px;border-bottom:1px solid #ccc"></td></tr>`).join('');
+  const mapViews = views.map(v=>{
+    let svgHtml = '';
+    try { svgHtml = hcLesionSvg(gid, [], v.id, true); } catch(e) {}
+    return `<div style="page-break-inside:avoid;margin:10px 0 14px">
+      <div style="font-size:12px;font-weight:bold;margin-bottom:3px">${v.name}</div>
+      ${svgHtml}
+      <table style="width:100%;margin-top:5px;border-collapse:collapse">${[1,2,3,4].map(n=>`<tr><td style="width:22px;font-size:11px;padding:2px;border-bottom:1px dotted #aaa">${n}.</td><td style="border-bottom:1px dotted #aaa;font-size:10px">&nbsp;</td></tr>`).join('')}</table>
+    </div>`;
+  }).join('');
+  win.document.write(`<html><head><title>Formato HC${g?' — '+g.name:''}</title><style>
+    @page{size:A4;margin:14mm}
+    body{font-family:Arial,sans-serif;color:#111;max-width:800px;margin:0 auto;padding:10px}
+    h1{color:#155230;font-size:19px;margin:0 0 2px;text-align:center}
+    h2{color:#1a6b3f;font-size:13px;border-bottom:1.5px solid #1a6b3f;padding-bottom:3px;margin:18px 0 8px;page-break-after:avoid}
+    .hdr{text-align:center;color:#555;font-size:10px;margin-bottom:6px}
+    .num{float:right;font-family:monospace;font-size:12px;border:1px solid #999;padding:3px 10px}
+    .hint{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;font-size:10px;padding:5px 8px;border-radius:5px;margin:6px 0 10px}
+    table{width:100%}
+    .foot{margin-top:26px;font-size:10px;color:#777;text-align:center;border-top:1px solid #ccc;padding-top:6px}
+    @media print{body{padding:0}}
+  </style></head><body>
+  <span class="num">N° HC ____________</span>
+  <h1>HISTORIA CLÍNICA — WILDVET</h1>
+  <p class="hdr">Plataforma clínica para fauna silvestre · Grupo anatómico de referencia: <strong>${g?g.name:'Genérico'}</strong></p>
+  <div class="hint">Formato para diligenciar a mano. El mapa de lesiones corresponde al grupo taxonómico seleccionado (${g?g.name:'genérico'}): numere cada lesión en el dibujo y descríbala en la lista inferior.</div>
+
+  <h2>1. Identificación del individuo</h2>
+  ${field('Fecha',140)}${field('N° de ID / Microchip',200)}${field('Institución / Centro de rescate',230)}<br>
+  ${field('Nombre del individuo',320)}${field('Especie',240)}<br>
+  ${field('Nombre científico',300)}${field('Sexo',120)}${field('Fecha de nacimiento',160)}${field('Edad',90)}
+
+  <h2>2. Motivo de consulta y anamnesis</h2>
+  <div style="font-size:11px;color:#444">Motivo de consulta:</div>${line()}
+  <div style="height:8px"></div>
+  <div style="font-size:11px;color:#444">Anamnesis (antecedentes, procedencia, manejo previo):</div>
+  ${line()}${line()}${line()}${line()}
+
+  <h2>3. Evaluación clínica</h2>
+  ${field('Condición corporal (desc.)',180)}${field('Puntuación CC',110)}${field('Peso (kg)',110)}${field('Actividad',160)}<br>
+  ${field('Comportamiento',250)}${field('% Deshidratación',140)}
+
+  <h2>4. Constantes fisiológicas &nbsp;<span style="font-weight:normal;font-size:10px;color:#666">(referencia ${g?g.name.toLowerCase():''}: T° ${g?.vitals?.temp||'—'} · Fr ${g?.vitals?.fr||'—'} · Fc ${g?.vitals?.fc||'—'})</span></h2>
+  ${field('T° (°C)',110)}${field('Fr (rpm)',110)}${field('Fc (bpm)',110)}${field('TLLC (seg)',110)}<br>
+  ${field('RPC (seg)',110)}${field('% Deshidratación',140)}${field('Membranas mucosas',260)}
+
+  <h2>5. Revisión por sistemas</h2>
+  <table>${sysRows}</table>
+
+  <h2>6. Mapa de lesiones</h2>
+  ${mapViews}
+
+  <h2>7. Abordaje diagnóstico</h2>
+  <div style="font-size:11px;color:#444">Lista de problemas (1–10):</div>
+  <table>${[1,2,3,4,5,6,7,8,9,10].map(n=>`<tr><td style="width:24px;font-size:11px;padding:2px;border-bottom:1px dotted #aaa">${n}.</td><td style="border-bottom:1px dotted #aaa;font-size:10px">&nbsp;</td></tr>`).join('')}</table>
+  <div style="height:8px"></div>
+  <div style="font-size:11px;color:#444">Lista maestra y diagnósticos diferenciales:</div>
+  <table>${['I','II','III','IV'].map(n=>`<tr><td style="width:30px;font-size:11px;padding:2px;border-bottom:1px dotted #aaa">${n}.</td><td style="border-bottom:1px dotted #aaa;font-size:10px">&nbsp;</td></tr>`).join('')}</table>
+  <div style="height:8px"></div>
+  <div style="font-size:11px;color:#444">Diagnóstico(s) presuntivo(s):</div>
+  ${line()}${line()}${line()}
+  <div style="height:8px"></div>
+  <div style="font-size:11px;color:#444">Exámenes complementarios (fecha / tipo / resultado):</div>
+  <table>${[1,2,3,4,5].map(()=>`<tr><td style="width:110px;border-bottom:1px dotted #aaa;font-size:10px">&nbsp;</td><td style="width:200px;border-bottom:1px dotted #aaa;font-size:10px">&nbsp;</td><td style="border-bottom:1px dotted #aaa;font-size:10px">&nbsp;</td></tr>`).join('')}</table>
+  <div style="height:8px"></div>
+  <div style="font-size:11px;color:#444">Diagnóstico definitivo:</div>
+  ${line()}${line()}
+
+  <h2>8. Tratamiento</h2>
+  <table style="border-collapse:collapse">
+    <thead><tr>${['Fármaco (PA)','Concentración','Dosis','Peso (kg)','Total','Vía','Frecuencia','Duración'].map(h=>`<th style="border:1px solid #bbb;background:#f0fdf4;font-size:10px;padding:4px">${h}</th>`).join('')}</tr></thead>
+    <tbody>${[1,2,3,4,5,6].map(()=>`<tr>${Array(8).fill('<td style="border:1px solid #bbb;height:22px;font-size:10px">&nbsp;</td>').join('')}</tr>`).join('')}</tbody>
+  </table>
+
+  <h2>9. Planes</h2>
+  <table>${[1,2,3].map(n=>`<tr><td style="width:24px;font-size:11px;padding:2px;border-bottom:1px dotted #aaa">${n}.</td><td style="width:200px;border-bottom:1px dotted #aaa;font-size:10px">&nbsp;</td><td style="border-bottom:1px dotted #aaa;font-size:10px">&nbsp;</td></tr>`).join('')}</table>
+
+  <h2>10. Notas u observaciones</h2>
+  ${line()}${line()}${line()}${line()}
+
+  <table style="width:100%;margin-top:22px"><tr>
+    <td style="width:45%;text-align:center;font-size:11px">${line(30)}<br>Firma veterinario tratante</td>
+    <td style="width:10%"></td>
+    <td style="width:45%;text-align:center;font-size:11px">${line(30)}<br>Firma / cargo</td>
+  </tr></table>
+
+  <p class="foot">WildVet — Plataforma clínica para fauna silvestre · Formato en blanco${g?' · '+g.name:''}</p>
+  <script>window.print();<\/script></body></html>`);
+  win.document.close();
+  toast('📄 Formato en blanco generado' + (g ? ' (' + g.name + ')' : ''));
 }
 
 async function shareRecintosWithEmail() {
