@@ -8223,12 +8223,30 @@ function hcSelectGroup(gid) {
   }
 }
 async function loadHCGroups() {
+  const _migrateUngulados = (arr) => {
+    const idx = arr.findIndex(g => g.id === 'ungulados');
+    if (idx === -1) return;
+    const old = arr[idx];
+    const newGroups = [
+      { id:'cervidos', name:'Cérvidos', emoji:'🦌', taxon:{families:['Cervidae']}, vitals:old.vitals||{temp:'37.5–38.9',fr:'15–30',fc:'40–80'}, systems:old.systems||[...HC_SYS_DEFAULT], viewType:'mamifero' },
+      { id:'bovidos', name:'Bóvidos', emoji:'🐄', taxon:{families:['Bovidae']}, vitals:{temp:'38.0–39.3',fr:'16–30',fc:'48–84'}, systems:[...HC_SYS_DEFAULT], viewType:'mamifero' },
+      { id:'equinos', name:'Equinos', emoji:'🐎', taxon:{families:['Equidae']}, vitals:{temp:'37.2–38.5',fr:'12–20',fc:'28–44'}, systems:[...HC_SYS_DEFAULT], viewType:'mamifero' },
+      { id:'otros-ungulados', name:'Otros ungulados', emoji:'🦙', taxon:{orders:['Perissodactyla','Artiodactyla','Cetartiodactyla'],keywords:['tapiridae','camelidae','suidae','tayassuidae','tragulidae','moschidae','giraffidae','antilocapridae','rhinocerotidae']}, vitals:{temp:'36.5–38.5',fr:'10–30',fc:'35–90'}, systems:[...HC_SYS_DEFAULT], viewType:'mamifero' }
+    ];
+    arr.splice(idx, 1, ...newGroups);
+  };
   const local = await dbGet('settings', 'hc_groups');
-  if (local?.value?.length) { HC_GROUPS_DB = JSON.parse(JSON.stringify(local.value)); return; }
+  if (local?.value?.length) {
+    _migrateUngulados(local.value);
+    HC_GROUPS_DB = JSON.parse(JSON.stringify(local.value));
+    await dbPut('settings', { id:'hc_groups', value: JSON.parse(JSON.stringify(HC_GROUPS_DB)) });
+    return;
+  }
   if (firestore && fbUid()) {
     try {
       const snap = await firestore.collection('settings').doc('hc_groups').get();
       if (snap.exists && snap.data()?.value?.length) {
+        _migrateUngulados(snap.data().value);
         HC_GROUPS_DB = JSON.parse(JSON.stringify(snap.data().value));
         await dbPut('settings', { id:'hc_groups', value: JSON.parse(JSON.stringify(HC_GROUPS_DB)) });
         return;
@@ -8922,7 +8940,7 @@ function openNewRecord() {
     <div class="form-group"><label>Número de ID / Microchip</label><input id="rec-id" class="form-control" placeholder="ID-001, chip #..."></div>
   </div>
   <div class="form-group"><label>Nombre del individuo</label><input id="rec-name" class="form-control" placeholder="Ej: Tapir #001, Puma hembra..."></div>
-  <div class="form-group"><label>Especie</label><input id="rec-species" class="form-control" list="rec-species-dl" placeholder="Buscar especie (por nombre común)..." autocomplete="off" oninput="hcApplySpecies()" onchange="hcApplySpecies()"><datalist id="rec-species-dl">${speciesDl}</datalist><input type="hidden" id="rec-species-id"></div>
+  <div class="form-group"><label>Nombre común</label><input id="rec-species" class="form-control" list="rec-species-dl" placeholder="Buscar especie (por nombre común)..." autocomplete="off" oninput="hcApplySpecies()" onchange="hcApplySpecies()"><datalist id="rec-species-dl">${speciesDl}</datalist><input type="hidden" id="rec-species-id"></div>
   <div class="form-row">
     <div class="form-group"><label>Nombre científico</label><input id="rec-sci" class="form-control" placeholder="Escribir o se llena al seleccionar especie" oninput="this.dataset.edited='1'"></div>
     <div class="form-group"><label>Sexo</label>
@@ -9435,93 +9453,139 @@ function exportBlankHCPDF() {
   if (!win) { toast('⚠ Activa las ventanas emergentes'); return; }
   const line = (h) => `<div style="border-bottom:1px solid #999;height:${h||20}px"></div>`;
   const field = (label, w) => `<div style="display:inline-block;vertical-align:bottom;margin:0 14px 8px 0;width:${w||220}px"><span style="font-size:11px;color:#444">${label}</span>${line(16)}</div>`;
-  const sysRows = systems.map(s=>`<tr><td style="padding:7px 4px;border-bottom:1px solid #ccc;font-size:11px;width:190px">${s}</td><td style="padding:7px 4px;border-bottom:1px solid #ccc;font-size:11px;width:150px">☐ Normal&nbsp;&nbsp;☐ Anormal</td><td style="padding:0 4px;border-bottom:1px solid #ccc"></td></tr>`).join('');
-  const mapViews = views.map(v=>{
+
+  // systems: header row + each system with 3 checkboxes + 3 blank lines
+  const sysHeader = `<thead><tr>
+    <th style="font-size:10px;text-align:left;padding:3px 4px;border-bottom:1.5px solid #333;width:180px">Sistema</th>
+    <th style="font-size:10px;text-align:center;padding:3px 4px;border-bottom:1.5px solid #333;width:60px">Normal</th>
+    <th style="font-size:10px;text-align:center;padding:3px 4px;border-bottom:1.5px solid #333;width:64px">Anormal</th>
+    <th style="font-size:10px;text-align:center;padding:3px 4px;border-bottom:1.5px solid #333;width:68px">Sin evaluar</th>
+    <th style="font-size:10px;text-align:left;padding:3px 4px;border-bottom:1.5px solid #333">Hallazgos</th>
+  </tr></thead>`;
+  const sysRows = systems.map(s => {
+    const lines = `<div style="border-bottom:1px dotted #bbb;height:15px"></div>`.repeat(3);
+    return `<tr>
+      <td style="font-size:11px;padding:5px 4px;border-bottom:1px solid #ddd;font-weight:500;vertical-align:top">${s}</td>
+      <td style="text-align:center;padding:5px 4px;border-bottom:1px solid #ddd;font-size:14px;vertical-align:top">☐</td>
+      <td style="text-align:center;padding:5px 4px;border-bottom:1px solid #ddd;font-size:14px;vertical-align:top">☐</td>
+      <td style="text-align:center;padding:5px 4px;border-bottom:1px solid #ddd;font-size:14px;vertical-align:top">☐</td>
+      <td style="padding:5px 4px;border-bottom:1px solid #ddd;vertical-align:top">${lines}</td>
+    </tr>`;
+  }).join('');
+
+  // lesion maps: 2 per row, compact, each with small numbered list
+  const mapCells = views.map(v => {
     let svgHtml = '';
     try { svgHtml = hcLesionSvg(gid, [], v.id, true); } catch(e) {}
-    return `<div style="page-break-inside:avoid;margin:10px 0 14px">
-      <div style="font-size:12px;font-weight:bold;margin-bottom:3px">${v.name}</div>
-      ${svgHtml}
-      <table style="width:100%;margin-top:5px;border-collapse:collapse">${[1,2,3,4].map(n=>`<tr><td style="width:22px;font-size:11px;padding:2px;border-bottom:1px dotted #aaa">${n}.</td><td style="border-bottom:1px dotted #aaa;font-size:10px">&nbsp;</td></tr>`).join('')}</table>
-    </div>`;
-  }).join('');
+    const noteLines = [1,2,3].map(n=>`<div style="border-bottom:1px dotted #bbb;height:13px;font-size:10px"><span style="color:#888">${n}.</span></div>`).join('');
+    return `<td style="width:48%;vertical-align:top;padding:6px 8px;border:1px solid #ddd;border-radius:4px;background:#fafbfc;page-break-inside:avoid">
+      <div style="font-size:11px;font-weight:700;color:#1a6b3f;margin-bottom:2px">${v.name}</div>
+      <div style="width:100%">${svgHtml}</div>
+      <div style="margin-top:4px;font-size:10px;color:#444">Lesiones:</div>
+      ${noteLines}
+    </td>`;
+  });
+  // pad to even count
+  if (mapCells.length % 2 === 1) mapCells.push('<td style="width:48%"></td>');
+  const mapTable = [];
+  for (let i = 0; i < mapCells.length; i += 2) {
+    mapTable.push(`<tr style="page-break-inside:avoid">${mapCells[i]}${mapCells[i+1]}</tr>`);
+  }
+
   win.document.write(`<html><head><title>Formato HC${g?' — '+g.name:''}</title><style>
-    @page{size:A4;margin:14mm}
+    @page{size:A4;margin:12mm}
+    *{box-sizing:border-box}
     body{font-family:Arial,sans-serif;color:#111;max-width:800px;margin:0 auto;padding:10px}
-    h1{color:#155230;font-size:19px;margin:0 0 2px;text-align:center}
-    h2{color:#1a6b3f;font-size:13px;border-bottom:1.5px solid #1a6b3f;padding-bottom:3px;margin:18px 0 8px;page-break-after:avoid}
+    h1{color:#155230;font-size:18px;margin:0 0 2px;text-align:center}
+    h2{color:#1a6b3f;font-size:12px;border-bottom:1.5px solid #1a6b3f;padding-bottom:3px;margin:14px 0 6px;page-break-after:avoid}
     .hdr{text-align:center;color:#555;font-size:10px;margin-bottom:6px}
     .num{float:right;font-family:monospace;font-size:12px;border:1px solid #999;padding:3px 10px}
-    .hint{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;font-size:10px;padding:5px 8px;border-radius:5px;margin:6px 0 10px}
-    table{width:100%}
-    .foot{margin-top:26px;font-size:10px;color:#777;text-align:center;border-top:1px solid #ccc;padding-top:6px}
+    table.sys-table{width:100%;border-collapse:collapse}
+    .maps-grid{width:100%;border-collapse:separate;border-spacing:6px}
+    .foot{margin-top:20px;font-size:10px;color:#777;text-align:center;border-top:1px solid #ccc;padding-top:5px}
     @media print{body{padding:0}}
   </style></head><body>
   <span class="num">N° HC ____________</span>
   <h1>HISTORIA CLÍNICA — WILDVET</h1>
-  <p class="hdr">Plataforma clínica para fauna silvestre · Grupo anatómico de referencia: <strong>${g?g.name:'Genérico'}</strong></p>
-  <div class="hint">Formato para diligenciar a mano. El mapa de lesiones corresponde al grupo taxonómico seleccionado (${g?g.name:'genérico'}): numere cada lesión en el dibujo y descríbala en la lista inferior.</div>
+  <p class="hdr">Plataforma clínica para fauna silvestre</p>
 
   <h2>1. Identificación del individuo</h2>
   ${field('Fecha',140)}${field('N° de ID / Microchip',200)}${field('Institución / Centro de rescate',230)}<br>
-  ${field('Nombre del individuo',320)}${field('Especie',240)}<br>
+  ${field('Nombre del individuo',320)}${field('Nombre común',240)}<br>
   ${field('Nombre científico',300)}${field('Sexo',120)}${field('Fecha de nacimiento',160)}${field('Edad',90)}
 
   <h2>2. Motivo de consulta y anamnesis</h2>
   <div style="font-size:11px;color:#444">Motivo de consulta:</div>${line()}
-  <div style="height:8px"></div>
+  <div style="height:6px"></div>
   <div style="font-size:11px;color:#444">Anamnesis (antecedentes, procedencia, manejo previo):</div>
   ${line()}${line()}${line()}${line()}
 
   <h2>3. Evaluación clínica</h2>
   ${field('Condición corporal (desc.)',180)}${field('Puntuación CC',110)}${field('Peso (kg)',110)}${field('Actividad',160)}<br>
-  ${field('Comportamiento',250)}${field('% Deshidratación',140)}
+  ${field('Comportamiento',250)}
 
-  <h2>4. Constantes fisiológicas &nbsp;<span style="font-weight:normal;font-size:10px;color:#666">(referencia ${g?g.name.toLowerCase():''}: T° ${g?.vitals?.temp||'—'} · Fr ${g?.vitals?.fr||'—'} · Fc ${g?.vitals?.fc||'—'})</span></h2>
+  <h2>4. Constantes fisiológicas${g?' <span style="font-weight:normal;font-size:10px;color:#666">(ref. '+g.name.toLowerCase()+': T° '+g.vitals.temp+' · Fr '+g.vitals.fr+' · Fc '+g.vitals.fc+')</span>':''}</h2>
   ${field('T° (°C)',110)}${field('Fr (rpm)',110)}${field('Fc (bpm)',110)}${field('TLLC (seg)',110)}<br>
   ${field('RPC (seg)',110)}${field('% Deshidratación',140)}${field('Membranas mucosas',260)}
 
   <h2>5. Revisión por sistemas</h2>
-  <table>${sysRows}</table>
+  <table class="sys-table">${sysHeader}<tbody>${sysRows}</tbody></table>
 
   <h2>6. Mapa de lesiones</h2>
-  ${mapViews}
+  <p style="font-size:10px;color:#555;margin:0 0 6px">Numere cada lesión en el dibujo y descríbala a continuación. Mapas correspondientes al grupo: <strong>${g?g.name:'genérico'}</strong></p>
+  <table class="maps-grid">${mapTable.join('')}</table>
 
   <h2>7. Abordaje diagnóstico</h2>
   <div style="font-size:11px;color:#444">Lista de problemas (1–10):</div>
-  <table>${[1,2,3,4,5,6,7,8,9,10].map(n=>`<tr><td style="width:24px;font-size:11px;padding:2px;border-bottom:1px dotted #aaa">${n}.</td><td style="border-bottom:1px dotted #aaa;font-size:10px">&nbsp;</td></tr>`).join('')}</table>
-  <div style="height:8px"></div>
+  <table style="width:100%">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<tr><td style="width:24px;font-size:11px;padding:2px;border-bottom:1px dotted #aaa">${n}.</td><td style="border-bottom:1px dotted #aaa;font-size:10px;height:16px">&nbsp;</td></tr>`).join('')}</table>
+  <div style="height:6px"></div>
   <div style="font-size:11px;color:#444">Lista maestra y diagnósticos diferenciales:</div>
-  <table>${['I','II','III','IV'].map(n=>`<tr><td style="width:30px;font-size:11px;padding:2px;border-bottom:1px dotted #aaa">${n}.</td><td style="border-bottom:1px dotted #aaa;font-size:10px">&nbsp;</td></tr>`).join('')}</table>
-  <div style="height:8px"></div>
+  <table style="width:100%">${['I','II','III','IV'].map(n=>`<tr><td style="width:30px;font-size:11px;padding:2px;border-bottom:1px dotted #aaa">${n}.</td><td style="border-bottom:1px dotted #aaa;font-size:10px;height:16px">&nbsp;</td></tr>`).join('')}</table>
+  <div style="height:6px"></div>
   <div style="font-size:11px;color:#444">Diagnóstico(s) presuntivo(s):</div>
   ${line()}${line()}${line()}
-  <div style="height:8px"></div>
-  <div style="font-size:11px;color:#444">Exámenes complementarios (fecha / tipo / resultado):</div>
-  <table>${[1,2,3,4,5].map(()=>`<tr><td style="width:110px;border-bottom:1px dotted #aaa;font-size:10px">&nbsp;</td><td style="width:200px;border-bottom:1px dotted #aaa;font-size:10px">&nbsp;</td><td style="border-bottom:1px dotted #aaa;font-size:10px">&nbsp;</td></tr>`).join('')}</table>
-  <div style="height:8px"></div>
-  <div style="font-size:11px;color:#444">Diagnóstico definitivo:</div>
-  ${line()}${line()}
 
-  <h2>8. Tratamiento</h2>
-  <table style="border-collapse:collapse">
-    <thead><tr>${['Fármaco (PA)','Concentración','Dosis','Peso (kg)','Total','Vía','Frecuencia','Duración'].map(h=>`<th style="border:1px solid #bbb;background:#f0fdf4;font-size:10px;padding:4px">${h}</th>`).join('')}</tr></thead>
-    <tbody>${[1,2,3,4,5,6].map(()=>`<tr>${Array(8).fill('<td style="border:1px solid #bbb;height:22px;font-size:10px">&nbsp;</td>').join('')}</tr>`).join('')}</tbody>
+  <h2>8. Exámenes complementarios</h2>
+  <table style="width:100%;border-collapse:collapse">
+    <thead><tr>
+      <th style="text-align:left;padding:3px 4px;border-bottom:1.5px solid #333;font-size:10px;width:100px">Fecha</th>
+      <th style="text-align:left;padding:3px 4px;border-bottom:1.5px solid #333;font-size:10px;width:200px">Tipo de examen</th>
+      <th style="text-align:left;padding:3px 4px;border-bottom:1.5px solid #333;font-size:10px">Resultado</th>
+      <th style="text-align:left;padding:3px 4px;border-bottom:1.5px solid #333;font-size:10px;width:120px">Observaciones</th>
+    </tr></thead>
+    <tbody>${[1,2,3,4,5,6,7,8].map(()=>`<tr>
+      <td style="padding:4px;border-bottom:1px dotted #aaa;font-size:10px;height:22px">&nbsp;</td>
+      <td style="padding:4px;border-bottom:1px dotted #aaa;font-size:10px;height:22px">&nbsp;</td>
+      <td style="padding:4px;border-bottom:1px dotted #aaa;font-size:10px;height:22px">&nbsp;</td>
+      <td style="padding:4px;border-bottom:1px dotted #aaa;font-size:10px;height:22px">&nbsp;</td>
+    </tr>`).join('')}</tbody>
   </table>
 
-  <h2>9. Planes</h2>
-  <table>${[1,2,3].map(n=>`<tr><td style="width:24px;font-size:11px;padding:2px;border-bottom:1px dotted #aaa">${n}.</td><td style="width:200px;border-bottom:1px dotted #aaa;font-size:10px">&nbsp;</td><td style="border-bottom:1px dotted #aaa;font-size:10px">&nbsp;</td></tr>`).join('')}</table>
+  <div style="margin-top:8px">
+    <div style="font-size:11px;color:#444">Diagnóstico definitivo:</div>
+    ${line()}${line()}
+  </div>
 
-  <h2>10. Notas u observaciones</h2>
+  <h2>9. Tratamiento</h2>
+  <table style="width:100%;border-collapse:collapse">
+    <thead><tr>
+      ${['Principio activo','Nombre comercial','Concentración','Dosis','Peso (kg)','Total','Vía','Frec.','Duración','Notas'].map(h=>`<th style="border:1px solid #bbb;background:#f0fdf4;font-size:9px;padding:3px 2px;white-space:nowrap">${h}</th>`).join('')}
+    </tr></thead>
+    <tbody>${[1,2,3,4,5,6].map(()=>`<tr>${Array(10).fill('<td style="border:1px solid #bbb;height:20px;font-size:9px;padding:2px">&nbsp;</td>').join('')}</tr>`).join('')}</tbody>
+  </table>
+
+  <h2>10. Planes</h2>
+  <table style="width:100%">${[1,2,3].map(n=>`<tr><td style="width:24px;font-size:11px;padding:2px;border-bottom:1px dotted #aaa">${n}.</td><td style="width:180px;border-bottom:1px dotted #aaa;font-size:10px;height:16px">&nbsp;</td><td style="border-bottom:1px dotted #aaa;font-size:10px;height:16px">&nbsp;</td></tr>`).join('')}</table>
+
+  <h2>11. Notas u observaciones</h2>
   ${line()}${line()}${line()}${line()}
 
-  <table style="width:100%;margin-top:22px"><tr>
-    <td style="width:45%;text-align:center;font-size:11px">${line(30)}<br>Firma veterinario tratante</td>
+  <table style="width:100%;margin-top:18px"><tr>
+    <td style="width:45%;text-align:center;font-size:11px">${line(30)}<br><span style="font-size:10px">Firma veterinario tratante</span></td>
     <td style="width:10%"></td>
-    <td style="width:45%;text-align:center;font-size:11px">${line(30)}<br>Firma / cargo</td>
+    <td style="width:45%;text-align:center;font-size:11px">${line(30)}<br><span style="font-size:10px">Firma / cargo</span></td>
   </tr></table>
 
-  <p class="foot">WildVet — Plataforma clínica para fauna silvestre · Formato en blanco${g?' · '+g.name:''}</p>
   <script>window.print();<\/script></body></html>`);
   win.document.close();
   toast('📄 Formato en blanco generado' + (g ? ' (' + g.name + ')' : ''));
