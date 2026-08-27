@@ -429,7 +429,7 @@ textarea.form-control{resize:vertical;min-height:70px}
   <div id="screen-home" class="screen active">
     <div class="hero">
       <div class="hero-title">🌿 Fauna Silvestre</div>
-      <div class="hero-sub">Calculadoras clínicas · Historias · Vademécum</div>
+      <div class="hero-sub">Calculadoras nutricionales · Historias · Vademécum</div>
       <div class="search-box">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="text" id="main-search" placeholder="Buscar especie, fármaco..." oninput="handleSearch(this.value)">
@@ -463,7 +463,11 @@ textarea.form-control{resize:vertical;min-height:70px}
       </div>
       <div class="quick-card" onclick="showScreen('nutricion-calc')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M8 12h8M12 8v8"/></svg>
-        <span>Calculadoras</span>
+        <span>Calculadoras nutricionales</span>
+      </div>
+      <div class="quick-card" onclick="showScreen('laboratorio')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6v4H9z"/><path d="M10 7v6l-3 5h10l-3-5V7"/><path d="M8 21h8"/><circle cx="12" cy="14" r="1"/></svg>
+        <span>Laboratorio</span>
       </div>
     </div>
     <!-- Filtro rápido por clase -->
@@ -557,6 +561,20 @@ textarea.form-control{resize:vertical;min-height:70px}
       </div>
     </div>
     </div>
+  </div>
+
+  <!-- LABORATORIO -->
+  <div id="screen-laboratorio" class="screen">
+    <div class="flex-between mb-2">
+      <h2 style="font-size:1.1rem;font-weight:700">🧪 Resultados de Laboratorio</h2>
+      <div style="display:flex;gap:.35rem">
+        <button class="btn btn-secondary btn-sm" onclick="openLabRefsManager()">📋 Valores de referencia</button>
+        <button class="btn btn-primary btn-sm" onclick="openNewLabResult()">+ Nuevo resultado</button>
+      </div>
+    </div>
+    <p style="font-size:.82rem;color:var(--txt3);margin-bottom:.75rem">Resultados de cuadro hemático, coprológico y parcial de orina por especie. Análisis automático contra valores de referencia.</p>
+    <div id="lab-group-chips" style="overflow-x:auto;white-space:nowrap;margin-bottom:1rem;padding-bottom:.3rem"></div>
+    <div id="lab-list"></div>
   </div>
 
   <!-- HISTORIAS -->
@@ -721,6 +739,7 @@ textarea.form-control{resize:vertical;min-height:70px}
       <button class="tab-btn" onclick="showTab('medicamentos')">Medicamentos</button>
       <button class="tab-btn" onclick="showTab('protocolos')">Protocolos</button>
       <button class="tab-btn" onclick="showTab('fluidoterapia')">Fluidoterapia</button>
+      <button class="tab-btn" onclick="showTab('laboratorio')">Laboratorio</button>
     </div>
   </div>
   <div id="tab-general" class="tab-content active"></div>
@@ -731,6 +750,7 @@ textarea.form-control{resize:vertical;min-height:70px}
   <div id="tab-medicamentos" class="tab-content"></div>
   <div id="tab-protocolos" class="tab-content"></div>
   <div id="tab-fluidoterapia" class="tab-content"></div>
+  <div id="tab-laboratorio" class="tab-content"></div>
   <div id="tab-enriquecimiento" class="tab-content"></div>
 </div>
 
@@ -766,6 +786,15 @@ textarea.form-control{resize:vertical;min-height:70px}
     <div class="modal-handle"></div>
     <div class="modal-title" id="modal-record-title">Nueva Historia Clínica</div>
     <div id="modal-record-form"></div>
+  </div>
+</div>
+
+<!-- MODAL LABORATORIO -->
+<div class="modal-overlay" id="modal-lab">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modal-lab-title">Resultado de Laboratorio</div>
+    <div id="modal-lab-form"></div>
   </div>
 </div>
 
@@ -2236,6 +2265,7 @@ async function loadData() {
   await loadHCOptions();
   await loadHCGroups();
   await loadHCMapImages();
+  await loadLabData();
 
   renderRecordsList();
   renderVademecum();
@@ -2393,6 +2423,7 @@ function showScreen(name, trackNav=true) {
   if (name==='enriquecimiento') { renderEnriquecimientoScreen(); }
   if (name==='recintos') { renderRecintosScreen(); }
   if (name==='nutricion-calc') { renderNutricionCalcScreen(); }
+  if (name==='laboratorio') { renderLaboratorioScreen(); }
   if (name==='historias') renderRecordsList();
   if (name==='vademecum') { syncAndRenderVademecum(); }
 }
@@ -2755,7 +2786,7 @@ function renderTab(tab) {
   const sp = currentSpecies;
   const el = document.getElementById('tab-'+tab);
   if (!sp||!el) return;
-  const m = {general:renderGeneral,fisiologia:renderFisiologia,nutricion:renderNutricion,enfermedades:renderEnfermedades,comportamiento:renderComportamiento,medicamentos:renderMedicamentos,protocolos:renderProtocolos,fluidoterapia:renderFluidoterapia,enriquecimiento:renderEnriquecimientoTab};
+  const m = {general:renderGeneral,fisiologia:renderFisiologia,nutricion:renderNutricion,enfermedades:renderEnfermedades,comportamiento:renderComportamiento,medicamentos:renderMedicamentos,protocolos:renderProtocolos,fluidoterapia:renderFluidoterapia,laboratorio:renderLaboratorioTab,enriquecimiento:renderEnriquecimientoTab};
   if (m[tab]) m[tab](el, sp);
 }
 function renderGeneral(el, sp) {
@@ -5861,12 +5892,7 @@ function renderFluidoterapia(el, sp) {
           <select id="fl-d" onchange="calcFluids()">${dehydOpts}</select>
         </div>
         <div class="fluid-input-group"><label>Mantenimiento (ml/kg/día)</label>
-          <select id="fl-m" onchange="calcFluids()">
-            <option value="40">40 ml/kg/día</option>
-            <option value="50" selected>50 ml/kg/día</option>
-            <option value="60">60 ml/kg/día</option>
-            <option value="80">80 ml/kg/día</option>
-          </select>
+          <input type="number" id="fl-m" class="form-control" value="50" min="0" max="500" step="1" oninput="calcFluids()">
         </div>
         <div></div>
         <div class="fluid-input-group"><label>N.° episodios de vómito</label>
@@ -5884,6 +5910,7 @@ function renderFluidoterapia(el, sp) {
       <div class="fluid-result-card"><div class="fluid-result-label">Pérd. por vómito</div><div class="fluid-result-value" id="fl-vomv">—</div><div class="fluid-result-unit">ml</div></div>
       <div class="fluid-result-card"><div class="fluid-result-label">Pérd. por diarrea</div><div class="fluid-result-value" id="fl-diav">—</div><div class="fluid-result-unit">ml</div></div>
       <div class="fluid-result-card" style="border:2px solid var(--g4);grid-column:span 2"><div class="fluid-result-label">TOTAL 24h</div><div class="fluid-result-value" id="fl-tot" style="color:var(--g5);font-size:1.8rem">—</div><div class="fluid-result-unit">ml/día</div></div>
+      <div class="fluid-result-card" style="grid-column:span 2;background:var(--g0)"><div class="fluid-result-label">Velocidad de infusión</div><div class="fluid-result-value" id="fl-mlh" style="color:var(--g7);font-size:1.5rem">—</div><div class="fluid-result-unit">ml/hora (Total ÷ 24)</div></div>
     </div>
     <div class="sec-title">Tasas de goteo (Total ÷ 24h)</div>
     <div class="drip-grid">
@@ -6097,6 +6124,7 @@ function calcFluids() {
   set('fl-vomv', vomLoss);
   set('fl-diav', diaLoss);
   set('fl-tot', tot.toLocaleString('es-CO'));
+  set('fl-mlh', (tot/24).toFixed(1));
   set('drip-mi', (tot/86400*60).toFixed(2));
   set('drip-no', (tot/86400*20).toFixed(2));
   set('drip-ma', (tot/86400*10).toFixed(2));
@@ -9591,6 +9619,465 @@ function exportBlankHCPDF() {
   win.document.close();
   toast('📄 Formato en blanco generado' + (g ? ' (' + g.name + ')' : ''));
 }
+
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// RESULTADOS DE LABORATORIO
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+const LAB_TEST_TYPES = [
+  { id:'hemograma', name:'Cuadro hemÃ¡tico', icon:'ðŸ©¸', params:[
+    {id:'hto',name:'Hematocrito',unit:'%',ref_low:30,ref_high:55},
+    {id:'hb',name:'Hemoglobina',unit:'g/dL',ref_low:8,ref_high:18},
+    {id:'leuc',name:'Leucocitos totales',unit:'x10Â³/ÂµL',ref_low:5,ref_high:25},
+    {id:'neut',name:'NeutrÃ³filos',unit:'x10Â³/ÂµL',ref_low:2,ref_high:15},
+    {id:'linf',name:'Linfocitos',unit:'x10Â³/ÂµL',ref_low:1,ref_high:10},
+    {id:'mono',name:'Monocitos',unit:'x10Â³/ÂµL',ref_low:0,ref_high:2},
+    {id:'eos',name:'EosinÃ³filos',unit:'x10Â³/ÂµL',ref_low:0,ref_high:3},
+    {id:'baso',name:'BasÃ³filos',unit:'x10Â³/ÂµL',ref_low:0,ref_high:1},
+    {id:'plaquetas',name:'Plaquetas',unit:'x10Â³/ÂµL',ref_low:100,ref_high:600},
+    {id:'pcv',name:'Volumen corpuscular medio',unit:'fL',ref_low:35,ref_high:60}
+  ]},
+  { id:'coprologia', name:'CoprologÃ­a', icon:'ðŸ”¬', params:[
+    {id:'ph_copro',name:'pH',unit:'',ref_low:5,ref_high:7.5},
+    {id:'consistencia',name:'Consistencia',unit:'',ref_low:0,ref_high:0,isText:true},
+    {id:'sangre',name:'Sangre oculta',unit:'',ref_low:0,ref_high:0,isText:true},
+    {id:'mucus',name:'Moco',unit:'',ref_low:0,ref_high:0,isText:true},
+    {id:'cel_epit',name:'CÃ©lulas epiteliales',unit:'x/campo',ref_low:0,ref_high:5},
+    {id:'leucocitos_copro',name:'Leucocitos',unit:'x/campo',ref_low:0,ref_high:2},
+    {id:'protozoos',name:'Protozoos',unit:'',ref_low:0,ref_high:0,isText:true},
+    {id:'huevos',name:'Huevos/parÃ¡sitos',unit:'',ref_low:0,ref_high:0,isText:true},
+    {id:'grasas',name:'Grasas',unit:'',ref_low:0,ref_high:0,isText:true},
+    {id:'almidon',name:'AlmidÃ³n',unit:'',ref_low:0,ref_high:0,isText:true}
+  ]},
+  { id:'parcial_orina', name:'Parcial de orina', icon:'ðŸ’§', params:[
+    {id:'ph_orina',name:'pH',unit:'',ref_low:5,ref_high:7.5},
+    {id:'densidad',name:'Densidad',unit:'',ref_low:1.005,ref_high:1.045},
+    {id:'proteinuria',name:'ProteÃ­nas',unit:'mg/dL',ref_low:0,ref_high:30},
+    {id:'glucosuria',name:'Glucosa',unit:'mg/dL',ref_low:0,ref_high:0},
+    {id:'cetona',name:'Cetonas',unit:'mg/dL',ref_low:0,ref_high:0},
+    {id:'bilirrubina',name:'Bilirrubina',unit:'mg/dL',ref_low:0,ref_high:0.5},
+    {id:'urobilina',name:'UrobilinÃ³geno',unit:'mg/dL',ref_low:0.1,ref_high:1.0},
+    {id:'hematuria',name:'Sangre/hemoglobina',unit:'',ref_low:0,ref_high:0,isText:true},
+    {id:'leucocitos_orina',name:'Leucocitos',unit:'x/campo',ref_low:0,ref_high:5},
+    {id:'cilindros',name:'Cilindros',unit:'',ref_low:0,ref_high:0,isText:true},
+    {id:'cristales',name:'Cristales',unit:'',ref_low:0,ref_high:0,isText:true},
+    {id:'bacterias',name:'Bacterias',unit:'',ref_low:0,ref_high:0,isText:true}
+  ]}
+];
+let LAB_REFS_DB = [];
+let LAB_RESULTS_DB = [];
+let _labCurrentGroup = null;
+
+async function loadLabData() {
+  LAB_REFS_DB = await dbGetAll('lab_refs');
+  LAB_RESULTS_DB = await dbGetAll('lab_results');
+  if (firestore && fbUid()) {
+    try {
+      const refsSnap = await firestore.collection('lab_refs').where('owner','==',fbUid()).get();
+      for (const d of (refsSnap.docs||[])) {
+        const data = d.data();
+        if (!LAB_REFS_DB.find(r=>r.id===data.id)) { LAB_REFS_DB.push(data); await dbPut('lab_refs', data); }
+      }
+      const resSnap = await firestore.collection('lab_results').where('owner','==',fbUid()).get();
+      for (const d of (resSnap.docs||[])) {
+        const data = d.data();
+        if (!LAB_RESULTS_DB.find(r=>r.id===data.id)) { LAB_RESULTS_DB.push(data); await dbPut('lab_results', data); }
+      }
+    } catch(e) {}
+  }
+}
+async function saveLabRef(ref) {
+  ref.owner = fbUid()||'local';
+  await dbPut('lab_refs', ref);
+  const idx = LAB_REFS_DB.findIndex(r=>r.id===ref.id);
+  if (idx>=0) LAB_REFS_DB[idx]=ref; else LAB_REFS_DB.push(ref);
+  if (firestore && fbUid()) try{await firestore.collection('lab_refs').doc(ref.id).set(ref);}catch(e){}
+}
+async function saveLabResult(res) {
+  res.owner = fbUid()||'local';
+  await dbPut('lab_results', res);
+  const idx = LAB_RESULTS_DB.findIndex(r=>r.id===res.id);
+  if (idx>=0) LAB_RESULTS_DB[idx]=res; else LAB_RESULTS_DB.push(res);
+  if (firestore && fbUid()) try{await firestore.collection('lab_results').doc(res.id).set(res);}catch(e){}
+}
+async function deleteLabResult(id) {
+  await dbDeleteSync('lab_results', id);
+  LAB_RESULTS_DB = LAB_RESULTS_DB.filter(r=>r.id!==id);
+  if (firestore && fbUid()) try{await firestore.collection('lab_results').doc(id).delete();}catch(e){}
+}
+function labAnalyzeValue(paramId, value, groupId) {
+  const testType = LAB_TEST_TYPES.find(t=>t.params.some(p=>p.id===paramId));
+  const param = testType?.params.find(p=>p.id===paramId);
+  if (!param || param.isText || value===null || value===undefined || value==='') return null;
+  const v = parseFloat(value);
+  if (isNaN(v)) return null;
+  const ref = LAB_REFS_DB.find(r=>r.groupId===groupId && r.paramId===paramId);
+  const low = ref?.ref_low ?? param.ref_low;
+  const high = ref?.ref_high ?? param.ref_high;
+  if (v < low) return 'bajo';
+  if (v > high) return 'alto';
+  return 'normal';
+}
+function labStatusColor(status) {
+  if (status==='bajo') return 'background:#fef9c3;color:#a16207';
+  if (status==='alto') return 'background:#fee2e2;color:#991b1b';
+  return 'background:#dcfce7;color:#166534';
+}
+function labStatusLabel(status) {
+  if (status==='bajo') return 'â†“ Bajo';
+  if (status==='alto') return 'â†‘ Alto';
+  return 'âœ“ Normal';
+}
+
+// â”€â”€ Main screen â”€â”€
+function renderLaboratorioScreen() {
+  const chipEl = document.getElementById('lab-group-chips');
+  const listEl = document.getElementById('lab-list');
+  if (!chipEl || !listEl) return;
+  const groups = HC_GROUPS_DB;
+  chipEl.innerHTML = groups.map(g=>`<button class="tab-filter-btn${_labCurrentGroup===g.id?' active':''}" onclick="labSelectGroup('${g.id}')">${g.emoji||'ðŸ¾'} ${g.name}</button>`).join('');
+  if (!_labCurrentGroup && groups.length) _labCurrentGroup = groups[0].id;
+  const results = _labCurrentGroup ? LAB_RESULTS_DB.filter(r=>r.groupId===_labCurrentGroup) : LAB_RESULTS_DB;
+  if (!results.length) {
+    listEl.innerHTML = `<div class="empty-state" style="padding:2rem"><p>Sin resultados registrados.<br>Crea el primero con + Nuevo resultado</p></div>`;
+    return;
+  }
+  results.sort((a,b)=>new Date(b.date)-new Date(a.date));
+  listEl.innerHTML = results.map(r=>{
+    const sp = SPECIES_DB.find(s=>s.id===r.speciesId);
+    const alerts = r.analyses?.filter(a=>a.status!=='normal')||[];
+    const alertHtml = alerts.length ? alerts.map(a=>{
+      const testType = LAB_TEST_TYPES.find(t=>t.params.some(p=>p.id===a.paramId));
+      const param = testType?.params.find(p=>p.id===a.paramId);
+      return `<span style="display:inline-block;font-size:.7rem;padding:.1rem .4rem;border-radius:12px;margin:.1rem .15rem;${labStatusColor(a.status)}">${param?.name||a.paramId}: ${a.value} ${labStatusLabel(a.status)}</span>`;
+    }).join('') : '<span style="font-size:.75rem;color:var(--txt3)">Todos normales</span>';
+    return `<div class="record-card" onclick="openLabResult('${r.id}')">
+      <div class="record-header">
+        <div class="record-avatar" style="overflow:hidden;padding:0;background:var(--sur2)">${sp?.cover_photo?`<img src="${sp.cover_photo}" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-size:1.3rem">${sp?.emoji||'ðŸ§ª'}</span>`}</div>
+        <div style="flex:1;min-width:0">
+          <div class="record-name">${r.name||sp?.name||'Sin nombre'}</div>
+          <div class="record-meta">${r.species||''} Â· ${r.testType||''} Â· ${new Date(r.date).toLocaleDateString('es-CO')}</div>
+          <div style="margin-top:.3rem">${alertHtml}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:.7rem;color:var(--txt3)">${new Date(r.date).toLocaleDateString('es-CO')}</div>
+          ${r.image?`<span style="font-size:.65rem;color:var(--g5)">ðŸ“· Adjunto</span>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function labSelectGroup(gid) {
+  _labCurrentGroup = gid;
+  renderLaboratorioScreen();
+}
+
+// â”€â”€ Species card tab â”€â”€
+function renderLaboratorioTab(el, sp) {
+  if (!el) return;
+  const results = LAB_RESULTS_DB.filter(r=>r.speciesId===sp.id).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  if (!results.length) {
+    el.innerHTML = `<div class="info-card" style="text-align:center;padding:2rem">
+      <div style="font-size:2rem;margin-bottom:.5rem">ðŸ§ª</div>
+      <p style="color:var(--txt3)">Sin resultados de laboratorio para esta especie.</p>
+      <button class="btn btn-primary btn-sm" onclick="openNewLabResultForSpecies('${sp.id}')">+ Agregar resultado</button>
+    </div>`;
+    return;
+  }
+  const rows = results.map(r=>{
+    const alerts = r.analyses?.filter(a=>a.status!=='normal')||[];
+    const alterados = alerts.length;
+    return `<div class="record-card" onclick="openLabResult('${r.id}')" style="margin-bottom:.5rem">
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <span style="font-size:1.3rem">ðŸ§ª</span>
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:.88rem">${r.name||r.testType}</div>
+          <div style="font-size:.75rem;color:var(--txt3)">${new Date(r.date).toLocaleDateString('es-CO')} Â· ${r.testType||''} ${r.image?'Â· ðŸ“·':''}</div>
+        </div>
+        <div style="text-align:right">
+          ${alterados?`<span style="font-size:.72rem;padding:.2rem .5rem;border-radius:12px;background:#fee2e2;color:#991b1b;font-weight:600">${alterados} alterado${alterados>1?'s':''}</span>`:`<span style="font-size:.72rem;padding:.2rem .5rem;border-radius:12px;background:#dcfce7;color:#166534">Normal</span>`}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="info-card">
+      <div class="info-card-title">ðŸ§ª Resultados de Laboratorio</div>
+      <button class="btn btn-primary btn-sm" style="margin-bottom:.75rem" onclick="openNewLabResultForSpecies('${sp.id}')">+ Nuevo resultado</button>
+      ${rows}
+    </div>`;
+}
+
+// â”€â”€ New result form â”€â”€
+function openNewLabResult() { _openLabResultForm(null); }
+function openNewLabResultForSpecies(spId) { _openLabResultForm(null, spId); }
+function _openLabResultForm(existingId, spId) {
+  const existing = existingId ? LAB_RESULTS_DB.find(r=>r.id===existingId) : null;
+  const testTypes = LAB_TEST_TYPES;
+  const groups = HC_GROUPS_DB;
+  const speciesOpts = SPECIES_DB.map(s=>`<option value="${s.name.replace(/"/g,'&quot;')}">`).join('');
+
+  const modal = document.getElementById('modal-lab');
+  if (!modal) return;
+  document.getElementById('modal-lab-title').textContent = existing ? 'Editar resultado' : 'Nuevo resultado de laboratorio';
+  document.getElementById('modal-lab-form').innerHTML = `
+  <div class="form-row">
+    <div class="form-group"><label>Nombre / IdentificaciÃ³n</label><input id="lab-name" class="form-control" value="${existing?.name||''}" placeholder="Ej: Puma macho adulto"></div>
+    <div class="form-group"><label>Especie</label><input id="lab-species" class="form-control" list="lab-species-dl" value="${existing?.species||''}" placeholder="Buscar especie..." oninput="labAutoGroup()"><datalist id="lab-species-dl">${speciesOpts}</datalist><input type="hidden" id="lab-species-id" value="${existing?.speciesId||spId||''}"></div>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>Grupo anatÃ³mico</label>
+      <select id="lab-group" class="form-control">${groups.map(g=>`<option value="${g.id}"${(existing?.groupId||_labCurrentGroup)===g.id?' selected':''}>${g.emoji} ${g.name}</option>`).join('')}</select>
+    </div>
+    <div class="form-group"><label>Fecha</label><input id="lab-date" class="form-control" type="date" value="${existing?.date||new Date().toISOString().split('T')[0]}"></div>
+  </div>
+  <div class="form-group"><label>Tipo de prueba</label>
+    <select id="lab-test-type" class="form-control" onchange="labRenderParams()">
+      ${testTypes.map(t=>`<option value="${t.id}"${existing?.testType===t.id?' selected':''}>${t.icon} ${t.name}</option>`).join('')}
+    </select>
+  </div>
+
+  <div class="form-section-title">Valores del resultado</div>
+  <div id="lab-params-container"></div>
+
+  <div class="form-group"><label>Imagen del resultado (opcional)</label>
+    <div id="lab-image-preview" style="margin-bottom:.5rem">${existing?.image?`<img src="${existing.image}" style="max-width:100%;max-height:150px;border-radius:8px;border:1px solid var(--bor)">`:''}</div>
+    <label class="btn btn-secondary btn-sm" style="cursor:pointer">ðŸ“· Subir imagen<input type="file" accept="image/*" style="display:none" onchange="labLoadImage(this)"></label>
+  </div>
+  <div class="form-group"><label>Observaciones</label><textarea id="lab-notes" class="form-control" style="min-height:60px;font-size:.82rem" placeholder="Notas clÃ­nicas, medicamentos recientes...">${existing?.notes||''}</textarea></div>
+
+  <input type="hidden" id="lab-edit-id" value="${existing?.id||''}">
+  <input type="hidden" id="lab-image-data" value="${existing?.image||''}">
+
+  <div style="display:flex;gap:.5rem;margin-top:.75rem">
+    <button class="btn btn-secondary" onclick="closeModal('modal-lab')">Cancelar</button>
+    <button class="btn btn-primary" style="flex:1" onclick="saveLabResultFromForm()">ðŸ’¾ Guardar y analizar</button>
+  </div>`;
+
+  labRenderParams();
+  modal.classList.add('open');
+}
+
+let _labImage = '';
+function labLoadImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    _labImage = reader.result;
+    document.getElementById('lab-image-data').value = _labImage;
+    document.getElementById('lab-image-preview').innerHTML = `<img src="${_labImage}" style="max-width:100%;max-height:150px;border-radius:8px;border:1px solid var(--bor)">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function labRenderParams() {
+  const testId = document.getElementById('lab-test-type')?.value;
+  const testType = LAB_TEST_TYPES.find(t=>t.id===testId);
+  const groupId = document.getElementById('lab-group')?.value;
+  const container = document.getElementById('lab-params-container');
+  if (!testType || !container) return;
+  container.innerHTML = testType.params.map(p=>{
+    const ref = LAB_REFS_DB.find(r=>r.groupId===groupId && r.paramId===p.id);
+    const low = ref?.ref_low ?? p.ref_low;
+    const high = ref?.ref_high ?? p.ref_high;
+    const refStr = p.isText ? 'Qualitativo' : `Ref: ${low} â€“ ${high} ${p.unit}`;
+    if (p.isText) {
+      return `<div class="form-group" style="margin-bottom:.5rem">
+        <label style="font-size:.8rem">${p.name} <span style="font-size:.7rem;color:var(--txt3)">${refStr}</span></label>
+        <input class="form-control lab-param-input" data-param="${p.id}" placeholder="Negativo, Positivo, Ausente...">
+      </div>`;
+    }
+    return `<div class="form-row" style="margin-bottom:.4rem;align-items:end">
+      <div class="form-group" style="flex:2;margin-bottom:0">
+        <label style="font-size:.8rem">${p.name} <span style="font-size:.7rem;color:var(--txt3)">${refStr}</span></label>
+      </div>
+      <div class="form-group" style="flex:1;margin-bottom:0">
+        <input class="form-control lab-param-input" data-param="${p.id}" type="number" step="any" placeholder="${p.unit}">
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function labAutoGroup() {
+  const spName = (document.getElementById('lab-species')?.value||'').toLowerCase();
+  const sp = SPECIES_DB.find(s=>s.name.toLowerCase()===spName);
+  if (sp) {
+    document.getElementById('lab-species-id').value = sp.id;
+    const gid = hcAutoGroupForSpecies(sp);
+    if (gid) document.getElementById('lab-group').value = gid;
+  }
+}
+
+function saveLabResultFromForm() {
+  const name = (document.getElementById('lab-name')?.value||'').trim();
+  const species = (document.getElementById('lab-species')?.value||'').trim();
+  const speciesId = document.getElementById('lab-species-id')?.value||'';
+  const groupId = document.getElementById('lab-group')?.value;
+  const testType = document.getElementById('lab-test-type')?.value;
+  const date = document.getElementById('lab-date')?.value;
+  const notes = document.getElementById('lab-notes')?.value||'';
+  const editId = document.getElementById('lab-edit-id')?.value;
+  const imageData = document.getElementById('lab-image-data')?.value||'';
+
+  const values = {};
+  document.querySelectorAll('.lab-param-input').forEach(inp=>{
+    values[inp.dataset.param] = inp.value.trim();
+  });
+
+  const testDef = LAB_TEST_TYPES.find(t=>t.id===testType);
+  const analyses = testDef ? testDef.params.map(p=>{
+    const val = values[p.id];
+    const status = labAnalyzeValue(p.id, val, groupId);
+    return { paramId:p.id, name:p.name, unit:p.unit, value:val, status };
+  }).filter(a=>a.value!=='') : [];
+
+  const result = {
+    id: editId || 'lab_'+Date.now(),
+    name, species, speciesId, groupId, testType, date, notes,
+    values, analyses, image: imageData,
+    date_captured: new Date().toISOString()
+  };
+  saveLabResult(result).then(()=>{
+    closeModal('modal-lab');
+    toast('âœ“ Resultado guardado y analizado');
+    const alerts = analyses.filter(a=>a.status!=='normal');
+    if (alerts.length) {
+      setTimeout(()=>toast(`âš  ${alerts.length} parÃ¡metro${alerts.length>1?'s':''} alterado${alerts.length>1?'s':''}`), 300);
+    }
+    if (document.getElementById('lab-list')) renderLaboratorioScreen();
+  });
+}
+
+function openLabResult(id) {
+  const r = LAB_RESULTS_DB.find(x=>x.id===id);
+  if (!r) return;
+  const sp = SPECIES_DB.find(s=>s.id===r.speciesId);
+  const testDef = LAB_TEST_TYPES.find(t=>t.id===r.testType);
+  const group = HC_GROUPS_DB.find(g=>g.id===r.groupId);
+
+  const modal = document.getElementById('modal-lab');
+  document.getElementById('modal-lab-title').textContent = r.name || r.testType;
+  document.getElementById('modal-lab-form').innerHTML = `
+    <div style="display:flex;gap:.75rem;align-items:center;margin-bottom:.75rem;padding:.6rem;background:var(--sur2);border-radius:var(--rsm)">
+      <span style="font-size:1.5rem">${sp?.emoji||'ðŸ§ª'}</span>
+      <div style="flex:1">
+        <div style="font-weight:700">${r.name||sp?.name||''}</div>
+        <div style="font-size:.78rem;color:var(--txt3)">${r.species||''} Â· ${testDef?.name||r.testType} Â· ${group?.name||r.groupId}</div>
+        <div style="font-size:.75rem;color:var(--txt2)">${new Date(r.date).toLocaleDateString('es-CO')}</div>
+      </div>
+    </div>
+    ${r.image?`<div style="margin-bottom:.75rem"><img src="${r.image}" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid var(--bor);cursor:pointer" onclick="window.open('${r.image}','_blank')"></div>`:''}
+
+    <div class="info-card"><div class="info-card-title">Valores y anÃ¡lisis</div>
+      <table style="width:100%;border-collapse:collapse;font-size:.8rem">
+        <thead><tr>
+          <th style="text-align:left;padding:4px;border-bottom:1.5px solid var(--bor);font-size:.72rem">ParÃ¡metro</th>
+          <th style="text-align:right;padding:4px;border-bottom:1.5px solid var(--bor);font-size:.72rem">Resultado</th>
+          <th style="text-align:left;padding:4px;border-bottom:1.5px solid var(--bor);font-size:.72rem">Estado</th>
+        </tr></thead>
+        <tbody>${(r.analyses||[]).map(a=>`<tr>
+          <td style="padding:4px;border-bottom:1px solid var(--bor)">${a.name} ${a.unit?'('+a.unit+')':''}</td>
+          <td style="padding:4px;border-bottom:1px solid var(--bor);text-align:right;font-weight:600">${a.value}</td>
+          <td style="padding:4px;border-bottom:1px solid var(--bor)"><span style="font-size:.72rem;padding:.15rem .5rem;border-radius:12px;${labStatusColor(a.status)}">${labStatusLabel(a.status)}</span></td>
+        </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    ${r.analyses?.filter(a=>a.status!=='normal').length?`
+    <div class="info-card" style="border-color:var(--r5)"><div class="info-card-title" style="color:var(--r5)">âš ï¸ Resumen de alteraciones</div>
+      ${r.analyses.filter(a=>a.status!=='normal').map(a=>`<div style="padding:.3rem 0;font-size:.82rem;border-bottom:1px solid var(--bor)">
+        <span style="font-weight:600">${a.name}</span>: <span style="color:${a.status==='alto'?'var(--r5)':'var(--am)'}">${a.value} ${a.unit||''}</span> â†’ <span style="font-size:.72rem;padding:.1rem .4rem;border-radius:12px;${labStatusColor(a.status)}">${labStatusLabel(a.status)}</span>
+      </div>`).join('')}
+    </div>`:`<div class="info-card" style="border-color:var(--g5)"><div class="info-card-title" style="color:var(--g5)">âœ“ Todos los parÃ¡metros dentro de rango</div></div>`}
+
+    ${r.notes?`<div class="info-card"><div class="info-card-title">Observaciones</div><p class="text-sm">${r.notes}</p></div>`:''}
+
+    <div style="display:flex;gap:.5rem;margin-top:.75rem">
+      <button class="btn btn-danger btn-sm" onclick="labConfirmDelete('${r.id}')">Eliminar</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="closeModal('modal-lab')">Cerrar</button>
+      <button class="btn btn-primary" onclick="openEditLabResult('${r.id}')">âœï¸ Editar</button>
+    </div>`;
+  modal.classList.add('open');
+}
+
+function openEditLabResult(id) {
+  closeModal('modal-lab');
+  setTimeout(()=>_openLabResultForm(id), 200);
+}
+
+function labConfirmDelete(id) {
+  const r = LAB_RESULTS_DB.find(x=>x.id===id);
+  confirmDelete('Â¿Eliminar resultado?', `Se eliminarÃ¡ "${r?.name||r?.testType||''}".`, 'ðŸ§ª').then(ok=>{
+    if (!ok) return;
+    deleteLabResult(id);
+    closeModal('modal-lab');
+    toast('Resultado eliminado');
+    if (document.getElementById('lab-list')) renderLaboratorioScreen();
+  });
+}
+
+// â”€â”€ Reference values manager â”€â”€
+function openLabRefsManager() {
+  const modal = document.getElementById('modal-lab');
+  document.getElementById('modal-lab-title').textContent = 'Valores de referencia';
+  const groups = HC_GROUPS_DB;
+  let html = `<p style="font-size:.8rem;color:var(--txt3);margin-bottom:.75rem">Define rangos de referencia por grupo taxonÃ³mico. Si no se define un valor especÃ­fico, se usa el predeterminado del sistema.</p>`;
+  html += `<div style="max-height:60vh;overflow-y:auto">`;
+  html += groups.map(g=>{
+    const paramsHtml = LAB_TEST_TYPES.map(t=>{
+      const numericParams = t.params.filter(p=>!p.isText);
+      if (!numericParams.length) return '';
+      return `<div style="font-size:.78rem;font-weight:600;color:var(--g6);margin:.6rem 0 .3rem">${t.icon} ${t.name}</div>` +
+        numericParams.map(p=>{
+          const ref = LAB_REFS_DB.find(r=>r.groupId===g.id && r.paramId===p.id);
+          return `<div class="form-row" style="margin-bottom:.3rem;align-items:center">
+            <div style="flex:2;font-size:.78rem;color:var(--txt2)">${p.name} <span style="font-size:.7rem;color:var(--txt3)">(${p.unit}, default: ${p.ref_low}â€“${p.ref_high})</span></div>
+            <div class="form-group" style="flex:1;margin-bottom:0"><input class="form-control lab-ref-input" data-group="${g.id}" data-param="${p.id}" data-default-low="${p.ref_low}" data-default-high="${p.ref_high}" type="number" step="any" value="${ref?.ref_low??''}" placeholder="MÃ­n" style="font-size:.78rem"></div>
+            <div class="form-group" style="flex:1;margin-bottom:0"><input class="form-control lab-ref-input-hi" data-group="${g.id}" data-param="${p.id}" type="number" step="any" value="${ref?.ref_high??''}" placeholder="MÃ¡x" style="font-size:.78rem"></div>
+          </div>`;
+        }).join('');
+    }).join('');
+    return `<div style="padding:.5rem 0;border-bottom:1px solid var(--bor)">
+      <div style="font-size:.85rem;font-weight:600">${g.emoji} ${g.name}</div>
+      ${paramsHtml}
+    </div>`;
+  }).join('');
+  html += `</div>`;
+  html += `<div style="display:flex;gap:.5rem;margin-top:.75rem">
+    <button class="btn btn-secondary" onclick="closeModal('modal-lab')">Cancelar</button>
+    <button class="btn btn-primary" style="flex:1" onclick="saveLabRefsFromForm()">ðŸ’¾ Guardar referencias</button>
+  </div>`;
+
+  document.getElementById('modal-lab-form').innerHTML = html;
+  modal.classList.add('open');
+}
+
+function saveLabRefsFromForm() {
+  const promises = [];
+  document.querySelectorAll('.lab-ref-input').forEach(inp=>{
+    const gid = inp.dataset.group;
+    const pid = inp.dataset.param;
+    const lo = inp.value.trim();
+    const hi = document.querySelector(`.lab-ref-input-hi[data-group="${gid}"][data-param="${pid}"]`)?.value.trim();
+    if (lo==='' && hi==='') return;
+    const existing = LAB_REFS_DB.find(r=>r.groupId===gid && r.paramId===pid);
+    const ref = {
+      id: existing?.id || 'labref_'+gid+'_'+pid,
+      groupId: gid, paramId: pid,
+      ref_low: lo!=='' ? parseFloat(lo) : parseFloat(inp.dataset.defaultLow),
+      ref_high: hi!=='' ? parseFloat(hi) : parseFloat(inp.dataset.defaultHigh)
+    };
+    promises.push(saveLabRef(ref));
+  });
+  Promise.all(promises).then(()=>{
+    closeModal('modal-lab');
+    toast('âœ“ Referencias guardadas');
+  });
+}
+
+
 
 async function shareRecintosWithEmail() {
   const email = prompt('Correo electrónico con quien compartir los recintos:');
