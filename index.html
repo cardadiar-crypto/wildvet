@@ -9454,30 +9454,30 @@ function exportBlankHCPDF() {
   const line = (h) => `<div style="border-bottom:1px solid #999;height:${h||20}px"></div>`;
   const field = (label, w) => `<div style="display:inline-block;vertical-align:bottom;margin:0 14px 8px 0;width:${w||220}px"><span style="font-size:11px;color:#444">${label}</span>${line(16)}</div>`;
 
-  // systems: header row + each system with 3 checkboxes + 3 blank lines
+  // systems: compact columns + 2 findings lines
   const sysHeader = `<thead><tr>
-    <th style="font-size:10px;text-align:left;padding:3px 4px;border-bottom:1.5px solid #333;width:180px">Sistema</th>
-    <th style="font-size:10px;text-align:center;padding:3px 4px;border-bottom:1.5px solid #333;width:60px">Normal</th>
-    <th style="font-size:10px;text-align:center;padding:3px 4px;border-bottom:1.5px solid #333;width:64px">Anormal</th>
-    <th style="font-size:10px;text-align:center;padding:3px 4px;border-bottom:1.5px solid #333;width:68px">Sin evaluar</th>
+    <th style="font-size:10px;text-align:left;padding:3px 4px;border-bottom:1.5px solid #333;width:120px">Sistema</th>
+    <th style="font-size:10px;text-align:center;padding:3px 4px;border-bottom:1.5px solid #333;width:50px">Normal</th>
+    <th style="font-size:10px;text-align:center;padding:3px 4px;border-bottom:1.5px solid #333;width:54px">Anormal</th>
+    <th style="font-size:10px;text-align:center;padding:3px 4px;border-bottom:1.5px solid #333;width:62px">Sin evaluar</th>
     <th style="font-size:10px;text-align:left;padding:3px 4px;border-bottom:1.5px solid #333">Hallazgos</th>
   </tr></thead>`;
   const sysRows = systems.map(s => {
-    const lines = `<div style="border-bottom:1px dotted #bbb;height:15px"></div>`.repeat(3);
+    const lines = `<div style="border-bottom:1px solid #bbb;height:14px"></div>`.repeat(2);
     return `<tr>
-      <td style="font-size:11px;padding:5px 4px;border-bottom:1px solid #ddd;font-weight:500;vertical-align:top">${s}</td>
-      <td style="text-align:center;padding:5px 4px;border-bottom:1px solid #ddd;font-size:14px;vertical-align:top">☐</td>
-      <td style="text-align:center;padding:5px 4px;border-bottom:1px solid #ddd;font-size:14px;vertical-align:top">☐</td>
-      <td style="text-align:center;padding:5px 4px;border-bottom:1px solid #ddd;font-size:14px;vertical-align:top">☐</td>
-      <td style="padding:5px 4px;border-bottom:1px solid #ddd;vertical-align:top">${lines}</td>
+      <td style="font-size:10px;padding:4px;border-bottom:1px solid #ddd;font-weight:500;vertical-align:top">${s}</td>
+      <td style="text-align:center;padding:4px;border-bottom:1px solid #ddd;font-size:14px;vertical-align:top">☐</td>
+      <td style="text-align:center;padding:4px;border-bottom:1px solid #ddd;font-size:14px;vertical-align:top">☐</td>
+      <td style="text-align:center;padding:4px;border-bottom:1px solid #ddd;font-size:14px;vertical-align:top">☐</td>
+      <td style="padding:4px;border-bottom:1px solid #ddd;vertical-align:top">${lines}</td>
     </tr>`;
   }).join('');
 
-  // lesion maps: 2 per row, compact, each with small numbered list
+  // lesion maps: 2 per row, compact
   const mapCells = views.map(v => {
     let svgHtml = '';
     try { svgHtml = hcLesionSvg(gid, [], v.id, true); } catch(e) {}
-    const noteLines = [1,2,3].map(n=>`<div style="border-bottom:1px dotted #bbb;height:13px;font-size:10px"><span style="color:#888">${n}.</span></div>`).join('');
+    const noteLines = [1,2,3].map(n=>`<div style="border-bottom:1px solid #bbb;height:13px;font-size:10px"><span style="color:#888">${n}.</span></div>`).join('');
     return `<td style="width:48%;vertical-align:top;padding:6px 8px;border:1px solid #ddd;border-radius:4px;background:#fafbfc;page-break-inside:avoid">
       <div style="font-size:11px;font-weight:700;color:#1a6b3f;margin-bottom:2px">${v.name}</div>
       <div style="width:100%">${svgHtml}</div>
@@ -9485,7 +9485,6 @@ function exportBlankHCPDF() {
       ${noteLines}
     </td>`;
   });
-  // pad to even count
   if (mapCells.length % 2 === 1) mapCells.push('<td style="width:48%"></td>');
   const mapTable = [];
   for (let i = 0; i < mapCells.length; i += 2) {
@@ -9500,9 +9499,11 @@ function exportBlankHCPDF() {
     h2{color:#1a6b3f;font-size:12px;border-bottom:1.5px solid #1a6b3f;padding-bottom:3px;margin:14px 0 6px;page-break-after:avoid}
     .hdr{text-align:center;color:#555;font-size:10px;margin-bottom:6px}
     .num{float:right;font-family:monospace;font-size:12px;border:1px solid #999;padding:3px 10px}
-    table.sys-table{width:100%;border-collapse:collapse}
+    .tbl{width:100%;border-collapse:collapse}
+    .tbl th{border:1px solid #bbb;background:#f0fdf4;font-size:9px;padding:3px 2px;white-space:nowrap;text-align:left}
+    .tbl td{border:1px solid #bbb;height:20px;font-size:9px;padding:2px}
     .maps-grid{width:100%;border-collapse:separate;border-spacing:6px}
-    .foot{margin-top:20px;font-size:10px;color:#777;text-align:center;border-top:1px solid #ccc;padding-top:5px}
+    .tfoot{font-size:9px;color:#666;margin-top:3px;font-style:italic}
     @media print{body{padding:0}}
   </style></head><body>
   <span class="num">N° HC ____________</span>
@@ -9529,35 +9530,34 @@ function exportBlankHCPDF() {
   ${field('RPC (seg)',110)}${field('% Deshidratación',140)}${field('Membranas mucosas',260)}
 
   <h2>5. Revisión por sistemas</h2>
-  <table class="sys-table">${sysHeader}<tbody>${sysRows}</tbody></table>
+  <table class="tbl">${sysHeader}<tbody>${sysRows}</tbody></table>
 
   <h2>6. Mapa de lesiones</h2>
-  <p style="font-size:10px;color:#555;margin:0 0 6px">Numere cada lesión en el dibujo y descríbala a continuación. Mapas correspondientes al grupo: <strong>${g?g.name:'genérico'}</strong></p>
   <table class="maps-grid">${mapTable.join('')}</table>
 
   <h2>7. Abordaje diagnóstico</h2>
   <div style="font-size:11px;color:#444">Lista de problemas (1–10):</div>
-  <table style="width:100%">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<tr><td style="width:24px;font-size:11px;padding:2px;border-bottom:1px dotted #aaa">${n}.</td><td style="border-bottom:1px dotted #aaa;font-size:10px;height:16px">&nbsp;</td></tr>`).join('')}</table>
+  <table class="tbl"><tbody>${[1,2,3,4,5,6,7,8,9,10].map(n=>`<tr><td style="width:24px">${n}.</td><td style="height:16px"></td></tr>`).join('')}</tbody></table>
   <div style="height:6px"></div>
   <div style="font-size:11px;color:#444">Lista maestra y diagnósticos diferenciales:</div>
-  <table style="width:100%">${['I','II','III','IV'].map(n=>`<tr><td style="width:30px;font-size:11px;padding:2px;border-bottom:1px dotted #aaa">${n}.</td><td style="border-bottom:1px dotted #aaa;font-size:10px;height:16px">&nbsp;</td></tr>`).join('')}</table>
+  <table class="tbl"><tbody>${['I','II','III','IV'].map(n=>`<tr><td style="width:30px">${n}.</td><td style="height:16px"></td></tr>`).join('')}</tbody></table>
   <div style="height:6px"></div>
   <div style="font-size:11px;color:#444">Diagnóstico(s) presuntivo(s):</div>
   ${line()}${line()}${line()}
 
   <h2>8. Exámenes complementarios</h2>
-  <table style="width:100%;border-collapse:collapse">
+  <table class="tbl">
     <thead><tr>
-      <th style="text-align:left;padding:3px 4px;border-bottom:1.5px solid #333;font-size:10px;width:100px">Fecha</th>
-      <th style="text-align:left;padding:3px 4px;border-bottom:1.5px solid #333;font-size:10px;width:200px">Tipo de examen</th>
-      <th style="text-align:left;padding:3px 4px;border-bottom:1.5px solid #333;font-size:10px">Resultado</th>
-      <th style="text-align:left;padding:3px 4px;border-bottom:1.5px solid #333;font-size:10px;width:120px">Observaciones</th>
+      <th style="width:90px">Fecha</th>
+      <th style="width:200px">Tipo de examen</th>
+      <th>Resultado</th>
+      <th style="width:120px">Observaciones</th>
     </tr></thead>
     <tbody>${[1,2,3,4,5,6,7,8].map(()=>`<tr>
-      <td style="padding:4px;border-bottom:1px dotted #aaa;font-size:10px;height:22px">&nbsp;</td>
-      <td style="padding:4px;border-bottom:1px dotted #aaa;font-size:10px;height:22px">&nbsp;</td>
-      <td style="padding:4px;border-bottom:1px dotted #aaa;font-size:10px;height:22px">&nbsp;</td>
-      <td style="padding:4px;border-bottom:1px dotted #aaa;font-size:10px;height:22px">&nbsp;</td>
+      <td style="height:20px">&nbsp;</td>
+      <td style="height:20px">&nbsp;</td>
+      <td style="height:20px">&nbsp;</td>
+      <td style="height:20px">&nbsp;</td>
     </tr>`).join('')}</tbody>
   </table>
 
@@ -9567,15 +9567,16 @@ function exportBlankHCPDF() {
   </div>
 
   <h2>9. Tratamiento</h2>
-  <table style="width:100%;border-collapse:collapse">
+  <table class="tbl">
     <thead><tr>
-      ${['Principio activo','Nombre comercial','Concentración','Dosis','Peso (kg)','Total','Vía','Frec.','Duración','Notas'].map(h=>`<th style="border:1px solid #bbb;background:#f0fdf4;font-size:9px;padding:3px 2px;white-space:nowrap">${h}</th>`).join('')}
+      ${['PA','NC','Conc.','Dosis','Peso','Total','Vía','Frec.','Dur.','Notas'].map(h=>`<th>${h}</th>`).join('')}
     </tr></thead>
-    <tbody>${[1,2,3,4,5,6].map(()=>`<tr>${Array(10).fill('<td style="border:1px solid #bbb;height:20px;font-size:9px;padding:2px">&nbsp;</td>').join('')}</tr>`).join('')}</tbody>
+    <tbody>${[1,2,3,4,5,6].map(()=>`<tr>${Array(10).fill('<td style="height:20px">&nbsp;</td>').join('')}</tr>`).join('')}</tbody>
   </table>
+  <div class="tfoot">PA = Principio activo · NC = Nombre comercial · Conc. = Concentración · Frec. = Frecuencia · Dur. = Duración</div>
 
   <h2>10. Planes</h2>
-  <table style="width:100%">${[1,2,3].map(n=>`<tr><td style="width:24px;font-size:11px;padding:2px;border-bottom:1px dotted #aaa">${n}.</td><td style="width:180px;border-bottom:1px dotted #aaa;font-size:10px;height:16px">&nbsp;</td><td style="border-bottom:1px dotted #aaa;font-size:10px;height:16px">&nbsp;</td></tr>`).join('')}</table>
+  <table class="tbl"><tbody>${[1,2,3].map(n=>`<tr><td style="width:24px">${n}.</td><td style="width:180px;height:16px"></td><td style="height:16px"></td></tr>`).join('')}</tbody></table>
 
   <h2>11. Notas u observaciones</h2>
   ${line()}${line()}${line()}${line()}
