@@ -5900,7 +5900,7 @@ function renderFluidoterapiaCalcScreen() {
       <div class="drip-card"><div class="drip-type">Macrogotero</div><div class="drip-value" id="drip-ma">—</div><div class="drip-unit">gts/seg · 10 gts/ml</div></div>
     </div>
     <div class="sec-title">Aproximación a número entero (goteo real en venoclisis)</div>
-    <p style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">El goteo no se puede fraccionar por debajo de 1 gota/seg. Se busca el multiplicador más pequeño que lleva el resultado a un número entero y se muestra el factor aplicado.</p>
+    <p style="font-size:.72rem;color:var(--txt3);margin-bottom:.5rem">El goteo no se puede fraccionar por debajo de 1 gota. Se toma el multiplicador más pequeño que lleva el resultado a un número entero y se expresa como gotas por ese número de segundos (gts/x seg). Ejemplo: si el cálculo da 0,5 gts/seg, la aproximación es 1 gts/2 seg.</p>
     <div class="drip-grid">
       <div class="drip-card" style="border:1px solid var(--am)"><div class="drip-type">Microgotero · 60 gts/ml</div><div class="drip-value" id="drip-mi-approx" style="color:var(--am)">—</div><div class="drip-unit" id="drip-mi-factor">—</div></div>
       <div class="drip-card" style="border:1px solid var(--am)"><div class="drip-type">Normogotero · 20 gts/ml</div><div class="drip-value" id="drip-no-approx" style="color:var(--am)">—</div><div class="drip-unit" id="drip-no-factor">—</div></div>
@@ -6106,12 +6106,12 @@ function calcFluids() {
     return { w: Math.round(r), k: 0 };
   };
   const aMi = approx(mi), aNo = approx(no), aMa = approx(ma);
-  set('drip-mi-approx', aMi.w ? aMi.w+' gts/seg' : '—');
-  set('drip-no-approx', aNo.w ? aNo.w+' gts/seg' : '—');
-  set('drip-ma-approx', aMa.w ? aMa.w+' gts/seg' : '—');
-  set('drip-mi-factor', aMi.k ? 'multiplicado ×'+aMi.k : 'sin multiplicador');
-  set('drip-no-factor', aNo.k ? 'multiplicado ×'+aNo.k : 'sin multiplicador');
-  set('drip-ma-factor', aMa.k ? 'multiplicado ×'+aMa.k : 'sin multiplicador');
+  set('drip-mi-approx', aMi.w && aMi.k ? aMi.w+' gts / '+aMi.k+' seg' : '—');
+  set('drip-no-approx', aNo.w && aNo.k ? aNo.w+' gts / '+aNo.k+' seg' : '—');
+  set('drip-ma-approx', aMa.w && aMa.k ? aMa.w+' gts / '+aMa.k+' seg' : '—');
+  set('drip-mi-factor', aMi.k ? '×'+aMi.k+' seg' : 'sin aproximar');
+  set('drip-no-factor', aNo.k ? '×'+aNo.k+' seg' : 'sin aproximar');
+  set('drip-ma-factor', aMa.k ? '×'+aMa.k+' seg' : 'sin aproximar');
 }
 let _flPresets = [];
 function loadFlPresets() { try { _flPresets = JSON.parse(localStorage.getItem('FLUID_MAINT_PRESETS')||'[]') || []; } catch(e) { _flPresets = []; } }
