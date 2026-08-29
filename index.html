@@ -6191,7 +6191,8 @@ function calcFluids() {
   const bolosN = Math.max(1, parseInt(document.getElementById('fl-bolos-n')?.value)||1);
   set('fl-bolo', (tot/bolosN).toLocaleString('es-CO',{maximumFractionDigits:1}));
 
-  // 2: VOLUMEN DIARIO (Total ÷ 24)
+  // 2: VOLUMEN DIARIO (Total ÷ 24). La velocidad usa fl-mlh; el goteo usa el prefijo vd-.
+  set('fl-mlh', (tot/24).toFixed(1));
   renderDripBlock('vd', tot/24);
 
   // 3: DISTRIBUCIÓN (dos fases: % + horas, el resto en el tiempo restante)
