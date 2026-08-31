@@ -642,6 +642,8 @@ textarea.form-control{resize:vertical;min-height:70px}
       </div>
       <div id="admin-add-drug-btn" style="display:none;gap:.3rem;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="openAddDrug()">+ Fármaco</button>
+        <button class="btn btn-admin btn-sm" onclick="importVademecumCsv()">📥 Importar CSV</button>
+        <button class="btn btn-admin btn-sm" onclick="descargarPlantillaVademecum()">📄 Plantilla CSV</button>
       </div>
     </div>
     <input type="text" class="form-control" placeholder="Buscar fármaco..." oninput="filterVademecum(this.value)" style="margin-bottom:.75rem">
@@ -7384,6 +7386,242 @@ async function syncVadToSpecies(vadId) {
 
 // openEditDrug: simplified — just calls openAddDrug with the id
 function openEditDrug(id) { openAddDrug(id); }
+
+// ═══════════════════════════════════════════════════════════════
+// IMPORTADOR CSV · VADEMÉCUM
+// ═══════════════════════════════════════════════════════════════
+// Mapeo de encabezados del CSV (normalizados) → campos del fármaco.
+// Separa valores múltiples con ";" y las dosis por especie van en una
+// celda con una especie por línea (formato: especie|sci|dose_min|dose|dose_max|via|freq|notas).
+const VAD_HEADER_MAP = {
+  'nombres':'nombres','nombre':'nombres','nombre_comercial':'nombres','nombres_comerciales':'nombres',
+  'principio_activo':'active','activo':'active','principio':'active','active':'active','pa':'active',
+  'concentraciones_mg_ml':'concs','concentraciones':'concs','conc':'concs','concentracion':'concs','mg_ml':'concs',
+  'categorias':'cats','categoria':'cats','cats':'cats','categoria_general':'cats',
+  'categoria_especifica':'cat_esp','cat_esp':'cat_esp','subcategoria':'cat_esp',
+  'vias':'routes','vias_de_administracion':'routes','via':'routes','routes':'routes','administration':'routes',
+  'frecuencia':'freq','freq':'freq','frecuencia_administracion':'freq',
+  'indicaciones':'indic','indic':'indic','indicacion':'indic',
+  'contraindicaciones':'contraindications','contraindicacion':'contraindications','contra':'contraindications',
+  'efectos_adversos':'info','efectos':'info','efectos_secundarios':'info','info':'info','reacciones':'info',
+  'notas':'notes','notas_clinicas':'notes','notes':'notes','observaciones':'notes',
+  'dosis_por_especie':'species_doses','dosis':'species_doses','dosis_especies':'species_doses'
+};
+const VAD_SUB_SEP = ';';   // separador de valores múltiples
+const VAD_SPEC_SEP = '|';  // separador de campos dentro de una fila de dosis
+
+// Descarga una plantilla .csv de ejemplo con los encabezados y columnas que debe llenar el usuario.
+function descargarPlantillaVademecum() {
+  const headers = [
+    'nombres','principio_activo','concentraciones_mg_ml','categorias','categoria_especifica',
+    'vias','frecuencia','indicaciones','contraindicaciones','efectos_adversos','notas','dosis_por_especie'
+  ];
+  const ej = {
+    nombres:'Ketavet;Ketamidor',
+    principio_activo:'Ketamina',
+    concentraciones_mg_ml:'100;50',
+    categorias:'Anestésicos',
+    categoria_especifica:'Anestésico disociativo',
+    vias:'IM;IV;SC',
+    frecuencia:'dosis única',
+    indicaciones:'Anestesia general, contención química',
+    contraindicaciones:'Cardiopatía severa',
+    efectos_adversos:'Hipotensión, bradicardia',
+    notas:'Titular según profundidad anestésica.',
+    dosis_por_especie:'Perro|Canis lupus familiaris|5|10|15|IM|dosis única|\nGato|Felis catus|3|5|7|IM|dosis única|'
+  };
+  const esc = (v)=>{ v=String(v??''); return /[";\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+  const csv = headers.map(h=>esc(h)).join(';') + '\n' + headers.map(h=>esc(ej[h])).join(';');
+  const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'plantilla_vademecum.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 3000);
+  toast('📄 Plantilla descargada: plantilla_vademecum.csv');
+}
+
+// Abre el selector de archivo y procesa el CSV.
+function importVademecumCsv() {
+  const inp = document.createElement('input');
+  inp.type='file'; inp.accept='.csv,text/csv';
+  inp.onchange = ()=>{
+    const f = inp.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      try { _vadCsvPreview(e.target.result); }
+      catch(err){ toast('⚠ Error al leer el CSV: '+err.message); }
+    };
+    reader.readAsText(f, 'utf-8');
+  };
+  inp.click();
+}
+
+// Parsea el texto CSV detectando separador (; o ,) y comillas.
+function _parseCsv(text) {
+  text = text.replace(/^\ufeff/,'');
+  const firstNL = text.indexOf('\n');
+  const head = text.slice(0, firstNL<0?text.length:firstNL);
+  const semi = (head.match(/;/g)||[]).length;
+  const comma = (head.match(/,/g)||[]).length;
+  const delim = semi>=comma ? ';' : ',';
+  const rows=[]; let row=[]; let field=''; let inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else inQ=false; }
+      else field+=c;
+    } else {
+      if(c==='"') inQ=true;
+      else if(c===delim){ row.push(field); field=''; }
+      else if(c==='\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else if(c!=='\r') field+=c;
+    }
+  }
+  if(field!=='' || row.length){ row.push(field); rows.push(row); }
+  while(rows.length && rows[rows.length-1].every(f=>!String(f??'').trim())) rows.pop();
+  return rows;
+}
+
+// Normaliza un encabezado para hacer lookup en VAD_HEADER_MAP (sin acentos, minúsculas, underscores).
+function _normHeader(h){
+  return String(h??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+}
+
+// Construye el objeto fármaco (misma forma que saveDrug) a partir de una fila ya mapeada.
+function _vadRowToDrug(mapped) {
+  const nombres = (mapped.nombres||'').split(VAD_SUB_SEP).map(s=>s.trim()).filter(Boolean);
+  const concs = (mapped.concs||'').split(VAD_SUB_SEP).map(s=>parseFloat(String(s).trim())).filter(v=>!isNaN(v)&&v>0);
+  const cats = (mapped.cats||'').split(VAD_SUB_SEP).map(s=>s.trim()).filter(Boolean);
+  const routes = (mapped.routes||'').split(VAD_SUB_SEP).map(s=>s.trim()).filter(Boolean);
+  const drugName = nombres[0]||'';
+  const active = mapped.active||'';
+  // dosis por especie: una línea por especie, campos separados por "|"
+  const species_doses = [];
+  String(mapped.species_doses||'').split(/\r?\n/).forEach(line=>{
+    line=line.trim(); if(!line) return;
+    const p=line.split(VAD_SPEC_SEP).map(s=>s.trim());
+    const sp=p[0]; if(!sp) return;
+    species_doses.push({
+      species: sp,
+      sci: p[1]||'',
+      dose_min: parseFloat(p[2])||0,
+      dose: parseFloat(p[3])||0,
+      dose_max: parseFloat(p[4])||0,
+      routes: p[5] ? p[5].split(VAD_SUB_SEP).map(s=>s.trim()).filter(Boolean) : (routes.length?routes:['IM']),
+      route: null,
+      freq: p[6]||'',
+      notes: p[7]||''
+    });
+    const sdos = species_doses[species_doses.length-1];
+    sdos.route = sdos.routes[0]||'IM';
+  });
+  return {
+    drug: drugName, nombres, active,
+    cats, category: cats[0]||'',
+    cat_esp: mapped.cat_esp||'',
+    conc: concs[0]||0, concs: concs.length?concs:(concs[0]?concs:[]),
+    route: routes[0]||'IM', routes,
+    freq: mapped.freq||'',
+    indic: mapped.indic||'',
+    contraindications: mapped.contraindications||'',
+    info: mapped.info||'',
+    notes: mapped.notes||'',
+    species_doses
+  };
+}
+
+// Nombres de columnas del CSV (con orden fijo) para previsualización.
+const VAD_COL_LABELS = {
+  nombres:'Nombres comerciales', active:'Principio activo', concs:'Conc. (mg/ml)',
+  cats:'Categorías', cat_esp:'Cat. específica', routes:'Vías',
+  freq:'Frecuencia', indic:'Indicaciones', contraindications:'Contraindicaciones',
+  info:'Efectos adversos', notes:'Notas', species_doses:'Dosis por especie'
+};
+
+// Genera la previsualización en un modal y permite confirmar la importación.
+function _vadCsvPreview(text) {
+  const rows = _parseCsv(text);
+  if (!rows.length) { toast('⚠ El archivo está vacío'); return; }
+  const headerRaw = rows[0];
+  const colIdx = {};
+  headerRaw.forEach((h,i)=>{ const key=_normHeader(h); if(VAD_HEADER_MAP[key]) colIdx[i]=VAD_HEADER_MAP[key]; });
+  const usedCols = Object.values(colIdx);
+  if (!usedCols.length) { toast('⚠ No se reconocieron columnas válidas. Usa la plantilla descargada.'); return; }
+
+  const drugs = [];
+  for(let r=1; r<rows.length; r++){
+    const row = rows[r];
+    if (!row.some(c=>String(c??'').trim())) continue;
+    const mapped = {};
+    Object.keys(colIdx).forEach(i=>{ const f=colIdx[i]; const v=(row[i]??'').toString(); if(String(v).trim()!=='') mapped[f]=v; });
+    if(!mapped.nombres && !mapped.active) continue; // fila sin nombre ni principio activo → se omite
+    drugs.push(_vadRowToDrug(mapped));
+  }
+  if (!drugs.length) { toast('⚠ No hay fármacos válidos para importar'); return; }
+
+  document.getElementById('modal-vad-csv')?.remove();
+  const m=document.createElement('div');
+  m.id='modal-vad-csv';
+  m.style.cssText='position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;overflow-y:auto';
+  m.innerHTML=`
+    <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:640px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+      <div style="font-weight:700;font-size:.95rem;margin-bottom:.25rem">📥 Importar vademécum</div>
+      <div style="font-size:.78rem;color:var(--txt3);margin-bottom:.75rem">Se detectaron <b>${drugs.length}</b> fármaco(s). Revisa la vista previa antes de confirmar.</div>
+      <div style="overflow-x:auto;border:1px solid var(--bor);border-radius:var(--rsm);margin-bottom:.5rem">
+        <table style="width:100%;border-collapse:collapse;font-size:.74rem">
+          <thead><tr style="background:var(--sur2)">
+            ${['Fármaco','Principio activo','Conc.','Categoría','Vías','Especies'].map(h=>`<th style="padding:.35rem .5rem;text-align:left;border-bottom:1px solid var(--bor);font-size:.68rem;color:var(--txt3)">${h}</th>`).join('')}
+          </tr></thead>
+          <tbody>
+            ${drugs.map(d=>{
+              const sps = d.species_doses.map(s=>s.species).join(', ');
+              const conc = d.concs.join(' / ');
+              return `<tr style="border-bottom:1px solid var(--bor)">
+                <td style="padding:.3rem .5rem;font-weight:600">${d.drug||'—'}</td>
+                <td style="padding:.3rem .5rem">${d.active||'—'}</td>
+                <td style="padding:.3rem .5rem">${conc||'—'}</td>
+                <td style="padding:.3rem .5rem">${(d.cats.join(', '))||'—'}</td>
+                <td style="padding:.3rem .5rem">${d.routes.join(', ')||'—'}</td>
+                <td style="padding:.3rem .5rem">${sps||'—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('modal-vad-csv').remove()">Cancelar</button>
+        <button class="btn btn-primary" style="flex:2" onclick="confirmImportVademecum(${drugs.length})">✓ Importar ${drugs.length} fármaco(s)</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+  window._vadCsvImport = drugs;
+}
+
+// Confirma e inserta los fármacos en la base de datos (IndexedDB + en memoria).
+async function confirmImportVademecum(count) {
+  const drugs = window._vadCsvImport || [];
+  document.getElementById('modal-vad-csv')?.remove();
+  let ok=0, dup=0;
+  for(const d of drugs){
+    const already = VADEMECUM_DB.find(x =>
+      d.active && x.active && x.active.toLowerCase()===d.active.toLowerCase()
+    );
+    if (already) { dup++; continue; } // evita duplicar por principio activo
+    const newDrug = { id:'vad_'+Date.now()+'_'+Math.random().toString(36).slice(2,5), ...d };
+    VADEMECUM_DB.push(newDrug);
+    await dbPutSync('vademecum', newDrug);
+    ok++;
+  }
+  _vadCatActiva='__all__'; _vadSubcatActiva=null; _vadSubSubcatActiva=null;
+  renderVademecum();
+  const parts=[];
+  if(ok) parts.push('Importados '+ok+' fármaco(s)');
+  if(dup) parts.push('Omitidos '+dup+' duplicado(s) para editar manualmente');
+  toast((parts.length?'✓ ':'')+parts.join(' · '));
+}
 
 let _vadCatActiva = '__all__';
 let _vadSubcatActiva = null;
