@@ -3361,6 +3361,9 @@ async function loadData() {
     if (!savedVadCats?.value) await saveVademecumCats();
   }
 
+  // ── Garantizar que existan las categorías por defecto (añade lo que falte, sin pisar) ──
+  if (mergeDefaultVademecumCats()) await saveVademecumCats();
+
   // ── Migración estructura antigua vademécum ──
   for (const v of VADEMECUM_DB) {
     if (!v.species_doses) {
@@ -9642,6 +9645,34 @@ async function seedDefaultVademecumOnce() {
 function _normActive(s) {
   return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     .replace(/[^a-z0-9]+/g,' ').trim();
+}
+
+// Añade a VADEMECUM_CATS cualquier categoría/subcategoría/sub-subcategoría por defecto que falte.
+// Es aditivo: nunca borra ni pisa lo que el usuario ya tenga. Devuelve true si cambió algo.
+function mergeDefaultVademecumCats() {
+  let changed = false;
+  for (const [k, def] of Object.entries(DEFAULT_VADEMECUM_CATS)) {
+    if (!VADEMECUM_CATS[k]) {
+      VADEMECUM_CATS[k] = JSON.parse(JSON.stringify(def));
+      changed = true;
+      continue;
+    }
+    const cur = VADEMECUM_CATS[k];
+    if (!cur.subcategories) { cur.subcategories = {}; changed = true; }
+    for (const [sk, sdef] of Object.entries(def.subcategories||{})) {
+      if (!cur.subcategories[sk]) {
+        cur.subcategories[sk] = JSON.parse(JSON.stringify(sdef));
+        changed = true;
+      } else {
+        const cs = cur.subcategories[sk];
+        if (!cs.subcats) { cs.subcats = {}; }
+        for (const [ssk, ssdef] of Object.entries(sdef.subcats||{})) {
+          if (!cs.subcats[ssk]) { cs.subcats[ssk] = JSON.parse(JSON.stringify(ssdef)); changed = true; }
+        }
+      }
+    }
+  }
+  return changed;
 }
 
 
