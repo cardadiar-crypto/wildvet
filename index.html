@@ -3388,6 +3388,8 @@ async function loadData() {
 
   // ── Sembrar fichas vademécum por defecto (solo principio activo) ──
   await seedDefaultVademecumOnce();
+  // ── Reconciliación catálogo v2: garantiza categorías completas y fichas bien categorizadas ──
+  await rebuildDefaultCatalogV2();
 
   // ── PIN admin ──
   const pinSaved = await dbGet('settings', 'admin_pin');
@@ -9639,6 +9641,53 @@ async function seedDefaultVademecumOnce() {
     await dbPut('settings', { id:'vademecum_seed_v1', done:true, ts:Date.now(), added });
     if (added) console.log('Vademécum sembrado: ' + added + ' fichas por defecto');
   } catch(e) { console.warn('seedDefaultVademecumOnce:', e.message); }
+}
+
+// ── Reconciliación del catálogo v2 (una sola vez) ──
+// Restaura el catálogo de categorías completo por defecto y re-categoriza las fichas
+// para que los subniveles y fármacos se muestren correctamente sin duplicar nada.
+async function rebuildDefaultCatalogV2() {
+  try {
+    const flag = await dbGet('settings', 'vad_catalog_v2');
+    if (flag?.done) return;
+    let seeded = 0, retagged = 0;
+
+    // 1) Restaurar el catálogo por defecto completo (estructura con subniveles).
+    VADEMECUM_CATS = JSON.parse(JSON.stringify(DEFAULT_VADEMECUM_CATS));
+    await saveVademecumCats();
+
+    // 2) Añadir fichas por defecto que falten (por principio activo normalizado).
+    for (const base of DEFAULT_VADEMECUM) {
+      const normA = _normActive(base.active);
+      const exists = VADEMECUM_DB.some(x => _normActive(x.active) === normA);
+      if (exists) continue;
+      const ficha = { id:'vad_seed_'+Date.now()+'_'+Math.random().toString(36).slice(2,5), ...base };
+      VADEMECUM_DB.push(ficha);
+      await dbPutSync('vademecum', ficha);
+      if (typeof fsPut === 'function' && firestore && fbUid()) await fsPut('vademecum', ficha);
+      seeded++;
+    }
+
+    // 3) Re-categorizar fichas existentes para que coincidan con el catálogo por defecto.
+    const map = {};
+    for (const base of DEFAULT_VADEMECUM) map[_normActive(base.active)] = base;
+    for (const d of VADEMECUM_DB) {
+      const b = map[_normActive(d.active)];
+      if (!b) continue;
+      if (d.cat_vad !== b.cat_vad || d.subcat_vad !== b.subcat_vad || d.subsubcat_vad !== b.subsubcat_vad) {
+        d.cat_vad = b.cat_vad; d.subcat_vad = b.subcat_vad; d.subsubcat_vad = b.subsubcat_vad;
+        await dbPutSync('vademecum', d);
+        if (typeof fsPut === 'function' && firestore && fbUid()) await fsPut('vademecum', d);
+        retagged++;
+      }
+    }
+
+    if (seeded || retagged) {
+      VADEMECUM_DB = await dbGetAll('vademecum');
+    }
+    await dbPut('settings', { id:'vad_catalog_v2', done:true, ts:Date.now(), seeded, retagged });
+    if (seeded || retagged) console.log('Catálogo v2: ' + seeded + ' sembradas, ' + retagged + ' re-categorizadas');
+  } catch(e) { console.warn('rebuildDefaultCatalogV2:', e.message); }
 }
 
 // Normaliza un nombre de principio activo para comparar (minúsculas, sin acentos, espacios colapsados).
@@ -16254,6 +16303,7 @@ function _eg_updateOrganos() {
     html += `<label style="display:inline-flex;align-items:center;gap:.2rem;font-size:.73rem;padding:.1rem .35rem;border-radius:20px;border:2px solid var(--g4);cursor:pointer;background:${isGenChecked?'var(--g1)':'var(--sur)'}">
       <input type="checkbox" class="enfgen-organo-chk" value="${generalVal}" ${isGenChecked?'checked':''} style="accent-color:var(--g5)"> 🔷 ${sistLabel} — General
     </label>`;
+
     organos.filter(o=>o!=='General (sistema completo)').forEach(o => {
       const isChecked = existingChecked.includes(o);
       html += `<label style="display:inline-flex;align-items:center;gap:.2rem;font-size:.73rem;padding:.1rem .35rem;border-radius:20px;border:1px solid var(--bor);cursor:pointer;background:${isChecked?'var(--g1)':'var(--sur)'}">
