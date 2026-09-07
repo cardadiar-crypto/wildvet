@@ -27,7 +27,7 @@
   --sh:0 2px 12px rgba(10,46,26,0.08);--shl:0 8px 32px rgba(10,46,26,0.14);
   --r:12px;--rsm:8px;--rxs:6px;--mono:'DM Mono',monospace;--sans:'Space Grotesk',sans-serif;
 }
-@media(prefers-color-scheme:dark){:root{
+@media(prefers-color-scheme:dark) and (min-width:769px){:root{
   --bg:#060f0a;--sur:#0e1f14;--sur2:#152b1c;--bor:rgba(78,180,110,0.15);--bor2:rgba(78,180,110,0.25);
   --txt:#d8f0e2;--txt2:#8ec8a0;--txt3:#5a8a6a;
 }}
@@ -184,7 +184,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 .drug-table tr:last-child td{border-bottom:none}
 .drug-table tr:hover td{background:var(--sur2)}
 .drug-table .computed{font-family:var(--mono);font-weight:600;color:var(--g6);background:var(--g0)}
-@media(prefers-color-scheme:dark){.drug-table .computed{background:rgba(34,139,82,.1)}}
+@media(prefers-color-scheme:dark) and (min-width:769px){.drug-table .computed{background:rgba(34,139,82,.1)}}
 .editable-input{background:none;border:1px solid transparent;border-radius:var(--rxs);padding:.2rem .3rem;font-family:var(--mono);font-size:.8rem;color:var(--txt);width:70px;text-align:right;transition:border-color .15s}
 .editable-input:focus{outline:none;border-color:var(--g4);background:var(--sur2)}
 
@@ -195,7 +195,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 .reversal-section{margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--bor)}
 .reversal-title{font-size:.75rem;font-weight:600;color:var(--am);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem}
 .note-box{background:var(--am1);border-left:3px solid var(--am);border-radius:0 var(--rxs) var(--rxs) 0;padding:.6rem .75rem;font-size:.8rem;color:#5c3d00;margin-top:.75rem}
-@media(prefers-color-scheme:dark){.note-box{background:rgba(232,160,32,.1);color:var(--am)}}
+@media(prefers-color-scheme:dark) and (min-width:769px){.note-box{background:rgba(232,160,32,.1);color:var(--am)}}
 
 /* FLUID */
 .fluid-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem}
@@ -7037,9 +7037,9 @@ function renderFluidoterapiaCalcScreen() {
           <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">gts/min</th>
         </tr></thead>
         <tbody>
-          <tr><td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">Microgotero (60 gts/ml)</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-mi">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--am);font-weight:600" id="vd-mi-a">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-mi-min">—</td></tr>
-          <tr><td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">Normogotero (20 gts/ml)</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-no">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--am);font-weight:600" id="vd-no-a">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-no-min">—</td></tr>
-          <tr><td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">Macrogotero (10 gts/ml)</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-ma">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--am);font-weight:600" id="vd-ma-a">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-ma-min">—</td></tr>
+          <tr><td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">Microgotero (60)</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-mi">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--am);font-weight:600" id="vd-mi-a">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-mi-min">—</td></tr>
+          <tr><td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">Normogotero (20)</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-no">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--am);font-weight:600" id="vd-no-a">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-no-min">—</td></tr>
+          <tr><td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">Macrogotero (10)</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-ma">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--am);font-weight:600" id="vd-ma-a">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-ma-min">—</td></tr>
         </tbody>
       </table>
     </div>
@@ -7268,6 +7268,25 @@ async function removeLiquidoIV(i) {
   toast('Líquido eliminado');
 }
 
+// ── Aproximación del factor de goteo (gts/x seg) ──
+// Busca el menor k (segundos) tal que factor × k dé aproximadamente una gota:
+// prioriza resultado = 1, luego 0,9 y 1,2; si ninguno calza, busca que sea un
+// número entero de gotas (ej. 0,75 gts/seg → 3 gts / 4 seg). Devuelve {w, k}.
+function aproxGoteo(r) {
+  if (!isFinite(r) || r <= 0) return { w: 0, k: 0 };
+  const MAXK = 3600, TOL = 0.1;
+  for (let k = 1; k <= MAXK; k++) {
+    const v = r * k;
+    if (Math.abs(v - 1) <= TOL)   return { w: 1, k };
+    if (Math.abs(v - 0.9) <= TOL) return { w: 1, k };
+    if (Math.abs(v - 1.2) <= TOL) return { w: 1, k };
+    const wi = Math.round(v);
+    if (wi >= 2 && Math.abs(v - wi) <= TOL) return { w: wi, k };
+  }
+  const k = Math.max(1, Math.round(1 / r));
+  return { w: 1, k };
+}
+
 function calcFluids() {
   const w = parseFloat(document.getElementById('fl-w')?.value)||currentWeight;
   const d = parseFloat(document.getElementById('fl-d')?.value)||0;
@@ -7289,27 +7308,7 @@ function calcFluids() {
   // Goteo: ml/hora → gts/seg. gtts/ml: mi=60, no=20, ma=10. gts/seg = mlh*gtts/3600. gts/min = mlh*gtts/60.
   const gtts = { mi:60, no:20, ma:10 };
   const drips = (mlh) => ({ mi: mlh*gtts.mi/3600, no: mlh*gtts.no/3600, ma: mlh*gtts.ma/3600, min:(g)=> mlh*g/60 });
-  // Aproximación (gts/x seg): busca w gotas en k segundos (w/k ≈ gts/seg) prefiriendo
-  // el menor w (acercarse a 1 gota) y el mayor ajuste posible; gts/min aparte.
-  const approx = (r) => {
-    if (!isFinite(r) || r <= 0) return { w: 0, k: 0 };
-    if (r >= 1) { const w = Math.round(r); return { w, k: 1 }; }
-    const N = 120, LIM = 3600;
-    let best = null;
-    for (let w = 1; w <= N; w++) {
-      const k2 = Math.round(w / r);
-      for (const k of [k2 - 1, k2, k2 + 1]) {
-        if (k < 1 || k > LIM) continue;
-        const err = Math.abs(r - w / k);
-        if (!best || w < best.w || (w === best.w && (err < best.err - 1e-12 || (Math.abs(err - best.err) <= 1e-12 && k < best.k)))) {
-          best = { w, k, err };
-          if (w === 1 && err < 0.02) return best;   // 1 gota casi exacta → práctico y suficiente
-        }
-      }
-    }
-    return best || { w: 1, k: 0 };
-  };
-  const approxStr = (r) => { const a = approx(r); return (a.w && a.k) ? a.w+' gts / '+a.k+' seg' : '—'; };
+  const approxStr = (r) => { const a = aproxGoteo(r); return (a.w && a.k) ? a.w+' gts / '+a.k+' seg' : '—'; };
   const fmtGts = (r) => {
     if (!isFinite(r)) return '—';
     if (r === 0) return '0';
@@ -7318,7 +7317,7 @@ function calcFluids() {
   // Renderiza una fila de goteo (mi/no/ma) con su aproximación y gts/min bajo un prefijo de IDs.
   const renderDripBlock = (p, mlh) => {
     const dr = drips(mlh);
-    set(p+'-mlh', mlh.toFixed(4));
+    set(p+'-mlh', fmtVol(mlh));
     set(p+'-mi',  fmtGts(dr.mi)); set(p+'-mi-a', approxStr(dr.mi)); set(p+'-mi-min', fmtGts(dr.min(60)));
     set(p+'-no',  fmtGts(dr.no)); set(p+'-no-a', approxStr(dr.no)); set(p+'-no-min', fmtGts(dr.min(20)));
     set(p+'-ma',  fmtGts(dr.ma)); set(p+'-ma-a', approxStr(dr.ma)); set(p+'-ma-min', fmtGts(dr.min(10)));
@@ -7336,8 +7335,8 @@ function calcFluids() {
   const bolosN = Math.max(1, parseInt(document.getElementById('fl-bolos-n')?.value)||1);
   set('fl-bolo', fmtVol(tot/bolosN));
 
-  // 2: VOLUMEN DIARIO (Total ÷ 24) — 4 decimales sin aproximar.
-  set('fl-mlh', (tot/24).toFixed(4));
+  // 2: VOLUMEN DIARIO (Total ÷ 24) — coma decimal, sin ceros a la derecha.
+  set('fl-mlh', fmtVol(tot/24));
   renderDripBlock('vd', tot/24);
 
   // 3: DISTRIBUCIÓN (dos fases: % + horas, el resto en el tiempo restante)
@@ -7377,24 +7376,7 @@ function generarResumenFluidosPDF() {
     return (+v.toFixed(4)).toLocaleString('es-CO', { maximumFractionDigits: 4 });
   };
 
-  const approxDrip = (r) => {
-    if (!isFinite(r) || r <= 0) return { w: 0, k: 0 };
-    if (r >= 1) { const w = Math.round(r); return { w, k: 1 }; }
-    const N = 120, LIM = 3600;
-    let best = null;
-    for (let w = 1; w <= N; w++) {
-      const k2 = Math.round(w / r);
-      for (const k of [k2 - 1, k2, k2 + 1]) {
-        if (k < 1 || k > LIM) continue;
-        const err = Math.abs(r - w / k);
-        if (!best || w < best.w || (w === best.w && (err < best.err - 1e-12 || (Math.abs(err - best.err) <= 1e-12 && k < best.k)))) {
-          best = { w, k, err };
-          if (w === 1 && err < 0.02) return best;
-        }
-      }
-    }
-    return best || { w: 1, k: 0 };
-  };
+  const approxDrip = aproxGoteo;
 
   // Recolectar valores ingresados
   const w    = parseFloat(document.getElementById('fl-w')?.value) || 0;
