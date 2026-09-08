@@ -568,7 +568,7 @@ textarea.form-control{resize:vertical;min-height:70px}
           <span style="font-size:1.6rem">💊</span>
           <div style="flex:1">
             <div style="font-size:.82rem;font-weight:700">Calculadora de tratamientos</div>
-            <div style="font-size:.72rem;color:var(--txt3)">Dosis práctica según concentración y peso (misma que en historias clínicas)</div>
+            <div style="font-size:.72rem;color:var(--txt3)">Dosis total según concentración y peso (misma que en historias clínicas)</div>
           </div>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"/></svg>
         </div>
@@ -591,9 +591,30 @@ textarea.form-control{resize:vertical;min-height:70px}
       <h2 style="font-size:1.1rem;font-weight:700">💊 Calculadora de Tratamientos</h2>
       <button class="btn btn-secondary btn-sm" onclick="showScreen('calculadoras')">← Calculadoras</button>
     </div>
-    <p style="font-size:.82rem;color:var(--txt3);margin-bottom:1rem">Calcula la dosis práctica de cada medicamento según dosis básica (mg/kg), peso y concentración. Comparte la misma lógica que el panel de historias clínicas.</p>
+    <p style="font-size:.82rem;color:var(--txt3);margin-bottom:1rem">Calcula la dosis total de cada medicamento según dosis básica (mg/kg), peso y concentración. Puedes resolver cualquiera de las 4 variables (dosis total, concentración, peso o dosis básica) con las otras 3. Comparte la misma lógica que el panel de historias clínicas.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.8rem">
+      <div>
+        <label style="font-size:.72rem;font-weight:600">Especie (nombre común)</label>
+        <input id="tcalc-especie" class="form-control" list="tcalc-sp-dl" placeholder="Buscar especie..." autocomplete="off" style="font-size:.82rem" oninput="calcApplySpecies()" onchange="calcApplySpecies()">
+        <datalist id="tcalc-sp-dl"></datalist>
+      </div>
+      <div>
+        <label style="font-size:.72rem;font-weight:600">Nombre científico</label>
+        <input id="tcalc-sci" class="form-control" placeholder="Se llena al elegir especie" style="font-size:.82rem;background:var(--sur)" readonly>
+      </div>
+    </div>
     <div id="treatment-list-calc"></div>
-    <button class="btn btn-secondary btn-block btn-sm" onclick="addTreatmentRow('tcalc','treatment-list-calc')">+ Agregar medicamento</button>
+    <div style="display:flex;gap:.4rem;margin-bottom:1rem">
+      <button class="btn btn-secondary btn-sm" style="flex:1" onclick="addTreatmentRow('tcalc','treatment-list-calc')">+ Agregar medicamento</button>
+      <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveCalcTratamiento()">💾 Guardar cálculo</button>
+    </div>
+    <div style="border-top:1px solid var(--bor);padding-top:.6rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+        <div style="font-size:.82rem;font-weight:700">📂 Historial de cálculos</div>
+        <button class="btn btn-secondary btn-sm" onclick="openCalcTratHistManager()" style="font-size:.7rem">🗑 Varios</button>
+      </div>
+      <div id="tcalc-hist-list"><p style="font-size:.8rem;color:var(--txt3);font-style:italic;text-align:center;padding:.5rem">Sin cálculos guardados</p></div>
+    </div>
   </div>
 
   <!-- CALCULADORAS NUTRICIONALES -->
@@ -5266,6 +5287,165 @@ const ENF_TIPOS = {
   no_infecciosa:  ['Metabólica','Nutricional','Tóxica','Traumática','Degenerativa','Neoplásica','Hormonal / Endocrina','Neurológica (no infecciosa)','Congénita','Iatrogénica'],
 };
 
+// Lista combinada de causas para el selector único (infecciosas + no infecciosas)
+const ENF_CAUSAS = [...new Set([...ENF_TIPOS.infecciosa, ...ENF_TIPOS.no_infecciosa])];
+
+// Características del agente según la causa seleccionada (se agregan a la historia reutilizable)
+const ENF_AGENTE_CARACT = {
+  'Viral':                     ['ADN','ARN','Retrovirus','Herpesvirus','Orthomixovirus','Paramyxovirus','Coronavirus','Picornavirus','Flavivirus','Rhabdovirus','Otro'],
+  'Bacteriana':                ['Gram positiva','Gram negativa','Anaerobia','Micobacteria','Espiroqueta','Rickettsia / Mycoplasma / Chlamydia','Otro'],
+  'Fúngica':                   ['Dermatofito','Levadura','Moho','Dimórfico','Otro'],
+  'Parasitaria':               ['Nematodo','Cestodo','Trematodo','Protozoo','Artrópodo (ectoparásito)','Otro'],
+  'Priones':                   ['PrPc / PrPSc','Cepa atípica','Otro'],
+  'Metabólica':                ['Endógena','Alteración enzimática','Iatrogénica','Otro'],
+  'Nutricional':               ['Déficit','Exceso','Desequilibrio mineral','Otro'],
+  'Tóxica':                    ['Metal pesado','Veneno animal','Planta tóxica','Fármaco / Medicamento','Pesticida','Micotoxina','Otro'],
+  'Traumática':                ['Contusa / cerrada','Penetrante','Fractura','Luxación','Quemadura','Otro'],
+  'Degenerativa':              ['Artrosis','Neurodegenerativa','Cardiaca','Otro'],
+  'Neoplásica':                ['Benigna','Maligna','Carcinoma','Sarcoma','Linfoma','Otro'],
+  'Hormonal / Endocrina':      ['Hipo','Hiper','Neoplasia endocrina','Otro'],
+  'Neurológica (no infecciosa)': ['Epilepsia','Idiopática','Congénita','Otro'],
+  'Congénita':                 ['Malformación','Herencia recesiva','Herencia dominante','Otro'],
+  'Iatrogénica':               ['Fármaco','Quirúrgica','Manejo clínico','Otro'],
+};
+
+// ── Historiales de causas y características del agente (localStorage global) ──
+let _enfCausaHistorial  = new Set(JSON.parse(localStorage.getItem('wv_enf_causa_hist')||'[]'));
+let _enfAgenteHistorial = new Set(JSON.parse(localStorage.getItem('wv_enf_agente_hist')||'[]'));
+
+function _enf_seedHistories() {
+  const addC = c => { if (c && c.trim() && c !== '__otra__') _enfCausaHistorial.add(c.trim()); };
+  const addA = a => { if (a && a.trim() && a !== '__otra__') _enfAgenteHistorial.add(a.trim()); };
+  Object.values(ENFERMEDADES_GENERALES||{}).forEach(cl => {
+    Object.values(cl.sistemas||{}).forEach(sist => {
+      (sist.enfermedades||[]).forEach(enf => { addC(enf.subtipo); addA(enf.agente_tipo); });
+    });
+  });
+  SPECIES_DB?.forEach(sp => {
+    Object.values(sp.enfermedades_sistemas||{}).forEach(sist => {
+      (sist.enfermedades||[]).forEach(enf => { addC(enf.subtipo); addA(enf.agente_tipo); });
+    });
+  });
+  try { JSON.parse(localStorage.getItem('wv_enf_causa_hist')||'[]').forEach(addC); } catch(e) {}
+  try { JSON.parse(localStorage.getItem('wv_enf_agente_hist')||'[]').forEach(addA); } catch(e) {}
+}
+
+function _enf_causaOptionsHTML(selVal) {
+  const all = [...new Set([...ENF_CAUSAS, ..._enfCausaHistorial])];
+  let html = all.map(c=>`<option value="${c}" ${c===selVal?'selected':''}>${c}</option>`).join('');
+  if (selVal && !all.includes(selVal)) html += `<option value="${selVal}" selected>${selVal}</option>`;
+  html += '<option value="__otra__">➕ Otra causa...</option>';
+  return html;
+}
+
+function _enf_subtipoChanged(val) {
+  const wrap = document.getElementById('enf-causa-nueva-wrap');
+  if (wrap) wrap.style.display = (val === '__otra__') ? 'block' : 'none';
+  if (val && val !== '__otra__') _enf_updateAgente(val);
+}
+
+function _enf_saveCausaNueva() {
+  const inp = document.getElementById('enf-causa-nueva');
+  const val = inp?.value.trim();
+  if (!val) return;
+  _enfCausaHistorial.add(val);
+  try { localStorage.setItem('wv_enf_causa_hist', JSON.stringify([..._enfCausaHistorial])); } catch(e) {}
+  const sel = document.getElementById('enf-subtipo');
+  if (sel) { sel.innerHTML = _enf_causaOptionsHTML(val); sel.value = val; }
+  if (inp) inp.value = '';
+  const wrap = document.getElementById('enf-causa-nueva-wrap');
+  if (wrap) wrap.style.display = 'none';
+  _enf_updateAgente(val);
+}
+
+function _enf_updateAgente(causa, keepVal) {
+  const wrap = document.getElementById('enf-agente-charact');
+  if (!wrap) return;
+  const opts = ENF_AGENTE_CARACT[causa] || ['Otro'];
+  const keep = keepVal || document.getElementById('enf-agente-tipo')?.value || '';
+  const all = [...new Set([...opts, ..._enfAgenteHistorial])];
+  const LBL = 'font-size:.65rem;font-weight:600;color:var(--txt2);display:block;margin-bottom:.15rem';
+  let html = `<div style="${LBL}">Características del agente <span style="font-weight:400;color:var(--txt3)">(según causa: ${causa||'…'})</span></div>`;
+  html += '<select id="enf-agente-tipo" class="form-control" style="font-size:.8rem">';
+  all.forEach(o=>{ html += `<option value="${o}" ${o===keep?'selected':''}>${o}</option>`; });
+  if (keep && !all.includes(keep)) html += `<option value="${keep}" selected>${keep}</option>`;
+  html += '<option value="__otra__">➕ Otra característica...</option>';
+  html += '</select>';
+  html += '<div id="enf-agente-caract-nueva-wrap" style="display:none;margin-top:.3rem">'
+    + '<div style="display:flex;gap:.3rem">'
+    + '<input id="enf-agente-caract-nueva" class="form-control" placeholder="Nueva característica..." style="flex:1;font-size:.8rem">'
+    + '<button class="btn btn-primary btn-sm" onclick="_enf_saveAgenteCaractNueva()">Guardar</button>'
+    + '</div></div>';
+  wrap.innerHTML = html;
+  const sel = wrap.querySelector('#enf-agente-tipo');
+  if (sel) {
+    sel.onchange = () => {
+      const nw = document.getElementById('enf-agente-caract-nueva-wrap');
+      if (nw) nw.style.display = (sel.value === '__otra__') ? 'block' : 'none';
+    };
+  }
+}
+
+function _enf_saveAgenteCaractNueva() {
+  const inp = document.getElementById('enf-agente-caract-nueva');
+  const val = inp?.value.trim();
+  if (!val) return;
+  _enfAgenteHistorial.add(val);
+  try { localStorage.setItem('wv_enf_agente_hist', JSON.stringify([..._enfAgenteHistorial])); } catch(e) {}
+  const causa = document.getElementById('enf-subtipo')?.value || '';
+  _enf_updateAgente(causa, val);
+}
+
+function openEnfCausaHistorial() {
+  document.getElementById('enf-causa-hist-modal')?.remove();
+  const custom = [..._enfCausaHistorial].filter(c => !ENF_CAUSAS.includes(c)).sort();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="enf-causa-hist-modal" style="position:fixed;inset:0;z-index:1500;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:1rem" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--sur);border-radius:var(--r);padding:1.25rem;width:100%;max-width:440px;max-height:88vh;display:flex;flex-direction:column">
+        <div style="font-weight:700;font-size:.9rem;margin-bottom:.5rem">📋 Historial de causas personalizadas</div>
+        <div style="font-size:.75rem;color:var(--txt3);margin-bottom:.5rem">${custom.length} causa(s) agregada(s) manualmente</div>
+        <div style="flex:1;overflow-y:auto;border:1px solid var(--bor);border-radius:var(--rsm);padding:.3rem;margin-bottom:.5rem">
+          ${custom.length ? custom.map((c,i)=>`
+          <div style="display:flex;align-items:center;gap:.3rem;padding:.2rem .35rem;border-bottom:1px solid var(--bor)" id="enfcause-${i}">
+            <span style="flex:1;font-size:.82rem">${c}</span>
+            <button onclick="_enfCausaRemove('${c.replace(/'/g,"&#39;")}',${i})" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem;padding:.1rem .2rem">✕</button>
+          </div>`).join('') : '<p style="font-size:.8rem;color:var(--txt3);text-align:center;padding:.5rem">Sin causas personalizadas en el historial</p>'}
+        </div>
+        <div style="display:flex;gap:.3rem;margin-bottom:.5rem">
+          <input id="enf-causa-hist-new" class="form-control" placeholder="Agregar causa al historial..." style="flex:1;font-size:.82rem">
+          <button class="btn btn-primary btn-sm" onclick="_enfCausaHistAdd()">+ Agregar</button>
+        </div>
+        <button class="btn btn-secondary" onclick="document.getElementById('enf-causa-hist-modal').remove()">Cerrar</button>
+      </div>
+    </div>`);
+}
+
+function _refreshCausaSelect(val) {
+  const sel = document.getElementById('enf-subtipo');
+  if (!sel) return;
+  const prev = sel.value === '__otra__' ? '' : sel.value;
+  const use = (val && val !== '__otra__') ? val : prev;
+  sel.innerHTML = _enf_causaOptionsHTML(use);
+  if (use) sel.value = use;
+}
+
+function _enfCausaHistAdd() {
+  const inp = document.getElementById('enf-causa-hist-new');
+  const val = inp?.value.trim();
+  if (!val || ENF_CAUSAS.includes(val)) { if (inp) inp.value=''; return; }
+  _enfCausaHistorial.add(val);
+  try { localStorage.setItem('wv_enf_causa_hist', JSON.stringify([..._enfCausaHistorial])); } catch(e) {}
+  _refreshCausaSelect(val);
+  openEnfCausaHistorial();
+}
+
+function _enfCausaRemove(causa, idx) {
+  _enfCausaHistorial.delete(causa);
+  try { localStorage.setItem('wv_enf_causa_hist', JSON.stringify([..._enfCausaHistorial])); } catch(e) {}
+  document.getElementById('enfcause-'+idx)?.remove();
+  _refreshCausaSelect('');
+}
+
 const ENF_VIAS = [
   { cat:'1. Transmisión directa', subs:[
     'Contacto directo (piel a piel)','Contacto con mucosas','Mordeduras','Arañazos',
@@ -5759,6 +5939,7 @@ async function removeCategoria(id) {
 
 
 function openAddEnfermedad(sistId, editIdx=-1) {
+  _enf_seedHistories();
   document.getElementById('enf-modal')?.remove();
   const sp       = currentSpecies;
   const sistData = sp?.enfermedades_sistemas?.[sistId];
@@ -5785,7 +5966,7 @@ function openAddEnfermedad(sistId, editIdx=-1) {
           <input id="enf-sinonimos" class="form-control" value="${editEnf?.sinonimos||''}" placeholder="Otros nombres conocidos...">
         </div>
 
-        <!-- FIX 1: Tipo como badges horizontales sin desplegable -->
+        <!-- FIX 1: Tipo como badges horizontales sin desplegable + selector de causa único -->
         <div class="form-group">
           <label>Tipo de enfermedad</label>
           <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">
@@ -5795,21 +5976,29 @@ function openAddEnfermedad(sistId, editIdx=-1) {
               ${t==='infecciosa'?'🦠 Infecciosa':'🔬 No infecciosa'}
             </label>`).join('')}
           </div>
-          <select id="enf-subtipo" class="form-control" style="font-size:.82rem">
-            ${(ENF_TIPOS[editEnf?.tipo||'infecciosa']||ENF_TIPOS.infecciosa).map(s=>`<option value="${s}" ${editEnf?.subtipo===s?'selected':''}>${s}</option>`).join('')}
-          </select>
+          <div style="display:flex;gap:.3rem;align-items:flex-end">
+            <div style="flex:1">
+              <div style="font-size:.65rem;font-weight:600;color:var(--txt2);display:block;margin-bottom:.15rem">Causa / Etiología</div>
+              <select id="enf-subtipo" class="form-control" style="font-size:.82rem" onchange="_enf_subtipoChanged(this.value)">
+                ${_enf_causaOptionsHTML(editEnf?.subtipo||'')}
+              </select>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="font-size:.68rem" onclick="openEnfCausaHistorial()" title="Ver causas personalizadas guardadas">📋 Historial causas</button>
+          </div>
+          <div id="enf-causa-nueva-wrap" style="display:none;margin-top:.3rem">
+            <div style="display:flex;gap:.3rem">
+              <input id="enf-causa-nueva" class="form-control" placeholder="Escribe la nueva causa..." style="flex:1;font-size:.8rem">
+              <button class="btn btn-primary btn-sm" onclick="_enf_saveCausaNueva()">Guardar causa</button>
+            </div>
+          </div>
         </div>
 
         <!-- Agente / Causa -->
-        <div class="form-group"><label>Agente / Causa</label>
-          <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
-            <input id="enf-agente" class="form-control" value="${editEnf?.agente||''}" placeholder="Nombre científico del agente..." style="flex:2">
-            <select id="enf-agente-tipo" class="form-control" style="flex:1;font-size:.8rem">
-              ${['Virus','Bacteria','Hongo','Parásito','Toxina','Trauma','Neoplásico','Otro'].map(t=>`<option ${editEnf?.agente_tipo===t?'selected':''}>${t}</option>`).join('')}
-            </select>
-          </div>
-          <textarea id="enf-agente-info" class="form-control" style="min-height:55px;resize:vertical;font-size:.8rem"
-            placeholder="Información sobre el agente: características, serotipos, cepas, virulencia...">${editEnf?.agente_info||''}</textarea>
+        <div class="form-group"><label>Agente causal</label>
+          <input id="enf-agente" class="form-control" value="${editEnf?.agente||''}" placeholder="Nombre científico del agente (o descripción del factor causal)..." style="margin-bottom:.4rem">
+          <div id="enf-agente-charact"></div>
+          <textarea id="enf-agente-info" class="form-control" style="min-height:55px;resize:vertical;font-size:.8rem;margin-top:.4rem"
+            placeholder="Información sobre el agente: serotipos, cepas, virulencia, mecanismo de daño...">${editEnf?.agente_info||''}</textarea>
         </div>
 
         <!-- Sistemas afectados -->
@@ -5921,20 +6110,31 @@ function openAddEnfermedad(sistId, editIdx=-1) {
         <div class="form-group"><label>Diagnóstico</label>
           <!-- Gold Standard -->
           <div style="background:var(--g0);border:1.5px solid var(--g4);border-radius:var(--rsm);padding:.5rem .6rem;margin-bottom:.5rem">
-            <div style="font-size:.72rem;font-weight:700;color:var(--g6);margin-bottom:.3rem">⭐ Prueba Gold Standard</div>
-            <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
-              <input id="enf-dx-gold-std" class="form-control" value="${editEnf?.dx_gold_std||''}" placeholder="Prueba más precisa (PCR, histopatología...)" style="flex:2;font-size:.82rem">
-              <input id="enf-dx-gold-hallazgo" class="form-control" value="${editEnf?.dx_gold_hallazgo||''}" placeholder="Hallazgo esperado..." style="flex:1;font-size:.82rem">
+            <div style="font-size:.72rem;font-weight:700;color:var(--g6);margin-bottom:.35rem">⭐ Prueba Gold Standard</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.35rem">
+              <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Prueba más precisa</div>
+                <input id="enf-dx-gold-std" class="form-control" value="${editEnf?.dx_gold_std||''}" placeholder="PCR, histopatología..." style="font-size:.8rem">
+              </div>
+              <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Hallazgo esperado</div>
+                <input id="enf-dx-gold-hallazgo" class="form-control" value="${editEnf?.dx_gold_hallazgo||''}" placeholder="Hallazgo esperado..." style="font-size:.8rem">
+              </div>
+              <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Muestra</div>
+                <input id="enf-dx-gold-muestra" class="form-control" value="${editEnf?.dx_gold_muestra||''}" placeholder="Sangre, tejido..." style="font-size:.8rem">
+              </div>
+              <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Sensibilidad (%)</div>
+                <input id="enf-dx-gold-sensibilidad" class="form-control" value="${editEnf?.dx_gold_sensibilidad||''}" style="font-size:.8rem">
+              </div>
+              <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Especificidad (%)</div>
+                <input id="enf-dx-gold-especificidad" class="form-control" value="${editEnf?.dx_gold_especificidad||''}" style="font-size:.8rem">
+              </div>
+              <div></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.3rem">
-              <input id="enf-dx-gold-muestra" class="form-control" value="${editEnf?.dx_gold_muestra||''}" placeholder="Muestra (sangre, tejido...)" style="font-size:.8rem">
-              <input id="enf-dx-gold-sensibilidad" class="form-control" value="${editEnf?.dx_gold_sensibilidad||''}" placeholder="Sensibilidad (%)" style="font-size:.8rem">
-              <input id="enf-dx-gold-especificidad" class="form-control" value="${editEnf?.dx_gold_especificidad||''}" placeholder="Especificidad (%)" style="font-size:.8rem">
-            </div>
-            <textarea id="enf-dx-gold-descripcion" class="form-control" style="min-height:45px;resize:vertical;font-size:.8rem;margin-bottom:.3rem"
-              placeholder="Descripción del procedimiento, interpretación...">${editEnf?.dx_gold_descripcion||''}</textarea>
-            <textarea id="enf-dx-gold-utilidad" class="form-control" style="min-height:35px;resize:vertical;font-size:.8rem;margin-bottom:.3rem"
-              placeholder="Utilidad clínica, cuándo usar esta prueba...">${editEnf?.dx_gold_utilidad||''}</textarea>
+            <div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Descripción del procedimiento</div>
+            <textarea id="enf-dx-gold-descripcion" class="form-control" style="min-height:45px;resize:vertical;font-size:.8rem;margin-bottom:.35rem"
+              placeholder="Procedimiento, interpretación...">${editEnf?.dx_gold_descripcion||''}</textarea>
+            <div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Utilidad clínica</div>
+            <textarea id="enf-dx-gold-utilidad" class="form-control" style="min-height:35px;resize:vertical;font-size:.8rem;margin-bottom:.35rem"
+              placeholder="Cuándo usar esta prueba...">${editEnf?.dx_gold_utilidad||''}</textarea>
             <div id="enf-dx-gold-imgs" style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.25rem">
               ${(editEnf?.dx_gold_imagenes||[]).map(img=>`<div style="position:relative"><img src="${img.data||img.url}" style="height:55px;width:auto;border-radius:var(--rxs);cursor:pointer" onclick="openImageFull('${img.data||img.url}')"><button onclick="this.closest('div').remove()" style="position:absolute;top:0;right:0;background:var(--r5);color:white;border:none;border-radius:50%;width:16px;height:16px;font-size:.6rem;cursor:pointer;line-height:1">✕</button></div>`).join('')}
             </div>
@@ -5946,20 +6146,32 @@ function openAddEnfermedad(sistId, editIdx=-1) {
           <div id="enf-dx-list">
             ${(editEnf?.dx_lista||[editEnf?.dx||'']).filter(Boolean).map(d=>`
             <div class="enf-dx-row" style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.5rem;margin-bottom:.5rem;background:var(--sur2)">
-              <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
-                <input class="form-control enf-dx-item" value="${typeof d==='object'?d.metodo||'':d}" placeholder="Método diagnóstico (PCR, ELISA, Rx...)" style="flex:1;font-size:.82rem;font-weight:600">
+              <div style="display:flex;gap:.3rem;align-items:flex-end;margin-bottom:.35rem">
+                <div style="flex:1"><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Método diagnóstico</div>
+                  <input class="form-control enf-dx-item" value="${typeof d==='object'?d.metodo||'':d}" placeholder="PCR, ELISA, Rx..." style="font-size:.82rem;font-weight:600">
+                </div>
                 <button onclick="this.closest('.enf-dx-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
               </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.3rem">
-                <input class="form-control enf-dx-expect-item" value="${typeof d==='object'?d.esperado||'':''}" placeholder="Hallazgo esperado..." style="font-size:.8rem">
-                <input class="form-control enf-dx-muestra" value="${typeof d==='object'?d.muestra||'':''}" placeholder="Muestra (sangre, tejido...)" style="font-size:.8rem">
-                <input class="form-control enf-dx-sensibilidad" value="${typeof d==='object'?d.sensibilidad||'':''}" placeholder="Sensibilidad (%)" style="font-size:.8rem">
-                <input class="form-control enf-dx-especificidad" value="${typeof d==='object'?d.especificidad||'':''}" placeholder="Especificidad (%)" style="font-size:.8rem">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.35rem">
+                <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Hallazgo esperado</div>
+                  <input class="form-control enf-dx-expect-item" value="${typeof d==='object'?d.esperado||'':''}" placeholder="Hallazgo esperado..." style="font-size:.8rem">
+                </div>
+                <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Muestra</div>
+                  <input class="form-control enf-dx-muestra" value="${typeof d==='object'?d.muestra||'':''}" placeholder="Sangre, tejido..." style="font-size:.8rem">
+                </div>
+                <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Sensibilidad (%)</div>
+                  <input class="form-control enf-dx-sensibilidad" value="${typeof d==='object'?d.sensibilidad||'':''}" style="font-size:.8rem">
+                </div>
+                <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Especificidad (%)</div>
+                  <input class="form-control enf-dx-especificidad" value="${typeof d==='object'?d.especificidad||'':''}" style="font-size:.8rem">
+                </div>
               </div>
-              <textarea class="form-control enf-dx-descripcion" style="min-height:45px;resize:vertical;font-size:.8rem;margin-bottom:.3rem"
-                placeholder="Descripción del método, procedimiento, interpretación...">${typeof d==='object'?d.descripcion||'':''}</textarea>
-              <textarea class="form-control enf-dx-utilidad" style="min-height:35px;resize:vertical;font-size:.8rem;margin-bottom:.3rem"
-                placeholder="Utilidad clínica, cuándo usar este método...">${typeof d==='object'?d.utilidad||'':''}</textarea>
+              <div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Descripción del método</div>
+              <textarea class="form-control enf-dx-descripcion" style="min-height:45px;resize:vertical;font-size:.8rem;margin-bottom:.35rem"
+                placeholder="Procedimiento, interpretación...">${typeof d==='object'?d.descripcion||'':''}</textarea>
+              <div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Utilidad clínica</div>
+              <textarea class="form-control enf-dx-utilidad" style="min-height:35px;resize:vertical;font-size:.8rem;margin-bottom:.35rem"
+                placeholder="Cuándo usar este método...">${typeof d==='object'?d.utilidad||'':''}</textarea>
               <div class="enf-dx-img-preview" style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.2rem">
                 ${(typeof d==='object'&&d.imagenes||[]).map(img=>`<div><img src="${img.data||img.url}" style="height:55px;width:auto;border-radius:var(--rxs);cursor:pointer" onclick="openImageFull('${img.data||img.url}')"></div>`).join('')}
               </div>
@@ -6105,6 +6317,7 @@ function openAddEnfermedad(sistId, editIdx=-1) {
         </div>
       </div>
     </div>`);
+  _enf_updateAgente(editEnf?.subtipo || editEnf?.tipo || 'infecciosa', editEnf?.agente_tipo || '');
   setTimeout(() => { buildSignosHistory?.(); _buildSpeciesDatalist?.(); setTimeout(()=>_enfRenderRefList('enf'),50); }, 50);
 }
 
@@ -6198,7 +6411,9 @@ function _confirmarCargarEnfGen() {
   // Tipo
   const tipoEl = document.querySelector(`[name="enf-tipo"][value="${enf.tipo||'infecciosa'}"]`);
   if (tipoEl) { tipoEl.checked=true; _enf_updateSubtipo(enf.tipo||'infecciosa'); }
+  _refreshCausaSelect(enf.subtipo);
   set('enf-subtipo', enf.subtipo);
+  _enf_updateAgente(enf.subtipo || enf.tipo || 'infecciosa', enf.agente_tipo || '');
   set('enf-agente-tipo', enf.agente_tipo);
   // Sistemas afectados
   document.querySelectorAll('#enf-modal .enf-sistema-chk').forEach(chk => {
@@ -6501,9 +6716,9 @@ async function saveEnfermedadModal(sistId, editIdx=-1) {
     nombre,
     sinonimos:        document.getElementById('enf-sinonimos')?.value.trim()||'',
     tipo:             modal?.querySelector('[name="enf-tipo"]:checked')?.value||'infecciosa',
-    subtipo:          document.getElementById('enf-subtipo')?.value||'',
+    subtipo:          (document.getElementById('enf-subtipo')?.value||'').replace('__otra__',''),
     agente:           document.getElementById('enf-agente')?.value.trim()||'',
-    agente_tipo:      document.getElementById('enf-agente-tipo')?.value||'',
+    agente_tipo:      (document.getElementById('enf-agente-tipo')?.value||'').replace('__otra__',''),
     agente_info:      document.getElementById('enf-agente-info')?.value.trim()||'',
     sistemas_afectados: sistAfect.length ? sistAfect : (sistId ? [sistId] : []),
     organos:          qsC('.enf-organo-chk'),
@@ -6566,6 +6781,11 @@ async function saveEnfermedadModal(sistId, editIdx=-1) {
   // Agregar métodos diagnósticos al historial
   (enf.dx_lista||[]).forEach(d => { if(d.metodo) _dxHistorial.add(d.metodo.trim()); });
   try { localStorage.setItem('wv_dx_hist', JSON.stringify([..._dxHistorial])); } catch(e) {}
+  // Agregar causa y características del agente al historial
+  if (enf.subtipo && enf.subtipo !== '__otra__') _enfCausaHistorial.add(enf.subtipo.trim());
+  if (enf.agente_tipo && enf.agente_tipo !== '__otra__') _enfAgenteHistorial.add(enf.agente_tipo.trim());
+  try { localStorage.setItem('wv_enf_causa_hist', JSON.stringify([..._enfCausaHistorial])); } catch(e) {}
+  try { localStorage.setItem('wv_enf_agente_hist', JSON.stringify([..._enfAgenteHistorial])); } catch(e) {}
   await dbPutSync('species', currentSpecies);
 
   const todasEspExtra = [...(enf.especies_confirmadas||[]),...(enf.especies_vulnerables||[])];
@@ -8703,6 +8923,25 @@ function openAddDrug(editId=null, preselectedCat=null) {
         <textarea id="vd-notes" class="form-control" style="min-height:40px">${existing?.notes||''}</textarea>
       </div>
 
+      <!-- Mecanismo de acción -->
+      <div class="form-group"><label>Mecanismo de acción <span style="font-size:.7rem;font-weight:400;color:var(--txt3)">(técnico)</span></label>
+        <textarea id="vd-mech" class="form-control" style="min-height:60px;resize:vertical"
+          placeholder="Mecanismo farmacológico detallado: receptor, vía de señalización, efectos celulares...">${existing?.mech||''}</textarea>
+      </div>
+      <div class="form-group"><label>Mecanismo de acción resumido</label>
+        <textarea id="vd-mech-simple" class="form-control" style="min-height:40px;resize:vertical"
+          placeholder="Resumen breve para consulta rápida / lenguaje sencillo...">${existing?.mech_simple||''}</textarea>
+      </div>
+
+      <!-- Descripción + Palabras clave -->
+      <div class="form-group"><label>Descripción</label>
+        <textarea id="vd-desc" class="form-control" style="min-height:50px;resize:vertical"
+          placeholder="Descripción general del fármaco...">${existing?.desc||''}</textarea>
+      </div>
+      <div class="form-group"><label>Palabras clave <span style="font-size:.7rem;font-weight:400;color:var(--txt3)">(separadas por coma o espacio — la app las organiza como lista y son buscables)</span></label>
+        <input id="vd-keywords" class="form-control" value="${(existing?.keywords||[]).join(', ')}" placeholder="Ej: analgésico, opioide, dolor crónico, SID...">
+      </div>
+
       <!-- Dosis por especie -->
       <div style="margin-top:.5rem">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem">
@@ -8849,6 +9088,10 @@ async function saveDrug(editId='') {
     contraindications:document.getElementById('vd-contra')?.value||'',
     info:             document.getElementById('vd-info')?.value||'',
     notes:            document.getElementById('vd-notes')?.value||'',
+    mech:             document.getElementById('vd-mech')?.value||'',
+    mech_simple:      document.getElementById('vd-mech-simple')?.value||'',
+    desc:             document.getElementById('vd-desc')?.value||'',
+    keywords:         (document.getElementById('vd-keywords')?.value||'').split(/[,;]+/).map(k=>k.trim()).filter(Boolean),
     species_doses
   };
 
@@ -8895,6 +9138,10 @@ async function syncVadToSpecies(vadId) {
         contra: vd.contraindications||existingDrug.contra,
         effects: vd.info||existingDrug.effects,
         notes: vd.notes||existingDrug.notes,
+        mech: vd.mech||existingDrug.mech,
+        mech_simple: vd.mech_simple||existingDrug.mech_simple,
+        desc: vd.desc||existingDrug.desc,
+        keywords: vd.keywords||existingDrug.keywords,
         dose: spDose.dose||existingDrug.dose,
         dose_min: spDose.dose_min||existingDrug.dose_min,
         dose_max: spDose.dose_max||existingDrug.dose_max,
@@ -8927,6 +9174,10 @@ const VAD_HEADER_MAP = {
   'contraindicaciones':'contraindications','contraindicacion':'contraindications','contra':'contraindications',
   'efectos_adversos':'info','efectos':'info','efectos_secundarios':'info','info':'info','reacciones':'info',
   'notas':'notes','notas_clinicas':'notes','notes':'notes','observaciones':'notes',
+  'mecanismo_accion':'mech','mecanismo':'mech','mecanismo_tecnico':'mech','mecanismo_de_accion':'mech','mecanismo_tecnico_detallado':'mech',
+  'mecanismo_resumido':'mech_simple','mecanismo_simple':'mech_simple','resumen_mecanismo':'mech_simple',
+  'descripcion':'desc','desc':'desc','description':'desc',
+  'palabras_clave':'keywords','palabras_claves':'keywords','keywords':'keywords','etiquetas':'keywords','tags':'keywords',
   'dosis_por_especie':'species_doses','dosis':'species_doses','dosis_especies':'species_doses'
 };
 const VAD_SUB_SEP = ';';   // separador de valores múltiples
@@ -8936,7 +9187,8 @@ const VAD_SPEC_SEP = '|';  // separador de campos dentro de una fila de dosis
 function descargarPlantillaVademecum() {
   const headers = [
     'nombres','principio_activo','concentraciones_mg_ml','categorias','categoria_especifica',
-    'vias','frecuencia','indicaciones','contraindicaciones','efectos_adversos','notas','dosis_por_especie'
+    'vias','frecuencia','indicaciones','contraindicaciones','efectos_adversos','notas',
+    'mecanismo_accion','mecanismo_resumido','descripcion','palabras_clave','dosis_por_especie'
   ];
   const ej = {
     nombres:'Ketavet;Ketamidor',
@@ -8950,6 +9202,10 @@ function descargarPlantillaVademecum() {
     contraindicaciones:'Cardiopatía severa',
     efectos_adversos:'Hipotensión, bradicardia',
     notas:'Titular según profundidad anestésica.',
+    mecanismo_accion:'Antagonismo no competitivo de receptores NMDA (glutamatérgicos), bloqueando la entrada de calcio y produciendo disociación sensorial y analgesia profunda.',
+    mecanismo_resumido:'Bloquea los receptores NMDA; produce anestesia disociativa e inmovilización.',
+    descripcion:'Anestésico disociativo de acción rápida usado en contención química y procedimientos cortos.',
+    palabras_clave:'anestésico, disociativo, NMDA, contención',
     dosis_por_especie:'Perro|Canis lupus familiaris|5|10|15|IM|dosis única|\nGato|Felis catus|3|5|7|IM|dosis única|'
   };
   const esc = (v)=>{ v=String(v??''); return /[";\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
@@ -9051,6 +9307,10 @@ function _vadRowToDrug(mapped) {
     contraindications: mapped.contraindications||'',
     info: mapped.info||'',
     notes: mapped.notes||'',
+    mech: mapped.mech||'',
+    mech_simple: mapped.mech_simple||'',
+    desc: mapped.desc||'',
+    keywords: (mapped.keywords||'').split(/[,;]+/).map(k=>k.trim()).filter(Boolean),
     species_doses
   };
 }
@@ -9060,7 +9320,8 @@ const VAD_COL_LABELS = {
   nombres:'Nombres comerciales', active:'Principio activo', concs:'Conc. (mg/ml)',
   cats:'Categorías', cat_esp:'Cat. específica', routes:'Vías',
   freq:'Frecuencia', indic:'Indicaciones', contraindications:'Contraindicaciones',
-  info:'Efectos adversos', notes:'Notas', species_doses:'Dosis por especie'
+  info:'Efectos adversos', notes:'Notas', species_doses:'Dosis por especie',
+  mech:'Mecanismo de acción', mech_simple:'Mecanismo resumido', desc:'Descripción', keywords:'Palabras clave'
 };
 
 // Genera la previsualización en un modal y permite confirmar la importación.
@@ -9368,13 +9629,23 @@ function editVadSubcategoryInfo(subId) {
 }
 
 // ── Sub-subcategory CRUD ──
+// Permite crear una sub-subcategoría desde el listado de subcategorías
+// (funciona aunque la subcategoría aún no tenga ninguna subcats).
+function openAddVadSubSubFromThis(subId) {
+  if (!subId || !_vadCatActiva || _vadCatActiva === '__all__') return;
+  _vadSubcatActiva = subId;
+  _vadSubSubcatActiva = null;
+  openAddVadSubSubcategory();
+}
+
 function openAddVadSubSubcategory() {
   const cat = VADEMECUM_CATS[_vadCatActiva];
   const sub = cat?.subcategories?.[_vadSubcatActiva];
   if (!sub) return;
+  const prevSub = _vadSubcatActiva;
   if (!sub.subcats) sub.subcats = {};
   const nombre = prompt('Nombre de la nueva sub-subcategoría:');
-  if (!nombre?.trim()) return;
+  if (!nombre?.trim()) { _vadSubcatActiva = prevSub; return; }
   const id = nombre.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_');
   if (sub.subcats[id]) { toast('⚠ Ya existe una sub-subcategoría con ese nombre'); return; }
   sub.subcats[id] = { label: nombre.trim(), info: '' };
@@ -9463,6 +9734,27 @@ function copyDrug(drugId) {
   });
 }
 
+// ── Orden numérico estable: extrae el número (arábigo o romano) inicial de un label ──
+function _vadSortNum(label) {
+  const s = String(label||'').trim();
+  let m = s.match(/^(\d+)[\.\)\-–—:]\s*/);
+  if (m) return parseInt(m[1],10);
+  m = s.match(/^([IVXLCDMivxlcdm]+)[\.\)\-–—:]\s*/);
+  if (m) {
+    const val = {I:1,V:5,X:10,L:50,C:100,D:500,M:1000};
+    let total = 0, prev = 0;
+    for (let i = m[1].length-1; i >= 0; i--) {
+      const cur = val[m[1][i].toUpperCase()] || 0;
+      if (cur < prev) total -= cur; else { total += cur; prev = cur; }
+    }
+    return total;
+  }
+  return Infinity;
+}
+function _vadSortByNum(arr) {
+  return arr.sort((a,b) => (_vadSortNum(a[1].label) - _vadSortNum(b[1].label)) || a[0].localeCompare(b[0], 'es'));
+}
+
 // ── Render: main dispatcher ──
 function renderVademecum(filter='') {
   const list = document.getElementById('vademecum-list');
@@ -9527,7 +9819,7 @@ function renderVademecum(filter='') {
 
 // ── Render: Level 1 — Categories ──
 function _renderVadCategories(el, isAdmin) {
-  const cats = Object.entries(VADEMECUM_CATS);
+  const cats = _vadSortByNum(Object.entries(VADEMECUM_CATS));
   if (!cats.length) {
     el.innerHTML = '<div class="empty-state"><p>Sin categorías configuradas</p></div>' + (isAdmin ? `
     <button onclick="openAddVadCategory()" class="btn btn-secondary btn-sm" style="width:100%;margin-top:.5rem">
@@ -9574,7 +9866,7 @@ function _renderVadCategories(el, isAdmin) {
 function _renderVadSubcategories(el, isAdmin) {
   const cat = VADEMECUM_CATS[_vadCatActiva];
   if (!cat) { el.innerHTML = '<div class="empty-state"><p>Categoría no encontrada</p></div>'; return; }
-  const subcats = Object.entries(cat.subcategories||{});
+  const subcats = _vadSortByNum(Object.entries(cat.subcategories||{}));
   if (!subcats.length) {
     el.innerHTML = (isAdmin ? `<button onclick="openAddVadSubcategory()" class="btn btn-secondary btn-sm" style="width:100%;margin-top:.5rem">+ Nueva subcategoría</button>` : '<div class="empty-state"><p>Sin subcategorías</p></div>');
     return;
@@ -9600,6 +9892,7 @@ function _renderVadSubcategories(el, isAdmin) {
       </div>
       ${isAdmin ? `<div style="display:flex;gap:.3rem;padding:0 .85rem .4rem;flex-wrap:wrap">
         <button onclick="event.stopPropagation();editVadSubcategoryInfo('${id}')" class="btn btn-secondary btn-sm" style="font-size:.68rem">📝 Info</button>
+        <button onclick="event.stopPropagation();openAddVadSubSubFromThis('${id}')" class="btn btn-secondary btn-sm" style="font-size:.68rem;color:var(--g6)">📂 Sub-subcategoría</button>
         <button onclick="event.stopPropagation();renameVadSubcategory('${id}')" class="btn btn-secondary btn-sm" style="font-size:.68rem">✏️ Renombrar</button>
         <button onclick="event.stopPropagation();deleteVadSubcategory('${id}')" class="btn btn-secondary btn-sm" style="font-size:.68rem;color:var(--r5)">✕ Eliminar</button>
       </div>` : ''}
@@ -9615,7 +9908,7 @@ function _renderVadSubSubcategories(el, isAdmin) {
   const cat = VADEMECUM_CATS[_vadCatActiva];
   const sub = cat?.subcategories?.[_vadSubcatActiva];
   if (!sub?.subcats) { el.innerHTML = '<div class="empty-state"><p>No hay sub-subcategorías</p></div>'; return; }
-  const subsubs = Object.entries(sub.subcats);
+  const subsubs = _vadSortByNum(Object.entries(sub.subcats));
   el.innerHTML = subsubs.map(([id, ss]) => {
     const drugCount = VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && d.subcat_vad === sub.label && d.subsubcat_vad === ss.label).length;
     return `
@@ -9648,6 +9941,10 @@ function _renderVadSearch(el, isAdmin, q) {
     (d.cat_esp||'').toLowerCase().includes(q) ||
     (d.indic||'').toLowerCase().includes(q) ||
     (d.info||'').toLowerCase().includes(q) ||
+    (d.mech||'').toLowerCase().includes(q) ||
+    (d.mech_simple||'').toLowerCase().includes(q) ||
+    (d.desc||'').toLowerCase().includes(q) ||
+    (d.keywords||[]).some(k=>k.toLowerCase().includes(q)) ||
     (d.nombres||[]).some(n=>n.toLowerCase().includes(q)) ||
     (d.cats||[]).some(cc=>cc.toLowerCase().includes(q)) ||
     (d.species_doses||[]).some(s=>
@@ -9781,6 +10078,10 @@ function _buildVadDrugCard(d, isAdmin, showBreadcrumb) {
         ${d.freq?`<p style="margin:0;font-size:.8rem"><strong>Frecuencia:</strong> ${d.freq}</p>`:''}
         ${d.indic?`<p style="margin:0;font-size:.8rem;color:var(--txt2)"><strong style="color:var(--g6)">✅ Indicaciones:</strong> ${d.indic}</p>`:''}
         ${d.contraindications?`<div style="background:var(--r1);border-radius:var(--rxs);padding:.3rem .5rem;font-size:.78rem;color:var(--r5)">⚠ <strong>Contraindicaciones:</strong> ${d.contraindications}</div>`:''}
+        ${d.mech?`<p style="margin:0;font-size:.8rem;color:var(--txt2)"><strong style="color:var(--g6)">⚙️ Mecanismo de acción:</strong> ${d.mech}</p>`:''}
+        ${d.mech_simple?`<p style="margin:0;font-size:.78rem;color:var(--txt3)"><strong>Mecanismo (resumido):</strong> ${d.mech_simple}</p>`:''}
+        ${d.desc?`<p style="margin:0;font-size:.8rem;color:var(--txt2)"><strong>Descripción:</strong> ${d.desc}</p>`:''}
+        ${d.keywords?.length?`<div style="margin-top:.25rem;display:flex;flex-wrap:wrap;gap:.2rem">${d.keywords.map(k=>`<span style="font-size:.65rem;background:var(--g0);color:var(--g6);border:1px solid var(--g4);border-radius:20px;padding:.05rem .4rem">#${k}</span>`).join('')}</div>`:''}
         ${d.info?`<p style="margin:0;font-size:.78rem;color:var(--txt3)"><strong>Efectos adversos:</strong> ${d.info}</p>`:''}
         ${d.notes?`<p style="margin:0;font-size:.78rem;color:var(--txt3);font-style:italic">📋 ${d.notes}</p>`:''}
       </div>
@@ -10832,9 +11133,18 @@ function hcTreatRowHtml(i, prefix) {
         <div><label style="font-size:.72rem;color:var(--txt3)">Dosis básica <span class="treat-dosis-u" style="color:var(--txt3);font-weight:400">(mg/kg)</span></label><input class="form-control treat-dosis" type="text" inputmode="decimal" placeholder="Ej: 2" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
         <div><label style="font-size:.72rem;color:var(--txt3)">Peso (kg)</label><input class="form-control treat-peso" type="text" inputmode="decimal" placeholder="kg" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
       </div>
+      <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem">
+        <label style="font-size:.72rem;color:var(--txt3);flex-shrink:0">Calcular:</label>
+        <select class="form-control treat-calc" style="flex:1;font-size:.78rem" onchange="calcTreatDose(this)">
+          <option value="total">Dosis total (dosis × peso / concentración)</option>
+          <option value="conc">Concentración (dosis × peso / total)</option>
+          <option value="peso">Peso (concentración × total / dosis)</option>
+          <option value="dosis">Dosis básica (concentración × total / peso)</option>
+        </select>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;margin-bottom:.4rem">
-        <div><label style="font-size:.72rem;color:var(--txt3)">Dosis práctica <span style="font-size:.62rem;color:var(--txt3)">(editable)</span></label><input class="form-control treat-total" type="text" inputmode="decimal" placeholder="auto / manual" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
-        <div><label style="font-size:.72rem;color:var(--txt3)">Unidad dosis práctica</label><input class="form-control treat-total-u" value="" readonly placeholder="ml/tab/cap..." style="font-size:.82rem;background:var(--sur)"></div>
+        <div><label style="font-size:.72rem;color:var(--txt3)">Dosis total <span style="font-size:.62rem;color:var(--txt3)">(editable)</span></label><input class="form-control treat-total" type="text" inputmode="decimal" placeholder="auto / manual" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
+        <div><label style="font-size:.72rem;color:var(--txt3)">Unidad dosis total</label><input class="form-control treat-total-u" value="" readonly placeholder="ml/tab/cap..." style="font-size:.82rem;background:var(--sur)"></div>
         <div><label style="font-size:.72rem;color:var(--txt3)">Vía</label>
           <select class="form-control treat-via" style="font-size:.82rem">
             <option value="">Vía</option><option>IM</option><option>IV</option><option>SC</option><option>VO</option><option>Tópico</option><option>IN</option><option>Inhalatorio</option>
@@ -10858,24 +11168,44 @@ function calcTreatDose(input) {
   const elNum = row.querySelector('.treat-conc-num');
   const elDen = row.querySelector('.treat-conc-den');
   if (!elDosis || !elPeso || !elConc || !elTotal) return;
-  if (input === elTotal) row.dataset.last = 'total';
-  else if (input === elDosis) row.dataset.last = 'dosis';
   const peso = parseNum(elPeso.value)||0;
   const conc = parseNum(elConc.value)||0;
+  const dosis = parseNum(elDosis.value)||0;
+  const total = parseNum(elTotal.value)||0;
   const den = elDen?.value || '';
   const num = elNum?.value || '';
   const tu = row.querySelector('.treat-total-u');
   if (tu && den) tu.value = den;
   const du = row.querySelector('.treat-dosis-u');
   if (du) du.textContent = num ? '('+num+'/kg)' : '';
-  if (row.dataset.last === 'total') {
-    const total = parseNum(elTotal.value)||0;
-    if (total>0 && peso>0 && conc>0) { elDosis.value = fmtNum(total*conc/peso); row.dataset.calc = 'manual'; }
-    else elDosis.value = '';
-  } else {
-    const dosis = parseNum(elDosis.value)||0;
-    if (dosis>0 && peso>0 && conc>0) { elTotal.value = fmtNum(dosis*peso/conc); row.dataset.calc = 'calc'; }
-    else elTotal.value = '';
+
+  // Variable a calcular: la del selector (o dosis total si no hay selector).
+  // Si el usuario edita directamente el campo de dosis total, ese valor es manual
+  // y sirve para recalcular la dosis básica (compatibilidad con historias).
+  let target = row.querySelector('.treat-calc')?.value || 'total';
+  if (input === elTotal) target = 'total';
+
+  if (target === 'total') {
+    row.dataset.calc = (input === elTotal) ? 'manual' : 'calc';
+    if (input === elTotal) {
+      if (total>0 && peso>0 && conc>0) elDosis.value = fmtNum(total*conc/peso);
+      else elDosis.value = '';
+    } else {
+      if (dosis>0 && peso>0 && conc>0) { elTotal.value = fmtNum(dosis*peso/conc); row.dataset.calc = 'calc'; }
+      else if (elTotal.value) elTotal.value = '';
+    }
+  } else if (target === 'conc') {
+    row.dataset.calc = 'calc';
+    if (input !== elConc && total>0 && peso>0 && dosis>0) elConc.value = fmtNum(dosis*peso/total);
+    else if (input !== elConc && elConc.value) elConc.value = '';
+  } else if (target === 'peso') {
+    row.dataset.calc = 'calc';
+    if (input !== elPeso && total>0 && conc>0 && dosis>0) elPeso.value = fmtNum(total*conc/dosis);
+    else if (input !== elPeso && elPeso.value) elPeso.value = '';
+  } else { // dosis
+    row.dataset.calc = 'calc';
+    if (input !== elDosis && total>0 && peso>0 && conc>0) elDosis.value = fmtNum(total*conc/peso);
+    else if (input !== elDosis && elDosis.value) elDosis.value = '';
   }
 }
 // ═══════════════════════════════════
@@ -10926,11 +11256,11 @@ function treatDesc(t) {
   if (t.conc_num) {
     arr.push(['Concentración', `${fmtNum(t.conc)} ${t.conc_num}/${t.conc_den}`]);
     if (t.dosis) arr.push(['Dosis básica', `${fmtNum(t.dosis)} ${t.conc_num}/kg`]);
-    if (t.total) arr.push(['Dosis práctica', `${fmtNum(t.total)} ${t.total_u||t.conc_den||''}`]);
+    if (t.total) arr.push(['Dosis total', `${fmtNum(t.total)} ${t.total_u||t.conc_den||''}`]);
   } else {
     if (t.conc) arr.push(['Concentración', t.conc]);
     if (t.dosis) arr.push(['Dosis', `${fmtNum(t.dosis)} mg/kg`]);
-    if (t.total) arr.push(['Dosis práctica', `${fmtNum(t.total)} ${t.total_u||'mg'}`]);
+    if (t.total) arr.push(['Dosis total', `${fmtNum(t.total)} ${t.total_u||'mg'}`]);
     if (t.vol) arr.push(['Vol', fmtNum(t.vol)]);
   }
   if (t.peso) arr.push(['Peso', `${fmtNum(t.peso)} kg`]);
@@ -11202,9 +11532,200 @@ function addTreatmentRow(prefix, container) {
 }
 function renderCalcTratamientosScreen() {
   tcalcCount = 0;
+  _txEditId = null;
+  const el = document.getElementById('treatment-list-calc');
+  if (el) el.innerHTML = hcTreatRowHtml(++tcalcCount, 'tcalc');
+  _buildCalcSpDatalist();
+  loadCalcTratHist().then(renderCalcTratHist);
+}
+
+// ── Calculadora de tratamientos: vinculación común↔científico + historial editable ──
+let _txHistory = [];
+let _txEditId = null;
+
+function _buildCalcSpDatalist() {
+  const dl = document.getElementById('tcalc-sp-dl');
+  if (!dl) return;
+  dl.innerHTML = hcSpeciesOptions().map(o =>
+    `<option value="${String(o.nombre).replace(/"/g,'&quot;')}" data-sci="${String(o.sci||'').replace(/"/g,'&quot;')}">${o.nombre} — ${o.sci||''}</option>`
+  ).join('');
+}
+function calcApplySpecies() {
+  const nombre = (document.getElementById('tcalc-especie')?.value||'').trim();
+  const opt = hcSpeciesOptions().find(o => o.nombre.toLowerCase() === nombre.toLowerCase());
+  const sciEl = document.getElementById('tcalc-sci');
+  if (sciEl) sciEl.value = opt ? (opt.sci||'') : '';
+  const sp = opt?.id ? SPECIES_DB.find(s=>s.id===opt.id) : null;
+  document.querySelectorAll('#treatment-list-calc .treat-peso').forEach(p => {
+    if (sp && !p.value) p.value = sp.weight_avg || '';
+    const dosisEl = p.closest('[data-trow]')?.querySelector('.treat-dosis');
+    if (dosisEl) calcTreatDose(dosisEl);
+  });
+}
+
+function calcCollectRows() {
+  const out = [];
+  document.querySelectorAll('#treatment-list-calc [data-trow="tcalc"]').forEach(row => {
+    const pa = row.querySelector('.treat-pa')?.value.trim();
+    if (!pa) return;
+    out.push({
+      pa,
+      nc: row.querySelector('.treat-nc')?.value,
+      conc: row.querySelector('.treat-conc')?.value,
+      conc_num: row.querySelector('.treat-conc-num')?.value,
+      conc_den: row.querySelector('.treat-conc-den')?.value,
+      dosis: row.querySelector('.treat-dosis')?.value,
+      peso: row.querySelector('.treat-peso')?.value,
+      total: row.querySelector('.treat-total')?.value,
+      total_u: row.querySelector('.treat-total-u')?.value,
+      via: row.querySelector('.treat-via')?.value,
+      freq: row.querySelector('.treat-freq')?.value,
+      dur: row.querySelector('.treat-dur')?.value,
+      notas: row.querySelector('.treat-notas')?.value,
+      calc: row.dataset.calc || 'calc'
+    });
+  });
+  return out;
+}
+
+async function loadCalcTratHist() {
+  try {
+    const saved = await dbGet('settings', 'calc_tratamientos_hist');
+    if (Array.isArray(saved?.value)) _txHistory = saved.value;
+    else _txHistory = [];
+  } catch(e) { _txHistory = []; }
+  return _txHistory;
+}
+async function saveCalcTratHist() {
+  await dbPut('settings', { key: 'calc_tratamientos_hist', value: _txHistory });
+}
+
+async function saveCalcTratamiento() {
+  const tratamientos = calcCollectRows();
+  if (!tratamientos.length) { toast('⚠ Agrega al menos un medicamento con principio activo'); return; }
+  const especie = (document.getElementById('tcalc-especie')?.value||'').trim();
+  const sci = (document.getElementById('tcalc-sci')?.value||'').trim();
+  const entry = {
+    id: _txEditId || 'tx_'+Date.now(),
+    fecha: new Date().toISOString(),
+    especie, sci,
+    tratamientos
+  };
+  const existing = _txHistory.findIndex(h => h.id === entry.id);
+  const editing = existing >= 0;
+  if (existing >= 0) _txHistory[existing] = entry;
+  else _txHistory.unshift(entry);
+  await saveCalcTratHist();
+  _txEditId = null;
+  renderCalcTratHist();
+  toast(editing ? '✓ Cálculo actualizado' : '✓ Cálculo guardado');
+}
+
+function loadCalcTratamiento(id) {
+  const entry = _txHistory.find(h => h.id === id);
+  if (!entry) return;
+  document.getElementById('tcalc-especie') && (document.getElementById('tcalc-especie').value = entry.especie || '');
+  document.getElementById('tcalc-sci') && (document.getElementById('tcalc-sci').value = entry.sci || '');
   const el = document.getElementById('treatment-list-calc');
   if (!el) return;
-  el.innerHTML = hcTreatRowHtml(++tcalcCount, 'tcalc');
+  tcalcCount = 0;
+  el.innerHTML = '';
+  const rows = entry.tratamientos?.length ? entry.tratamientos : [{}];
+  rows.forEach(t => {
+    const div = document.createElement('div');
+    div.innerHTML = hcTreatRowHtml(++tcalcCount, 'tcalc');
+    const row = div.firstElementChild;
+    el.appendChild(row);
+    row.querySelector('.treat-pa') && (row.querySelector('.treat-pa').value = t.pa || '');
+    row.querySelector('.treat-nc') && (row.querySelector('.treat-nc').value = t.nc || '');
+    row.querySelector('.treat-conc') && (row.querySelector('.treat-conc').value = t.conc || '');
+    if (row.querySelector('.treat-conc-num')) row.querySelector('.treat-conc-num').value = t.conc_num || '';
+    if (row.querySelector('.treat-conc-den')) row.querySelector('.treat-conc-den').value = t.conc_den || '';
+    row.querySelector('.treat-dosis') && (row.querySelector('.treat-dosis').value = t.dosis || '');
+    row.querySelector('.treat-peso') && (row.querySelector('.treat-peso').value = t.peso || '');
+    row.querySelector('.treat-total') && (row.querySelector('.treat-total').value = t.total || '');
+    row.querySelector('.treat-total-u') && (row.querySelector('.treat-total-u').value = t.total_u || '');
+    if (row.querySelector('.treat-via')) row.querySelector('.treat-via').value = t.via || '';
+    row.querySelector('.treat-freq') && (row.querySelector('.treat-freq').value = t.freq || '');
+    row.querySelector('.treat-dur') && (row.querySelector('.treat-dur').value = t.dur || '');
+    row.querySelector('.treat-notas') && (row.querySelector('.treat-notas').value = t.notas || '');
+    if (t.calc) row.dataset.calc = t.calc;
+    const tu = row.querySelector('.treat-total-u');
+    const den = t.conc_den || '';
+    if (tu && den) tu.value = den;
+  });
+  _txEditId = id;
+  toast('✓ Cálculo cargado en el editor (puedes modificarlo y guardar)');
+}
+
+async function removeCalcTratamiento(id) {
+  const entry = _txHistory.find(h => h.id === id);
+  const ok = await confirmDelete('¿Eliminar cálculo?', entry?.especie
+    ? `Se eliminará el cálculo "${entry.especie}" (${entry.tratamientos?.length||0} medicamento(s)) del historial.`
+    : 'Se eliminará este cálculo del historial.');
+  if (!ok) return;
+  _txHistory = _txHistory.filter(h => h.id !== id);
+  if (_txEditId === id) _txEditId = null;
+  await saveCalcTratHist();
+  renderCalcTratHist();
+  toast('✓ Cálculo eliminado');
+}
+
+function renderCalcTratHist() {
+  const el = document.getElementById('tcalc-hist-list');
+  if (!el) return;
+  if (!_txHistory.length) {
+    el.innerHTML = '<p style="font-size:.8rem;color:var(--txt3);font-style:italic;text-align:center;padding:.5rem">Sin cálculos guardados</p>';
+    return;
+  }
+  el.innerHTML = _txHistory.map(h => {
+    const trat = (h.tratamientos||[])[0];
+    const n = h.tratamientos?.length||0;
+    return `<div style="display:flex;align-items:center;gap:.4rem;padding:.45rem .5rem;border:1px solid var(--bor);border-radius:var(--rsm);margin-bottom:.35rem;background:var(--sur2)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.82rem;font-weight:600">${n>1?n+' medicamentos · ':''}${h.especie?('🐾 '+h.especie+(h.sci?' <em style="font-size:.7rem;opacity:.7">('+h.sci+')</em>':'')):trat?.pa||'Cálculo'}</div>
+        <div style="font-size:.68rem;color:var(--txt3)">${trat?`💊 ${trat.pa}${trat.conc?' · '+fmtNum(trat.conc)+' '+(trat.conc_num||'')+'/'+(trat.conc_den||''):''}${trat.total?' · total '+fmtNum(trat.total)+' '+(trat.total_u||''):''}`:'Sin medicamentos'} · ${(()=>{const d=new Date(h.fecha);return isNaN(d)?'':d.toLocaleString('es-CO');})()}</div>
+      </div>
+      <button onclick="loadCalcTratamiento('${h.id}')" class="btn btn-secondary btn-sm" style="font-size:.66rem">✏️ Editar</button>
+      <button onclick="removeCalcTratamiento('${h.id}')" class="btn btn-secondary btn-sm" style="font-size:.66rem;color:var(--r5)">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+function openCalcTratHistManager() {
+  if (!_txHistory.length) { toast('Sin cálculos para eliminar'); return; }
+  const list = _txHistory.map((h,i)=>{
+    const trat = (h.tratamientos||[])[0];
+    return `<label style="display:flex;align-items:center;gap:.4rem;padding:.4rem 0;border-bottom:1px solid var(--bor);font-size:.82rem">
+      <input type="checkbox" class="tx-del-chk" value="${i}">
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.especie||trat?.pa||'Cálculo'} · ${(()=>{const d=new Date(h.fecha);return isNaN(d)?'':d.toLocaleDateString('es-CO');})()}</span>
+    </label>`;
+  }).join('');
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="tx-hist-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:90vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+          <div style="font-weight:700;font-size:.95rem">🗑 Eliminar cálculos</div>
+          <button onclick="document.getElementById('tx-hist-modal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+        </div>
+        ${list}
+        <div style="display:flex;gap:.5rem;margin-top:1rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('tx-hist-modal').remove()">Cancelar</button>
+          <button class="btn btn-danger" style="flex:1" onclick="bulkDeleteCalcTrat()">Eliminar seleccionados</button>
+        </div>
+      </div>
+    </div>`);
+}
+async function bulkDeleteCalcTrat() {
+  const sel = Array.from(document.querySelectorAll('.tx-del-chk:checked')).map(c=>+c.value).sort((a,b)=>b-a);
+  if (!sel.length) { toast('⚠ Selecciona al menos un cálculo'); return; }
+  const ok = await confirmDelete('¿Eliminar cálculos?', `Se eliminarán ${sel.length} cálculo(s) del historial.`);
+  if (!ok) return;
+  sel.forEach(i => { if (_txHistory[i] && _txHistory[i].id === _txEditId) _txEditId = null; _txHistory.splice(i,1); });
+  await saveCalcTratHist();
+  document.getElementById('tx-hist-modal')?.remove();
+  renderCalcTratHist();
+  toast('✓ Cálculos eliminados');
 }
 
 async function saveRecord() {
@@ -11835,14 +12356,15 @@ function renderEnriquecimientoTab(el, sp) {
         const espBadges = (enr.especies||[]).filter(e=>e?.sp||e?.especie).map(e =>
           `<span style="font-size:.6rem;background:var(--g0);border:1px solid var(--g3);border-radius:20px;padding:.08rem .35rem;color:var(--g6)">${e.sp||e.especie||''}${e.sci?` <em style="opacity:.7">${e.sci}</em>`:''}</span>`
         ).join('');
-        return `<div style="display:flex;gap:.5rem;padding:.5rem;border:1px solid var(--bor);border-radius:var(--rsm);background:var(--sur)">
-          ${foto?`<img src="${foto}" style="width:56px;height:44px;object-fit:cover;border-radius:var(--rxs);flex-shrink:0;cursor:pointer" onclick="openImageFull('${foto}')">`:
+        return `<div style="display:flex;gap:.5rem;padding:.5rem;border:1px solid var(--bor);border-radius:var(--rsm);background:var(--sur);cursor:pointer;align-items:center" onclick="openEnriqDetail(${realIdx})">
+          ${foto?`<img src="${foto}" style="width:56px;height:44px;object-fit:cover;border-radius:var(--rxs);flex-shrink:0;cursor:pointer" onclick="event.stopPropagation();openImageFull('${foto}')">`:
             `<div style="width:56px;height:44px;background:${cat.color}20;border-radius:var(--rxs);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">${cat.icon}</div>`}
           <div style="flex:1;min-width:0">
             <div style="font-weight:600;font-size:.85rem">${enr.nombre}</div>
             ${(catBadges||espBadges)?`<div style="display:flex;gap:.2rem;flex-wrap:wrap;margin-top:.2rem">${catBadges}${espBadges}</div>`:''}
             ${enr.descripcion?`<div style="font-size:.75rem;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${enr.descripcion}</div>`:''}
           </div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:var(--txt3)"><polyline points="9 18 15 12 9 6"/></svg>
         </div>`;
       }).join('')}
     </div>` : `<div style="padding:.4rem;border-radius:var(--rsm);background:var(--sur2);margin-bottom:.4rem">
@@ -11942,14 +12464,10 @@ function refPdfButtons(r, spKey, idx) {
   if (!src) {
     return `<span style="font-size:.68rem;color:var(--txt3);font-style:italic">📄 ${r.pdf.name||'PDF'} — solo en este dispositivo</span>`;
   }
-  const isLocal = !isStorageUrl(src) && src.startsWith('data:');
-  const view = isLocal
-    ? `<button onclick="viewPdfFromRef('${spKey}',${idx})"
-         style="font-size:.7rem;color:var(--g6);background:var(--g0);border:1px solid var(--g4);border-radius:var(--rxs);padding:.15rem .45rem;cursor:pointer;display:inline-flex;align-items:center;gap:.2rem">👁 Ver PDF</button>`
-    : `<a href="${src}" target="_blank" rel="noopener"
-         style="font-size:.7rem;color:var(--g6);background:var(--g0);border:1px solid var(--g4);border-radius:var(--rxs);padding:.15rem .45rem;text-decoration:none;display:inline-flex;align-items:center;gap:.2rem">👁 Ver PDF</a>`;
-  const dl = `<a href="${src}" download="${r.pdf.name||'documento.pdf'}"
-      style="font-size:.7rem;color:var(--bl);background:var(--b0,#eff6ff);border:1px solid var(--bl);border-radius:var(--rxs);padding:.15rem .45rem;text-decoration:none;display:inline-flex;align-items:center;gap:.2rem">⬇ Descargar</a>`;
+  const view = `<button onclick="viewPdfFromRef('${spKey}',${idx})"
+       style="font-size:.7rem;color:var(--g6);background:var(--g0);border:1px solid var(--g4);border-radius:var(--rxs);padding:.15rem .45rem;cursor:pointer;display:inline-flex;align-items:center;gap:.2rem">👁 Ver PDF</button>`;
+  const dl = `<button onclick="downloadPdfFromRef('${spKey}',${idx})"
+      style="font-size:.7rem;color:var(--bl);background:var(--b0,#eff6ff);border:1px solid var(--bl);border-radius:var(--rxs);padding:.15rem .45rem;cursor:pointer;display:inline-flex;align-items:center;gap:.2rem">⬇ Descargar</button>`;
   return `<span style="display:inline-flex;gap:.3rem;align-items:center;flex-wrap:wrap">${view}${dl}</span>`;
 }
 
@@ -11957,10 +12475,58 @@ function viewPdfFromRef(spKey, idx) {
   const refs = spKey === '' ? BIBLIOTECA_GENERAL : (BIBLIOTECA_DB[spKey] || []);
   const r = refs[idx];
   if (!r?.pdf) return;
-  const src = r.pdf.url || r.pdf.data;
+  _openPdfSource(r.pdf.url || r.pdf.data, r.pdf.name || r.titulo || 'PDF');
+}
+
+function downloadPdfFromRef(spKey, idx) {
+  const refs = spKey === '' ? BIBLIOTECA_GENERAL : (BIBLIOTECA_DB[spKey] || []);
+  const r = refs[idx];
+  if (!r?.pdf) return;
+  _downloadPdfSource(r.pdf.url || r.pdf.data, r.pdf.name || 'documento.pdf');
+}
+
+// Abrir un PDF desde su fuente (data URL local o URL de Storage)
+// usando Blob + objectURL para evitar fallos con data URLs muy grandes
+async function _openPdfSource(src, name) {
   if (!src) return;
   if (isStorageUrl(src)) { window.open(src, '_blank'); return; }
-  openPdfViewer(src, r.pdf.name || r.titulo || 'PDF');
+  try {
+    const res = await fetch(src);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    openPdfViewer(url, name);
+    setTimeout(()=>URL.revokeObjectURL(url), 120000);
+  } catch(e) {
+    console.warn('Abrir PDF local:', e);
+    openPdfViewer(src, name);
+  }
+}
+
+async function _downloadPdfSource(src, name) {
+  if (!src) return;
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  if (isStorageUrl(src)) {
+    a.href = src.indexOf('alt=media') === -1 ? src + (src.includes('?') ? '&' : '?') + 'alt=media' : src;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+  } else {
+    try {
+      const res = await fetch(src);
+      const blob = await res.blob();
+      a.href = URL.createObjectURL(blob);
+      a.download = name || 'documento.pdf';
+    } catch(e) {
+      a.href = src;
+      a.download = name || 'documento.pdf';
+    }
+  }
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{
+    if (a.href && a.href.startsWith('blob:')) URL.revokeObjectURL(a.href);
+    a.remove();
+  }, 3000);
 }
 
 function renderBiblioteca() {
@@ -12690,20 +13256,12 @@ function openPdfViewer(src, name) {
 
 function viewRefPDF() {
   if (!_refPDFData) return;
-  const src = _refPDFData.url || _refPDFData.data;
-  if (!src) return;
-  if (isStorageUrl(src)) { window.open(src, '_blank'); return; }
-  openPdfViewer(src, _refPDFData.name || 'PDF');
+  _openPdfSource(_refPDFData.url || _refPDFData.data, _refPDFData.name || 'PDF');
 }
 
 function downloadRefPDF() {
   if (!_refPDFData) return;
-  const src = _refPDFData.url || _refPDFData.data;
-  if (!src) return;
-  const a = document.createElement('a');
-  a.href = src;
-  a.download = _refPDFData.name || 'referencia.pdf';
-  a.click();
+  _downloadPdfSource(_refPDFData.url || _refPDFData.data, _refPDFData.name || 'referencia.pdf');
 }
 
 async function saveRefGeneral() {
@@ -12894,6 +13452,42 @@ function toggleEnriqCard(i) {
   if (chev) chev.style.transform = body.classList.contains('open') ? 'rotate(180deg)' : '';
 }
 
+// Abre el detalle completo de un enriquecimiento (info completa + fotos)
+function openEnriqDetail(i) {
+  const enr = ENRIQUECIMIENTOS_DB[i];
+  if (!enr) return;
+  document.getElementById('enriq-detail-modal')?.remove();
+  const cats = (enr.categorias||[enr.categoria||'alimenticio']).map(cid => ENRIQ_CATS.find(cc=>cc.id===cid)).filter(Boolean);
+  const cat = cats[0] || ENRIQ_CATS[0];
+  const isAdmin = currentUser?.role === 'admin';
+  const catBadges = (enr.categorias||[enr.categoria]).map(cid=>{const ct=ENRIQ_CATS.find(cc=>cc.id===cid)||ENRIQ_CATS[0];return `<span style="font-size:.65rem;background:${ct.color}20;color:${ct.color};border-radius:20px;padding:.1rem .4rem;font-weight:600;margin-right:.2rem">${ct.icon} ${ct.label}</span>`;}).join('');
+  const espBadges = (enr.especies?.length ? enr.especies : (enr.especie?[{sp:enr.especie,sci:enr.sci}]:[])).filter(e=>e?.sp||e?.especie).map(e =>
+    `<span style="background:var(--g0);border:1px solid var(--g3);border-radius:20px;padding:.15rem .6rem;font-size:.78rem;color:var(--g7)">${e.sp||e.especie||''}${e.sci?` <em style="font-size:.7rem">(${e.sci})</em>`:''}</span>`).join('');
+  const fotos = (enr.fotos||[]).map(f=>{const fs=_getFotoSrc(f);return fs?`<img src="${fs}" style="height:130px;width:auto;border-radius:var(--rxs);border:1px solid var(--bor);cursor:pointer;object-fit:cover" onclick="openImageFull('${fs}')">`:'';}).join('');
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="enriq-detail-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+          <div style="font-weight:700;font-size:.95rem">🌿 ${enr.nombre||'Enriquecimiento'}</div>
+          <button onclick="document.getElementById('enriq-detail-modal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+        </div>
+        <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.75rem">${catBadges}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.6rem">
+          ${enr.descripcion?`<div><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Descripción</div><p style="font-size:.82rem;color:var(--txt2);line-height:1.5">${enr.descripcion}</p></div>`:''}
+          ${enr.objetivo?`<div><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Objetivo</div><p style="font-size:.82rem;color:var(--txt2);line-height:1.5">${enr.objetivo}</p></div>`:''}
+        </div>
+        ${espBadges?`<div style="margin-bottom:.6rem"><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.25rem">🐾 Especies aplicables</div><div style="display:flex;flex-wrap:wrap;gap:.3rem">${espBadges}</div></div>`:''}
+        ${(enr.materiales||[]).filter(Boolean).length?`<div style="margin-bottom:.6rem"><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.25rem">Materiales</div><div style="display:flex;flex-wrap:wrap;gap:.25rem">
+          ${enr.materiales.filter(Boolean).map(m=>`<span style="background:var(--sur2);border:1px solid var(--bor);border-radius:20px;padding:.15rem .5rem;font-size:.75rem">${m}</span>`).join('')}
+        </div></div>`:''}
+        ${fotos?`<div><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.25rem">📷 Fotos</div><div style="display:flex;flex-wrap:wrap;gap:.4rem">${fotos}</div></div>`:''}
+        ${isAdmin?`<div style="display:flex;gap:.5rem;margin-top:1rem">
+          <button class="btn btn-primary" style="flex:1" onclick="document.getElementById('enriq-detail-modal').remove();openEditEnriquecimiento(${i})">✏️ Editar</button>
+        </div>`:''}
+      </div>
+    </div>`);
+}
+
 function filterEnriqBySpecies(q) {
   const el = document.getElementById('enriq-list');
   if (!el) return;
@@ -12948,9 +13542,22 @@ function filterEnriqBySpecies(q) {
         </div>`:''}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="enriq-chev-${realIdx}" style="flex-shrink:0;transition:transform .2s"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <div class="enriq-card-body" id="enriq-body-${realIdx}" style="display:none">
-        <div style="font-size:.78rem;color:var(--txt3);padding:.5rem 0">${enr.descripcion||enr.objetivo||'Sin descripción'}</div>
-        ${espBadges ? `<div style="font-size:.72rem;font-weight:600;color:var(--txt3);margin-bottom:.3rem">ESPECIES:</div><div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.5rem">${espBadges}</div>` : ''}
+      <div class="enriq-card-body" id="enriq-body-${realIdx}">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.5rem">
+          ${enr.descripcion?`<div><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Descripción</div><p style="font-size:.82rem;color:var(--txt2);line-height:1.5">${enr.descripcion}</p></div>`:''}
+          ${enr.objetivo?`<div><div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.2rem">Objetivo</div><p style="font-size:.82rem;color:var(--txt2);line-height:1.5">${enr.objetivo}</p></div>`:''}
+        </div>
+        ${espBadges ? `<div style="margin-bottom:.5rem">
+          <div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.25rem">🐾 Especies aplicables</div>
+          <div style="display:flex;flex-wrap:wrap;gap:.3rem">${espBadges}</div>
+        </div>` : ''}
+        ${enr.materiales?.length?`<div style="margin-bottom:.5rem">
+          <div style="font-size:.68rem;font-weight:600;color:var(--txt3);text-transform:uppercase;margin-bottom:.25rem">Materiales</div>
+          <div style="display:flex;flex-wrap:wrap;gap:.25rem">${enr.materiales.map(m=>`<span style="background:var(--sur2);border:1px solid var(--bor);border-radius:20px;padding:.15rem .5rem;font-size:.75rem">${m}</span>`).join('')}</div>
+        </div>`:''}
+        ${enr.fotos?.length?`<div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.4rem">
+          ${enr.fotos.map(f=>{const fs=_getFotoSrc(f);return fs?`<img src="${fs}" style="height:100px;width:auto;border-radius:var(--rxs);border:1px solid var(--bor);cursor:pointer;object-fit:cover" onclick="openImageFull('${fs}')">`:'';}).join('')}
+        </div>`:''}
         ${isAdmin?`<div style="display:flex;gap:.4rem;margin-top:.4rem">
           <button class="btn btn-primary btn-sm" onclick="openEditEnriquecimiento(${realIdx})">✏️ Editar</button>
         </div>`:''}
@@ -16896,7 +17503,9 @@ function _enf_addSignosBulk() {
 function _enf_updateSubtipo(tipo) {
   const sel = document.getElementById('enf-subtipo');
   if (!sel) return;
-  sel.innerHTML = (ENF_TIPOS[tipo]||[]).map(s=>`<option>${s}</option>`).join('');
+  const prev = sel.value;
+  sel.innerHTML = _enf_causaOptionsHTML(prev);
+  sel.value = prev;
 }
 
 function _enfgenAddEspecieConfRow() {
@@ -17069,18 +17678,22 @@ function _enf_addDxItem() {
   const row = document.createElement('div');
   row.className = 'enf-dx-row';
   row.style.cssText = 'border:1px solid var(--bor);border-radius:var(--rsm);padding:.5rem;margin-bottom:.5rem;background:var(--sur2)';
-  row.innerHTML = '<div style="display:flex;gap:.3rem;margin-bottom:.3rem">'
-    + '<input class="form-control enf-dx-item" placeholder="Método diagnóstico (PCR, ELISA, Rx...)" style="flex:1;font-size:.82rem;font-weight:600">'
+  const lf = (t) => '<div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">'+t+'</div>';
+  row.innerHTML = '<div style="display:flex;gap:.3rem;align-items:flex-end;margin-bottom:.35rem">'
+    + '<div style="flex:1">'+lf('Método diagnóstico')
+    + '<input class="form-control enf-dx-item" placeholder="PCR, ELISA, Rx..." style="font-size:.82rem;font-weight:600"></div>'
     + '<button onclick="this.closest(\'.enf-dx-row\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>'
     + '</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.3rem">'
-    + '<input class="form-control enf-dx-expect-item" placeholder="Hallazgo esperado..." style="font-size:.8rem">'
-    + '<input class="form-control enf-dx-muestra" placeholder="Muestra (sangre, tejido...)" style="font-size:.8rem">'
-    + '<input class="form-control enf-dx-sensibilidad" placeholder="Sensibilidad (%)" style="font-size:.8rem">'
-    + '<input class="form-control enf-dx-especificidad" placeholder="Especificidad (%)" style="font-size:.8rem">'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.35rem">'
+    + '<div>'+lf('Hallazgo esperado')+'<input class="form-control enf-dx-expect-item" placeholder="Hallazgo esperado..." style="font-size:.8rem"></div>'
+    + '<div>'+lf('Muestra')+'<input class="form-control enf-dx-muestra" placeholder="Sangre, tejido..." style="font-size:.8rem"></div>'
+    + '<div>'+lf('Sensibilidad (%)')+'<input class="form-control enf-dx-sensibilidad" style="font-size:.8rem"></div>'
+    + '<div>'+lf('Especificidad (%)')+'<input class="form-control enf-dx-especificidad" style="font-size:.8rem"></div>'
     + '</div>'
-    + '<textarea class="form-control enf-dx-descripcion" style="min-height:45px;resize:vertical;font-size:.8rem;margin-bottom:.3rem" placeholder="Descripción del método..."></textarea>'
-    + '<textarea class="form-control enf-dx-utilidad" style="min-height:35px;resize:vertical;font-size:.8rem;margin-bottom:.3rem" placeholder="Utilidad clínica..."></textarea>'
+    + lf('Descripción del método')
+    + '<textarea class="form-control enf-dx-descripcion" style="min-height:45px;resize:vertical;font-size:.8rem;margin-bottom:.35rem" placeholder="Procedimiento, interpretación..."></textarea>'
+    + lf('Utilidad clínica')
+    + '<textarea class="form-control enf-dx-utilidad" style="min-height:35px;resize:vertical;font-size:.8rem;margin-bottom:.35rem" placeholder="Cuándo usar este método..."></textarea>'
     + '<div class="enf-dx-img-preview" style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.2rem"></div>'
     + '<label class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.68rem;margin-top:.1rem">📷 Imagen hallazgo<input type="file" accept="image/*" style="display:none" onchange="_enf_addDxImage(this)"></label>';
   list.appendChild(row);
@@ -17410,6 +18023,7 @@ function openNuevaEnfGen() {
 
 
 function openAddEnfGen(sistId, editIdx=-1) {
+  _enf_seedHistories();
   document.getElementById('enfgen-add-modal')?.remove();
   const claseData = ENFERMEDADES_GENERALES[_enfGenClaseActiva] || {};
   const editEnf   = editIdx >= 0 ? claseData.sistemas?.[sistId]?.enfermedades?.[editIdx] : null;
@@ -17434,31 +18048,39 @@ function openAddEnfGen(sistId, editIdx=-1) {
           <input id="enfgen-sinonimos" class="form-control" value="${editEnf?.sinonimos||''}" placeholder="Otros nombres conocidos...">
         </div>
 
-        <!-- FIX 1: Tipo como badges horizontales sin desplegable -->
+        <!-- FIX 1: Tipo como badges horizontales sin desplegable + selector de causa único -->
         <div class="form-group">
           <label>Tipo de enfermedad</label>
           <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">
             ${['infecciosa','no_infecciosa'].map(t=>`
             <label style="display:inline-flex;align-items:center;gap:.3rem;font-size:.82rem;cursor:pointer;padding:.3rem .7rem;border-radius:20px;border:1.5px solid var(--bor);background:${(editEnf?.tipo||'infecciosa')===t?'var(--g1)':'var(--sur)'};transition:background .15s">
-              <input type="radio" name="enfgen-tipo" value="${t}" ${(editEnf?.tipo||'infecciosa')===t?'checked':''} style="accent-color:var(--g5)" onchange="_eg_updateSubtipo(this.value)">
+              <input type="radio" name="enfgen-tipo" value="${t}" ${(editEnf?.tipo||'infecciosa')===t?'checked':''} style="accent-color:var(--g5)" onchange="_enf_updateSubtipo(this.value)">
               ${t==='infecciosa'?'🦠 Infecciosa':'🔬 No infecciosa'}
             </label>`).join('')}
           </div>
-          <select id="enfgen-subtipo" class="form-control" style="font-size:.82rem">
-            ${(ENF_TIPOS[editEnf?.tipo||'infecciosa']||ENF_TIPOS.infecciosa).map(s=>`<option value="${s}" ${editEnf?.subtipo===s?'selected':''}>${s}</option>`).join('')}
-          </select>
+          <div style="display:flex;gap:.3rem;align-items:flex-end">
+            <div style="flex:1">
+              <div style="font-size:.65rem;font-weight:600;color:var(--txt2);display:block;margin-bottom:.15rem">Causa / Etiología</div>
+              <select id="enf-subtipo" class="form-control" style="font-size:.82rem" onchange="_enf_subtipoChanged(this.value)">
+                ${_enf_causaOptionsHTML(editEnf?.subtipo||'')}
+              </select>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="font-size:.68rem" onclick="openEnfCausaHistorial()" title="Ver causas personalizadas guardadas">📋 Historial causas</button>
+          </div>
+          <div id="enf-causa-nueva-wrap" style="display:none;margin-top:.3rem">
+            <div style="display:flex;gap:.3rem">
+              <input id="enf-causa-nueva" class="form-control" placeholder="Escribe la nueva causa..." style="flex:1;font-size:.8rem">
+              <button class="btn btn-primary btn-sm" onclick="_enf_saveCausaNueva()">Guardar causa</button>
+            </div>
+          </div>
         </div>
 
         <!-- Agente / Causa -->
-        <div class="form-group"><label>Agente / Causa</label>
-          <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
-            <input id="enfgen-agente" class="form-control" value="${editEnf?.agente||''}" placeholder="Nombre científico del agente..." style="flex:2">
-            <select id="enfgen-agente-tipo" class="form-control" style="flex:1;font-size:.8rem">
-              ${['Virus','Bacteria','Hongo','Parásito','Toxina','Trauma','Neoplásico','Otro'].map(t=>`<option ${editEnf?.agente_tipo===t?'selected':''}>${t}</option>`).join('')}
-            </select>
-          </div>
-          <textarea id="enfgen-agente-info" class="form-control" style="min-height:55px;resize:vertical;font-size:.8rem"
-            placeholder="Información sobre el agente: características, serotipos, cepas, virulencia...">${editEnf?.agente_info||''}</textarea>
+        <div class="form-group"><label>Agente causal</label>
+          <input id="enfgen-agente" class="form-control" value="${editEnf?.agente||''}" placeholder="Nombre científico del agente (o descripción del factor causal)..." style="margin-bottom:.4rem">
+          <div id="enf-agente-charact"></div>
+          <textarea id="enfgen-agente-info" class="form-control" style="min-height:55px;resize:vertical;font-size:.8rem;margin-top:.4rem"
+            placeholder="Información sobre el agente: serotipos, cepas, virulencia, mecanismo de daño...">${editEnf?.agente_info||''}</textarea>
         </div>
 
         <!-- Sistemas afectados -->
@@ -17754,6 +18376,7 @@ function openAddEnfGen(sistId, editIdx=-1) {
         </div>
       </div>
     </div>`);
+  _enf_updateAgente(editEnf?.subtipo || editEnf?.tipo || 'infecciosa', editEnf?.agente_tipo || '');
   setTimeout(() => { buildSignosHistory?.(); _buildSpeciesDatalist?.(); setTimeout(()=>_enfRenderRefList('enfgen'),50); }, 50);
 }
 
@@ -17826,9 +18449,9 @@ async function saveEnfGen(sistId, editIdx=-1) {
     nombre,
     sinonimos:        document.getElementById('enfgen-sinonimos')?.value.trim()||'',
     tipo:             modal?.querySelector('[name="enfgen-tipo"]:checked')?.value||'infecciosa',
-    subtipo:          document.getElementById('enfgen-subtipo')?.value||'',
+    subtipo:          (document.getElementById('enf-subtipo')?.value||'').replace('__otra__',''),
     agente:           document.getElementById('enfgen-agente')?.value.trim()||'',
-    agente_tipo:      document.getElementById('enfgen-agente-tipo')?.value||'',
+    agente_tipo:      (document.getElementById('enf-agente-tipo')?.value||'').replace('__otra__',''),
     agente_info:      document.getElementById('enfgen-agente-info')?.value.trim()||'',
     sistemas_afectados: qsC('.enfgen-sistema-chk').length ? qsC('.enfgen-sistema-chk') : [sistId],
     organos:          qsC('.enfgen-organo-chk'),
@@ -17892,6 +18515,11 @@ async function saveEnfGen(sistId, editIdx=-1) {
   // Agregar métodos diagnósticos al historial
   (dx_lista||[]).forEach(d => { if(d.metodo) _dxHistorial.add(d.metodo.trim()); });
   try { localStorage.setItem('wv_dx_hist', JSON.stringify([..._dxHistorial])); } catch(e) {}
+  // Agregar causa y características del agente al historial
+  if (enf.subtipo && enf.subtipo !== '__otra__') _enfCausaHistorial.add(enf.subtipo.trim());
+  if (enf.agente_tipo && enf.agente_tipo !== '__otra__') _enfAgenteHistorial.add(enf.agente_tipo.trim());
+  try { localStorage.setItem('wv_enf_causa_hist', JSON.stringify([..._enfCausaHistorial])); } catch(e) {}
+  try { localStorage.setItem('wv_enf_agente_hist', JSON.stringify([..._enfAgenteHistorial])); } catch(e) {}
 
   await saveEnfermedadesGenerales();
 
@@ -18304,7 +18932,7 @@ function renderBulkReviewList(spId) {
 function viewBulkPdf(i) {
   const it = _bulkReviewItems[i];
   if (!it) return;
-  if (it.base64) openPdfViewer(it.base64, it.file.name);
+  if (it.base64) _openPdfSource(it.base64, it.file.name);
   else toast('⚠ PDF no disponible');
 }
 
