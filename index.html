@@ -591,7 +591,7 @@ textarea.form-control{resize:vertical;min-height:70px}
       <h2 style="font-size:1.1rem;font-weight:700">💊 Calculadora de Tratamientos</h2>
       <button class="btn btn-secondary btn-sm" onclick="showScreen('calculadoras')">← Calculadoras</button>
     </div>
-    <p style="font-size:.82rem;color:var(--txt3);margin-bottom:1rem">Calcula la dosis total de cada medicamento según dosis básica (mg/kg), peso y concentración. Puedes resolver cualquiera de las 4 variables (dosis total, concentración, peso o dosis básica) con las otras 3. Comparte la misma lógica que el panel de historias clínicas.</p>
+    <p style="font-size:.82rem;color:var(--txt3);margin-bottom:1rem">Cálculo automático y exacto: completa 3 de las 4 variables (dosis total, concentración, peso o dosis básica) en cada medicamento y la app calcula la que falta al instante, con precisión de 4 decimales.</p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.8rem">
       <div>
         <label style="font-size:.72rem;font-weight:600">Especie (nombre común)</label>
@@ -2177,7 +2177,18 @@ function dbGet(store, key) {
   return new Promise(res => { try { const r = db.transaction(store,'readonly').objectStore(store).get(key); r.onsuccess = ()=>res(r.result); r.onerror=()=>res(null); } catch{res(null);} });
 }
 function dbPut(store, obj) {
-  return new Promise(res => { try { const t = db.transaction(store,'readwrite'); t.objectStore(store).put(obj); t.oncomplete=()=>res(true); t.onerror=()=>res(false); } catch{res(false);} });
+  return new Promise(res => { try {
+      const t = db.transaction(store,'readwrite');
+      const os = t.objectStore(store);
+      const kp = os.keyPath;
+      let rec = obj;
+      if (kp && typeof kp === 'string' && rec && typeof rec === 'object' && !(kp in rec) && rec.key !== undefined) {
+        rec = Object.assign({}, rec, { [kp]: rec.key });
+        delete rec.key;
+      }
+      os.put(rec);
+      t.oncomplete=()=>res(true); t.onerror=()=>res(false);
+    } catch{res(false);} });
 }
 function dbGetAll(store) {
   return new Promise(res => { try { const r = db.transaction(store,'readonly').objectStore(store).getAll(); r.onsuccess=()=>res(r.result||[]); r.onerror=()=>res([]); } catch{res([]);} });
@@ -2955,14 +2966,6 @@ function buildSpeciesExportHTML(sp) {
   html += row(42, 'Dieta bajo cuidado profesional', v2h(n.captive));
   html += row(43, 'Frecuencia de alimentación',     v2h(n.freq));
 
-  const reqRows = (sp.req_energetico||[]).map(r=>
-    `<tr>
-      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(r.cat)}</td>
-      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:700">${esc(String(r.kcal||''))}</td>
-    </tr>`).join('');
-  html += row(44, 'Requerimientos de energía (kcal/día)',
-    tblInner(['Categoría (adulto / juvenil / gestante)','kcal/día'], reqRows));
-
   const supRows = (sp.suplementos||[]).map(s=>
     `<tr>
       <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:600">${esc(s.nombre)}</td>
@@ -2971,7 +2974,7 @@ function buildSpeciesExportHTML(sp) {
       <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(String(s.conc||''))}</td>
       <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(s.unitC||'ml')}</td>
     </tr>`).join('');
-  html += row(45, 'Suplementación',
+  html += row(44, 'Suplementación',
     tblInner(['Suplemento','Dosis','Unidad dosis','Concentración','Unidad concentración'], supRows));
 
   const toxRows = (sp.toxicos_lista||[]).map(t=>
@@ -2979,7 +2982,7 @@ function buildSpeciesExportHTML(sp) {
       <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:600;color:#c0392b">${esc(t.nombre||String(t))}</td>
       <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(t.efecto||'')}</td>
     </tr>`).join('');
-  html += row(46, 'Alimentos tóxicos y prohibidos',
+  html += row(45, 'Alimentos tóxicos y prohibidos',
     (sp.toxicos_lista||[]).length
       ? tblInner(['Alimento','Efecto tóxico'], toxRows)
       : n.toxic ? `<div style="color:#c0392b">${esc(n.toxic)}</div>` : ND);
@@ -2991,7 +2994,7 @@ function buildSpeciesExportHTML(sp) {
       <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(String(d.inf??d.inferior??d[2]??''))}</td>
       <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(d.funcion||d[3]||'')}</td>
     </tr>`).join('');
-  html += row(47, 'Fórmula dentaria',
+  html += row(46, 'Fórmula dentaria',
     tblInner(['Tipo de diente','Superior','Inferior','Función'], dentRows));
 
   const dmRows = (sp.dental_measures||[]).map(m=>
@@ -3000,7 +3003,7 @@ function buildSpeciesExportHTML(sp) {
       <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(m.label||'')}</td>
       <td style="font-weight:700;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(m.value||'')}</td>
     </tr>`).join('');
-  html += row(48, 'Medidas odontológicas',
+  html += row(47, 'Medidas odontológicas',
     tblInner(['Número diente','Nombre diente','Tamaño'], dmRows));
 
   // 49: Enfermedades
@@ -3586,6 +3589,12 @@ function showScreen(name, trackNav=true) {
 }
 function goHome() { showScreen('home'); }
 function closeDetail() {
+  // Si hay un visor abierto (imagen/PDF), primero se cierra, no se navega
+  if (document.getElementById('img-full-modal') || document.getElementById('pdf-viewer-modal')) {
+    document.getElementById('img-full-modal')?.remove();
+    document.getElementById('pdf-viewer-modal')?.remove();
+    return;
+  }
   document.getElementById('species-detail').style.display='none';
   document.getElementById('main').style.display='';
   document.getElementById('screen-home').classList.add('active');
@@ -3883,15 +3892,48 @@ function handleSearch(val) {
   document.getElementById('species-grid').style.display = q ? 'none' : 'grid';
   srDiv.style.display = q ? 'block' : 'none';
   if (!q) return;
+  const escq = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const hay = (...fs) => fs.some(f => (f||'').toLowerCase().includes(q));
   const sMatches = SPECIES_DB.filter(sp => {
-    const fields = [sp.name, sp.sci, sp.order, sp.family, sp.clase,
-      sp.sci?.split(' ')[0]  // género
-    ];
+    const fields = [sp.name, sp.sci, sp.order, sp.family, sp.clase, sp.sci?.split(' ')[0]];
     return fields.some(f => (f||'').toLowerCase().includes(q));
   });
   const dMatches = VADEMECUM_DB.filter(d => d.drug.toLowerCase().includes(q)||d.category.toLowerCase().includes(q));
+
+  // Historias clínicas: especie, nombre científico, signos, diagnósticos, fármacos...
+  const rMatches = (clinicalRecords||[]).filter(r => {
+    const txt = [r.species, r.sci, r.name, r.chief_complaint, r.history,
+      (r.problems||[]).map(p=>p.text).join(' '),
+      hcMasterEntries(r).map(m=>m.text).join(' '),
+      hcDdxEntries(r).map(d=>d.text).join(' '),
+      hcPresuntivos(r).join(' '),
+      r.definitivo, hcNotas(r),
+      (r.treatments||[]).map(t=>t.pa+' '+(t.nc||'')).join(' '),
+      (r.exams||[]).map(e=>e.tipo+' '+e.resultado).join(' ')].join(' \n ');
+    return txt.toLowerCase().includes(q);
+  });
+  const fmtFecha = (d) => { try { const x = new Date(d); return isNaN(x)?'':x.toLocaleDateString('es-CO'); } catch(e) { return ''; } };
+
+  // Enriquecimientos: nombre, especies, categorías, descripción...
+  const eMatches = [];
+  (ENRIQUECIMIENTOS_DB||[]).forEach((enr, i) => {
+    const esp = (enr.especies?.length?enr.especies:(enr.especie?[{sp:enr.especie,sci:enr.sci}]:[]));
+    const espTxt = esp.map(e=>`${e.sp||e.especie||''} ${e.sci||''}`).join(' ');
+    const catTxt = (enr.categorias||[enr.categoria]).map(c=>{const ct=ENRIQ_CATS.find(cc=>cc.id===c);return ct?ct.label:'';}).join(' ');
+    const txt = [enr.nombre, espTxt, catTxt, enr.descripcion, enr.objetivo, (enr.materiales||[]).join(' ')].join(' ');
+    if (txt.toLowerCase().includes(q)) eMatches.push({ enr, i, esp, catTxt });
+  });
+
+  // Cálculos de tratamientos guardados: especie, nombre científico o fármaco
+  const txMatches = (_txHistory||[]).filter(h => {
+    const paTxt = (h.tratamientos||[]).map(t=>`${t.pa||''} ${t.nc||''}`).join(' ');
+    return hay(h.especie, h.sci, paTxt);
+  });
+
+  const recAvatar = (r) => (()=>{ const _s=SPECIES_DB.find(s=>s.id===r.speciesId); return _s?.cover_photo?`<img src="${_s.cover_photo}" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-size:1.3rem">${_s?.emoji||'🐾'}</span>`; })();
+
   document.getElementById('search-list').innerHTML = `
-    ${sMatches.length ? `<div class="sec-title">Especies</div>`+sMatches.map(sp=>`
+    ${sMatches.length ? `<div class="sec-title">Especies (ficha completa)</div>`+sMatches.map(sp=>`
       <div class="record-card" onclick="openSpecies('${sp.id}')">
         <div class="record-header">
           <div class="record-avatar" style="overflow:hidden;background:var(--sur2)">
@@ -3901,12 +3943,44 @@ function handleSearch(val) {
           <span class="badge badge-${sp.uicn_world.toLowerCase()}" style="margin-left:auto">${sp.uicn_world}</span>
         </div>
       </div>`).join('') : ''}
-    ${dMatches.length ? `<div class="sec-title" style="margin-top:1rem">Fármacos</div>`+dMatches.slice(0,5).map(d=>`
+    ${dMatches.length ? `<div class="sec-title" style="margin-top:1rem">Fármacos (vademécum)</div>`+dMatches.slice(0,5).map(d=>`
       <div class="vademecum-item">
         <div class="flex-between"><span class="vad-drug">${d.drug}</span><span class="vad-category">${d.category}</span></div>
         <div class="vad-info">${d.dose}</div>
       </div>`).join('') : ''}
-    ${!sMatches.length&&!dMatches.length ? `<div class="empty-state"><p>Sin resultados para "${val}"</p></div>` : ''}`;
+    ${rMatches.length ? `<div class="sec-title" style="margin-top:1rem">Historias clínicas (${rMatches.length})</div>`+rMatches.slice(0,8).map(r=>`
+      <div class="record-card" onclick="showScreen('historias');openRecord('${r.id}')">
+        <div class="record-header">
+          <div class="record-avatar" style="overflow:hidden;padding:0;background:var(--sur2)">${recAvatar(r)}</div>
+          <div style="flex:1;min-width:0">
+            <div class="record-name">${escq(r.name)}</div>
+            <div class="record-meta">${r.species}${r.sci?' <em style="opacity:.75">('+escq(r.sci)+')</em>':''} · ${fmtFecha(r.date)}</div>
+            ${r.chief_complaint?`<div class="text-sm text-muted" style="margin-top:.15rem">📋 ${escq(r.chief_complaint)}</div>`:''}
+          </div>
+          <span class="badge badge-lc" style="margin-left:auto;flex-shrink:0">${escq(r.hc_num||'HC')}</span>
+        </div>
+      </div>`).join('') : ''}
+    ${eMatches.length ? `<div class="sec-title" style="margin-top:1rem">Enriquecimientos (${eMatches.length})</div>`+eMatches.slice(0,8).map(({enr,i,catTxt})=>`
+      <div class="record-card" onclick="showScreen('enriquecimiento');openEnriqDetail(${i})">
+        <div class="record-header">
+          <div class="record-avatar" style="background:var(--g0)"><span style="font-size:1.2rem">🌿</span></div>
+          <div style="flex:1;min-width:0">
+            <div class="record-name">${escq(enr.nombre)}</div>
+            <div class="record-meta">${escq(catTxt)} · ${escq((enr.especies||[enr.especie]).map(e=>e.sp||e.especie||'').filter(Boolean).slice(0,3).join(', '))}</div>
+          </div>
+        </div>
+      </div>`).join('') : ''}
+    ${txMatches.length ? `<div class="sec-title" style="margin-top:1rem">Cálculos de tratamientos guardados (${txMatches.length})</div>`+txMatches.slice(0,8).map(h=>`
+      <div class="record-card" onclick="showScreen('calc-tratamientos');loadCalcTratamiento('${h.id}')">
+        <div class="record-header">
+          <div class="record-avatar" style="background:var(--sur2)"><span style="font-size:1.2rem">💊</span></div>
+          <div style="flex:1;min-width:0">
+            <div class="record-name">${escq(h.especie||'Cálculo de tratamiento')}${h.sci?' <span style="font-size:.72rem;color:var(--txt3)">('+escq(h.sci)+')</span>':''}</div>
+            <div class="record-meta">${(h.tratamientos||[]).map(t=>t.pa||'').filter(Boolean).slice(0,3).join(', ')}${(h.tratamientos?.length||0)>3?' +'+(h.tratamientos.length-3)+' más':''} · ${fmtFecha(h.fecha)}</div>
+          </div>
+        </div>
+      </div>`).join('') : ''}
+    ${!sMatches.length&&!dMatches.length&&!rMatches.length&&!eMatches.length&&!txMatches.length ? `<div class="empty-state"><p>Sin resultados para "${val}"</p></div>` : ''}`;
 }
 
 // ═══════════════════════════════════
@@ -5361,14 +5435,16 @@ function _enf_saveCausaNueva() {
 function _enf_updateAgente(causa, keepVal) {
   const wrap = document.getElementById('enf-agente-charact');
   if (!wrap) return;
-  const opts = ENF_AGENTE_CARACT[causa] || ['Otro'];
+  // Mostrar TODAS las características cargadas en la app (de todas las causas)
+  // más las que el usuario haya agregado manualmente al historial.
+  const allLoaded = Object.values(ENF_AGENTE_CARACT).flat();
+  const opts = [...new Set([...allLoaded, ..._enfAgenteHistorial])];
   const keep = keepVal || document.getElementById('enf-agente-tipo')?.value || '';
-  const all = [...new Set([...opts, ..._enfAgenteHistorial])];
   const LBL = 'font-size:.65rem;font-weight:600;color:var(--txt2);display:block;margin-bottom:.15rem';
   let html = `<div style="${LBL}">Características del agente <span style="font-weight:400;color:var(--txt3)">(según causa: ${causa||'…'})</span></div>`;
   html += '<select id="enf-agente-tipo" class="form-control" style="font-size:.8rem">';
-  all.forEach(o=>{ html += `<option value="${o}" ${o===keep?'selected':''}>${o}</option>`; });
-  if (keep && !all.includes(keep)) html += `<option value="${keep}" selected>${keep}</option>`;
+  opts.forEach(o=>{ html += `<option value="${o}" ${o===keep?'selected':''}>${o}</option>`; });
+  if (keep && !opts.includes(keep)) html += `<option value="${keep}" selected>${keep}</option>`;
   html += '<option value="__otra__">➕ Otra característica...</option>';
   html += '</select>';
   html += '<div id="enf-agente-caract-nueva-wrap" style="display:none;margin-top:.3rem">'
@@ -6194,14 +6270,25 @@ function openAddEnfermedad(sistId, editIdx=-1) {
             <div id="enf-tx-posibles-list">
               ${(editEnf?.tx_posibles||[]).map(t=>`
               <div class="enf-tx-posible-row" style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem;margin-bottom:.4rem;background:var(--sur)">
-                <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
-                  <input class="form-control enf-txp-nombre" value="${t.nombre||''}" placeholder="Nombre del tratamiento..." style="flex:2;font-size:.82rem;font-weight:600">
-                  <input class="form-control enf-txp-objetivo" value="${t.objetivo||''}" placeholder="Objetivo terapéutico..." style="flex:2;font-size:.8rem">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.25rem">
+                  <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Nombre del tratamiento</div>
+                    <input class="form-control enf-txp-nombre" value="${t.nombre||''}" placeholder="Ej: Terapia de soporte..." style="font-size:.82rem;font-weight:600">
+                  </div>
+                  <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Objetivo terapéutico</div>
+                    <input class="form-control enf-txp-objetivo" value="${t.objetivo||''}" placeholder="Objetivo terapéutico..." style="font-size:.8rem">
+                  </div>
+                </div>
+                <div style="display:flex;gap:.3rem;align-items:flex-start;margin-bottom:.25rem">
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Descripción del tratamiento</div>
+                    <textarea class="form-control enf-txp-descripcion" style="min-height:45px;resize:vertical;font-size:.8rem"
+                      placeholder="Descripción del tratamiento...">${t.descripcion||''}</textarea>
+                  </div>
                   <button onclick="this.closest('.enf-tx-posible-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
                 </div>
-                <textarea class="form-control enf-txp-descripcion" style="min-height:45px;resize:vertical;font-size:.8rem;margin-bottom:.25rem"
-                  placeholder="Descripción del tratamiento...">${t.descripcion||''}</textarea>
-                <input class="form-control enf-txp-mas-info" value="${t.mas_info||''}" placeholder="Más información (referencia, URL...)" style="font-size:.8rem">
+                <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Más información</div>
+                  <input class="form-control enf-txp-mas-info" value="${t.mas_info||''}" placeholder="Referencia, URL..." style="font-size:.8rem">
+                </div>
               </div>`).join('')}
             </div>
             <button class="btn btn-secondary btn-sm" style="font-size:.72rem" onclick="_enf_addTxPosible()">+ Agregar tratamiento posible</button>
@@ -6212,13 +6299,18 @@ function openAddEnfermedad(sistId, editIdx=-1) {
             <div id="enf-tx-list">
               ${(editEnf?.tx_lista||[editEnf?.tx||'']).filter(Boolean).map(t=>`
               <div class="enf-tx-esp-row" style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem;margin-bottom:.4rem;background:var(--sur)">
-                <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
-                  <input class="form-control enf-tx-item" value="${typeof t==='object'?t.nombre||t:t}" placeholder="Nombre del tratamiento específico..." style="flex:1;font-size:.82rem;font-weight:600">
+                <div style="display:flex;gap:.3rem;align-items:flex-end;margin-bottom:.25rem">
+                  <div style="flex:1;min-width:0"><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Nombre del tratamiento específico</div>
+                    <input class="form-control enf-tx-item" value="${typeof t==='object'?t.nombre||t:t}" placeholder="Ej: Amoxicilina 22 mg/kg BID..." style="font-size:.82rem;font-weight:600">
+                  </div>
                   <button onclick="this.closest('.enf-tx-esp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
                 </div>
+                <div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Descripción del tratamiento</div>
                 <textarea class="form-control enf-tx-descripcion" style="min-height:50px;resize:vertical;font-size:.8rem;margin-bottom:.25rem"
-                  placeholder="Descripción del tratamiento (dosis, protocolo, consideraciones)...">${typeof t==='object'?t.descripcion||'':''}</textarea>
-                <input class="form-control enf-tx-duracion" value="${typeof t==='object'?t.duracion||'':''}" placeholder="Duración del tratamiento (ej: 7-10 días, hasta remisión)..." style="font-size:.8rem">
+                  placeholder="Dosis, protocolo, consideraciones...">${typeof t==='object'?t.descripcion||'':''}</textarea>
+                <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Duración del tratamiento</div>
+                  <input class="form-control enf-tx-duracion" value="${typeof t==='object'?t.duracion||'':''}" placeholder="Ej: 7-10 días, hasta remisión..." style="font-size:.8rem">
+                </div>
               </div>`).join('')}
             </div>
             <button class="btn btn-secondary btn-sm" style="font-size:.72rem" onclick="_enf_addTxItem()">+ Agregar tratamiento específico</button>
@@ -7192,11 +7284,16 @@ function renderFluidoterapiaCalcScreen() {
         <div class="fluid-input-group"><label>% Deshidratación (1–15%)</label>
           <select id="fl-d" onchange="calcFluids()">${dehydOpts}</select>
         </div>
-        <div class="fluid-input-group"><label>Mantenimiento (ml/kg/día)</label>
+        <div class="fluid-input-group"><label>Mantenimiento (dosis)</label>
           <div style="display:flex;gap:.3rem">
-            <input type="number" id="fl-m" class="form-control" value="50" min="0" max="500" step="1" oninput="calcFluids()" style="flex:1">
+            <select id="fl-m-unit" class="form-control" style="flex-shrink:0;font-size:.78rem" onchange="calcFluids()">
+              <option value="dia">por día</option>
+              <option value="hora">por hora</option>
+            </select>
+            <input type="number" id="fl-m" class="form-control" value="50" min="0" max="500" step="0.5" oninput="calcFluids()" style="flex:1">
             <button type="button" class="btn btn-primary btn-sm" style="flex-shrink:0;font-size:.68rem" onclick="guardarMantenimiento()" title="Guardar esta dosis de mantenimiento para reutilizarla">💾 Guardar</button>
           </div>
+          <div id="fl-m-hint" style="font-size:.68rem;color:var(--txt3);margin-top:.25rem"></div>
           <div id="fl-m-presets" style="margin-top:.3rem"></div>
         </div>
         <div></div>
@@ -7246,7 +7343,7 @@ function renderFluidoterapiaCalcScreen() {
       <div class="fluid-result-card" style="background:var(--g0);border:1px solid var(--g3);margin-bottom:.5rem">
         <div class="fluid-result-label">Velocidad de infusión continua</div>
         <div class="fluid-result-value" id="fl-mlh" style="color:var(--g7);font-size:1.5rem">—</div>
-        <div class="fluid-result-unit">ml/hora (Total ÷ 24)</div>
+        <div class="fluid-result-unit" id="fl-mlh-sub">ml/hora (Total ÷ 24)</div>
       </div>
       <div style="font-size:.7rem;color:var(--txt3);font-weight:600;margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.06em">Goteo y aproximación</div>
       <table style="width:100%;border-collapse:collapse;font-size:.82rem">
@@ -7489,33 +7586,36 @@ async function removeLiquidoIV(i) {
 }
 
 // ── Aproximación del factor de goteo (gts/x seg) ──
-// Busca el menor k (segundos) tal que factor × k dé aproximadamente una gota:
-// prioriza resultado = 1, luego 0,9 y 1,2; si ninguno calza, busca que sea un
-// número entero de gotas (ej. 0,75 gts/seg → 3 gts / 4 seg). Devuelve {w, k}.
+// Siempre devuelve un número entero de gotas con el menor k posible:
+// primero busca "1 gts / k seg" (r×k ≈ 1, tolerancia muy estrecha) y, si no,
+// busca cualquier w entero ≥2 con r×k ≈ w (ej. 0,75 gts/seg → 3 gts / 4 seg).
+// Devuelve {w, k}.
 function aproxGoteo(r) {
   if (!isFinite(r) || r <= 0) return { w: 0, k: 0 };
-  const MAXK = 3600, TOL = 0.1;
+  const EPS = 0.012, MAXK = 3600;
+  for (let k = 1; k <= MAXK; k++) {
+    if (Math.abs(r * k - 1) <= EPS) return { w: 1, k };
+  }
   for (let k = 1; k <= MAXK; k++) {
     const v = r * k;
-    if (Math.abs(v - 1) <= TOL)   return { w: 1, k };
-    if (Math.abs(v - 0.9) <= TOL) return { w: 1, k };
-    if (Math.abs(v - 1.2) <= TOL) return { w: 1, k };
     const wi = Math.round(v);
-    if (wi >= 2 && Math.abs(v - wi) <= TOL) return { w: wi, k };
+    if (wi >= 2 && Math.abs(v - wi) <= EPS) return { w: wi, k };
   }
-  const k = Math.max(1, Math.round(1 / r));
+  const k = Math.max(1, Math.min(MAXK, Math.round(1 / r)));
   return { w: 1, k };
 }
 
 function calcFluids() {
   const w = parseFloat(document.getElementById('fl-w')?.value)||currentWeight;
   const d = parseFloat(document.getElementById('fl-d')?.value)||0;
-  const m = parseFloat(document.getElementById('fl-m')?.value)||50;
+  const m = parseFloat(document.getElementById('fl-m')?.value)||0;
+  const mUnit = document.getElementById('fl-m-unit')?.value || 'dia';
   const vom = parseInt(document.getElementById('fl-vom')?.value)||0;
   const dia = parseInt(document.getElementById('fl-dia')?.value)||0;
   // Sin aproximar: valores exactos de cada multiplicación.
   const def = w * d * 10;          // ml: peso(kg) × %deshid × 10
-  const mv  = w * m;               // ml: peso × ml/kg/día
+  // Mantenimiento: por día → ml/kg/día; por hora → ml/kg/h (×24 para el día).
+  const mv  = w * m * (mUnit === 'hora' ? 24 : 1);   // ml/día
   const vomLoss = vom * w * 4;     // ml: episodios × peso × 4 ml/kg
   const diaLoss = dia * w * 6;     // ml: episodios × peso × 6 ml/kg
   const tot = def + mv + vomLoss + diaLoss;
@@ -7534,6 +7634,8 @@ function calcFluids() {
     if (r === 0) return '0';
     return (+r.toFixed(4)).toLocaleString('es-CO');
   };
+  // Velocidad continua (ml/h): por día = Total ÷ 24; por hora = mantenimiento/h tras repartir el resto en 24 h.
+  const mlh = mUnit === 'hora' ? (w * m + (def + vomLoss + diaLoss) / 24) : (tot / 24);
   // Renderiza una fila de goteo (mi/no/ma) con su aproximación y gts/min bajo un prefijo de IDs.
   const renderDripBlock = (p, mlh) => {
     const dr = drips(mlh);
@@ -7545,7 +7647,7 @@ function calcFluids() {
 
   // Desglose del total (componentes)
   set('fl-def',  fmtVol(def));    set('fl-def-f',  w+' × '+d+'% × 10');
-  set('fl-mv',   fmtVol(mv));     set('fl-mv-f',   w+' × '+m+' ml/kg/día');
+  set('fl-mv',   fmtVol(mv));     set('fl-mv-f',   mUnit === 'hora' ? w+' × '+m+' ml/kg/h × 24 h' : w+' × '+m+' ml/kg/día');
   set('fl-vomv', fmtVol(vomLoss));set('fl-vomv-f', vom+' × '+w+' × 4 ml/kg');
   set('fl-diav', fmtVol(diaLoss));set('fl-diav-f', dia+' × '+w+' × 6 ml/kg');
   set('fl-sum',  fmtVol(tot));
@@ -7555,9 +7657,17 @@ function calcFluids() {
   const bolosN = Math.max(1, parseInt(document.getElementById('fl-bolos-n')?.value)||1);
   set('fl-bolo', fmtVol(tot/bolosN));
 
-  // 2: VOLUMEN DIARIO (Total ÷ 24) — coma decimal, sin ceros a la derecha.
-  set('fl-mlh', fmtVol(tot/24));
-  renderDripBlock('vd', tot/24);
+  // 2: VOLUMEN DIARIO — coma decimal, sin ceros a la derecha.
+  set('fl-mlh', fmtVol(mlh));
+  const msub = document.getElementById('fl-mlh-sub');
+  if (msub) msub.textContent = mUnit === 'hora'
+    ? 'ml/hora = (peso × '+m+' ml/kg/h) + (desh. + pérdidas) ÷ 24'
+    : 'ml/hora (Total ÷ 24)';
+  const mhint = document.getElementById('fl-m-hint');
+  if (mhint) mhint.textContent = mUnit === 'hora'
+    ? 'Dosis por hora (ml/kg/h): el goteo se calcula con la velocidad directa, sin dividir el total entre 24.'
+    : 'Dosis por día (ml/kg/día): el volumen total se reparte en 24 horas.';
+  renderDripBlock('vd', mlh);
 
   // 3: DISTRIBUCIÓN (dos fases: % + horas, el resto en el tiempo restante)
   const pct1 = Math.max(0, Math.min(100, parseFloat(document.getElementById('fl-d1-pct')?.value)||50));
@@ -7601,7 +7711,8 @@ function generarResumenFluidosPDF() {
   // Recolectar valores ingresados
   const w    = parseFloat(document.getElementById('fl-w')?.value) || 0;
   const d    = parseFloat(document.getElementById('fl-d')?.value) || 0;
-  const m    = parseFloat(document.getElementById('fl-m')?.value) || 50;
+  const m    = parseFloat(document.getElementById('fl-m')?.value) || 0;
+  const mUnit = document.getElementById('fl-m-unit')?.value || 'dia';
   const vom  = parseInt(document.getElementById('fl-vom')?.value) || 0;
   const dia  = parseInt(document.getElementById('fl-dia')?.value) || 0;
   const bolosN = Math.max(1, parseInt(document.getElementById('fl-bolos-n')?.value) || 1);
@@ -7613,11 +7724,11 @@ function generarResumenFluidosPDF() {
 
   // Resultados (mismas fórmulas que la calculadora)
   const def = w * d * 10;
-  const mv  = w * m;
+  const mv  = w * m * (mUnit === 'hora' ? 24 : 1);
   const vomLoss = vom * w * 4;
   const diaLoss = dia * w * 6;
   const tot = def + mv + vomLoss + diaLoss;
-  const mlh = tot / 24;
+  const mlh = mUnit === 'hora' ? (w * m + (def + vomLoss + diaLoss) / 24) : (tot / 24);
   const vol1 = tot * pct1 / 100;
   const vol2 = tot * pct2 / 100;
 
@@ -7683,7 +7794,7 @@ function generarResumenFluidosPDF() {
   const vars = [
     ['P — Peso del animal', '[kg]', hasVal ? fmt(w) : ''],
     ['%Desh — Porcentaje de deshidratación', '[%]', hasVal ? fmt(d) : ''],
-    ['D_mant — Dosis de mantenimiento', '[ml/kg/día]', hasVal ? fmt(m) : ''],
+    ['D_mant — Dosis de mantenimiento', mUnit === 'hora' ? '[ml/kg/h]' : '[ml/kg/día]', hasVal ? fmt(m) : ''],
     ['E_vom — Episodios de vómito', '[n.°]', hasVal ? fmt(vom) : ''],
     ['E_dia — Episodios de diarrea', '[n.°]', hasVal ? fmt(dia) : ''],
     ['N_bolos — Número de bolos', '[n.°]', hasVal ? fmt(bolosN) : ''],
@@ -7698,7 +7809,10 @@ function generarResumenFluidosPDF() {
   // Componentes del total
   section('1. Componentes del volumen total (24 h)');
   row('V_desh = P × %Desh × 10   [ml]', hasVal ? (w + ' × ' + d + '% × 10 = ' + fmt(def) + ' ml') : '');
-  row('V_mant = P × D_mant   [ml]', hasVal ? (fmt(w) + ' × ' + fmt(m) + ' = ' + fmt(mv) + ' ml') : '');
+  row('V_mant = ' + (mUnit === 'hora' ? '(P × D_mant) × 24   [ml]' : 'P × D_mant   [ml]'),
+      hasVal ? (mUnit === 'hora'
+        ? '(' + fmt(w) + ' × ' + fmt(m) + ') × 24 = ' + fmt(mv) + ' ml'
+        : fmt(w) + ' × ' + fmt(m) + ' = ' + fmt(mv) + ' ml') : '');
   row('V_vómito = E_vom × P × 4   [ml]', hasVal ? (vom + ' × ' + fmt(w) + ' × 4 = ' + fmt(vomLoss) + ' ml') : '');
   row('V_diarrea = E_dia × P × 6   [ml]', hasVal ? (dia + ' × ' + fmt(w) + ' × 6 = ' + fmt(diaLoss) + ' ml') : '');
   row('V_total = V_desh + V_mant + V_vómito + V_diarrea   [ml]', hasVal ? (fmt(def) + ' + ' + fmt(mv) + ' + ' + fmt(vomLoss) + ' + ' + fmt(diaLoss) + ' = ' + fmt(tot) + ' ml') : '');
@@ -7706,7 +7820,11 @@ function generarResumenFluidosPDF() {
 
   // Volumen diario
   section('2. Volumen diario');
-  row('V/h = V_total ÷ 24   [ml/h]', hasVal ? (fmt(tot) + ' ÷ 24 = ' + fmt(mlh) + ' ml/h') : '');
+  row(mUnit === 'hora' ? 'V/h = (P × D_mant) + (V_desh + V_vómito + V_diarrea) ÷ 24   [ml/h]'
+                       : 'V/h = V_total ÷ 24   [ml/h]',
+      hasVal ? (mUnit === 'hora'
+        ? '(' + fmt(w) + ' × ' + fmt(m) + ') + (' + fmt(def) + ' + ' + fmt(vomLoss) + ' + ' + fmt(diaLoss) + ') ÷ 24 = ' + fmt(mlh) + ' ml/h'
+        : fmt(tot) + ' ÷ 24 = ' + fmt(mlh) + ' ml/h') : '');
   row('Cada bolo = V_total ÷ N_bolos   [ml]', hasVal ? (fmt(tot) + ' ÷ ' + fmt(bolosN) + ' = ' + fmt(tot / bolosN) + ' ml') : '');
   blank();
 
@@ -7781,7 +7899,7 @@ function renderFlPresets() {
     <div style="display:flex;gap:.3rem;margin-top:.2rem">
       <select class="form-control" style="font-size:.75rem;flex:1" onchange="usarMantenimiento(this.value)">
         <option value="">— Seleccionar guardada —</option>
-        ${_flPresets.map((p,i)=>`<option value="${i}">${p.name} (${p.value} ml/kg/día)</option>`).join('')}
+        ${_flPresets.map((p,i)=>`<option value="${i}">${p.name} (${p.value} ${p.unit==='hora'?'ml/kg/h':'ml/kg/día'})</option>`).join('')}
       </select>
       <button type="button" class="icon-btn danger" style="flex-shrink:0;width:32px;height:34px" onclick="borrarMantenimiento()" title="Eliminar la seleccionada">✕</button>
     </div>`;
@@ -7794,7 +7912,7 @@ function guardarMantenimiento() {
   loadFlPresets();
   const nombre = name.trim() || 'Mantenimiento '+val;
   if (_flPresets.some(p=>p.name.toLowerCase()===nombre.toLowerCase())) { toast('⚠ Ya existe una dosis con ese nombre'); return; }
-  _flPresets.push({ name: nombre, value: val });
+  _flPresets.push({ name: nombre, value: val, unit: document.getElementById('fl-m-unit')?.value || 'dia' });
   saveFlPresets();
   renderFlPresets();
   toast('✓ Dosis de mantenimiento guardada');
@@ -7803,8 +7921,10 @@ function usarMantenimiento(idx) {
   const p = _flPresets[parseInt(idx)];
   if (!p) return;
   const el = document.getElementById('fl-m');
+  const u = document.getElementById('fl-m-unit');
+  if (u && p.unit) u.value = p.unit;
   if (el) { el.value = p.value; calcFluids(); }
-  toast('✓ Usando "'+p.name+'" ('+p.value+' ml/kg/día)');
+  toast('✓ Usando "'+p.name+'" ('+p.value+' '+(p.unit==='hora'?'ml/kg/h':'ml/kg/día')+')');
 }
 function borrarMantenimiento() {
   const sel = document.querySelector('#fl-m-presets select');
@@ -9501,7 +9621,14 @@ function vadGoBack() {
 }
 
 window.addEventListener('popstate', function(e) {
-  if (document.getElementById('screen-vademecum')?.classList.contains('active')) {
+  const viewerOpen = !!(document.getElementById('img-full-modal') || document.getElementById('pdf-viewer-modal'));
+  const vadActive = document.getElementById('screen-vademecum')?.classList.contains('active');
+  if (viewerOpen) {
+    document.getElementById('img-full-modal')?.remove();
+    document.getElementById('pdf-viewer-modal')?.remove();
+    if (!vadActive) { e.stopImmediatePropagation(); return; }
+  }
+  if (vadActive) {
     vadGoBack();
     e.stopImmediatePropagation();
   }
@@ -9867,11 +9994,11 @@ function _renderVadSubcategories(el, isAdmin) {
   const cat = VADEMECUM_CATS[_vadCatActiva];
   if (!cat) { el.innerHTML = '<div class="empty-state"><p>Categoría no encontrada</p></div>'; return; }
   const subcats = _vadSortByNum(Object.entries(cat.subcategories||{}));
-  if (!subcats.length) {
-    el.innerHTML = (isAdmin ? `<button onclick="openAddVadSubcategory()" class="btn btn-secondary btn-sm" style="width:100%;margin-top:.5rem">+ Nueva subcategoría</button>` : '<div class="empty-state"><p>Sin subcategorías</p></div>');
-    return;
-  }
-  el.innerHTML = subcats.map(([id, sub]) => {
+  // Fármacos asignados directamente a la categoría (sin subcategoría)
+  const catDrugs = VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && !d.subcat_vad);
+  let html = '';
+  if (subcats.length) {
+    html = subcats.map(([id, sub]) => {
     const hasSubcats = sub.subcats && Object.keys(sub.subcats).length;
     let drugCount = 0;
     if (hasSubcats) {
@@ -9896,11 +10023,20 @@ function _renderVadSubcategories(el, isAdmin) {
         <button onclick="event.stopPropagation();renameVadSubcategory('${id}')" class="btn btn-secondary btn-sm" style="font-size:.68rem">✏️ Renombrar</button>
         <button onclick="event.stopPropagation();deleteVadSubcategory('${id}')" class="btn btn-secondary btn-sm" style="font-size:.68rem;color:var(--r5)">✕ Eliminar</button>
       </div>` : ''}
-    </div>`;
-  }).join('') + (isAdmin ? `
-    <button onclick="openAddVadSubcategory()" class="btn btn-secondary btn-sm" style="width:100%;margin-top:.5rem">
+    </div>`}).join('');
+  } else if (!isAdmin) {
+    html = '<div class="empty-state"><p>Sin subcategorías</p></div>';
+  }
+  if (catDrugs.length) {
+    html += `<div style="font-size:.7rem;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;margin:.75rem 0 .4rem">Fármacos de esta categoría</div>`;
+    html += catDrugs.map(d => _buildVadDrugCard(d, isAdmin, true)).join('');
+  }
+  if (isAdmin) {
+    html += `<button onclick="openAddVadSubcategory()" class="btn btn-secondary btn-sm" style="width:100%;margin-top:.5rem">
       + Nueva subcategoría
-    </button>` : '');
+    </button>`;
+  }
+  el.innerHTML = html;
 }
 
 // ── Render: Level 2.5 — Sub-subcategories ──
@@ -11017,21 +11153,27 @@ async function hcAddMM() {
 function hcSpeciesOptions() {
   const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
   const map = {};
-  SPECIES_DB.forEach(s => { if (s.name) map[norm(s.name)] = { id:s.id, nombre:s.name, sci:s.sci||'' }; });
+  const feed = (n, sci, id) => {
+    const k = norm(n);
+    if (!n || !k) return;
+    if (!map[k]) map[k] = { id: id||'', nombre:n, sci:sci||'' };
+    else if (!map[k].sci && sci) map[k].sci = sci;
+  };
+  SPECIES_DB.forEach(s => { if (s.name) feed(s.name, s.sci, s.id); });
   (ENRIQUECIMIENTOS_DB||[]).forEach(enr => {
     const rows = (enr.especies && enr.especies.length) ? enr.especies : (enr.especie ? [{sp:enr.especie, sci:enr.sci||''}] : []);
-    rows.forEach(r => {
-      const n = (r.sp||'').trim();
-      if (!n) return;
-      const k = norm(n);
-      if (!map[k]) map[k] = { id:'', nombre:n, sci:r.sci||'' };
-    });
+    rows.forEach(r => feed((r.sp||'').trim(), r.sci||'', ''));
   });
+  // Especies escritas en historias clínicas y en cálculos de tratamientos
+  (clinicalRecords||[]).forEach(r => feed((r.species||'').trim(), r.sci||'', r.speciesId||''));
+  (_txHistory||[]).forEach(h => feed((h.especie||'').trim(), h.sci||'', ''));
   return Object.values(map).sort((a,b)=>a.nombre.localeCompare(b.nombre));
 }
 function hcApplySpecies() {
   const nombre = (document.getElementById('rec-species')?.value||'').trim();
-  const opt = hcSpeciesOptions().find(o=>o.nombre.toLowerCase()===nombre.toLowerCase());
+  const opts = hcSpeciesOptions();
+  const opt = opts.find(o=>o.nombre.toLowerCase()===nombre.toLowerCase())
+           || (nombre ? opts.find(o=>(o.sci||'').toLowerCase()===nombre.toLowerCase()) : null);
   const idEl = document.getElementById('rec-species-id');
   const sciEl = document.getElementById('rec-sci');
   if (idEl) idEl.value = opt ? (opt.id||'') : '';
@@ -11057,7 +11199,7 @@ function fmtNum(v) {
   if (v===null || v===undefined || v==='') return '';
   const n = parseNum(v);
   if (isNaN(n)) return String(v);
-  return n.toFixed(2).replace(/\.?0+$/,'').replace('.', ',');
+  return n.toFixed(4).replace(/\.?0+$/,'').replace('.', ',');
 }
 function fmtInput(el) {
   if (!el || el.value==='') return;
@@ -11134,13 +11276,7 @@ function hcTreatRowHtml(i, prefix) {
         <div><label style="font-size:.72rem;color:var(--txt3)">Peso (kg)</label><input class="form-control treat-peso" type="text" inputmode="decimal" placeholder="kg" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
       </div>
       <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem">
-        <label style="font-size:.72rem;color:var(--txt3);flex-shrink:0">Calcular:</label>
-        <select class="form-control treat-calc" style="flex:1;font-size:.78rem" onchange="calcTreatDose(this)">
-          <option value="total">Dosis total (dosis × peso / concentración)</option>
-          <option value="conc">Concentración (dosis × peso / total)</option>
-          <option value="peso">Peso (concentración × total / dosis)</option>
-          <option value="dosis">Dosis básica (concentración × total / peso)</option>
-        </select>
+        <label style="font-size:.72rem;color:var(--txt3);flex-shrink:0">⚡ Cálculo automático: completa 3 de las 4 variables (dosis, peso, concentración, dosis total) y la app calcula la que falta.</label>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;margin-bottom:.4rem">
         <div><label style="font-size:.72rem;color:var(--txt3)">Dosis total <span style="font-size:.62rem;color:var(--txt3)">(editable)</span></label><input class="form-control treat-total" type="text" inputmode="decimal" placeholder="auto / manual" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
@@ -11157,6 +11293,20 @@ function hcTreatRowHtml(i, prefix) {
       </div>
       <div><label style="font-size:.72rem;color:var(--txt3)">Notas</label><input class="form-control treat-notas" placeholder="Observaciones de administración..." style="font-size:.82rem"></div>
     </div>`;
+}
+// Auto-detección: cuál variable falta (exactamente una) con las otras 3 > 0 → se calcula esa
+function _tcalcMissing(dosis, peso, conc, total) {
+  const present4 = dosis>0 && peso>0 && conc>0 && total>0;
+  if (present4) return null;
+  const empty = [];
+  if (!(dosis>0)) empty.push('dosis');
+  if (!(peso>0)) empty.push('peso');
+  if (!(conc>0)) empty.push('conc');
+  if (!(total>0)) empty.push('total');
+  if (empty.length !== 1) return null;
+  const e = empty[0];
+  const others = ['dosis','peso','conc','total'].filter(k=>k!==e);
+  return others.every(k => [dosis,peso,conc,total][['dosis','peso','conc','total'].indexOf(k)]>0) ? e : null;
 }
 function calcTreatDose(input) {
   const row = (input && input.closest) ? input.closest('[data-trow]') : (input||null);
@@ -11179,33 +11329,23 @@ function calcTreatDose(input) {
   const du = row.querySelector('.treat-dosis-u');
   if (du) du.textContent = num ? '('+num+'/kg)' : '';
 
-  // Variable a calcular: la del selector (o dosis total si no hay selector).
-  // Si el usuario edita directamente el campo de dosis total, ese valor es manual
-  // y sirve para recalcular la dosis básica (compatibilidad con historias).
-  let target = row.querySelector('.treat-calc')?.value || 'total';
-  if (input === elTotal) target = 'total';
-
-  if (target === 'total') {
-    row.dataset.calc = (input === elTotal) ? 'manual' : 'calc';
-    if (input === elTotal) {
-      if (total>0 && peso>0 && conc>0) elDosis.value = fmtNum(total*conc/peso);
-      else elDosis.value = '';
-    } else {
-      if (dosis>0 && peso>0 && conc>0) { elTotal.value = fmtNum(dosis*peso/conc); row.dataset.calc = 'calc'; }
-      else if (elTotal.value) elTotal.value = '';
-    }
-  } else if (target === 'conc') {
+  // Sin selector manual: la app calcula la variable que falta, sin aproximar.
+  const miss = _tcalcMissing(dosis, peso, conc, total);
+  row.dataset.calcVar = miss || '';
+  if (miss === 'total') {
     row.dataset.calc = 'calc';
-    if (input !== elConc && total>0 && peso>0 && dosis>0) elConc.value = fmtNum(dosis*peso/total);
-    else if (input !== elConc && elConc.value) elConc.value = '';
-  } else if (target === 'peso') {
+    elTotal.value = fmtNum(dosis*peso/conc);
+  } else if (miss === 'conc') {
     row.dataset.calc = 'calc';
-    if (input !== elPeso && total>0 && conc>0 && dosis>0) elPeso.value = fmtNum(total*conc/dosis);
-    else if (input !== elPeso && elPeso.value) elPeso.value = '';
-  } else { // dosis
+    elConc.value = fmtNum(dosis*peso/total);
+  } else if (miss === 'peso') {
     row.dataset.calc = 'calc';
-    if (input !== elDosis && total>0 && peso>0 && conc>0) elDosis.value = fmtNum(total*conc/peso);
-    else if (input !== elDosis && elDosis.value) elDosis.value = '';
+    elPeso.value = fmtNum(total*conc/dosis);
+  } else if (miss === 'dosis') {
+    row.dataset.calc = 'calc';
+    elDosis.value = fmtNum(total*conc/peso);
+  } else {
+    row.dataset.calc = row.dataset.calc || 'calc';
   }
 }
 // ═══════════════════════════════════
@@ -11546,13 +11686,24 @@ let _txEditId = null;
 function _buildCalcSpDatalist() {
   const dl = document.getElementById('tcalc-sp-dl');
   if (!dl) return;
-  dl.innerHTML = hcSpeciesOptions().map(o =>
-    `<option value="${String(o.nombre).replace(/"/g,'&quot;')}" data-sci="${String(o.sci||'').replace(/"/g,'&quot;')}">${o.nombre} — ${o.sci||''}</option>`
-  ).join('');
+  const q = (s) => String(s||'').replace(/"/g,'&quot;');
+  const opts = hcSpeciesOptions();
+  const seen = new Set();
+  opts.forEach(o => {
+    ['nombre','sci'].forEach(k => {
+      const v = (o[k]||'').trim();
+      if (!v || seen.has(v)) return;
+      seen.add(v);
+      dl.insertAdjacentHTML('beforeend',
+        `<option value="${q(v)}">${q(o.nombre)}${o.sci && o.sci!==v?' — '+q(o.sci):''}</option>`);
+    });
+  });
 }
 function calcApplySpecies() {
   const nombre = (document.getElementById('tcalc-especie')?.value||'').trim();
-  const opt = hcSpeciesOptions().find(o => o.nombre.toLowerCase() === nombre.toLowerCase());
+  const opts = hcSpeciesOptions();
+  const opt = opts.find(o => o.nombre.toLowerCase() === nombre.toLowerCase())
+           || (nombre ? opts.find(o => (o.sci||'').toLowerCase() === nombre.toLowerCase()) : null);
   const sciEl = document.getElementById('tcalc-sci');
   if (sciEl) sciEl.value = opt ? (opt.sci||'') : '';
   const sp = opt?.id ? SPECIES_DB.find(s=>s.id===opt.id) : null;
@@ -11582,7 +11733,8 @@ function calcCollectRows() {
       freq: row.querySelector('.treat-freq')?.value,
       dur: row.querySelector('.treat-dur')?.value,
       notas: row.querySelector('.treat-notas')?.value,
-      calc: row.dataset.calc || 'calc'
+      calc: row.dataset.calc || 'calc',
+      calc_var: row.dataset.calcVar || ''
     });
   });
   return out;
@@ -11686,10 +11838,117 @@ function renderCalcTratHist() {
         <div style="font-size:.82rem;font-weight:600">${n>1?n+' medicamentos · ':''}${h.especie?('🐾 '+h.especie+(h.sci?' <em style="font-size:.7rem;opacity:.7">('+h.sci+')</em>':'')):trat?.pa||'Cálculo'}</div>
         <div style="font-size:.68rem;color:var(--txt3)">${trat?`💊 ${trat.pa}${trat.conc?' · '+fmtNum(trat.conc)+' '+(trat.conc_num||'')+'/'+(trat.conc_den||''):''}${trat.total?' · total '+fmtNum(trat.total)+' '+(trat.total_u||''):''}`:'Sin medicamentos'} · ${(()=>{const d=new Date(h.fecha);return isNaN(d)?'':d.toLocaleString('es-CO');})()}</div>
       </div>
+      <button onclick="viewCalcTratamiento('${h.id}')" class="btn btn-secondary btn-sm" style="font-size:.66rem">👁 Ver</button>
       <button onclick="loadCalcTratamiento('${h.id}')" class="btn btn-secondary btn-sm" style="font-size:.66rem">✏️ Editar</button>
       <button onclick="removeCalcTratamiento('${h.id}')" class="btn btn-secondary btn-sm" style="font-size:.66rem;color:var(--r5)">🗑</button>
     </div>`;
   }).join('');
+}
+
+function _txvFormulaText(t, miss) {
+  const dosis = parseNum(t.dosis)||0, peso = parseNum(t.peso)||0, conc = parseNum(t.conc)||0, total = parseNum(t.total)||0;
+  const nu = t.conc_num || 'mg', de = t.conc_den || 'ml';
+  if (!miss || miss === 'total') {
+    if (dosis>0 && peso>0 && conc>0) return `Dosis total = ${fmtNum(dosis)} × ${fmtNum(peso)} ÷ ${fmtNum(conc)} = <strong>${fmtNum(dosis*peso/conc)}</strong> ${de}`;
+    return 'Completa 3 campos para calcular la dosis total';
+  }
+  if (miss === 'conc') {
+    if (dosis>0 && peso>0 && total>0) return `Concentración = ${fmtNum(dosis)} × ${fmtNum(peso)} ÷ ${fmtNum(total)} = <strong>${fmtNum(dosis*peso/total)}</strong> ${nu}/${de}`;
+    return 'Completa 3 campos para calcular la concentración';
+  }
+  if (miss === 'peso') {
+    if (dosis>0 && conc>0 && total>0) return `Peso = ${fmtNum(total)} × ${fmtNum(conc)} ÷ ${fmtNum(dosis)} = <strong>${fmtNum(total*conc/dosis)}</strong> kg`;
+    return 'Completa 3 campos para calcular el peso';
+  }
+  if (miss === 'dosis') {
+    if (peso>0 && conc>0 && total>0) return `Dosis básica = ${fmtNum(total)} × ${fmtNum(conc)} ÷ ${fmtNum(peso)} = <strong>${fmtNum(total*conc/peso)}</strong> ${nu}/kg`;
+    return 'Completa 3 campos para calcular la dosis básica';
+  }
+  return '';
+}
+function _txvRecalc(idx) {
+  const row = document.querySelector(`#txv-row-${idx}`);
+  if (!row) return;
+  const elDosis = row.querySelector('.txv-dosis'), elPeso = row.querySelector('.txv-peso'),
+        elConc = row.querySelector('.txv-conc'), elTotal = row.querySelector('.txv-total');
+  const dosis = parseNum(elDosis.value)||0, peso = parseNum(elPeso.value)||0,
+        conc = parseNum(elConc.value)||0, total = parseNum(elTotal.value)||0;
+  const miss = _tcalcMissing(dosis, peso, conc, total);
+  if (miss === 'total') elTotal.value = fmtNum(dosis*peso/conc);
+  else if (miss === 'conc') elConc.value = fmtNum(dosis*peso/total);
+  else if (miss === 'peso') elPeso.value = fmtNum(total*conc/dosis);
+  else if (miss === 'dosis') elDosis.value = fmtNum(total*conc/peso);
+  const t = { dosis: elDosis.value, peso: elPeso.value, conc: elConc.value, total: elTotal.value,
+    conc_num: row.dataset.num||'', conc_den: row.dataset.den||'' };
+  row.querySelector('.txv-formula').innerHTML = _txvFormulaText(t, miss);
+}
+function viewCalcTratamiento(id) {
+  const entry = _txHistory.find(h => h.id === id);
+  if (!entry) return;
+  document.getElementById('txv-modal')?.remove();
+  const rowsHtml = (entry.tratamientos||[]).map((t,i)=>{
+    const miss = t.calc_var || 'total';
+    const nu = t.conc_num || 'mg', de = t.conc_den || 'ml';
+    return `
+    <div id="txv-row-${i}" data-num="${nu}" data-den="${de}" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rsm);padding:.6rem;margin-bottom:.5rem">
+      <div style="font-size:.82rem;font-weight:700;margin-bottom:.35rem">💊 ${t.pa||'Sin nombre'}${t.nc?' <span style="font-weight:400;color:var(--txt3);font-size:.72rem">('+t.nc+')</span>':''}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.3rem">
+        <div><label style="font-size:.65rem;color:var(--txt3)">Concentración (${nu}/${de})</label><input class="form-control txv-conc" value="${t.conc||''}" style="font-size:.8rem" oninput="_txvRecalc(${i})"></div>
+        <div><label style="font-size:.65rem;color:var(--txt3)">Dosis básica (${nu}/kg)</label><input class="form-control txv-dosis" value="${t.dosis||''}" style="font-size:.8rem" oninput="_txvRecalc(${i})"></div>
+        <div><label style="font-size:.65rem;color:var(--txt3)">Peso (kg)</label><input class="form-control txv-peso" value="${t.peso||''}" style="font-size:.8rem" oninput="_txvRecalc(${i})"></div>
+        <div><label style="font-size:.65rem;color:var(--txt3)">Dosis total (${de})</label><input class="form-control txv-total" value="${t.total||''}" style="font-size:.8rem" oninput="_txvRecalc(${i})"></div>
+      </div>
+      <div class="txv-formula" style="font-size:.72rem;color:var(--g6);background:var(--sur);border-radius:var(--rxs);padding:.3rem .5rem">${_txvFormulaText(t, miss)}</div>
+      ${(t.via||t.freq||t.dur)?`<div style="font-size:.68rem;color:var(--txt3);margin-top:.3rem">${[('Vía: '+t.via),('Frec: '+t.freq),('Duración: '+t.dur+' d')].filter(Boolean).join(' · ')}</div>`:''}
+      ${t.notas?`<div style="font-size:.68rem;color:var(--txt3);font-style:italic;margin-top:.2rem">📋 ${t.notas}</div>`:''}
+    </div>`;
+  }).join('');
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="txv-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:560px;max-height:92vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+          <div style="font-weight:700;font-size:.95rem">📋 Detalle del cálculo</div>
+          <button onclick="document.getElementById('txv-modal').remove()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;line-height:1">✕</button>
+        </div>
+        ${entry.especie?`<div style="font-size:.8rem;margin-bottom:.6rem">🐾 <strong>${entry.especie}</strong>${entry.sci?` <em style="font-size:.7rem;opacity:.7">(${entry.sci})</em>`:''}</div>`:''}
+        <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.6rem">${(()=>{const d=new Date(entry.fecha);return isNaN(d)?'':d.toLocaleString('es-CO');})()}</div>
+        <div style="font-size:.68rem;color:var(--txt3);margin-bottom:.6rem">Modifica concentración, peso u otra variable: la app recalcula al instante.</div>
+        ${rowsHtml || '<div class="empty-state"><p>Sin medicamentos</p></div>'}
+        <div style="display:flex;gap:.5rem;margin-top:1rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('txv-modal').remove()">Cerrar</button>
+          <button class="btn btn-primary" style="flex:1.5" onclick="saveViewCalcTratNew('${id}')">💾 Guardar como nuevo cálculo</button>
+        </div>
+      </div>
+    </div>`);
+}
+function saveViewCalcTratNew(id) {
+  const entry = _txHistory.find(h => h.id === id);
+  const tratamientos = [];
+  (entry?.tratamientos||[]).forEach((t,i)=>{
+    const row = document.getElementById('txv-row-'+i);
+    if (!row) return;
+    const pa = t.pa || '';
+    if (!pa) return;
+    tratamientos.push(Object.assign({}, t, {
+      conc: row.querySelector('.txv-conc')?.value || '',
+      dosis: row.querySelector('.txv-dosis')?.value || '',
+      peso: row.querySelector('.txv-peso')?.value || '',
+      total: row.querySelector('.txv-total')?.value || '',
+      calc: 'calc', calc_var: ''
+    }));
+  });
+  if (!tratamientos.length) { toast('⚠ El cálculo no tiene medicamentos'); return; }
+  _txHistory.unshift({
+    id: 'tx_'+Date.now()+'_'+Math.floor(Math.random()*1000),
+    fecha: new Date().toISOString(),
+    especie: entry?.especie||'', sci: entry?.sci||'',
+    tratamientos
+  });
+  saveCalcTratHist().then(()=>{
+    document.getElementById('txv-modal')?.remove();
+    renderCalcTratHist();
+    toast('✓ Nuevo cálculo guardado en el historial');
+  });
 }
 
 function openCalcTratHistManager() {
@@ -11798,7 +12057,8 @@ async function saveRecord() {
       freq: row.querySelector('.treat-freq')?.value,
       dur: row.querySelector('.treat-dur')?.value,
       notas: row.querySelector('.treat-notas')?.value,
-      calc: row.dataset.calc || 'calc'
+      calc: row.dataset.calc || 'calc',
+      calc_var: row.dataset.calcVar || ''
     });
   });
 
@@ -12436,12 +12696,20 @@ function getRefCategoria(r) {
 }
 
 async function loadBibliotecaGeneral() {
+  // Igual que la biblioteca por especie: lo local conserva el PDF real.
   const saved = await dbGet('settings', 'biblioteca_general');
   BIBLIOTECA_GENERAL = saved?.value || [];
   if (firestore && fbUid()) {
     try {
       const snap = await firestore.collection('settings').doc('biblioteca_general').get();
-      if (snap.exists) BIBLIOTECA_GENERAL = snap.data().value || [];
+      if (snap.exists && Array.isArray(snap.data().value)) {
+        const cloud = snap.data().value;
+        const localKeys = new Set(BIBLIOTECA_GENERAL.map(r => (r.titulo||'') + '\u0001' + (r.autores||'')));
+        cloud.forEach(cr => {
+          const key = (cr.titulo||'') + '\u0001' + (cr.autores||'');
+          if (!localKeys.has(key)) { BIBLIOTECA_GENERAL.push(cr); localKeys.add(key); }
+        });
+      }
     } catch(e) {}
   }
 }
@@ -15806,21 +16074,29 @@ if ('serviceWorker' in navigator) {
 let BIBLIOTECA_DB = {}; // { spId: [{titulo, autores, año, tipo, url, notas}] }
 
 async function loadBiblioteca() {
-  // Intentar Firestore primero
+  // Los datos locales (IndexedDB) conservan el PDF real adjunto.
+  // La nube guarda solo metadatos sin PDF, por eso NO debe reemplazar lo local.
+  const saved = await dbGet('settings', 'biblioteca');
+  BIBLIOTECA_DB = saved?.value || {};
+  for (const sp of SPECIES_DB) { if (!BIBLIOTECA_DB[sp.id]) BIBLIOTECA_DB[sp.id] = []; }
   if (firestore && fbUid()) {
     try {
       const snap = await firestore.collection('settings').doc('biblioteca').get();
       if (snap.exists) {
-        BIBLIOTECA_DB = snap.data().value || {};
-        await dbPut('settings', { key: 'biblioteca', value: BIBLIOTECA_DB });
+        const cloud = snap.data().value || {};
+        Object.entries(cloud).forEach(([spId, refs]) => {
+          if (!Array.isArray(refs)) return;
+          const localRefs = BIBLIOTECA_DB[spId] || (BIBLIOTECA_DB[spId] = []);
+          const localKeys = new Set(localRefs.map(r => (r.titulo||'') + '\u0001' + (r.autores||'')));
+          refs.forEach(cr => {
+            const key = (cr.titulo||'') + '\u0001' + (cr.autores||'');
+            if (!localKeys.has(key)) { localRefs.push(cr); localKeys.add(key); }
+          });
+        });
         for (const sp of SPECIES_DB) { if (!BIBLIOTECA_DB[sp.id]) BIBLIOTECA_DB[sp.id] = []; }
-        return;
       }
     } catch(e) {}
   }
-  const saved = await dbGet('settings', 'biblioteca');
-  BIBLIOTECA_DB = saved?.value || {};
-  for (const sp of SPECIES_DB) { if (!BIBLIOTECA_DB[sp.id]) BIBLIOTECA_DB[sp.id] = []; }
 }
 
 async function saveBiblioteca() {
@@ -17655,18 +17931,22 @@ function _eg_addDxItem() {
   const row = document.createElement('div');
   row.className = 'enfgen-dx-row';
   row.style.cssText = 'border:1px solid var(--bor);border-radius:var(--rsm);padding:.5rem;margin-bottom:.5rem;background:var(--sur2)';
-  row.innerHTML = '<div style="display:flex;gap:.3rem;margin-bottom:.3rem">'
-    + '<input class="form-control enfgen-dx-item" placeholder="Método diagnóstico (PCR, ELISA, Rx...)" style="flex:1;font-size:.82rem;font-weight:600">'
+  const lf = (t) => '<div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">'+t+'</div>';
+  row.innerHTML = '<div style="display:flex;gap:.3rem;align-items:flex-end;margin-bottom:.3rem">'
+    + '<div style="flex:1">'+lf('Método diagnóstico')
+    + '<input class="form-control enfgen-dx-item" placeholder="PCR, ELISA, Rx..." style="font-size:.82rem;font-weight:600"></div>'
     + '<button onclick="this.closest(\'.enfgen-dx-row\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>'
     + '</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.3rem">'
-    + '<input class="form-control enfgen-dx-expect-item" placeholder="Hallazgo esperado..." style="font-size:.8rem">'
-    + '<input class="form-control enfgen-dx-muestra" placeholder="Muestra (sangre, tejido...)" style="font-size:.8rem">'
-    + '<input class="form-control enfgen-dx-sensibilidad" placeholder="Sensibilidad (%)" style="font-size:.8rem">'
-    + '<input class="form-control enfgen-dx-especificidad" placeholder="Especificidad (%)" style="font-size:.8rem">'
+    + '<div>'+lf('Hallazgo esperado')+'<input class="form-control enfgen-dx-expect-item" placeholder="Hallazgo esperado..." style="font-size:.8rem"></div>'
+    + '<div>'+lf('Muestra')+'<input class="form-control enfgen-dx-muestra" placeholder="Sangre, tejido..." style="font-size:.8rem"></div>'
+    + '<div>'+lf('Sensibilidad (%)')+'<input class="form-control enfgen-dx-sensibilidad" style="font-size:.8rem"></div>'
+    + '<div>'+lf('Especificidad (%)')+'<input class="form-control enfgen-dx-especificidad" style="font-size:.8rem"></div>'
     + '</div>'
-    + '<textarea class="form-control enfgen-dx-descripcion" style="min-height:45px;resize:vertical;font-size:.8rem;margin-bottom:.3rem" placeholder="Descripción del método..."></textarea>'
-    + '<textarea class="form-control enfgen-dx-utilidad" style="min-height:35px;resize:vertical;font-size:.8rem;margin-bottom:.3rem" placeholder="Utilidad clínica..."></textarea>'
+    + lf('Descripción del método')
+    + '<textarea class="form-control enfgen-dx-descripcion" style="min-height:45px;resize:vertical;font-size:.8rem;margin-bottom:.3rem" placeholder="Procedimiento, interpretación..."></textarea>'
+    + lf('Utilidad clínica')
+    + '<textarea class="form-control enfgen-dx-utilidad" style="min-height:35px;resize:vertical;font-size:.8rem;margin-bottom:.3rem" placeholder="Cuándo usar este método..."></textarea>'
     + '<div class="enfgen-dx-img-preview" style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.2rem"></div>'
     + '<label class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:.68rem;margin-top:.1rem">📷 Imagen hallazgo<input type="file" accept="image/*" style="display:none" onchange="_eg_addDxImage(this)"></label>';
   list.appendChild(row);
@@ -17706,13 +17986,18 @@ function _eg_addTxPosible() {
   const row = document.createElement('div');
   row.className = 'enfgen-tx-posible-row';
   row.style.cssText = 'border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem;margin-bottom:.4rem;background:var(--sur)';
-  row.innerHTML = '<div style="display:flex;gap:.3rem;margin-bottom:.25rem">'
-    + '<input class="form-control enfgen-txp-nombre" placeholder="Nombre del tratamiento..." style="flex:2;font-size:.82rem;font-weight:600">'
-    + '<input class="form-control enfgen-txp-objetivo" placeholder="Objetivo terapéutico..." style="flex:2;font-size:.8rem">'
+  const lf = (t) => '<div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">'+t+'</div>';
+  row.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.25rem">'
+    + '<div>'+lf('Nombre del tratamiento')+'<input class="form-control enfgen-txp-nombre" placeholder="Ej: Terapia de soporte..." style="font-size:.82rem;font-weight:600"></div>'
+    + '<div>'+lf('Objetivo terapéutico')+'<input class="form-control enfgen-txp-objetivo" placeholder="Objetivo terapéutico..." style="font-size:.8rem"></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:.3rem;align-items:flex-start;margin-bottom:.25rem">'
+    + '<div style="flex:1;min-width:0">'+lf('Descripción del tratamiento')
+    + '<textarea class="form-control enfgen-txp-descripcion" style="min-height:45px;resize:vertical;font-size:.8rem" placeholder="Descripción del tratamiento..."></textarea></div>'
     + '<button onclick="this.closest(\'.enfgen-tx-posible-row\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>'
     + '</div>'
-    + '<textarea class="form-control enfgen-txp-descripcion" style="min-height:45px;resize:vertical;font-size:.8rem;margin-bottom:.25rem" placeholder="Descripción del tratamiento..."></textarea>'
-    + '<input class="form-control enfgen-txp-mas-info" placeholder="Más información (referencia, URL...)" style="font-size:.8rem">';
+    + lf('Más información')
+    + '<input class="form-control enfgen-txp-mas-info" placeholder="Referencia, URL..." style="font-size:.8rem">';
   list.appendChild(row);
   row.querySelector('input').focus();
 }
@@ -17723,13 +18008,18 @@ function _enf_addTxPosible() {
   const row = document.createElement('div');
   row.className = 'enf-tx-posible-row';
   row.style.cssText = 'border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem;margin-bottom:.4rem;background:var(--sur)';
-  row.innerHTML = '<div style="display:flex;gap:.3rem;margin-bottom:.25rem">'
-    + '<input class="form-control enf-txp-nombre" placeholder="Nombre del tratamiento..." style="flex:2;font-size:.82rem;font-weight:600">'
-    + '<input class="form-control enf-txp-objetivo" placeholder="Objetivo terapéutico..." style="flex:2;font-size:.8rem">'
+  const lf = (t) => '<div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">'+t+'</div>';
+  row.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.25rem">'
+    + '<div>'+lf('Nombre del tratamiento')+'<input class="form-control enf-txp-nombre" placeholder="Ej: Terapia de soporte..." style="font-size:.82rem;font-weight:600"></div>'
+    + '<div>'+lf('Objetivo terapéutico')+'<input class="form-control enf-txp-objetivo" placeholder="Objetivo terapéutico..." style="font-size:.8rem"></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:.3rem;align-items:flex-start;margin-bottom:.25rem">'
+    + '<div style="flex:1;min-width:0">'+lf('Descripción del tratamiento')
+    + '<textarea class="form-control enf-txp-descripcion" style="min-height:45px;resize:vertical;font-size:.8rem" placeholder="Descripción del tratamiento..."></textarea></div>'
     + '<button onclick="this.closest(\'.enf-tx-posible-row\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>'
     + '</div>'
-    + '<textarea class="form-control enf-txp-descripcion" style="min-height:45px;resize:vertical;font-size:.8rem;margin-bottom:.25rem" placeholder="Descripción del tratamiento..."></textarea>'
-    + '<input class="form-control enf-txp-mas-info" placeholder="Más información (referencia, URL...)" style="font-size:.8rem">';
+    + lf('Más información')
+    + '<input class="form-control enf-txp-mas-info" placeholder="Referencia, URL..." style="font-size:.8rem">';
   list.appendChild(row);
   row.querySelector('input').focus();
 }
@@ -17740,12 +18030,16 @@ function _eg_addTxItem() {
   const row = document.createElement('div');
   row.className = 'enfgen-tx-esp-row';
   row.style.cssText = 'border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem;margin-bottom:.4rem;background:var(--sur)';
-  row.innerHTML = '<div style="display:flex;gap:.3rem;margin-bottom:.25rem">'
-    + '<input class="form-control enfgen-tx-item" placeholder="Nombre del tratamiento específico..." style="flex:1;font-size:.82rem;font-weight:600">'
+  const lf = (t) => '<div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">'+t+'</div>';
+  row.innerHTML = '<div style="display:flex;gap:.3rem;align-items:flex-end;margin-bottom:.25rem">'
+    + '<div style="flex:1;min-width:0">'+lf('Nombre del tratamiento específico')
+    + '<input class="form-control enfgen-tx-item" placeholder="Ej: Amoxicilina 22 mg/kg BID..." style="font-size:.82rem;font-weight:600"></div>'
     + '<button onclick="this.closest(\'.enfgen-tx-esp-row\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>'
     + '</div>'
-    + '<textarea class="form-control enfgen-tx-descripcion" style="min-height:50px;resize:vertical;font-size:.8rem;margin-bottom:.25rem" placeholder="Descripción (dosis, protocolo, consideraciones)..."></textarea>'
-    + '<input class="form-control enfgen-tx-duracion" placeholder="Duración (ej: 7-10 días, hasta remisión)..." style="font-size:.8rem">';
+    + lf('Descripción del tratamiento')
+    + '<textarea class="form-control enfgen-tx-descripcion" style="min-height:50px;resize:vertical;font-size:.8rem;margin-bottom:.25rem" placeholder="Dosis, protocolo, consideraciones..."></textarea>'
+    + lf('Duración del tratamiento')
+    + '<input class="form-control enfgen-tx-duracion" placeholder="Ej: 7-10 días, hasta remisión..." style="font-size:.8rem">';
   list.appendChild(row);
   row.querySelector('input').focus();
 }
@@ -17756,12 +18050,16 @@ function _enf_addTxItem() {
   const row = document.createElement('div');
   row.className = 'enf-tx-esp-row';
   row.style.cssText = 'border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem;margin-bottom:.4rem;background:var(--sur)';
-  row.innerHTML = '<div style="display:flex;gap:.3rem;margin-bottom:.25rem">'
-    + '<input class="form-control enf-tx-item" placeholder="Nombre del tratamiento específico..." style="flex:1;font-size:.82rem;font-weight:600">'
+  const lf = (t) => '<div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">'+t+'</div>';
+  row.innerHTML = '<div style="display:flex;gap:.3rem;align-items:flex-end;margin-bottom:.25rem">'
+    + '<div style="flex:1;min-width:0">'+lf('Nombre del tratamiento específico')
+    + '<input class="form-control enf-tx-item" placeholder="Ej: Amoxicilina 22 mg/kg BID..." style="font-size:.82rem;font-weight:600"></div>'
     + '<button onclick="this.closest(\'.enf-tx-esp-row\').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>'
     + '</div>'
-    + '<textarea class="form-control enf-tx-descripcion" style="min-height:50px;resize:vertical;font-size:.8rem;margin-bottom:.25rem" placeholder="Descripción (dosis, protocolo, consideraciones)..."></textarea>'
-    + '<input class="form-control enf-tx-duracion" placeholder="Duración (ej: 7-10 días, hasta remisión)..." style="font-size:.8rem">';
+    + lf('Descripción del tratamiento')
+    + '<textarea class="form-control enf-tx-descripcion" style="min-height:50px;resize:vertical;font-size:.8rem;margin-bottom:.25rem" placeholder="Dosis, protocolo, consideraciones..."></textarea>'
+    + lf('Duración del tratamiento')
+    + '<input class="form-control enf-tx-duracion" placeholder="Ej: 7-10 días, hasta remisión..." style="font-size:.8rem">';
   list.appendChild(row);
   row.querySelector('input').focus();
 }
@@ -18217,20 +18515,32 @@ function openAddEnfGen(sistId, editIdx=-1) {
           <div id="enfgen-dx-list">
             ${(editEnf?.dx_lista||[editEnf?.dx||'']).filter(Boolean).map(d=>`
             <div class="enfgen-dx-row" style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.5rem;margin-bottom:.5rem;background:var(--sur2)">
-              <div style="display:flex;gap:.3rem;margin-bottom:.3rem">
-                <input class="form-control enfgen-dx-item" value="${typeof d==='object'?d.metodo||'':d}" placeholder="Método diagnóstico (PCR, ELISA, Rx...)" style="flex:1;font-size:.82rem;font-weight:600">
+              <div style="display:flex;gap:.3rem;align-items:flex-end;margin-bottom:.3rem">
+                <div style="flex:1"><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Método diagnóstico</div>
+                  <input class="form-control enfgen-dx-item" value="${typeof d==='object'?d.metodo||'':d}" placeholder="PCR, ELISA, Rx..." style="font-size:.82rem;font-weight:600">
+                </div>
                 <button onclick="this.closest('.enfgen-dx-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.3rem">
-                <input class="form-control enfgen-dx-expect-item" value="${typeof d==='object'?d.esperado||'':''}" placeholder="Hallazgo esperado..." style="font-size:.8rem">
-                <input class="form-control enfgen-dx-muestra" value="${typeof d==='object'?d.muestra||'':''}" placeholder="Muestra (sangre, tejido...)" style="font-size:.8rem">
-                <input class="form-control enfgen-dx-sensibilidad" value="${typeof d==='object'?d.sensibilidad||'':''}" placeholder="Sensibilidad (%)" style="font-size:.8rem">
-                <input class="form-control enfgen-dx-especificidad" value="${typeof d==='object'?d.especificidad||'':''}" placeholder="Especificidad (%)" style="font-size:.8rem">
+                <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Hallazgo esperado</div>
+                  <input class="form-control enfgen-dx-expect-item" value="${typeof d==='object'?d.esperado||'':''}" placeholder="Hallazgo esperado..." style="font-size:.8rem">
+                </div>
+                <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Muestra</div>
+                  <input class="form-control enfgen-dx-muestra" value="${typeof d==='object'?d.muestra||'':''}" placeholder="Sangre, tejido..." style="font-size:.8rem">
+                </div>
+                <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Sensibilidad (%)</div>
+                  <input class="form-control enfgen-dx-sensibilidad" value="${typeof d==='object'?d.sensibilidad||'':''}" style="font-size:.8rem">
+                </div>
+                <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Especificidad (%)</div>
+                  <input class="form-control enfgen-dx-especificidad" value="${typeof d==='object'?d.especificidad||'':''}" style="font-size:.8rem">
+                </div>
               </div>
+              <div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Descripción del método</div>
               <textarea class="form-control enfgen-dx-descripcion" style="min-height:45px;resize:vertical;font-size:.8rem;margin-bottom:.3rem"
-                placeholder="Descripción del método, procedimiento, interpretación...">${typeof d==='object'?d.descripcion||'':''}</textarea>
+                placeholder="Procedimiento, interpretación...">${typeof d==='object'?d.descripcion||'':''}</textarea>
+              <div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Utilidad clínica</div>
               <textarea class="form-control enfgen-dx-utilidad" style="min-height:35px;resize:vertical;font-size:.8rem;margin-bottom:.3rem"
-                placeholder="Utilidad clínica, cuándo usar este método...">${typeof d==='object'?d.utilidad||'':''}</textarea>
+                placeholder="Cuándo usar este método...">${typeof d==='object'?d.utilidad||'':''}</textarea>
               <div class="enfgen-dx-img-preview" style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.2rem">
                 ${(typeof d==='object'&&d.imagenes||[]).map(img=>`<div><img src="${img.data||img.url}" style="height:55px;width:auto;border-radius:var(--rxs);cursor:pointer" onclick="openImageFull('${img.data||img.url}')"></div>`).join('')}
               </div>
@@ -18253,14 +18563,25 @@ function openAddEnfGen(sistId, editIdx=-1) {
             <div id="enfgen-tx-posibles-list">
               ${(editEnf?.tx_posibles||[]).map(t=>`
               <div class="enfgen-tx-posible-row" style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem;margin-bottom:.4rem;background:var(--sur)">
-                <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
-                  <input class="form-control enfgen-txp-nombre" value="${t.nombre||''}" placeholder="Nombre del tratamiento..." style="flex:2;font-size:.82rem;font-weight:600">
-                  <input class="form-control enfgen-txp-objetivo" value="${t.objetivo||''}" placeholder="Objetivo terapéutico..." style="flex:2;font-size:.8rem">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.25rem">
+                  <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Nombre del tratamiento</div>
+                    <input class="form-control enfgen-txp-nombre" value="${t.nombre||''}" placeholder="Ej: Terapia de soporte..." style="font-size:.82rem;font-weight:600">
+                  </div>
+                  <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Objetivo terapéutico</div>
+                    <input class="form-control enfgen-txp-objetivo" value="${t.objetivo||''}" placeholder="Objetivo terapéutico..." style="font-size:.8rem">
+                  </div>
+                </div>
+                <div style="display:flex;gap:.3rem;align-items:flex-start;margin-bottom:.25rem">
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Descripción del tratamiento</div>
+                    <textarea class="form-control enfgen-txp-descripcion" style="min-height:45px;resize:vertical;font-size:.8rem"
+                      placeholder="Descripción del tratamiento...">${t.descripcion||''}</textarea>
+                  </div>
                   <button onclick="this.closest('.enfgen-tx-posible-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
                 </div>
-                <textarea class="form-control enfgen-txp-descripcion" style="min-height:45px;resize:vertical;font-size:.8rem;margin-bottom:.25rem"
-                  placeholder="Descripción del tratamiento...">${t.descripcion||''}</textarea>
-                <input class="form-control enfgen-txp-mas-info" value="${t.mas_info||''}" placeholder="Más información (referencia, URL...)" style="font-size:.8rem">
+                <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Más información</div>
+                  <input class="form-control enfgen-txp-mas-info" value="${t.mas_info||''}" placeholder="Referencia, URL..." style="font-size:.8rem">
+                </div>
               </div>`).join('')}
             </div>
             <button class="btn btn-secondary btn-sm" style="font-size:.72rem" onclick="_eg_addTxPosible()">+ Agregar tratamiento posible</button>
@@ -18271,13 +18592,18 @@ function openAddEnfGen(sistId, editIdx=-1) {
             <div id="enfgen-tx-list">
               ${(editEnf?.tx_lista||[editEnf?.tx||'']).filter(Boolean).map(t=>`
               <div class="enfgen-tx-esp-row" style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.4rem;margin-bottom:.4rem;background:var(--sur)">
-                <div style="display:flex;gap:.3rem;margin-bottom:.25rem">
-                  <input class="form-control enfgen-tx-item" value="${typeof t==='object'?t.nombre||t:t}" placeholder="Nombre del tratamiento específico..." style="flex:1;font-size:.82rem;font-weight:600">
+                <div style="display:flex;gap:.3rem;align-items:flex-end;margin-bottom:.25rem">
+                  <div style="flex:1;min-width:0"><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Nombre del tratamiento específico</div>
+                    <input class="form-control enfgen-tx-item" value="${typeof t==='object'?t.nombre||t:t}" placeholder="Ej: Amoxicilina 22 mg/kg BID..." style="font-size:.82rem;font-weight:600">
+                  </div>
                   <button onclick="this.closest('.enfgen-tx-esp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
                 </div>
+                <div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Descripción del tratamiento</div>
                 <textarea class="form-control enfgen-tx-descripcion" style="min-height:50px;resize:vertical;font-size:.8rem;margin-bottom:.25rem"
-                  placeholder="Descripción del tratamiento (dosis, protocolo, consideraciones)...">${typeof t==='object'?t.descripcion||'':''}</textarea>
-                <input class="form-control enfgen-tx-duracion" value="${typeof t==='object'?t.duracion||'':''}" placeholder="Duración del tratamiento (ej: 7-10 días, hasta remisión)..." style="font-size:.8rem">
+                  placeholder="Dosis, protocolo, consideraciones...">${typeof t==='object'?t.descripcion||'':''}</textarea>
+                <div><div style="font-size:.65rem;font-weight:600;color:var(--txt2);margin-bottom:.15rem">Duración del tratamiento</div>
+                  <input class="form-control enfgen-tx-duracion" value="${typeof t==='object'?t.duracion||'':''}" placeholder="Ej: 7-10 días, hasta remisión..." style="font-size:.8rem">
+                </div>
               </div>`).join('')}
             </div>
             <button class="btn btn-secondary btn-sm" style="font-size:.72rem" onclick="_eg_addTxItem()">+ Agregar tratamiento específico</button>
@@ -19091,7 +19417,13 @@ function _cerrarModalesAbiertos() {
     'guardar-dieta-modal','editar-dieta-modal','clonar-dieta-modal',
     'hist-modal','edit-cat-modal','modal-add-drug','ref-modal','enf-modal',
     'enfgen-add-modal','enfgen-edit-modal','importenf-modal',
-    'sp-hist-modal','new-calc-modal','liquido-modal','cat-modal','bulk-pdf-modal'
+    'sp-hist-modal','new-calc-modal','liquido-modal','cat-modal','bulk-pdf-modal',
+    'img-full-modal','pdf-viewer-modal','tx-hist-modal','txv-modal',
+    'editfield-modal','bib-cats-modal','bib-addcat-modal','multi-del-modal',
+    'enriq-detail-modal','import-from-gen-modal','cargar-gen-modal',
+    'dx-hist-editor-modal','enf-causa-hist-modal','copy-clase-modal',
+    'grupos-enf-sel-modal','signos-hist-mgr-modal','dx-hist-mgr-modal',
+    'bulk-review-modal'
   ];
   let alguno = false;
   floatingModals.forEach(id => {
@@ -19101,6 +19433,14 @@ function _cerrarModalesAbiertos() {
   // Estrategia genérica: cerrar cualquier div de overlay fijo en z-index alto
   document.querySelectorAll(
     'div[style*="position:fixed"][style*="z-index:1"][style*="rgba(0,0,0"]'
+  ).forEach(el => {
+    if (!['confirm-modal','pin-overlay'].includes(el.id)) {
+      el.remove(); alguno = true;
+    }
+  });
+  // Overlays fullscreen con z-index alto (p. ej. visores de imagen 9999)
+  document.querySelectorAll(
+    'div[style*="position:fixed"][style*="z-index:9"][style*="background:rgba(0,0,0"]'
   ).forEach(el => {
     if (!['confirm-modal','pin-overlay'].includes(el.id)) {
       el.remove(); alguno = true;
@@ -19240,6 +19580,8 @@ async function init() {
 
   if (!navigator.onLine) document.getElementById('offline-badge')?.classList.add('show');
   pushNav({ type: 'screen', name: 'home' });
+  // Precargar el historial de cálculos de tratamientos para el buscador principal
+  loadCalcTratHist();
 }
 function renderDietasEnEspecie(sp, isAdmin) {
   const dietasEsp = (DIETAS_GUARDADAS || []).filter(d =>
