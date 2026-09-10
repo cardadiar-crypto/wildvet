@@ -434,7 +434,7 @@ textarea.form-control{resize:vertical;min-height:70px}
       <div class="hero-sub">Calculadoras nutricionales · Historias · Vademécum</div>
       <div class="search-box">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input type="text" id="main-search" placeholder="Buscar especie, fármaco..." oninput="handleSearch(this.value)">
+        <input type="text" id="main-search" placeholder="Buscar especie, fármaco, enfermedad, recinto, dieta, referencia..." oninput="handleSearch(this.value)">
       </div>
     </div>
     <div class="sec-title">Acceso Rápido</div>
@@ -665,6 +665,7 @@ textarea.form-control{resize:vertical;min-height:70px}
       </div>
       <div id="admin-add-drug-btn" style="display:none;gap:.3rem;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="openAddDrug()">+ Fármaco</button>
+        <button class="btn btn-admin btn-sm" onclick="openVadExcel()">📊 Excel (copiar/pegar)</button>
         <button class="btn btn-admin btn-sm" onclick="importVademecumCsv()">📥 Importar CSV</button>
         <button class="btn btn-admin btn-sm" onclick="descargarPlantillaVademecum()">📄 Plantilla CSV</button>
       </div>
@@ -2966,17 +2967,6 @@ function buildSpeciesExportHTML(sp) {
   html += row(42, 'Dieta bajo cuidado profesional', v2h(n.captive));
   html += row(43, 'Frecuencia de alimentación',     v2h(n.freq));
 
-  const supRows = (sp.suplementos||[]).map(s=>
-    `<tr>
-      <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:600">${esc(s.nombre)}</td>
-      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(String(s.dosis||''))}</td>
-      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(s.unitB||'mg')}/${esc(s.unitA||'kg')}</td>
-      <td style="text-align:center;padding:3pt 6pt;border:0.5pt solid #ddd">${esc(String(s.conc||''))}</td>
-      <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${esc(s.unitC||'ml')}</td>
-    </tr>`).join('');
-  html += row(44, 'Suplementación',
-    tblInner(['Suplemento','Dosis','Unidad dosis','Concentración','Unidad concentración'], supRows));
-
   const toxRows = (sp.toxicos_lista||[]).map(t=>
     `<tr>
       <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:600;color:#c0392b">${esc(t.nombre||String(t))}</td>
@@ -3160,29 +3150,6 @@ function buildSpeciesExportHTML(sp) {
         </div>`;
       });
       html += row('', 'Protocolos anestésicos', protHtml);
-    }
-  }
-
-  // Fluidoterapia (pestaña Fluidoterapia)
-  const liqs = sp.liquidos_iv || DEFAULT_LIQUIDOS;
-  if (sp.fluid_nota || (liqs||[]).length) {
-    html += secHeader('Fluidoterapia');
-    if (sp.fluid_nota) {
-      html += row('', 'Nota clínica de fluidoterapia', `<div class="note">${esc(sp.fluid_nota).replace(/\n/g,'<br>')}</div>`);
-    }
-    if ((liqs||[]).length) {
-      const liqRows = liqs.map(l=>`<tr>
-        <td style="padding:3pt 5pt;border:0.5pt solid #ddd;font-weight:700">${esc(l.nombre)}</td>
-        <td style="padding:3pt 5pt;border:0.5pt solid #ddd">${esc(l.tipo||'—')}</td>
-        <td style="padding:3pt 5pt;border:0.5pt solid #ddd">${esc(l.osmolaridad||'—')}</td>
-        <td style="padding:3pt 5pt;border:0.5pt solid #ddd">${esc(l.composicion||'—')}</td>
-        <td style="padding:3pt 5pt;border:0.5pt solid #ddd;font-size:8.5pt">${esc(l.indicaciones||'—')}</td>
-        <td style="padding:3pt 5pt;border:0.5pt solid #ddd;font-size:8.5pt">${esc(l.contraindicaciones||'—')}</td>
-        <td style="padding:3pt 5pt;border:0.5pt solid #ddd">${esc(l.dosis||'—')}</td>
-        <td style="padding:3pt 5pt;border:0.5pt solid #ddd;font-size:8.5pt;color:#555">${esc(l.notas||'')}</td>
-      </tr>`).join('');
-      html += row('', 'Líquidos IV de referencia',
-        tblInner(['Líquido','Tipo','Osmolaridad','Composición','Indicaciones','Contraindicaciones','Dosis','Notas'], liqRows));
     }
   }
 
@@ -3889,18 +3856,42 @@ function previewFormCover(input) {
 function handleSearch(val) {
   const q = val.trim().toLowerCase();
   const srDiv = document.getElementById('search-results');
-  document.getElementById('species-grid').style.display = q ? 'none' : 'grid';
+  const gridEl = document.getElementById('species-grid');
+  if (gridEl) gridEl.style.display = q ? 'none' : 'grid';
   srDiv.style.display = q ? 'block' : 'none';
   if (!q) return;
   const escq = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const escJs = s2 => String(s2??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   const hay = (...fs) => fs.some(f => (f||'').toLowerCase().includes(q));
+
+  // Reconstruir signos guardados en localStorage si aún no cargados en esta sesión
+  if (!_signosHistorial.size) {
+    try { JSON.parse(localStorage.getItem('wv_signos_hist')||'[]').forEach(s => _signosHistorial.add(s)); } catch(e) {}
+  }
+
+  // ── 1. Especies con ficha completa (incluye nombre común, sinónimos, dieta, toxicos) ──
   const sMatches = SPECIES_DB.filter(sp => {
-    const fields = [sp.name, sp.sci, sp.order, sp.family, sp.clase, sp.sci?.split(' ')[0]];
+    const fields = [sp.name, sp.sci, sp.order, sp.family, sp.clase, sp.sci?.split(' ')[0],
+      sp.nombre_alternativo, sp.alias, sp.diet_wild,
+      (sp.dieta_silvestre_lista||[]).map(x=>typeof x==='object'?(x.nombre||''):x).join(' '),
+      (sp.enfermedades_sistemas ? Object.values(sp.enfermedades_sistemas).flatMap(s2=>s2.enfermedades||[]).map(e=>e.nombre).join(' ') : '')];
     return fields.some(f => (f||'').toLowerCase().includes(q));
   });
-  const dMatches = VADEMECUM_DB.filter(d => d.drug.toLowerCase().includes(q)||d.category.toLowerCase().includes(q));
 
-  // Historias clínicas: especie, nombre científico, signos, diagnósticos, fármacos...
+  // ── 2. Fármacos del vademécum (incluye indicaciones) ──
+  const dMatches = VADEMECUM_DB.filter(d => (d.drug||'').toLowerCase().includes(q)||(d.category||'').toLowerCase().includes(q)||(d.active||'').toLowerCase().includes(q)||(d.indicaciones||'').toLowerCase().includes(q));
+
+  // ── 3. Especies en historiales (sin ficha completa): recintos, grupos, enriquecimientos, dietas, pendientes, pacientes ──
+  const fichasSet = new Set(SPECIES_DB.map(s => String(s.name||'').toLowerCase()));
+  const hMatches = getSpeciesHistory().filter(h => {
+    const nombre = String(h.nombre||'').toLowerCase();
+    return nombre && !fichasSet.has(nombre) && (nombre.includes(q) || String(h.sci||'').toLowerCase().includes(q));
+  }).slice(0,8);
+
+  // ── 4. Signos clínicos (historial) ──
+  const signoMatches = [..._signosHistorial].filter(s => String(s||'').toLowerCase().includes(q)).slice(0,8);
+
+  // ── 5. Historias clínicas ──
   const rMatches = (clinicalRecords||[]).filter(r => {
     const txt = [r.species, r.sci, r.name, r.chief_complaint, r.history,
       (r.problems||[]).map(p=>p.text).join(' '),
@@ -3914,7 +3905,7 @@ function handleSearch(val) {
   });
   const fmtFecha = (d) => { try { const x = new Date(d); return isNaN(x)?'':x.toLocaleDateString('es-CO'); } catch(e) { return ''; } };
 
-  // Enriquecimientos: nombre, especies, categorías, descripción...
+  // ── 6. Enriquecimientos ──
   const eMatches = [];
   (ENRIQUECIMIENTOS_DB||[]).forEach((enr, i) => {
     const esp = (enr.especies?.length?enr.especies:(enr.especie?[{sp:enr.especie,sci:enr.sci}]:[]));
@@ -3924,17 +3915,77 @@ function handleSearch(val) {
     if (txt.toLowerCase().includes(q)) eMatches.push({ enr, i, esp, catTxt });
   });
 
-  // Cálculos de tratamientos guardados: especie, nombre científico o fármaco
+  // ── 7. Cálculos de tratamientos guardados ──
   const txMatches = (_txHistory||[]).filter(h => {
     const paTxt = (h.tratamientos||[]).map(t=>`${t.pa||''} ${t.nc||''}`).join(' ');
     return hay(h.especie, h.sci, paTxt);
   });
 
+  // ── 8. Recintos (nombre, institución, especie) ──
+  const recMatches = (RECINTOS_DB||[]).filter(r => hay(r.nombre, r.institucion, r.especie, r.sci, r.lineamientos, (r.componentes||[]).join(' ')));
+
+  // ── 9. Dietas guardadas (especie, nombre científico, ingredientes) ──
+  const dietMatches = (DIETAS_GUARDADAS||[]).filter(d => {
+    const ingTxt = Object.entries(d.ingredientes||{}).flatMap(([ ,arr])=> (arr||[]).map(i=>i.nombre||'')).join(' ');
+    return hay(d.especie, d.sci, d.nombre, d.label, ingTxt);
+  });
+
+  // ── 10. Enfermedades del catálogo general (todas las clases) + pendientes por especie ──
+  const enfMatches = [];
+  const claseSel = { 'general':['🌍','General'], 'mammalia':['🐾','Mamíferos'], 'reptilia':['🦎','Reptiles'], 'aves':['🦅','Aves'], 'amphibia':['🐸','Anfibios'], 'peces':['🐟','Peces'] };
+  const sistSel = {}; (SISTEMAS_ENFERMEDAD||[]).forEach(s=>sistSel[s.id]=s.icon||'');
+  Object.entries(ENFERMEDADES_GENERALES||{}).forEach(([clase, cData]) => {
+    Object.entries(cData?.sistemas||{}).forEach(([sistId, sData]) => {
+      if (!sistSel[sistId]) sistSel[sistId] = SISTEMAS_ENFERMEDAD.find(s=>s.id===sistId)?.icon || '📋';
+      (sData.enfermedades||[]).forEach((enf, enfIdx) => {
+        const txt = [enf.nombre, enf.agente, enf.tipo, (enf.causas||[]).join(' '),
+          (enf.signos_lista||[]).map(s=>typeof s==='object'?(s.signo||''):s).join(' '),
+          (enf.vias||[]).join(' '), (enf.tags||[]).join(' '), (enf.dx||[]).map(d=>d.trim()).join(' '),
+          (enf.tratamiento||enf.tx||[]).map(t=>typeof t==='object'?Object.values(t).join(' '):t).join(' '),
+          enf.zoonosis
+        ].join(' ');
+        if (txt.toLowerCase().includes(q)) enfMatches.push({ clase, sistId, enfIdx, enf });
+      });
+    });
+  });
+  const pendMatches = [];
+  Object.entries(ENFERMEDADES_PENDIENTES||{}).forEach(([esp, lista]) => {
+    if (String(esp||'').toLowerCase().includes(q)) {
+      lista.forEach(p => pendMatches.push({ esp, enf: p.enf, clase: p.clase || 'general' }));
+      return;
+    }
+    lista.forEach(p => {
+      if (String(p.enf||'').toLowerCase().includes(q)) pendMatches.push({ esp, enf: p.enf, clase: p.clase || 'general' });
+    });
+  });
+
+  // ── 11. Referencias de biblioteca (generales y por especie) ──
+  const biG = (BIBLIOTECA_GENERAL||[]).map((r,i)=>({ r, spKey:'', idx:i, spName:'' }))
+    .filter(o=>hay(o.r.titulo, o.r.autores, o.r.subject, o.r.keywords, o.r.notas, o.r.url, getRefCategoria(o.r)));
+  const biS = [];
+  Object.entries(BIBLIOTECA_DB||{}).forEach(([spId, refs]) => {
+    const spName = SPECIES_DB.find(sp=>sp.id===spId)?.name || spId;
+    (refs||[]).forEach((r, idx) => {
+      if (hay(r.titulo, r.autores, r.subject, r.keywords, r.notas, r.url, getRefCategoria(r), spName)) biS.push({ r, spKey: spId, idx, spName });
+    });
+  });
+  const bibMatches = [...biG, ...biS].slice(0,8);
+
+  // ── 12. Líquidos IV del catálogo ──
+  const liqMatches = DEFAULT_LIQUIDOS.filter(l => hay(l.nombre, l.tipo, l.composicion, l.indicaciones, l.dosis, l.notas));
+
+  // ── 13. Grupos taxonómicos (nombre del grupo + especies miembro) ──
+  const grpMatches = (SPECIES_GROUPS||[]).filter(g =>
+    hay(g.nombre, (g.especies||[]).map(e=>`${e.sp||''} ${e.sci||''}`).join(' '))
+  );
+
   const recAvatar = (r) => (()=>{ const _s=SPECIES_DB.find(s=>s.id===r.speciesId); return _s?.cover_photo?`<img src="${_s.cover_photo}" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-size:1.3rem">${_s?.emoji||'🐾'}</span>`; })();
 
+  const anyEmpty = !sMatches.length && !dMatches.length && !hMatches.length && !signoMatches.length && !rMatches.length && !eMatches.length && !txMatches.length && !recMatches.length && !dietMatches.length && !enfMatches.length && !pendMatches.length && !bibMatches.length && !liqMatches.length && !grpMatches.length;
+
   document.getElementById('search-list').innerHTML = `
-    ${sMatches.length ? `<div class="sec-title">Especies (ficha completa)</div>`+sMatches.map(sp=>`
-      <div class="record-card" onclick="openSpecies('${sp.id}')">
+    ${sMatches.length ? `<div class="sec-title">Especies (ficha completa)</div>`+sMatches.slice(0,8).map(sp=>`
+      <div class="record-card" onclick="openSpecies('${escJs(sp.id)}')">
         <div class="record-header">
           <div class="record-avatar" style="overflow:hidden;background:var(--sur2)">
               ${sp.cover_photo ? `<img src="${sp.cover_photo}" style="width:100%;height:100%;object-fit:cover">` : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`}
@@ -3944,9 +3995,105 @@ function handleSearch(val) {
         </div>
       </div>`).join('') : ''}
     ${dMatches.length ? `<div class="sec-title" style="margin-top:1rem">Fármacos (vademécum)</div>`+dMatches.slice(0,5).map(d=>`
-      <div class="vademecum-item">
-        <div class="flex-between"><span class="vad-drug">${d.drug}</span><span class="vad-category">${d.category}</span></div>
-        <div class="vad-info">${d.dose}</div>
+      <div class="record-card" onclick="goToVadDrug('${escq(d.id)}')">
+        <div class="record-header">
+          <div class="record-avatar" style="background:var(--g0)"><span style="font-size:1.2rem">💊</span></div>
+          <div style="flex:1;min-width:0">
+            <div class="record-name">${escq(d.drug)}</div>
+            <div class="record-meta">${escq(d.category)}${d.active?' · '+escq(d.active):''}</div>
+          </div>
+        </div>
+      </div>`).join('') : ''}
+    ${hMatches.length ? `<div class="sec-title" style="margin-top:1rem">Especies (historial — sin ficha)</div>`+hMatches.map(h=>`
+      <div class="record-card" onclick="openSpeciesFromHistory('${escJs(h.nombre)}')">
+        <div class="record-header">
+          <div class="record-avatar" style="background:var(--sur2)"><span style="font-size:1.3rem">🐾</span></div>
+          <div style="flex:1;min-width:0">
+            <div class="record-name">${escq(h.nombre)}</div>
+            ${h.sci?`<div class="record-meta"><em style="opacity:.75">${escq(h.sci)}</em></div>`:''}
+          </div>
+        </div>
+      </div>`).join('') : ''}
+    ${enfMatches.length ? `<div class="sec-title" style="margin-top:1rem">Enfermedades (catálogo) (${enfMatches.length})</div>`+enfMatches.slice(0,8).map(({clase,sistId,enfIdx,enf})=>`
+      <div class="record-card" onclick="goToEnfermedad('${clase}','${sistId}',${enfIdx})">
+        <div class="record-header">
+          <div class="record-avatar" style="background:var(--r1)"><span style="font-size:1.2rem">🦠</span></div>
+          <div style="flex:1;min-width:0">
+            <div class="record-name">${escq(enf.nombre)}</div>
+            <div class="record-meta">${claseSel[clase]?claseSel[clase][1]:clase}${enf.agente?' · '+escq(enf.agente):''}</div>
+          </div>
+          <span class="badge badge-lc" style="margin-left:auto;flex-shrink:0">${escq(sistSel[sistId]||'')}</span>
+        </div>
+      </div>`).join('') : ''}
+    ${pendMatches.length ? `<div class="sec-title" style="margin-top:1rem">Enfermedades pendientes por especie (${pendMatches.length})</div>`+pendMatches.slice(0,6).map(({esp,enf,clase})=>`
+      <div class="record-card" onclick="goToEnfermedadPendiente('${escJs(esp)}','${escJs(enf)}','${clase}')">
+        <div class="record-header">
+          <div class="record-avatar" style="background:var(--am1)"><span style="font-size:1.2rem">🦠</span></div>
+          <div style="flex:1;min-width:0">
+            <div class="record-name">${escq(enf)}</div>
+            <div class="record-meta">Pendiente para ${escq(esp)}</div>
+          </div>
+        </div>
+      </div>`).join('') : ''}
+    ${liqMatches.length ? `<div class="sec-title" style="margin-top:1rem">Líquidos IV (catálogo)</div>`+liqMatches.slice(0,5).map(l=>`
+      <div class="record-card" onclick="goToLiquidoIV('${escJs(l.nombre)}')">
+        <div class="record-header">
+          <div class="record-avatar" style="background:var(--bl)"><span style="font-size:1.2rem">💧</span></div>
+          <div style="flex:1;min-width:0">
+            <div class="record-name">${escq(l.nombre)}</div>
+            <div class="record-meta">${escq(l.tipo)}${l.osmolaridad?' · '+escq(l.osmolaridad):''}</div>
+          </div>
+        </div>
+      </div>`).join('') : ''}
+    ${recMatches.length ? `<div class="sec-title" style="margin-top:1rem">Recintos (${recMatches.length})</div>`+recMatches.slice(0,6).map(r=>`
+      <div class="record-card" onclick="goToRecintoSearch()">
+        <div class="record-header">
+          <div class="record-avatar" style="background:var(--sur2)"><span style="font-size:1.2rem">🏠</span></div>
+          <div style="flex:1;min-width:0">
+            <div class="record-name">${escq(r.nombre)}</div>
+            <div class="record-meta">${r.institucion||''}${r.especie?' · '+escq(r.especie):''}${r.sci?' ('+escq(r.sci)+')':''}</div>
+          </div>
+        </div>
+      </div>`).join('') : ''}
+    ${dietMatches.length ? `<div class="sec-title" style="margin-top:1rem">Dietas guardadas (${dietMatches.length})</div>`+dietMatches.slice(0,6).map(d=>`
+      <div class="record-card" onclick="goToDietaSearch('${escJs(d.especie)}')">
+        <div class="record-header">
+          <div class="record-avatar" style="background:var(--g1)"><span style="font-size:1.2rem">🥗</span></div>
+          <div style="flex:1;min-width:0">
+            <div class="record-name">${escq(d.especie)}${d.sci?' <em style="opacity:.75">('+escq(d.sci)+')</em>':''}${d.nombre?' · '+escq(d.nombre):''}</div>
+            <div class="record-meta">${d.pesoKg?''+d.pesoKg+' kg':''}${d.pct?' · '+d.pct+'%':''}${d.fecha?' · '+fmtFecha(d.fecha):''}</div>
+          </div>
+        </div>
+      </div>`).join('') : ''}
+    ${grpMatches.length ? `<div class="sec-title" style="margin-top:1rem">Grupos taxonómicos</div>`+grpMatches.slice(0,5).map(g=>`
+      <div class="record-card" onclick="goToGroupsSearch()">
+        <div class="record-header">
+          <div class="record-avatar" style="background:var(--sur2)"><span style="font-size:1.2rem">🗂</span></div>
+          <div style="flex:1;min-width:0">
+            <div class="record-name">${escq(g.nombre||'Grupo')}</div>
+            <div class="record-meta">${(g.especies||[]).slice(0,3).map(e=>e.sp||e.especie||'').filter(Boolean).join(', ')}</div>
+          </div>
+        </div>
+      </div>`).join('') : ''}
+    ${bibMatches.length ? `<div class="sec-title" style="margin-top:1rem">Biblioteca (referencias) (${bibMatches.length})</div>`+bibMatches.map(({r,spKey,idx,spName})=>`
+      <div class="record-card" onclick="goToBibliotecaRef('${spKey}',${idx})">
+        <div class="record-header">
+          <div class="record-avatar" style="background:var(--sur2)"><span style="font-size:1.2rem">📚</span></div>
+          <div style="flex:1;min-width:0">
+            <div class="record-name">${escq(r.titulo)}</div>
+            <div class="record-meta">${escq(getRefCategoria(r))}${r.autores?' · '+escq(r.autores):''}${spName?' · '+escq(spName):''}</div>
+          </div>
+        </div>
+      </div>`).join('') : ''}
+    ${signoMatches.length ? `<div class="sec-title" style="margin-top:1rem">Signos clínicos (historial) (${signoMatches.length})</div>`+signoMatches.slice(0,8).map(s=>`
+      <div class="record-card" onclick="openSignosHistorialManager()">
+        <div class="record-header">
+          <div class="record-avatar" style="background:var(--g0)"><span style="font-size:1.2rem">🩺</span></div>
+          <div style="flex:1;min-width:0">
+            <div class="record-name">${escq(s)}</div>
+            <div class="record-meta">Signo clínico — ver historial</div>
+          </div>
+        </div>
       </div>`).join('') : ''}
     ${rMatches.length ? `<div class="sec-title" style="margin-top:1rem">Historias clínicas (${rMatches.length})</div>`+rMatches.slice(0,8).map(r=>`
       <div class="record-card" onclick="showScreen('historias');openRecord('${r.id}')">
@@ -3980,7 +4127,108 @@ function handleSearch(val) {
           </div>
         </div>
       </div>`).join('') : ''}
-    ${!sMatches.length&&!dMatches.length&&!rMatches.length&&!eMatches.length&&!txMatches.length ? `<div class="empty-state"><p>Sin resultados para "${val}"</p></div>` : ''}`;
+    ${anyEmpty ? `<div class="empty-state"><p>Sin resultados para "${val}"</p></div>` : ''}`;
+}
+
+// ── Navegación desde la búsqueda principal ──
+function goToVadDrug(id) {
+  const d = VADEMECUM_DB.find(x => x.id === id);
+  if (!d) return;
+  const drugName = d.drug || d.active || '';
+  const searchInput = document.querySelector('#screen-vademecum input');
+  showScreen('vademecum');
+  // syncAndRenderVademecum() termina con renderVademecum() (vista por defecto);
+  // reintentar aplicar la búsqueda hasta que se monte la tarjeta del fármaco.
+  let tries = 0;
+  const t = setInterval(() => {
+    tries++;
+    if (tries > 40) { clearInterval(t); return; }
+    if (document.getElementById('vademecum-list') && drugName) {
+      if (searchInput) searchInput.value = drugName;
+      filterVademecum(drugName);
+      if (document.getElementById('vd-card-' + id)) {
+        toggleVdCard(id);
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        clearInterval(t);
+      }
+    }
+  }, 80);
+}
+
+function openSpeciesFromHistory(nombre) {
+  const sp = SPECIES_DB.find(s => s.name && String(s.name).toLowerCase() === String(nombre).toLowerCase());
+  if (sp) { openSpecies(sp.id); return; }
+  // Buscar dónde aparece esa especie: recintos, dietas, grupos, historias clínicas, cálculos
+  const inRecintos = (RECINTOS_DB||[]).some(r => (r.especie||'').toLowerCase() === String(nombre).toLowerCase());
+  const inDietas  = (DIETAS_GUARDADAS||[]).some(d => (d.especie||'').toLowerCase() === String(nombre).toLowerCase());
+  const inEnriq   = (ENRIQUECIMIENTOS_DB||[]).some(enr => (enr.especies||[]).some(e=>(e.sp||e.especie||'').toLowerCase() === String(nombre).toLowerCase()) || (enr.especie||'').toLowerCase() === String(nombre).toLowerCase());
+  const inRecords = (clinicalRecords||[]).some(r => (r.species||'').toLowerCase() === String(nombre).toLowerCase());
+  if (inRecords) { showScreen('historias'); renderRecordsList(nombre.toLowerCase()); toast('🐾 Historias clínicas de ' + nombre); return; }
+  if (inRecintos) { showScreen('recintos'); filterRecintosBySpecies(nombre.toLowerCase()); toast('🐾 Recintos de ' + nombre); return; }
+  if (inDietas)   { showScreen('nutricion-calc'); toast('🐾 Dietas de ' + nombre); return; }
+  showScreen('enriquecimiento');
+  filterEnriqBySpecies(nombre);
+  toast('🐾 Sin ficha completa — mostrando enriquecimientos de ' + nombre);
+}
+
+// ── Navegación de los resultados de la búsqueda principal ──
+async function goToEnfermedad(clase, sistId, enfIdx) {
+  showScreen('enfermedades-gen');
+  await loadEnfermedadesGenerales();
+  _enfGenClaseActiva = clase;
+  document.querySelectorAll('#enfgen-tabs .tab-filter-btn').forEach(b=>b.classList.remove('active'));
+  const target = [...document.querySelectorAll('#enfgen-tabs .tab-filter-btn')].find(b=>b.getAttribute('onclick')?.includes(`'${clase}',`));
+  if (target) target.classList.add('active');
+  renderEnfGenContent();
+  _enfGenVerDetalle(sistId, enfIdx);
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+async function goToEnfermedadPendiente(esp, enf, clase) {
+  showScreen('enfermedades-gen');
+  _enfGenClaseActiva = clase || 'general';
+  await loadEnfermedadesGenerales();
+  document.querySelectorAll('#enfgen-tabs .tab-filter-btn').forEach(b=>b.classList.remove('active'));
+  const target = [...document.querySelectorAll('#enfgen-tabs .tab-filter-btn')].find(b=>b.getAttribute('onclick')?.includes(`'${clase}',`));
+  if (target) target.classList.add('active');
+  renderEnfGenContent();
+  const searchEl = document.getElementById('enfgen-search');
+  if (searchEl) searchEl.value = enf;
+  _enfGenApplyFilters();
+  toast('🦠 Enfermedad pendiente para ' + esp);
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function goToLiquidoIV(nombre) {
+  showScreen('calc-fluidoterapia');
+  toast('💧 ' + nombre + ' — revisa la calculadora de fluidoterapia');
+}
+
+function goToRecintoSearch() {
+  showScreen('recintos');
+  toast('🏠 Recintos');
+}
+
+function goToDietaSearch(especie) {
+  showScreen('nutricion-calc');
+  toast('🥗 Dietas de ' + especie);
+}
+
+function goToGroupsSearch() {
+  showScreen('enriquecimiento');
+  openGroupsManager();
+  toast('🗂 Grupos taxonómicos');
+}
+
+function goToBibliotecaRef(spKey, idx) {
+  const refs = spKey === '' ? BIBLIOTECA_GENERAL : (BIBLIOTECA_DB[spKey] || []);
+  const r = refs[idx];
+  showScreen('biblioteca');
+  loadBibliotecaGeneral().then(() => {
+    renderBiblioteca();
+    setTimeout(() => openRefView(spKey, idx), 60);
+  });
+  if (r) toast('📚 ' + (r.titulo || 'Referencia'));
 }
 
 // ═══════════════════════════════════
@@ -5412,64 +5660,70 @@ function _enf_causaOptionsHTML(selVal) {
   return html;
 }
 
-function _enf_subtipoChanged(val) {
-  const wrap = document.getElementById('enf-causa-nueva-wrap');
+function _enf_pf() { return window._enfActivePf === 'enfgen' ? 'enfgen' : 'enf'; }
+
+function _enf_subtipoChanged(val, pf) {
+  pf = pf || _enf_pf();
+  const wrap = document.getElementById(pf+'-causa-nueva-wrap');
   if (wrap) wrap.style.display = (val === '__otra__') ? 'block' : 'none';
-  if (val && val !== '__otra__') _enf_updateAgente(val);
+  if (val && val !== '__otra__') _enf_updateAgente(val, undefined, pf);
 }
 
-function _enf_saveCausaNueva() {
-  const inp = document.getElementById('enf-causa-nueva');
+function _enf_saveCausaNueva(pf) {
+  pf = pf || _enf_pf();
+  const inp = document.getElementById(pf+'-causa-nueva');
   const val = inp?.value.trim();
   if (!val) return;
   _enfCausaHistorial.add(val);
   try { localStorage.setItem('wv_enf_causa_hist', JSON.stringify([..._enfCausaHistorial])); } catch(e) {}
-  const sel = document.getElementById('enf-subtipo');
+  const sel = document.getElementById(pf+'-subtipo');
   if (sel) { sel.innerHTML = _enf_causaOptionsHTML(val); sel.value = val; }
   if (inp) inp.value = '';
-  const wrap = document.getElementById('enf-causa-nueva-wrap');
+  const wrap = document.getElementById(pf+'-causa-nueva-wrap');
   if (wrap) wrap.style.display = 'none';
-  _enf_updateAgente(val);
+  _enf_updateAgente(val, undefined, pf);
 }
 
-function _enf_updateAgente(causa, keepVal) {
-  const wrap = document.getElementById('enf-agente-charact');
+function _enf_updateAgente(causa, keepVal, pf) {
+  pf = pf || _enf_pf();
+  const wrap = document.getElementById(pf+'-agente-charact');
   if (!wrap) return;
   // Mostrar TODAS las características cargadas en la app (de todas las causas)
   // más las que el usuario haya agregado manualmente al historial.
   const allLoaded = Object.values(ENF_AGENTE_CARACT).flat();
   const opts = [...new Set([...allLoaded, ..._enfAgenteHistorial])];
-  const keep = keepVal || document.getElementById('enf-agente-tipo')?.value || '';
+  const keep = keepVal || document.getElementById(pf+'-agente-tipo')?.value || '';
   const LBL = 'font-size:.65rem;font-weight:600;color:var(--txt2);display:block;margin-bottom:.15rem';
   let html = `<div style="${LBL}">Características del agente <span style="font-weight:400;color:var(--txt3)">(según causa: ${causa||'…'})</span></div>`;
-  html += '<select id="enf-agente-tipo" class="form-control" style="font-size:.8rem">';
+  html += '<select id="'+pf+'-agente-tipo" class="form-control" style="font-size:.8rem">';
   opts.forEach(o=>{ html += `<option value="${o}" ${o===keep?'selected':''}>${o}</option>`; });
   if (keep && !opts.includes(keep)) html += `<option value="${keep}" selected>${keep}</option>`;
   html += '<option value="__otra__">➕ Otra característica...</option>';
   html += '</select>';
-  html += '<div id="enf-agente-caract-nueva-wrap" style="display:none;margin-top:.3rem">'
+  html += '<div id="'+pf+'-agente-caract-nueva-wrap" style="display:none;margin-top:.3rem">'
     + '<div style="display:flex;gap:.3rem">'
-    + '<input id="enf-agente-caract-nueva" class="form-control" placeholder="Nueva característica..." style="flex:1;font-size:.8rem">'
-    + '<button class="btn btn-primary btn-sm" onclick="_enf_saveAgenteCaractNueva()">Guardar</button>'
+    + '<input id="'+pf+'-agente-caract-nueva" class="form-control" placeholder="Nueva característica..." style="flex:1;font-size:.8rem">'
+    + '<button class="btn btn-primary btn-sm" onclick="_enf_saveAgenteCaractNueva(\''+pf+'\')">Guardar</button>'
     + '</div></div>';
   wrap.innerHTML = html;
-  const sel = wrap.querySelector('#enf-agente-tipo');
+  const sel = wrap.querySelector('#'+pf+'-agente-tipo');
   if (sel) {
     sel.onchange = () => {
-      const nw = document.getElementById('enf-agente-caract-nueva-wrap');
+      const nw = document.getElementById(pf+'-agente-caract-nueva-wrap');
       if (nw) nw.style.display = (sel.value === '__otra__') ? 'block' : 'none';
     };
   }
 }
 
-function _enf_saveAgenteCaractNueva() {
-  const inp = document.getElementById('enf-agente-caract-nueva');
+function _enf_saveAgenteCaractNueva(pf) {
+  pf = pf || _enf_pf();
+  const inp = document.getElementById(pf+'-agente-caract-nueva');
   const val = inp?.value.trim();
   if (!val) return;
   _enfAgenteHistorial.add(val);
   try { localStorage.setItem('wv_enf_agente_hist', JSON.stringify([..._enfAgenteHistorial])); } catch(e) {}
-  const causa = document.getElementById('enf-subtipo')?.value || '';
-  _enf_updateAgente(causa, val);
+  const causa = document.getElementById(pf+'-subtipo')?.value || '';
+  _enf_updateAgente(causa, val, pf);
 }
 
 function openEnfCausaHistorial() {
@@ -5496,8 +5750,9 @@ function openEnfCausaHistorial() {
     </div>`);
 }
 
-function _refreshCausaSelect(val) {
-  const sel = document.getElementById('enf-subtipo');
+function _refreshCausaSelect(val, pf) {
+  pf = pf || _enf_pf();
+  const sel = document.getElementById(pf+'-subtipo');
   if (!sel) return;
   const prev = sel.value === '__otra__' ? '' : sel.value;
   const use = (val && val !== '__otra__') ? val : prev;
@@ -6016,6 +6271,7 @@ async function removeCategoria(id) {
 
 function openAddEnfermedad(sistId, editIdx=-1) {
   _enf_seedHistories();
+  window._enfActivePf = 'enf';
   document.getElementById('enf-modal')?.remove();
   const sp       = currentSpecies;
   const sistData = sp?.enfermedades_sistemas?.[sistId];
@@ -7019,7 +7275,7 @@ function renderMedicamentos(el, sp) {
     ${(sp.drugs||[]).map(d=>`
       <div class="info-card" style="margin-bottom:.5rem">
         <div class="info-card-title">${d.name} <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--g6)">${d.cat}</span></div>
-        ${row('Vía',d.route)}${row('Frecuencia',d.freq)}${row('Dosis mín/máx',d.dose_min+'–'+d.dose_max+' mg/kg')}${row('Efectos adversos',d.effects||'N/D')}${row('Sitios venopunción',d.sites||'N/D')}${d.notes?row('Notas',d.notes):''}
+        ${row('Vía',d.route)}${row('Frecuencia',d.freq)}${row('Dosis mín/máx',d.dose_min+'–'+d.dose_max+' '+(d.dose_unit||'mg/kg'))}${row('Efectos adversos',d.effects||'N/D')}${row('Sitios venopunción',d.sites||'N/D')}${d.notes?row('Notas',d.notes):''}
       </div>`).join('')}`;
 }
 
@@ -7031,6 +7287,7 @@ function renderDrugRowsNew(drugs, weight, isAdmin) {
     const drec  = d.dose||0;
     const dmax  = d.dose_max||0;
     const conc  = d.conc||1;
+    const du    = d.dose_unit || 'mg/kg';
     const hasRange = dmin > 0 && dmax > 0;
     // Calcular volumen recomendado
     const vol = (peso > 0 && drec > 0 && conc > 0) ? (peso*drec/conc).toFixed(2) : '—';
@@ -7049,9 +7306,9 @@ function renderDrugRowsNew(drugs, weight, isAdmin) {
       <td style="padding:.35rem .5rem;border-bottom:1px solid var(--bor)">
         ${hasRange ? `
         <div style="font-size:.7rem;color:var(--txt3)">mín: ${dmin}</div>
-        <div style="font-weight:700;color:var(--g6)">${drec} mg/kg</div>
+        <div style="font-weight:700;color:var(--g6)">${drec} ${du}</div>
         <div style="font-size:.7rem;color:var(--txt3)">máx: ${dmax}</div>` :
-        `<div style="font-weight:700;color:var(--g6)">${drec} mg/kg</div>`}
+        `<div style="font-weight:700;color:var(--g6)">${drec} ${du}</div>`}
       </td>
       <td style="padding:.35rem .5rem;border-bottom:1px solid var(--bor);text-align:right">
         ${peso > 0 ? `
@@ -7286,11 +7543,11 @@ function renderFluidoterapiaCalcScreen() {
         </div>
         <div class="fluid-input-group"><label>Mantenimiento (dosis)</label>
           <div style="display:flex;gap:.3rem">
-            <select id="fl-m-unit" class="form-control" style="flex-shrink:0;font-size:.78rem" onchange="calcFluids()">
+            <input type="number" id="fl-m" class="form-control" value="50" min="0" max="500" step="0.5" oninput="calcFluids()" style="flex:1;min-width:0">
+            <select id="fl-m-unit" class="form-control" style="flex-shrink:0;flex:0 0 auto;font-size:.78rem" onchange="calcFluids()">
               <option value="dia">por día</option>
               <option value="hora">por hora</option>
             </select>
-            <input type="number" id="fl-m" class="form-control" value="50" min="0" max="500" step="0.5" oninput="calcFluids()" style="flex:1">
             <button type="button" class="btn btn-primary btn-sm" style="flex-shrink:0;font-size:.68rem" onclick="guardarMantenimiento()" title="Guardar esta dosis de mantenimiento para reutilizarla">💾 Guardar</button>
           </div>
           <div id="fl-m-hint" style="font-size:.68rem;color:var(--txt3);margin-top:.25rem"></div>
@@ -8985,14 +9242,21 @@ function openAddDrug(editId=null, preselectedCat=null) {
 
       <!-- Concentraciones (múltiple) -->
       <div class="form-group">
-        <label>Concentraciones comerciales <span style="font-size:.7rem;font-weight:400;color:var(--txt3)">(mg/ml — puede haber varias)</span></label>
+        <label>Concentraciones comerciales <span style="font-size:.7rem;font-weight:400;color:var(--txt3)">(puede haber varias)</span></label>
         <div id="vd-conc-list" style="margin-top:.25rem">
-          ${(existing?.concs?.length ? existing.concs : (existing?.conc ? [existing.conc] : [null])).map((c,i)=>`
-          <div style="display:flex;gap:.3rem;margin-bottom:.25rem" id="vdc-row-${i}">
-            <input class="form-control vd-conc-inp" type="number" step="0.01" value="${c||''}" placeholder="Ej: 10, 50, 100..." style="flex:1;font-size:.82rem">
-            <span style="font-size:.75rem;color:var(--txt3);align-self:center">mg/ml</span>
-            <button onclick="document.getElementById('vdc-row-${i}').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
-          </div>`).join('')}
+          ${(existing?.concs?.length ? existing.concs : (existing?.conc ? [existing.conc] : [null])).map((c,i)=>{
+            const cp = vdParseConc(c);
+            return `
+          <div style="display:flex;gap:.25rem;margin-bottom:.25rem;align-items:center" id="vdc-row-${i}">
+            <input class="form-control vd-conc-inp" type="number" step="0.01" value="${cp?cp.val:''}" placeholder="Ej: 10, 50..." style="flex:01 70px;font-size:.82rem">
+            <select class="form-control vd-conc-num" style="flex:0 0 auto;font-size:.76rem;width:auto;min-width:50px">${vdConcOptsStr('num', cp?cp.num:'mg')}</select>
+            <span style="font-size:.7rem;color:var(--txt3)">/</span>
+            <select class="form-control vd-conc-den" style="flex:0 0 auto;font-size:.76rem;width:auto;min-width:50px">${vdConcOptsStr('den', cp?cp.den:'ml')}</select>
+            <button type="button" class="icon-btn" style="width:24px;height:26px;flex-shrink:0;font-size:.6rem" onclick="vdAddConcUnit(this.closest('[id^=vdc-row]'),'num')" title="Agregar unidad numerador">+</button>
+            <button type="button" class="icon-btn" style="width:24px;height:26px;flex-shrink:0;font-size:.6rem" onclick="vdAddConcUnit(this.closest('[id^=vdc-row]'),'den')" title="Agregar unidad denominador">+</button>
+            <button onclick="document.getElementById('vdc-row-${i}').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.15rem .35rem;font-size:.65rem;flex-shrink:0">✕</button>
+          </div>`;
+          }).join('')}
         </div>
         <button onclick="addVdConcRow()" class="btn btn-secondary btn-sm" style="margin-top:.2rem">+ Otra concentración</button>
       </div>
@@ -9062,6 +9326,15 @@ function openAddDrug(editId=null, preselectedCat=null) {
         <input id="vd-keywords" class="form-control" value="${(existing?.keywords||[]).join(', ')}" placeholder="Ej: analgésico, opioide, dolor crónico, SID...">
       </div>
 
+      <!-- Bibliografía -->
+      <div class="form-group">
+        <label>Bibliografía <span style="font-size:.7rem;font-weight:400;color:var(--txt3)">(incluye el link/cita o selecciona una fuente guardada en la biblioteca de la app)</span></label>
+        <div id="vd-bib-list" style="margin-top:.25rem">
+          ${(existing?.bibliografia?.length ? existing.bibliografia : [null]).map(b=>vdBibRowHtml(b)).join('')}
+        </div>
+        <button onclick="addVdBibRow()" class="btn btn-secondary btn-sm" style="margin-top:.2rem">+ Agregar fuente</button>
+      </div>
+
       <!-- Dosis por especie -->
       <div style="margin-top:.5rem">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem">
@@ -9076,10 +9349,12 @@ function openAddDrug(editId=null, preselectedCat=null) {
               <input class="form-control vds-sci" value="${s.sci||''}" placeholder="Nombre científico" style="flex:1;font-size:.78rem">
               <button onclick="this.closest('.vd-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .35rem;font-size:.7rem;flex-shrink:0">✕</button>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem">
-              <div><label style="font-size:.65rem;color:var(--txt3)">Dosis mín</label><input class="form-control vds-dmin" type="number" step="0.001" value="${s.dose_min||''}" placeholder="1.0" style="font-size:.78rem"></div>
-              <div><label style="font-size:.65rem;color:var(--txt3)">Dosis rec.</label><input class="form-control vds-drec" type="number" step="0.001" value="${s.dose||''}" placeholder="2.0" style="font-size:.78rem"></div>
-              <div><label style="font-size:.65rem;color:var(--txt3)">Dosis máx</label><input class="form-control vds-dmax" type="number" step="0.001" value="${s.dose_max||''}" placeholder="4.0" style="font-size:.78rem"></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin:.15rem 0">
+              <span style="font-size:.65rem;color:var(--txt3);font-weight:600">Dosis registradas <span style="font-weight:400">(varias por especie, cada una con su fuente)</span></span>
+              <button onclick="addVdsdEntry(this.closest('.vd-sp-row'))" class="btn btn-secondary btn-sm" style="font-size:.68rem">+ Dosis</button>
+            </div>
+            <div class="vdsd-entries">
+              ${vdDoseEntriesOf(s).map(de=>vddEntryHtml(de)).join('')}
             </div>
             <div style="margin-top:.3rem">
               <label style="font-size:.65rem;color:var(--txt3);display:block;margin-bottom:.15rem">Vías de administración</label>
@@ -9123,10 +9398,14 @@ function addVdConcRow() {
   if (!list) return;
   const idx = list.children.length;
   list.insertAdjacentHTML('beforeend', `
-    <div style="display:flex;gap:.3rem;margin-bottom:.25rem" id="vdc-row-${idx}">
-      <input class="form-control vd-conc-inp" type="number" step="0.01" value="" placeholder="Ej: 10, 50, 100..." style="flex:1;font-size:.82rem">
-      <span style="font-size:.75rem;color:var(--txt3);align-self:center">mg/ml</span>
-      <button onclick="document.getElementById('vdc-row-${idx}').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .4rem;font-size:.7rem">✕</button>
+    <div style="display:flex;gap:.25rem;margin-bottom:.25rem;align-items:center" id="vdc-row-${idx}">
+      <input class="form-control vd-conc-inp" type="number" step="0.01" value="" placeholder="Ej: 10, 50..." style="flex:01 70px;font-size:.82rem">
+      <select class="form-control vd-conc-num" style="flex:0 0 auto;font-size:.76rem;width:auto;min-width:50px">${vdConcOptsStr('num','mg')}</select>
+      <span style="font-size:.7rem;color:var(--txt3)">/</span>
+      <select class="form-control vd-conc-den" style="flex:0 0 auto;font-size:.76rem;width:auto;min-width:50px">${vdConcOptsStr('den','ml')}</select>
+      <button type="button" class="icon-btn" style="width:24px;height:26px;flex-shrink:0;font-size:.6rem" onclick="vdAddConcUnit(this.closest('[id^=vdc-row]'),'num')" title="Agregar unidad numerador">+</button>
+      <button type="button" class="icon-btn" style="width:24px;height:26px;flex-shrink:0;font-size:.6rem" onclick="vdAddConcUnit(this.closest('[id^=vdc-row]'),'den')" title="Agregar unidad denominador">+</button>
+      <button onclick="document.getElementById('vdc-row-${idx}').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.15rem .35rem;font-size:.65rem;flex-shrink:0">✕</button>
     </div>`);
 }
 
@@ -9141,10 +9420,12 @@ function addVdSpeciesDoseRow() {
         <input class="form-control vds-sci" value="" placeholder="Nombre científico" style="flex:1;font-size:.78rem">
         <button onclick="this.closest('.vd-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .35rem;font-size:.7rem;flex-shrink:0">✕</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem">
-        <div><label style="font-size:.65rem;color:var(--txt3)">Dosis mín</label><input class="form-control vds-dmin" type="number" step="0.001" placeholder="1.0" style="font-size:.78rem"></div>
-        <div><label style="font-size:.65rem;color:var(--txt3)">Dosis rec.</label><input class="form-control vds-drec" type="number" step="0.001" placeholder="2.0" style="font-size:.78rem"></div>
-        <div><label style="font-size:.65rem;color:var(--txt3)">Dosis máx</label><input class="form-control vds-dmax" type="number" step="0.001" placeholder="4.0" style="font-size:.78rem"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:.15rem 0">
+        <span style="font-size:.65rem;color:var(--txt3);font-weight:600">Dosis registradas <span style="font-weight:400">(varias por especie, cada una con su fuente)</span></span>
+        <button onclick="addVdsdEntry(this.closest('.vd-sp-row'))" class="btn btn-secondary btn-sm" style="font-size:.68rem">+ Dosis</button>
+      </div>
+      <div class="vdsd-entries">
+        ${vddEntryHtml(null)}
       </div>
       <div style="margin-top:.3rem">
         <label style="font-size:.65rem;color:var(--txt3);display:block;margin-bottom:.15rem">Vías de administración</label>
@@ -9170,18 +9451,50 @@ async function saveDrug(editId='') {
   if (!drugName && !active) { toast('⚠ Ingresa al menos un nombre o el principio activo'); return; }
 
   const cats = Array.from(document.querySelectorAll('#modal-add-drug .vd-cat-chk:checked')).map(el=>el.value);
-  const concs = Array.from(document.querySelectorAll('#modal-add-drug .vd-conc-inp')).map(el=>parseFloat(el.value)).filter(v=>!isNaN(v)&&v>0);
+  const concObjs = [];
+  document.querySelectorAll('#modal-add-drug .vd-conc-inp').forEach(el => {
+    const val = parseFloat(el.value);
+    if (isNaN(val) || val <= 0) return;
+    const row = el.closest('[id^=vdc-row-]');
+    concObjs.push({
+      val,
+      num: row?.querySelector('.vd-conc-num')?.value || 'mg',
+      den: row?.querySelector('.vd-conc-den')?.value || 'ml'
+    });
+  });
   const routes = Array.from(document.querySelectorAll('#modal-add-drug .vd-route-chk:checked')).map(el=>el.value);
+  const bibliografia = [];
+  document.querySelectorAll('#vd-bib-list .vd-bib-row').forEach(row => {
+    const b = vdBibReadSel(row);
+    if (b) bibliografia.push(b);
+  });
   const species_doses = [];
   document.querySelectorAll('#vd-species-rows .vd-sp-row').forEach(row => {
     const sp = row.querySelector('.vds-sp')?.value.trim();
+    if (!sp) return;
     const spRoutes = Array.from(row.querySelectorAll('.vds-route-chk:checked')).map(el=>el.value);
-    if (sp) species_doses.push({
+    const dosis = [];
+    row.querySelectorAll('.vdsd-entry').forEach(ent => {
+      const dmin = parseFloat(ent.querySelector('.vdsd-min')?.value) || 0;
+      const drec = parseFloat(ent.querySelector('.vdsd-rec')?.value) || 0;
+      const dmax = parseFloat(ent.querySelector('.vdsd-max')?.value) || 0;
+      dosis.push({
+        min: dmin,
+        rec: drec,
+        max: dmax,
+        unit: ent.querySelector('.vdsd-unit')?.value || 'mg/kg',
+        fuente: vdBibReadSel(ent)
+      });
+    });
+    const first = dosis[0] || {};
+    species_doses.push({
       species:  sp,
       sci:      row.querySelector('.vds-sci')?.value.trim()||'',
-      dose_min: parseFloat(row.querySelector('.vds-dmin')?.value)||0,
-      dose:     parseFloat(row.querySelector('.vds-drec')?.value)||0,
-      dose_max: parseFloat(row.querySelector('.vds-dmax')?.value)||0,
+      dosis,
+      dose_min: first.min || 0,
+      dose:     first.rec || 0,
+      dose_max: first.max || 0,
+      dose_unit: first.unit || 'mg/kg',
       route:    spRoutes[0]||'IM',
       routes:   spRoutes.length ? spRoutes : ['IM'],
       freq:     row.querySelector('.vds-freq')?.value||'',
@@ -9199,8 +9512,9 @@ async function saveDrug(editId='') {
     cat_vad:          _vadCatActiva !== '__all__' ? _vadCatActiva : (cats[0] ? Object.entries(VADEMECUM_CATS).find(([k,v]) => v.label === cats[0])?.[0] || '' : ''),
     subcat_vad:       _vadSubcatActiva || '',
     subsubcat_vad:    _vadSubSubcatActiva || '',
-    conc:             concs[0]||0,
-    concs:            concs.length ? concs : (concs[0] ? concs : []),
+    conc:             concObjs[0]?.val || 0,
+    concs:            concObjs,
+    conc_units:       concObjs.map(c => c.num + '/' + c.den),
     route:            routes[0]||'IM',
     routes:           routes.length ? routes : [],
     freq:             document.getElementById('vd-freq')?.value||'',
@@ -9212,6 +9526,7 @@ async function saveDrug(editId='') {
     mech_simple:      document.getElementById('vd-mech-simple')?.value||'',
     desc:             document.getElementById('vd-desc')?.value||'',
     keywords:         (document.getElementById('vd-keywords')?.value||'').split(/[,;]+/).map(k=>k.trim()).filter(Boolean),
+    bibliografia,
     species_doses
   };
 
@@ -9265,6 +9580,7 @@ async function syncVadToSpecies(vadId) {
         dose: spDose.dose||existingDrug.dose,
         dose_min: spDose.dose_min||existingDrug.dose_min,
         dose_max: spDose.dose_max||existingDrug.dose_max,
+        dose_unit: spDose.dose_unit||existingDrug.dose_unit||'mg/kg',
         route: spDose.route||existingDrug.route,
         freq: spDose.freq||existingDrug.freq,
       });
@@ -9507,14 +9823,24 @@ function _vadCsvPreview(text) {
 async function confirmImportVademecum(count) {
   const drugs = window._vadCsvImport || [];
   document.getElementById('modal-vad-csv')?.remove();
-  let filled=0, added=0, dup=0;
+  let filled=0, added=0, dup=0, sinCat=0;
   for(const d of drugs){
-    const addr = _normActive(d.active);
-    // 1) buscar ficha existente por principio activo (normalizado)
-    const already = VADEMECUM_DB.find(x => x.active && _normActive(x.active) === addr);
+    vdEnsureCats(d);
+    if (!d.cat_vad && !(d.cats||[]).length) sinCat++;
+    const addr = _activeCore(d.active) || _normActive(d.active);
+    // 1) buscar ficha existente por principio activo (normalizado, tolerando sales tipo "clorhidrato de X")
+    const already = addr ? VADEMECUM_DB.find(x => {
+      const c = _activeCore(x.active) || _normActive(x.active);
+      if (c === addr) return true;
+      if (_normActive(x.drug||'') === addr) return true;
+      return (x.nombres||[]).some(n => _normActive(n) === addr);
+    }) : null;
     if (already) {
+      // completar campos vacíos del stub y asegurar categorías
       const changed = _vadMergeIntoFicha(already, d);
-      if (changed) { await dbPutSync('vademecum', already); if (firestore && fbUid()) await fsPut('vademecum', already); filled++; }
+      const beforeCat = already.cat_vad;
+      vdEnsureCats(already);
+      if (changed || beforeCat !== already.cat_vad) { await dbPutSync('vademecum', already); if (firestore && fbUid()) await fsPut('vademecum', already); filled++; }
       else { dup++; }
       continue;
     }
@@ -9530,6 +9856,7 @@ async function confirmImportVademecum(count) {
   if(filled) parts.push('Actualizados '+filled+' fármaco(s)');
   if(added) parts.push('Añadidos '+added+' nuevo(s)');
   if(dup) parts.push('Sin cambios '+dup+' (ya completos)');
+  if(sinCat) parts.push('⚠ '+sinCat+' sin categoría (visibles en "Todos" y en el buscador)');
   toast((parts.length?'✓ ':'')+parts.join(' · '));
 }
 
@@ -9555,6 +9882,458 @@ function _vadMergeIntoFicha(t, s) {
   if (!t.drug && s.drug) { t.drug = s.drug; changed = true; }
   if (!t.category && s.category) { t.category = s.category; changed = true; }
   return changed;
+}
+
+// ─────────────────────────────────────────────
+// Vademécum en tabla (editor tipo Excel)
+// ─────────────────────────────────────────────
+// Núcleo del principio activo: quita sales/derivados al inicio ("clorhidrato de ketamina" → "ketamina")
+function _activeCore(s) {
+  const salts = ['clorhidrato','hidrocloruro','clorhidrarato','bromhidrato','clorhidratado',
+    'bromuro','sulfato','fosfato','citrato','maleato','tartrato','nitrato','pamoato',
+    'monohidrato','hidrato','sal','sodico','calcico','potasico','magnesico','ferroso'];
+  const words = _normActive(s).split(/\s+/).filter(Boolean);
+  let i = 0;
+  while (i < words.length) {
+    if (salts.includes(words[i])) { i += (words[i+1] === 'de') ? 2 : 1; continue; }
+    break;
+  }
+  return words.slice(i).join(' ');
+}
+
+// Completa cat_vad/subcat_vad/subsubcat_vad a partir de cats/category/cat_esp
+function vdEnsureCats(d) {
+  const labels = (d.cats||[]).slice();
+  if (d.category && !labels.includes(d.category)) labels.unshift(d.category);
+  if (!d.cat_vad) {
+    for (const [k, v] of Object.entries(VADEMECUM_CATS)) {
+      if (labels.includes(v.label) || String(d.category||'').trim().toLowerCase() === String(v.label).toLowerCase()) {
+        d.cat_vad = k; d.category = v.label; break;
+      }
+    }
+  }
+  if (!d.subcat_vad) {
+    for (const k of Object.keys(VADEMECUM_CATS)) {
+      if (d.cat_vad && k !== d.cat_vad) continue;
+      const cat = VADEMECUM_CATS[k];
+      let hitSub = '', hitSs = '';
+      for (const [sk, sv] of Object.entries(cat.subcategories||{})) {
+        if (labels.includes(sv.label)) { hitSub = sv.label; break; }
+        for (const [ssk, ssv] of Object.entries(sv.subcats||{})) {
+          if (labels.includes(ssv.label)) { hitSub = sv.label; hitSs = ssv.label; break; }
+        }
+        if (hitSub) break;
+      }
+      if (hitSub) {
+        d.cat_vad = d.cat_vad || k;
+        d.category = d.category || VADEMECUM_CATS[d.cat_vad].label;
+        d.subcat_vad = hitSub;
+        if (hitSs) d.subsubcat_vad = hitSs;
+        break;
+      }
+    }
+  }
+  if (!d.cat_esp && d.subcat_vad) d.cat_esp = d.subcat_vad;
+  return !!d.cat_vad;
+}
+
+// Opciones de categoría/subcategoría sincronizadas con VADEMECUM_CATS actual
+function vdExcelSecOptions(selected) {
+  let o = '<option value="">— Sin categoría —</option>';
+  Object.entries(VADEMECUM_CATS).forEach(([k,v]) => {
+    o += '<option value="'+vdEsc(v.label)+'"'+(v.label===selected?' selected':'')+'>'+vdEsc(v.label)+'</option>';
+  });
+  return o;
+}
+function vdExcelSubOptions(secLabel, selected) {
+  let o = '<option value="">—</option>';
+  Object.entries(VADEMECUM_CATS).forEach(([k,v]) => {
+    if (secLabel && v.label !== secLabel) return;
+    Object.entries(v.subcategories||{}).forEach(([sk,sv]) => {
+      o += '<option value="'+vdEsc(sv.label)+'"'+(sv.label===selected?' selected':'')+'>'+vdEsc(sv.label)+'</option>';
+    });
+  });
+  return o;
+}
+function vdExcelSsOptions(secLabel, subLabel, selected) {
+  let o = '<option value="">—</option>';
+  Object.entries(VADEMECUM_CATS).forEach(([k,v]) => {
+    if (secLabel && v.label !== secLabel) return;
+    Object.entries(v.subcategories||{}).forEach(([sk,sv]) => {
+      if (subLabel && sv.label !== subLabel) return;
+      Object.entries(sv.subcats||{}).forEach(([ssk,ssv]) => {
+        o += '<option value="'+vdEsc(ssv.label)+'"'+(ssv.label===selected?' selected':'')+'>'+vdEsc(ssv.label)+'</option>';
+      });
+    });
+  });
+  return o;
+}
+function _preserveOpt(optsHtml, val) {
+  if (!val) return optsHtml;
+  const escVal = vdEsc(val);
+  if (optsHtml.indexOf('value="'+escVal+'"') === -1) {
+    return optsHtml + '<option value="'+escVal+'" selected>'+escVal+'</option>';
+  }
+  return optsHtml;
+}
+
+function vdExcelCatChanged(sel) {
+  const row = sel.closest('tr');
+  const secLabel = sel.value;
+  const subSel = row.querySelector('[data-col="subcat"]');
+  const ssSel = row.querySelector('[data-col="subsubcat"]');
+  if (subSel) { subSel.innerHTML = _preserveOpt(vdExcelSubOptions(secLabel, subSel.value), subSel.value); }
+  if (ssSel) { ssSel.innerHTML = _preserveOpt(vdExcelSsOptions(secLabel, subSel?.value||'', ''), ssSel.value); }
+}
+function vdExcelSubChanged(sel) {
+  const row = sel.closest('tr');
+  const sec = row.querySelector('[data-col="categoria"]')?.value || '';
+  const ssSel = row.querySelector('[data-col="subsubcat"]');
+  if (ssSel) { ssSel.innerHTML = _preserveOpt(vdExcelSsOptions(sec, sel.value, ''), ssSel.value); }
+}
+
+function vdExcelConcStr(d) {
+  const parts = vdConcsArr(d);
+  if (!parts.length) return '';
+  return parts.map(p => p.val + ' ' + p.num + '/' + p.den).join('; ');
+}
+function vdExcelDosisStr(d) {
+  return (d.species_doses||[]).map(s => {
+    if (Array.isArray(s.dosis) && s.dosis.length) {
+      return s.dosis.map(de => {
+        const unit = de.unit || 'mg/kg';
+        const range = [de.min, de.rec, de.max].filter(v => v).join('-');
+        return (s.species||'') + ': ' + range + ' ' + unit;
+      }).join('\n');
+    }
+    return (s.species||'') + '|' + (s.sci||'') + '|' + (s.dose_min||'') + '|' + (s.dose||'') + '|' + (s.dose_max||'') + '|' + ((s.routes||[]).join(';')||'') + '|' + (s.freq||'') + '|' + (s.notes||'');
+  }).join('\n');
+}
+function vdExcelBibStr(d) {
+  return (d.bibliografia||[]).map(b => b.kind==='url' ? b.text : ('bib:' + (b.spKey||'') + ':' + b.idx)).join(' | ');
+}
+
+function vdParseConcStr(s) {
+  const out = [];
+  let fallbackUnit = '';
+  String(s??'').replace(/,/g,';').split(';').forEach(part => {
+    part = part.trim(); if(!part) return;
+    const m = part.match(/^([\d.]+)\s*([a-zA-Zµ/ ]*)$/);
+    if (!m) return;
+    const val = parseFloat(m[1]);
+    if (!(val>0)) return;
+    let unit = (m[2]||'').trim();
+    if (/[a-zA-Zµ]/.test(unit)) fallbackUnit = unit;
+    if (!unit) unit = fallbackUnit || 'mg/ml';
+    const p = unit.split('/');
+    out.push({ val, num: (p[0]||'').trim()||'mg', den: (p[1]||'').trim()||'ml' });
+  });
+  return out;
+}
+function vdParseDosisStr(s) {
+  const out = [];
+  String(s??'').split(/\r?\n/).forEach(line => {
+    line = line.trim(); if(!line) return;
+    if (line.includes('|')) {
+      const p = line.split('|').map(x=>x.trim());
+      const sp = p[0]; if(!sp) return;
+      const routes = p[5] ? p[5].split(/[;,]/).map(x=>x.trim()).filter(Boolean) : [];
+      const min = parseFloat(p[2])||0, rec = parseFloat(p[3])||0, max = parseFloat(p[4])||0;
+      out.push({
+        species: sp, sci: p[1]||'',
+        dose_min: min, dose: rec, dose_max: max, dose_unit: 'mg/kg',
+        routes, route: routes[0]||'IM', freq: p[6]||'', notes: p[7]||'',
+        dosis: [{ min, rec, max, unit: 'mg/kg', fuente: null }]
+      });
+      return;
+    }
+    const m = line.match(/^([^:]+):\s*(.*)$/);
+    const sp = (m ? m[1] : line.split(/\s{2,}/)[0]).trim();
+    const rest = m ? m[2] : line;
+    if (!sp) return;
+    const vals = (rest.match(/\d+(?:[.,]\d+)?/g)||[]).map(n=>parseFloat(n.replace(',','.'))).filter(v=>!isNaN(v));
+    const unitM = rest.match(/(mg|ml|µg|g|UI|mEq|mmol|mcg)\/(m²|kg|animal|ml|g)\b/i) || rest.match(/(mg|ml|µg|g|UI|mEq|mmol|mcg)\b/i);
+    const unit = unitM ? unitM[0] : 'mg/kg';
+    const routes = (rest.match(/\b(IM|IV|SC|VO|IN|Tópico|Tópica|Inhalatorio)\b/img)||[]).map(x=>x.charAt(0).toUpperCase()+x.slice(1).toLowerCase()).filter((v,i,a)=>a.indexOf(v)===i);
+    const freqM = rest.match(/SID|BID|TID|Q\s?\d+\s?[hH]|cada\s*\d+\s*(h|horas)?|dosis\s*única|una\s*vez|semanal|mensual|diaria|PRN/ig);
+    const freq = freqM ? freqM.join(', ') : '';
+    const notes = rest
+      .replace(/\b(IM|IV|SC|VO|IN|Tópica?|Inhalatorio)\b/ig,' ')
+      .replace(/[\d.,]+/g,' ')
+      .replace(/\b(mg|ml|µg|g|UI|mEq|mmol|mcg)\/(m²|kg|animal|ml|g)\b/ig,' ')
+      .replace(/\s+/g,' ').trim();
+    let min=0, rec=0, max=0;
+    if (vals.length>=3) { min=vals[0]; rec=vals[1]; max=vals[2]; }
+    else if (vals.length===2) { min=vals[0]; rec=vals[1]; max=vals[1]; }
+    else if (vals.length===1) { rec=vals[0]; }
+    out.push({
+      species: sp, sci:'',
+      dose_min: min, dose: rec, dose_max: max, dose_unit: unit,
+      routes, route: routes[0]||'IM', freq, notes,
+      dosis: [{ min, rec, max, unit, fuente: null }]
+    });
+  });
+  return out;
+}
+function vdParseBibStr(s) {
+  const out = [];
+  String(s??'').split(/[|\n]/).forEach(tok => {
+    tok = tok.trim(); if(!tok) return;
+    if (tok.indexOf('bib:') === 0) {
+      const p = tok.slice(4).split(':');
+      out.push({ kind:'bib', spKey: p[0]||'', idx: parseInt(p[1],10)||0 });
+    } else out.push({ kind:'url', text: tok });
+  });
+  return out;
+}
+
+function vadGridRowHtml(d) {
+  d = d || {};
+  const id = d.id || '';
+  const secLabel = d.category || (d.cat_vad ? (VADEMECUM_CATS[d.cat_vad]?.label||'') : '') || (d.cats?.[0]||'');
+  const subLabel = d.subcat_vad || '';
+  const ssLabel = d.subsubcat_vad || '';
+  const concVal = d._conc != null ? d._conc : vdExcelConcStr(d);
+  const dosisVal = d._dosis != null ? d._dosis : vdExcelDosisStr(d);
+  const bibVal = d._bib != null ? d._bib : vdExcelBibStr(d);
+  const estado = id ? '' : '<span style="color:var(--g6);font-weight:600;font-size:.65rem">NUEVO</span>';
+  return `<tr data-row data-id="${id}" style="border-bottom:1px solid var(--bor)">
+    <td style="padding:.2rem .3rem">${estado}</td>
+    <td style="padding:.2rem .3rem"><input data-col="active" value="${vdEsc(d.active||'')}" placeholder="Ketamina" style="width:100%;min-width:120px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="nombres" value="${vdEsc((d.nombres||[]).join(' / '))}" placeholder="Ketavet / Ketamidor" style="width:100%;min-width:130px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><select data-col="categoria" onchange="vdExcelCatChanged(this)" style="width:100%;min-width:150px;font-size:.68rem">${_preserveOpt(vdExcelSecOptions(secLabel), secLabel)}</select></td>
+    <td style="padding:.2rem .3rem"><select data-col="subcat" onchange="vdExcelSubChanged(this)" style="width:100%;min-width:170px;font-size:.68rem">${_preserveOpt(vdExcelSubOptions(secLabel, subLabel), subLabel)}</select></td>
+    <td style="padding:.2rem .3rem"><select data-col="subsubcat" style="width:100%;min-width:150px;font-size:.68rem">${_preserveOpt(vdExcelSsOptions(secLabel, subLabel, ssLabel), ssLabel)}</select></td>
+    <td style="padding:.2rem .3rem"><input data-col="cat_esp" value="${vdEsc(d.cat_esp||'')}" placeholder="Ej: AINE" style="width:100%;min-width:90px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="conc" value="${vdEsc(concVal)}" placeholder="Ej: 100 mg/ml" style="width:100%;min-width:110px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="routes" value="${vdEsc((d.routes&&d.routes.length?d.routes.join(', '):d.route||''))}" placeholder="IM, IV" style="width:100%;min-width:90px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="freq" value="${vdEsc(d.freq||'')}" placeholder="SID" style="width:100%;min-width:80px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><textarea data-col="dosis" rows="2" placeholder="Perro: 5-10-15 mg/kg IM SID&#10;Gato|Felis catus|3|5|7|IM|dosis única" style="width:100%;min-width:150px;font-size:.68rem">${vdEsc(dosisVal)}</textarea></td>
+    <td style="padding:.2rem .3rem"><input data-col="notes" value="${vdEsc(d.notes||'')}" placeholder="Observaciones..." style="width:100%;min-width:110px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="bibliografia" value="${vdEsc(bibVal)}" placeholder="https://... o bib:spKey:idx" style="width:100%;min-width:140px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem;text-align:center">${id?`<input type="checkbox" data-col="eliminar" title="Marcar para eliminar al guardar">`:''}</td>
+  </tr>`;
+}
+
+function openVadExcel() {
+  mergeDefaultVademecumCats();
+  document.getElementById('modal-vad-excel')?.remove();
+  const m = document.createElement('div');
+  m.id = 'modal-vad-excel';
+  m.style.cssText = 'position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;overflow-y:auto';
+  const rowsHtml = VADEMECUM_DB.map(d => vadGridRowHtml(d)).join('');
+  m.innerHTML = `
+    <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:1500px;max-height:94vh;display:flex;flex-direction:column;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;gap:.5rem;flex-wrap:wrap">
+        <div style="min-width:0">
+          <div style="font-weight:700;font-size:.95rem">📊 Vademécum en tabla (Excel)</div>
+          <div style="font-size:.72rem;color:var(--txt3)">Todos los fármacos subidos. Edita celdas, pega filas de tu hoja (📋 Pegar) y dale 💾 Guardar. Las categorías y subcategorías se sincronizan con las de la app.</div>
+        </div>
+        <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="vadExcelPaste()">📋 Pegar desde Excel</button>
+          <button class="btn btn-secondary btn-sm" onclick="addVadExcelRow()">➕ Agregar fila</button>
+          <button class="btn btn-primary btn-sm" onclick="saveVadExcel()">💾 Guardar</button>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('modal-vad-excel').remove()">Cerrar</button>
+        </div>
+      </div>
+      <div style="overflow:auto;flex:1;border:1px solid var(--bor);border-radius:var(--rsm);background:var(--sur)">
+        <table style="width:100%;border-collapse:collapse;font-size:.72rem;min-width:1560px">
+          <thead><tr style="background:var(--sur2);position:sticky;top:0">
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Estado</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Principio activo</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Nombres comerciales</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Categoría</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Subcategoría</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Sub-subcategoría</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Cat. específica</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Concentración</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Vías</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Frecuencia</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Dosis por especie</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Notas</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Bibliografía</th>
+            <th style="padding:.35rem .3rem;text-align:center;color:var(--txt3)">Eliminar</th>
+          </tr></thead>
+          <tbody id="vad-excel-tbody">${rowsHtml}</tbody>
+        </table>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+}
+
+function vadExcelPaste() {
+  document.getElementById('modal-vad-paste')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="modal-vad-paste" style="position:fixed;inset:0;z-index:1110;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r);padding:1.25rem;width:100%;max-width:620px">
+        <div style="font-weight:700;font-size:.9rem;margin-bottom:.3rem">📋 Pegar filas de Excel</div>
+        <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.6rem">
+          Copia las filas de tu hoja y pégalas aquí (Ctrl+V). Se agregarán al final de la tabla como filas NUEVAS; revisa y dale 💾 Guardar.<br>
+          • Si pegas con <b>encabezados</b>, se detectan solos (nombres, principio activo, categorías, vías, dosis...).<br>
+          • Sin encabezados, se toman en este orden: <b>principio activo · nombres · categoría · subcategoría · concentración · vías · frecuencia · dosis · notas · bibliografía</b>.<br>
+          • En "dosis" una línea por especie: <b>Perro: 5-10-15 mg/kg IM SID</b> o <b>Perro|Canis lupus familiaris|5|10|15|IM|SID</b>.
+        </div>
+        <textarea id="vad-paste-text" class="form-control" rows="9" style="font-family:var(--mono);font-size:.78rem" placeholder="Pega aquí (Ctrl+V)..."></textarea>
+        <div style="display:flex;gap:.5rem;margin-top:.6rem">
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('modal-vad-paste').remove()">Cancelar</button>
+          <button class="btn btn-primary" style="flex:2" onclick="vadExcelApplyPaste()">➕ Agregar al final</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+function _vadGridColFromHeader(h) {
+  const k = VAD_HEADER_MAP[h];
+  if (k === 'active') return 'active';
+  if (k === 'nombres') return 'nombres';
+  if (k === 'concs') return 'conc';
+  if (k === 'cats') return 'categoria';
+  if (k === 'cat_esp') return 'cat_esp';
+  if (k === 'routes') return 'routes';
+  if (k === 'freq') return 'freq';
+  if (k === 'species_doses') return 'dosis';
+  if (k === 'notes') return 'notes';
+  if (h === 'categoria' || h === 'categoria_general' || h === 'seccion' || h === 'sec') return 'categoria';
+  if (h === 'subcategoria' || h === 'subcategorias' || h === 'subcat') return 'subcat';
+  if (h === 'subsubcategoria' || h === 'subsubcat' || h === 'sub_categoria' || h === 'subcat2') return 'subsubcat';
+  if (h === 'dosis' || h === 'dosis_por_especie' || h === 'dosis_especies') return 'dosis';
+  if (h.includes('bibliografia') || h.includes('referencia') || h.includes('fuente') || h === 'urls' || h === 'url') return 'bibliografia';
+  if (h.includes('concentra') || h === 'conc' || h === 'mg_ml') return 'conc';
+  return '';
+}
+
+function vadExcelApplyPaste() {
+  const text = document.getElementById('vad-paste-text')?.value || '';
+  document.getElementById('modal-vad-paste')?.remove();
+  const lines = text.split(/\r?\n/).filter(l => String(l).trim());
+  if (!lines.length) { toast('⚠ Nada que pegar'); return; }
+  const sep = lines[0].indexOf('\t') !== -1 ? '\t' : (lines[0].indexOf(';') !== -1 ? ';' : ',');
+  const firstCells = lines[0].split(sep).map(c=>c.trim());
+  const headerCols = firstCells.map(c => _vadGridColFromHeader(_normHeader(c)));
+  const hasHeader = headerCols.some(Boolean);
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+  const order = ['active','nombres','categoria','subcat','subsubcat','cat_esp','conc','routes','freq','dosis','notes','bibliografia'];
+  let added = 0;
+  dataLines.forEach(line => {
+    const cells = line.split(sep).map(c=>String(c).trim());
+    const mapped = {};
+    if (hasHeader) headerCols.forEach((col, i) => { if (col && cells[i]) mapped[col] = cells[i]; });
+    else order.forEach((key, i) => { if (cells[i]) mapped[key] = cells[i]; });
+    if (!mapped.active && !mapped.nombres && !mapped.categoria) return;
+    addVadExcelRowFromMapped(mapped);
+    added++;
+  });
+  toast(added ? ('✓ ' + added + ' fila(s) agregada(s). Revisa la tabla y dale 💾 Guardar.') : ('⚠ No se reconocieron filas válidas'));
+}
+
+function addVadExcelRow() { addVadExcelRowFromMapped({}); }
+
+function addVadExcelRowFromMapped(m) {
+  const tbody = document.getElementById('vad-excel-tbody');
+  if (!tbody) return;
+  let catLabel = m.categoria || m.category || '';
+  let catKey = '';
+  if (catLabel) {
+    const hit = Object.entries(VADEMECUM_CATS).find(([k,v]) => v.label === catLabel || k === catLabel);
+    if (hit) { catKey = hit[0]; catLabel = hit[1].label; }
+  }
+  tbody.insertAdjacentHTML('beforeend', vadGridRowHtml({
+    active: m.active || '',
+    nombres: (m.nombres||'').split(/[\/;]/).map(x=>x.trim()).filter(Boolean),
+    cat_vad: catKey,
+    category: catLabel,
+    subcat_vad: m.subcat || '',
+    subsubcat_vad: m.subsubcat || '',
+    cat_esp: m.cat_esp || '',
+    route: (m.routes||'').split(/[,;]/)[0]||'',
+    routes: (m.routes||'').split(/[,;]/).map(x=>x.trim()).filter(Boolean),
+    freq: m.freq || '',
+    _conc: m.conc || '',
+    _dosis: m.dosis || '',
+    notes: m.notes || '',
+    _bib: m.bibliografia || ''
+  }));
+}
+
+async function saveVadExcel() {
+  const rows = document.querySelectorAll('#modal-vad-excel tr[data-row]');
+  if (!rows.length) return;
+  const touched = [];
+  let created=0, updated=0, deleted=0, skipped=0, sinCat=0;
+  for (const row of rows) {
+    const id = row.dataset.id || '';
+    const active = (row.querySelector('[data-col="active"]')?.value||'').trim();
+    const nombresRaw = (row.querySelector('[data-col="nombres"]')?.value||'').trim();
+    if (row.querySelector('[data-col="eliminar"]')?.checked && id) {
+      VADEMECUM_DB = VADEMECUM_DB.filter(x => x.id !== id);
+      try { await dbDeleteSync('vademecum', id); } catch(e) {}
+      deleted++;
+      continue;
+    }
+    const nombres = nombresRaw ? nombresRaw.split(/[\/;]/).map(x=>x.trim()).filter(Boolean) : [];
+    if (!active && !nombresRaw) { skipped++; continue; }
+    const catLabel = row.querySelector('[data-col="categoria"]')?.value||'';
+    const subLabel = row.querySelector('[data-col="subcat"]')?.value||'';
+    const ssLabel = row.querySelector('[data-col="subsubcat"]')?.value||'';
+    const cat_esp = (row.querySelector('[data-col="cat_esp"]')?.value||'').trim();
+    const concObjs = vdParseConcStr(row.querySelector('[data-col="conc"]')?.value);
+    const routes = (row.querySelector('[data-col="routes"]')?.value||'').split(/[,;]/).map(x=>x.trim()).filter(Boolean);
+    const freq = (row.querySelector('[data-col="freq"]')?.value||'').trim();
+    const species_doses = vdParseDosisStr(row.querySelector('[data-col="dosis"]')?.value);
+    const notes = (row.querySelector('[data-col="notes"]')?.value||'').trim();
+    const bibliografia = vdParseBibStr(row.querySelector('[data-col="bibliografia"]')?.value);
+    if (!catLabel) sinCat++;
+    const drugData = {
+      drug: nombres[0] || active,
+      nombres: nombres.length ? nombres : (active ? [active] : []),
+      active,
+      cats: catLabel ? [catLabel] : [],
+      category: catLabel,
+      cat_vad: catLabel ? (Object.entries(VADEMECUM_CATS).find(([k,v])=>v.label===catLabel||k===catLabel)?.[0]||'') : '',
+      subcat_vad: subLabel || null,
+      subsubcat_vad: ssLabel || null,
+      cat_esp,
+      conc: concObjs[0]?.val || 0,
+      concs: concObjs,
+      conc_units: concObjs.map(c => c.num + '/' + c.den),
+      route: routes[0] || 'IM',
+      routes: routes.length ? routes : [],
+      freq, notes, bibliografia, species_doses
+    };
+    let target = null;
+    if (id) target = VADEMECUM_DB.find(x => x.id === id);
+    if (!target && active) {
+      const addr = _activeCore(active) || _normActive(active);
+      target = VADEMECUM_DB.find(x => {
+        const c = _activeCore(x.active) || _normActive(x.active);
+        if (addr && c === addr) return true;
+        if (addr && _normActive(x.drug||'') === addr) return true;
+        return (x.nombres||[]).some(n => _normActive(n) === addr);
+      });
+    }
+    if (target) {
+      Object.assign(target, drugData);
+      await dbPutSync('vademecum', target);
+      touched.push(target.id);
+      updated++;
+    } else {
+      const newDrug = { id:'vad_'+Date.now()+'_'+Math.random().toString(36).slice(2,5), ...drugData };
+      VADEMECUM_DB.push(newDrug);
+      await dbPutSync('vademecum', newDrug);
+      touched.push(newDrug.id);
+      created++;
+    }
+  }
+  document.getElementById('modal-vad-excel')?.remove();
+  for (const id of touched) { try { await syncVadToSpecies(id); } catch(e) {} }
+  renderVademecum();
+  const parts=[];
+  if (created) parts.push('Creados '+created);
+  if (updated) parts.push('Actualizados '+updated);
+  if (deleted) parts.push('Eliminados '+deleted);
+  if (skipped) parts.push('Vacías '+skipped);
+  if (sinCat) parts.push('⚠ '+sinCat+' sin categoría (visibles en "Todos" y buscador)');
+  toast((parts.length ? '✓ ' : '⚠ Sin cambios ') + parts.join(' · '));
 }
 
 let _vadCatActiva = '__all__';
@@ -9957,13 +10736,14 @@ function _renderVadCategories(el, isAdmin) {
   el.innerHTML = cats.map(([id, cat]) => {
     const subCount = Object.keys(cat.subcategories||{}).length;
     let drugCount = 0;
-    Object.values(cat.subcategories||{}).forEach(sub => {
+    Object.values(cat.subcategories||{}).forEach((sub, si) => {
+      const subId = Object.keys(cat.subcategories)[si];
       if (sub.subcats && Object.keys(sub.subcats).length) {
         Object.keys(sub.subcats).forEach(ssId => {
-          drugCount += VADEMECUM_DB.filter(d => d.cat_vad === id && d.subcat_vad === sub.label && d.subsubcat_vad === sub.subcats[ssId].label).length;
+          drugCount += VADEMECUM_DB.filter(d => d.cat_vad === id && (d.subcat_vad === sub.label || d.subcat_vad === subId) && d.subsubcat_vad === sub.subcats[ssId].label).length;
         });
       }
-      drugCount += VADEMECUM_DB.filter(d => d.cat_vad === id && d.subcat_vad === sub.label && !d.subsubcat_vad).length;
+      drugCount += VADEMECUM_DB.filter(d => d.cat_vad === id && (d.subcat_vad === sub.label || d.subcat_vad === subId) && !d.subsubcat_vad).length;
     });
     drugCount += VADEMECUM_DB.filter(d => d.cat_vad === id && !d.subcat_vad).length;
     return `
@@ -9994,8 +10774,8 @@ function _renderVadSubcategories(el, isAdmin) {
   const cat = VADEMECUM_CATS[_vadCatActiva];
   if (!cat) { el.innerHTML = '<div class="empty-state"><p>Categoría no encontrada</p></div>'; return; }
   const subcats = _vadSortByNum(Object.entries(cat.subcategories||{}));
-  // Fármacos asignados directamente a la categoría (sin subcategoría)
-  const catDrugs = VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && !d.subcat_vad);
+  // Fármacos de la categoría: directos + los asignados a subcategorías (sin los de sub-subcategorías)
+  const catDrugs = VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && !d.subsubcat_vad);
   let html = '';
   if (subcats.length) {
     html = subcats.map(([id, sub]) => {
@@ -10003,10 +10783,10 @@ function _renderVadSubcategories(el, isAdmin) {
     let drugCount = 0;
     if (hasSubcats) {
       Object.values(sub.subcats).forEach(ss => {
-        drugCount += VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && d.subcat_vad === sub.label && d.subsubcat_vad === ss.label).length;
+        drugCount += VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && (d.subcat_vad === sub.label || d.subcat_vad === id) && d.subsubcat_vad === ss.label).length;
       });
     }
-    drugCount += VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && d.subcat_vad === sub.label && !d.subsubcat_vad).length;
+    drugCount += VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && (d.subcat_vad === sub.label || d.subcat_vad === id) && !d.subsubcat_vad).length;
     return `
     <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.5rem;overflow:hidden">
       <div style="display:flex;align-items:center;gap:.5rem;padding:.6rem .85rem;cursor:pointer" onclick="selectVadSubcategory('${id}')">
@@ -10045,8 +10825,10 @@ function _renderVadSubSubcategories(el, isAdmin) {
   const sub = cat?.subcategories?.[_vadSubcatActiva];
   if (!sub?.subcats) { el.innerHTML = '<div class="empty-state"><p>No hay sub-subcategorías</p></div>'; return; }
   const subsubs = _vadSortByNum(Object.entries(sub.subcats));
-  el.innerHTML = subsubs.map(([id, ss]) => {
-    const drugCount = VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && d.subcat_vad === sub.label && d.subsubcat_vad === ss.label).length;
+  // Fármacos asignados directamente a esta subcategoría (sin sub-subcategoría)
+  const directDrugs = VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && (d.subcat_vad === sub.label || d.subcat_vad === _vadSubcatActiva) && !d.subsubcat_vad);
+  let html = subsubs.map(([id, ss]) => {
+    const drugCount = VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && (d.subcat_vad === sub.label || d.subcat_vad === _vadSubcatActiva) && d.subsubcat_vad === ss.label).length;
     return `
     <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.5rem;overflow:hidden">
       <div style="display:flex;align-items:center;gap:.5rem;padding:.6rem .85rem;cursor:pointer" onclick="selectVadSubSubcategory('${id}')">
@@ -10063,10 +10845,16 @@ function _renderVadSubSubcategories(el, isAdmin) {
         <button onclick="event.stopPropagation();deleteVadSubSubcat('${id}')" class="btn btn-secondary btn-sm" style="font-size:.68rem;color:var(--r5)">✕ Eliminar</button>
       </div>` : ''}
     </div>`;
-  }).join('') + (isAdmin ? `
+  }).join('');
+  if (directDrugs.length) {
+    html += `<div style="font-size:.7rem;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;margin:.75rem 0 .4rem">Fármacos de esta subcategoría</div>`;
+    html += directDrugs.map(d => _buildVadDrugCard(d, isAdmin, true)).join('');
+  }
+  html += isAdmin ? `
     <button onclick="openAddVadSubSubcategory()" class="btn btn-secondary btn-sm" style="width:100%;margin-top:.5rem">
       + Nueva sub-subcategoría
-    </button>` : '');
+    </button>` : '';
+  el.innerHTML = html;
 }
 
 // ── Render: Search (global, shows all instances) ──
@@ -10075,6 +10863,9 @@ function _renderVadSearch(el, isAdmin, q) {
     (d.drug||'').toLowerCase().includes(q) ||
     (d.active||'').toLowerCase().includes(q) ||
     (d.cat_esp||'').toLowerCase().includes(q) ||
+    (d.cat_vad||'').toLowerCase().includes(q) ||
+    (d.subcat_vad||'').toLowerCase().includes(q) ||
+    (d.subsubcat_vad||'').toLowerCase().includes(q) ||
     (d.indic||'').toLowerCase().includes(q) ||
     (d.info||'').toLowerCase().includes(q) ||
     (d.mech||'').toLowerCase().includes(q) ||
@@ -10085,7 +10876,14 @@ function _renderVadSearch(el, isAdmin, q) {
     (d.cats||[]).some(cc=>cc.toLowerCase().includes(q)) ||
     (d.species_doses||[]).some(s=>
       (s.species||'').toLowerCase().includes(q) ||
-      (s.sci||'').toLowerCase().includes(q)
+      (s.sci||'').toLowerCase().includes(q) ||
+      (s.dosis||[]).some(de=>{
+        const ft = de.fuente;
+        return ft && ((ft.text||vdBibTitulo(ft)||'')).toLowerCase().includes(q);
+      })
+    ) ||
+    (d.bibliografia||[]).some(b =>
+      ((b.text||'')+(b.kind==='bib'?vdBibTitulo(b):'')).toLowerCase().includes(q)
     )
   );
   items.sort((a,b) => (a.drug||'').localeCompare(b.drug||'', 'es'));
@@ -10188,7 +10986,7 @@ function _buildVadDrugCard(d, isAdmin, showBreadcrumb) {
         <div style="font-size:.9rem;font-weight:700;color:var(--txt)">${displayName}</div>
         ${d.active?`<div style="font-size:.72rem;color:var(--txt3);font-style:italic">${d.active}</div>`:''}
         ${d.cat_esp?`<span style="font-size:.65rem;background:var(--g0);color:var(--g7);border-radius:20px;padding:.05rem .3rem">${d.cat_esp}</span>`:''}
-        ${(d.concs?.length||d.conc)?`<span style="font-size:.65rem;color:var(--txt3);margin-left:.3rem">${(d.concs?.length ? d.concs.join('/') : d.conc)+' mg/ml'}</span>`:''}
+        ${(d.concs?.length||d.conc)?`<span style="font-size:.65rem;color:var(--txt3);margin-left:.3rem">${vdConcsShort(d)}</span>`:''}
         ${(d.routes?.length||d.route)?`<span style="font-size:.65rem;color:var(--txt3);margin-left:.3rem">· ${(d.routes?.length ? d.routes.join(', ') : d.route)}</span>`:''}
         ${d.freq?`<span style="font-size:.65rem;color:var(--g6);margin-left:.3rem">· ${d.freq}</span>`:''}
       </div>
@@ -10209,7 +11007,7 @@ function _buildVadDrugCard(d, isAdmin, showBreadcrumb) {
     </div>
     <div id="vd-panel-${d.id}" style="display:none;border-top:1px solid var(--bor)">
       <div style="padding:.5rem .85rem;display:grid;gap:.2rem">
-        ${(d.concs?.length||d.conc)?`<p style="margin:0;font-size:.8rem"><strong>Concentración:</strong> ${(d.concs?.length ? d.concs.map(c=>c+' mg/ml').join(', ') : d.conc+' mg/ml')}</p>`:''}
+        ${(d.concs?.length||d.conc)?`<p style="margin:0;font-size:.8rem"><strong>Concentración:</strong> ${vdConcListLabel(d)}</p>`:''}
         ${(d.routes?.length||d.route)?`<p style="margin:0;font-size:.8rem"><strong>Vías de administración:</strong> ${(d.routes?.length ? d.routes.join(', ') : d.route||'—')}</p>`:''}
         ${d.freq?`<p style="margin:0;font-size:.8rem"><strong>Frecuencia:</strong> ${d.freq}</p>`:''}
         ${d.indic?`<p style="margin:0;font-size:.8rem;color:var(--txt2)"><strong style="color:var(--g6)">✅ Indicaciones:</strong> ${d.indic}</p>`:''}
@@ -10220,6 +11018,7 @@ function _buildVadDrugCard(d, isAdmin, showBreadcrumb) {
         ${d.keywords?.length?`<div style="margin-top:.25rem;display:flex;flex-wrap:wrap;gap:.2rem">${d.keywords.map(k=>`<span style="font-size:.65rem;background:var(--g0);color:var(--g6);border:1px solid var(--g4);border-radius:20px;padding:.05rem .4rem">#${k}</span>`).join('')}</div>`:''}
         ${d.info?`<p style="margin:0;font-size:.78rem;color:var(--txt3)"><strong>Efectos adversos:</strong> ${d.info}</p>`:''}
         ${d.notes?`<p style="margin:0;font-size:.78rem;color:var(--txt3);font-style:italic">📋 ${d.notes}</p>`:''}
+        ${d.bibliografia?.length?`<p style="margin:0;font-size:.78rem"><strong>📚 Bibliografía:</strong></p><div style="display:flex;flex-wrap:wrap;gap:.15rem">${d.bibliografia.map(b=>vdBibChipHtml(b)).join(' ')}</div>`:''}
       </div>
       <div style="padding:.4rem .85rem .6rem;background:var(--sur2);border-top:1px solid var(--bor)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem">
@@ -10234,27 +11033,41 @@ function _buildVadDrugCard(d, isAdmin, showBreadcrumb) {
               <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--txt3)">Mín</th>
               <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--g6);font-weight:700">Rec.</th>
               <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--txt3)">Máx</th>
+              <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--txt3)">Unidad</th>
+              <th style="padding:.25rem .4rem;text-align:left;border-bottom:1px solid var(--bor);color:var(--txt3)">Fuente</th>
               <th style="padding:.25rem .4rem;text-align:left;border-bottom:1px solid var(--bor);color:var(--txt3)">Vía(s)</th>
               <th style="padding:.25rem .4rem;text-align:left;border-bottom:1px solid var(--bor);color:var(--txt3)">Frecuencia</th>
               <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--g6)">Resultado</th>
             </tr></thead>
             <tbody>
-              ${doses.map((s,si) => {
-                const spWeight = SPECIES_DB.find(sp => sp.name?.toLowerCase() === (s.species||'').split('(')[0].trim().toLowerCase())?.weight_avg || 0;
-                const vol = (spWeight && s.dose && d.conc) ? (spWeight * s.dose / d.conc).toFixed(2) + ' ml' : '—';
-                return `<tr style="border-bottom:1px solid var(--bor)">
-                  <td style="padding:.3rem .4rem">
-                    <div style="font-weight:600;font-size:.8rem">${(s.species||'').split('(')[0].trim()}</div>
-                    ${s.sci?`<div style="font-size:.65rem;color:var(--txt3);font-style:italic">${s.sci}</div>`:''}
-                  </td>
-                  <td style="padding:.3rem .4rem;text-align:center;color:var(--txt3);font-family:var(--mono)">${s.dose_min||'—'}</td>
-                  <td style="padding:.3rem .4rem;text-align:center;font-weight:700;color:var(--g5);font-family:var(--mono)">${s.dose||'—'}</td>
-                  <td style="padding:.3rem .4rem;text-align:center;color:var(--txt3);font-family:var(--mono)">${s.dose_max||'—'}</td>
-                  <td style="padding:.3rem .4rem;font-size:.72rem">${(s.routes?.length ? s.routes.join(', ') : s.route||'—')}</td>
-                  <td style="padding:.3rem .4rem;font-size:.75rem">${s.freq||'—'}</td>
-                  <td style="padding:.3rem .4rem;text-align:center;font-size:.72rem;color:var(--g6)">${vol}</td>
-                </tr>`;
-              }).join('')}
+              ${(function(){
+                const rows = [];
+                doses.forEach(s => {
+                  const entries = (Array.isArray(s.dosis) && s.dosis.length) ? s.dosis : [{min:s.dose_min, rec:s.dose, max:s.dose_max, unit:s.dose_unit||'mg/kg', fuente:null}];
+                  entries.forEach(de => {
+                    const doseUnit = de.unit || 'mg/kg';
+                    const concP = vdParseConc(d.conc) || vdParseConc((d.concs||[])[0]) || null;
+                    const spWeight = SPECIES_DB.find(sp => sp.name?.toLowerCase() === (s.species||'').split('(')[0].trim().toLowerCase())?.weight_avg || 0;
+                    const vol = (spWeight && de.rec && concP && doseUnit === 'mg/kg' && concP.num === 'mg')
+                      ? (spWeight * de.rec / concP.val).toFixed(2) + ' ml' : '—';
+                    rows.push(`<tr style="border-bottom:1px solid var(--bor)">
+                      <td style="padding:.3rem .4rem">
+                        <div style="font-weight:600;font-size:.8rem">${(s.species||'').split('(')[0].trim()}</div>
+                        ${s.sci?`<div style="font-size:.65rem;color:var(--txt3);font-style:italic">${s.sci}</div>`:''}
+                      </td>
+                      <td style="padding:.3rem .4rem;text-align:center;color:var(--txt3);font-family:var(--mono)">${vddFmt(de.min)}</td>
+                      <td style="padding:.3rem .4rem;text-align:center;font-weight:700;color:var(--g5);font-family:var(--mono)">${vddFmt(de.rec)}</td>
+                      <td style="padding:.3rem .4rem;text-align:center;color:var(--txt3);font-family:var(--mono)">${vddFmt(de.max)}</td>
+                      <td style="padding:.3rem .4rem;text-align:center;font-size:.7rem;color:var(--g6)">${doseUnit}</td>
+                      <td style="padding:.3rem .4rem;font-size:.7rem">${de.fuente ? vdBibChipHtml(de.fuente) : '—'}</td>
+                      <td style="padding:.3rem .4rem;font-size:.72rem">${(s.routes?.length ? s.routes.join(', ') : s.route||'—')}</td>
+                      <td style="padding:.3rem .4rem;font-size:.75rem">${s.freq||'—'}</td>
+                      <td style="padding:.3rem .4rem;text-align:center;font-size:.72rem;color:var(--g6)">${vol}</td>
+                    </tr>`);
+                  });
+                });
+                return rows.join('');
+              })()}
             </tbody>
           </table>
         </div>` : `<p style="font-size:.78rem;color:var(--txt3);font-style:italic">Sin dosis registradas</p>`}
@@ -11252,6 +12065,216 @@ function hcConcChanged(sel) {
   if (du) du.textContent = num ? '('+num+'/kg)' : '';
   calcTreatDose(sel);
 }
+// ═══════════════════════════════════
+// Vademécum: unidades de concentración y dosis por especie
+// ═══════════════════════════════════
+const VD_DOSE_UNITS = ['mg/kg','ml/kg','µg/kg','mg/m²','ml/m²','mg/animal','ml/animal','g/kg','UI/kg','mmol/kg','mEq/kg','mcg/kg','mg','ml','g','UI'];
+let VD_DOSE_UNITS_EXTRA = [];
+try { const saved = JSON.parse(localStorage.getItem('vd_dose_units_extra')||'[]'); if (Array.isArray(saved)) VD_DOSE_UNITS_EXTRA = saved; } catch(e) {}
+function vdSaveDoseUnits() { try { localStorage.setItem('vd_dose_units_extra', JSON.stringify(VD_DOSE_UNITS_EXTRA)); } catch(e) {} }
+
+function vdConcLabel(c) {
+  if (typeof c === 'number') return c + ' mg/ml';
+  if (c && typeof c === 'object' && c.val != null) return c.val + ' ' + (c.num||'mg') + '/' + (c.den||'ml');
+  return String(c || '');
+}
+
+function vdConcOptsStr(which, selected) {
+  const sel = String(selected||'').toLowerCase();
+  const defs = which === 'num' ? ['mg','µg','UI','g','mEq','mcg','mmol'] : ['ml','tab','cap','got','sachet','ampolla','frasco','parche'];
+  const extra = HC_UNITS_EXTRA[which] || [];
+  const all = [...defs, ...extra];
+  const ph = which === 'num' ? 'mg/µg/UI...' : 'ml/tab/cap...';
+  return '<option value="">' + ph + '</option>' +
+    all.map(u => '<option value="' + u + '"' + (u.toLowerCase() === sel ? ' selected' : '') + '>' + u + '</option>').join('');
+}
+
+function vdAddConcUnit(btn, which) {
+  const u = (prompt(which === 'num' ? 'Nueva unidad numerador (ej: mmol, mEq):' : 'Nueva unidad denominador (ej: ampolla, frasco):') || '').trim();
+  if (!u) return;
+  const list = HC_UNITS_EXTRA[which] || (HC_UNITS_EXTRA[which] = []);
+  if (list.some(x => x.toLowerCase() === u.toLowerCase())) { toast('⚠ Esa unidad ya existe'); return; }
+  list.push(u);
+  hcSaveUnits();
+  document.querySelectorAll('.vd-conc-' + which).forEach(sel => {
+    const keep = sel.value;
+    sel.innerHTML = vdConcOptsStr(which, keep);
+  });
+  toast('✓ Unidad ' + u + ' agregada');
+}
+
+function vdDoseUnitOpts(selected) {
+  const sel = String(selected||'').toLowerCase();
+  return '<option value="">mg/kg</option>' +
+    [...VD_DOSE_UNITS, ...VD_DOSE_UNITS_EXTRA].map(u => '<option value="' + u + '"' + (u.toLowerCase() === sel ? ' selected' : '') + '>' + u + '</option>').join('') +
+    '<option value="__custom__">+ Otra...</option>';
+}
+
+function vdDoseUnitChanged(sel) {
+  if (sel.value === '__custom__') {
+    const custom = (prompt('Unidad de dosis (ej: mg/m², UI/kg, µg/kg):') || '').trim();
+    if (!custom) { sel.value = ''; return; }
+    if (!VD_DOSE_UNITS.includes(custom) && !VD_DOSE_UNITS_EXTRA.some(x => x.toLowerCase() === custom.toLowerCase())) {
+      VD_DOSE_UNITS_EXTRA.push(custom);
+      vdSaveDoseUnits();
+    }
+    const opt = document.createElement('option');
+    opt.value = custom;
+    opt.textContent = custom;
+    sel.insertBefore(opt, sel.querySelector('[value="__custom__"]'));
+    sel.value = custom;
+  }
+}
+
+function vdParseConc(c) {
+  if (c == null) return null;
+  if (typeof c === 'object' && c.val != null) return { val: parseFloat(c.val) || 0, num: c.num || 'mg', den: c.den || 'ml' };
+  const n = parseFloat(c);
+  if (isNaN(n) || n <= 0) return null;
+  return { val: n, num: 'mg', den: 'ml' };
+}
+
+function vdConcsArr(d) {
+  const arr = d.concs?.length ? d.concs : (d.conc ? [d.conc] : []);
+  return arr.map(c => vdParseConc(c)).filter(Boolean);
+}
+
+function vdConcsShort(d) {
+  const parts = vdConcsArr(d);
+  if (!parts.length) return '';
+  const vals = parts.map(p => p.val).join('/');
+  const u = parts[0].num + '/' + parts[0].den;
+  return vals + ' ' + u;
+}
+
+function vdConcListLabel(d) {
+  const parts = vdConcsArr(d);
+  if (!parts.length) return '';
+  return parts.map(p => p.val + ' ' + p.num + '/' + p.den).join(', ');
+}
+// ═══════════════════════════════════
+// Vademécum: bibliografía por fármaco y fuente por dosis
+// ═══════════════════════════════════
+function vdEsc(s) { return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function vdBibSelVal(b) {
+  if (!b) return '';
+  if (b.kind === 'url') return '__url__';
+  if (b.kind === 'bib') return 'bib::' + (b.spKey||'') + '::' + (b.idx||0);
+  return '';
+}
+
+function vdBibLibOptions(srcOrVal) {
+  const sel = (typeof srcOrVal === 'object' && srcOrVal) ? vdBibSelVal(srcOrVal) : String(srcOrVal||'');
+  let opts = '<option value="">— Sin fuente —</option>';
+  opts += '<option value="__url__"' + (sel === '__url__' ? ' selected' : '') + '>🔗 Link / cita manual…</option>';
+  (BIBLIOTECA_GENERAL||[]).forEach((r,i) => {
+    const v = 'bib::::' + i;
+    opts += '<option value="' + v + '"' + (sel === v ? ' selected' : '') + '>📚 ' + vdEsc(r.titulo||'Referencia general ' + i) + '</option>';
+  });
+  (SPECIES_DB||[]).forEach(sp => {
+    ((BIBLIOTECA_DB||{})[sp.id]||[]).forEach((r,idx) => {
+      const v = 'bib::' + sp.id + '::' + idx;
+      opts += '<option value="' + v + '"' + (sel === v ? ' selected' : '') + '>📚 [' + vdEsc(sp.name||sp.id) + '] ' + vdEsc(r.titulo||'Referencia ' + idx) + '</option>';
+    });
+  });
+  return opts;
+}
+
+function vdBibReadSel(container) {
+  const sel = container.querySelector('.vdbib-sel, .vdsd-fuente');
+  if (!sel || !sel.value) return null;
+  if (sel.value === '__url__') {
+    const t = (container.querySelector('.vdbib-url, .vdsd-fuente-url')?.value||'').trim();
+    return t ? { kind:'url', text: t } : null;
+  }
+  const m = String(sel.value).match(/^bib::(.*)::(\d+)$/);
+  if (m) return { kind:'bib', spKey: m[1], idx: parseInt(m[2],10) || 0 };
+  return null;
+}
+
+function vdBibTitulo(b) {
+  if (!b) return '';
+  if (b.kind === 'url') return String(b.text||'');
+  const spKey = String(b.spKey||'');
+  const refs = spKey ? (BIBLIOTECA_DB||{})[spKey] : BIBLIOTECA_GENERAL;
+  const r = (refs||[])[b.idx];
+  if (!r) {
+    const spName = spKey ? (SPECIES_DB.find(s=>s.id===spKey)?.name || spKey) : '';
+    return 'Referencia ' + (spName ? '[' + spName + '] ' : 'general ') + '#' + (b.idx??0);
+  }
+  const spName = spKey ? SPECIES_DB.find(s=>s.id===spKey)?.name : '';
+  return (r.titulo||'Sin título') + (spName ? ' · ' + spName : '');
+}
+
+function vdBibChipHtml(b) {
+  if (!b) return '';
+  if (b.kind === 'url') {
+    const t = String(b.text||'');
+    const isUrl = /^https?:\/\//i.test(t.trim());
+    const inner = isUrl
+      ? `<a href="${vdEsc(t)}" target="_blank" rel="noopener noreferrer" style="color:var(--bl);word-break:break-all">🔗 ${vdEsc(t)}</a>`
+      : `<span>📄 ${vdEsc(t)}</span>`;
+    return `<span style="display:inline-block;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);padding:.05rem .35rem;font-size:.72rem;margin:.1rem 0">${inner}</span>`;
+  }
+  if (b.kind === 'bib') {
+    const spKey = String(b.spKey||'').replace(/'/g,"\\'");
+    const titulo = vdBibTitulo(b);
+    return `<span style="display:inline-block;background:var(--g0);border:1px solid var(--g4);border-radius:var(--rxs);padding:.05rem .35rem;font-size:.72rem;margin:.1rem 0;cursor:pointer" onclick="openRefView('${spKey}',${b.idx||0});return false">📚 ${vdEsc(titulo)}</span>`;
+  }
+  return '';
+}
+
+function vdBibRowHtml(b) {
+  const isUrl = b && b.kind === 'url';
+  return `<div class="vd-bib-row" style="display:flex;gap:.25rem;align-items:center;margin-bottom:.25rem;flex-wrap:wrap">
+      <select class="form-control vdbib-sel" onchange="vdBibMode(this)" style="flex:1 1 180px;font-size:.72rem;min-width:0">${vdBibLibOptions(b)}</select>
+      <input class="form-control vdbib-url" placeholder="Pega un enlace (https://...) o una cita corta..." value="${isUrl?vdEsc(b.text||''):''}" style="flex:1 1 180px;font-size:.72rem;display:${isUrl?'block':'none'}">
+      <button onclick="this.closest('.vd-bib-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.15rem .35rem;font-size:.65rem;flex-shrink:0">✕</button>
+    </div>`;
+}
+
+function addVdBibRow() {
+  const list = document.getElementById('vd-bib-list');
+  if (list) list.insertAdjacentHTML('beforeend', vdBibRowHtml(null));
+}
+
+function vdBibMode(sel) {
+  const cont = sel.closest('.vd-bib-row, .vdsd-entry');
+  const urlInp = cont?.querySelector('.vdbib-url, .vdsd-fuente-url');
+  if (urlInp) urlInp.style.display = sel.value === '__url__' ? 'block' : 'none';
+}
+
+function vdDoseEntriesOf(s) {
+  if (Array.isArray(s.dosis)) return s.dosis.length ? s.dosis : [{}];
+  return [{ min: s.dose_min || '', rec: s.dose || '', max: s.dose_max || '', unit: s.dose_unit || 'mg/kg', fuente: null }];
+}
+
+function vddEntryHtml(de) {
+  de = de || {};
+  const isUrl = de.fuente && de.fuente.kind === 'url';
+  return `<div class="vdsd-entry" style="background:var(--sur);border:1px dashed var(--bor);border-radius:var(--rxs);padding:.35rem;margin-bottom:.3rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.25rem">
+        <div><label style="font-size:.6rem;color:var(--txt3)">Dosis mín</label><input class="form-control vdsd-min" type="number" step="0.001" value="${de.min||''}" placeholder="1" style="font-size:.72rem"></div>
+        <div><label style="font-size:.6rem;color:var(--txt3)">Dosis rec.</label><input class="form-control vdsd-rec" type="number" step="0.001" value="${de.rec||''}" placeholder="2" style="font-size:.72rem"></div>
+        <div><label style="font-size:.6rem;color:var(--txt3)">Dosis máx</label><input class="form-control vdsd-max" type="number" step="0.001" value="${de.max||''}" placeholder="4" style="font-size:.72rem"></div>
+        <div><label style="font-size:.6rem;color:var(--txt3)">Unidad</label><select class="form-control vdsd-unit" onchange="vdDoseUnitChanged(this)" style="font-size:.7rem;min-width:0">${vdDoseUnitOpts(de.unit||'')}</select></div>
+      </div>
+      <div style="display:flex;gap:.25rem;margin-top:.25rem;align-items:center;flex-wrap:wrap">
+        <label style="font-size:.6rem;color:var(--txt3);flex-shrink:0">Fuente</label>
+        <select class="form-control vdsd-fuente" onchange="vdBibMode(this)" style="flex:1 1 150px;font-size:.68rem;min-width:0">${vdBibLibOptions(de.fuente)}</select>
+        <input class="form-control vdsd-fuente-url" placeholder="Pega un enlace o una cita de la fuente..." value="${isUrl?vdEsc(de.fuente.text||''):''}" style="flex:1 1 150px;font-size:.68rem;display:${isUrl?'block':'none'}">
+        <button onclick="this.closest('.vdsd-entry').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.15rem .35rem;font-size:.65rem;flex-shrink:0">✕</button>
+      </div>
+    </div>`;
+}
+
+function addVdsdEntry(row) {
+  const list = row?.closest?.('.vd-sp-row')?.querySelector('.vdsd-entries');
+  if (list) list.insertAdjacentHTML('beforeend', vddEntryHtml(null));
+}
+
+function vddFmt(v) { return (v === '' || v == null || v === 0) ? '—' : v; }
 // ═══════════════════════════════════
 // CAMBIO 8: fila de tratamiento rediseñada
 // ═══════════════════════════════════
@@ -12732,9 +13755,9 @@ function refPdfButtons(r, spKey, idx) {
   if (!src) {
     return `<span style="font-size:.68rem;color:var(--txt3);font-style:italic">📄 ${r.pdf.name||'PDF'} — solo en este dispositivo</span>`;
   }
-  const view = `<button onclick="viewPdfFromRef('${spKey}',${idx})"
+  const view = `<button onclick="event.stopPropagation();viewPdfFromRef('${spKey}',${idx})"
        style="font-size:.7rem;color:var(--g6);background:var(--g0);border:1px solid var(--g4);border-radius:var(--rxs);padding:.15rem .45rem;cursor:pointer;display:inline-flex;align-items:center;gap:.2rem">👁 Ver PDF</button>`;
-  const dl = `<button onclick="downloadPdfFromRef('${spKey}',${idx})"
+  const dl = `<button onclick="event.stopPropagation();downloadPdfFromRef('${spKey}',${idx})"
       style="font-size:.7rem;color:var(--bl);background:var(--b0,#eff6ff);border:1px solid var(--bl);border-radius:var(--rxs);padding:.15rem .45rem;cursor:pointer;display:inline-flex;align-items:center;gap:.2rem">⬇ Descargar</button>`;
   return `<span style="display:inline-flex;gap:.3rem;align-items:center;flex-wrap:wrap">${view}${dl}</span>`;
 }
@@ -12932,28 +13955,113 @@ function bibRefCardHTML(r, spKey, realIdx, isAdmin, accent) {
     ? `onclick="openEditRefGeneral(${realIdx})"`
     : `onclick="openEditRef('${spKey}',${realIdx})"`;
   const del = spKey === ''
-    ? `onclick="removeRefGeneral(${realIdx})"`
-    : `onclick="removeRef('${spKey}',${realIdx})"`;
+    ? `onclick="event.stopPropagation();removeRefGeneral(${realIdx})"`
+    : `onclick="event.stopPropagation();removeRef('${spKey}',${realIdx})"`;
   return `
-    <div style="padding:.4rem .5rem;border-left:3px solid ${accent};margin-bottom:.4rem;background:var(--sur2);border-radius:0 var(--rxs) var(--rxs) 0">
+    <div onclick="openRefView('${spKey}',${realIdx})" title="Ver ficha de la referencia"
+      style="padding:.4rem .5rem;border-left:3px solid ${accent};margin-bottom:.4rem;background:var(--sur2);border-radius:0 var(--rxs) var(--rxs) 0;cursor:pointer">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="flex:1">
           <div style="font-size:.82rem;font-weight:600">${r.titulo||'Sin título'}</div>
           ${r.autores?`<div style="font-size:.75rem;color:var(--txt3)">${r.autores}${r.año?' · '+r.año:''}</div>`:''}
           <div style="display:flex;gap:.35rem;flex-wrap:wrap;align-items:center;margin-top:.2rem">
             ${chips.join('')}
-            ${r.url?`<a href="${r.url}" target="_blank" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
+            ${r.url?`<a href="${r.url}" target="_blank" onclick="event.stopPropagation()" style="font-size:.65rem;color:var(--g6)">🔗 Ver</a>`:''}
             ${r.pdf ? refPdfButtons(r, spKey, realIdx) : ''}
           </div>
           ${r.notas?`<div style="font-size:.68rem;color:var(--txt3);margin-top:.2rem">${r.notas}</div>`:''}
         </div>
         <div style="display:flex;gap:.3rem;flex-shrink:0">
-          <button onclick="bibToggleFav('${spKey}',${realIdx})" title="${r.fav?'Quitar de favoritas':'Marcar como favorita'}" style="background:none;border:none;cursor:pointer;font-size:.85rem;color:${r.fav?'var(--am)':'var(--txt3)'}">${r.fav?'★':'☆'}</button>
+          <button onclick="event.stopPropagation();bibToggleFav('${spKey}',${realIdx})" title="${r.fav?'Quitar de favoritas':'Marcar como favorita'}" style="background:none;border:none;cursor:pointer;font-size:.85rem;color:${r.fav?'var(--am)':'var(--txt3)'}">${r.fav?'★':'☆'}</button>
           ${isAdmin?`<button ${edit} style="background:none;border:none;color:var(--g6);cursor:pointer;font-size:.75rem">✏️</button>`:''}
           ${isAdmin?`<button ${del} style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.75rem">✕</button>`:''}
         </div>
       </div>
     </div>`;
+}
+
+// ── Panel de vista de referencia (click en una referencia guardada) ──
+// Muestra toda la información ordenada + botones Ver/Descargar (PDF), conservando
+// intacto el panel de agregar/editar (ref-modal).
+function openRefView(spKey, idx) {
+  const refs = spKey === '' ? BIBLIOTECA_GENERAL : (BIBLIOTECA_DB[spKey]||[]);
+  const r = refs[idx];
+  if (!r) return;
+  const isAdmin = currentUser?.role === 'admin';
+  const isGeneral = spKey === '';
+  const categoria = getRefCategoria(r);
+  const catIcons = { 'Vademécums':'📖','Enfermedades':'🦠','Fármacos':'💊','Papers':'📄','Radiología':'🩻','Guías':'🏥' };
+  const spLabel = isGeneral ? null : (SPECIES_DB.find(s=>s.id===spKey)?.name || spKey);
+
+  // PDF block (Ver/Descargar) — sin almacenamiento: aviso de solo local
+  let pdfBlock = `<div style="margin-top:.7rem;padding:.55rem .6rem;background:var(--g0);border:1px solid var(--bor);border-radius:var(--rxs)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap">
+        <div style="min-width:0">
+          <div style="font-size:.72rem;color:var(--g7);font-weight:600">📎 ${r.pdf?.name || 'PDF adjunto'}</div>
+          ${r.pdf && !(r.pdf.url||r.pdf.data) ? `<div style="font-size:.65rem;color:var(--txt3);font-style:italic">Solo en este dispositivo</div>` : ''}
+        </div>
+        ${r.pdf && (r.pdf.url||r.pdf.data) ? `<div style="display:flex;gap:.4rem">
+          <button onclick="viewPdfFromRef('${spKey}',${idx})" class="btn btn-secondary btn-sm">👁 Ver PDF</button>
+          <button onclick="downloadPdfFromRef('${spKey}',${idx})" class="btn btn-primary btn-sm">⬇ Descargar</button>
+        </div>` : `<span style="font-size:.82rem">📕</span>`}
+      </div>
+    </div>`;
+
+  const metaRows = [];
+  if (r.subject)     metaRows.push(`<span title="Materia / Asunto" style="font-size:.68rem;background:var(--g1);color:var(--g7);padding:.05rem .4rem;border-radius:var(--rxs)">🏷 ${r.subject}</span>`);
+  if (r.keywords)    metaRows.push(`<span title="Palabras clave" style="font-size:.68rem;background:var(--g1);color:var(--g7);padding:.05rem .4rem;border-radius:var(--rxs)">🔑 ${r.keywords}</span>`);
+  if (r.numPages)    metaRows.push(`<span title="Páginas" style="font-size:.68rem;background:var(--g0);color:var(--g6);padding:.05rem .4rem;border-radius:var(--rxs)">📄 ${r.numPages} pág.</span>`);
+  if (r.producer)    metaRows.push(`<span title="Productor" style="font-size:.68rem;background:var(--g0);color:var(--g6);padding:.05rem .4rem;border-radius:var(--rxs)">🖨 ${r.producer}</span>`);
+  if (r.creator)     metaRows.push(`<span title="Creador" style="font-size:.68rem;background:var(--g0);color:var(--g6);padding:.05rem .4rem;border-radius:var(--rxs)">👤 ${r.creator}</span>`);
+  if (r.modYear)     metaRows.push(`<span title="Año de modificación" style="font-size:.68rem;background:var(--g0);color:var(--g6);padding:.05rem .4rem;border-radius:var(--rxs)">📅 ${r.modYear}</span>`);
+
+  document.getElementById('ref-view-modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="ref-view-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;margin-bottom:.6rem">
+          <div style="min-width:0">
+            <div style="font-weight:700;font-size:.95rem;line-height:1.25">${catIcons[categoria]||'📚'} ${r.titulo||'Sin título'}</div>
+            ${r.autores||r.año?`<div style="font-size:.8rem;color:var(--txt3);margin-top:.15rem">${[r.autores, r.año].filter(Boolean).join(' · ')||''}</div>`:''}
+          </div>
+          <button onclick="document.getElementById('ref-view-modal').remove()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;padding:.1rem .4rem;flex-shrink:0">✕</button>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:.55rem;font-size:.82rem">
+          ${spLabel?`<div><span style="color:var(--txt3)">Especie:</span> 🐾 <b>${spLabel}</b></div>`:''}
+          <div><span style="color:var(--txt3)">Categoría:</span> <b>${categoria}</b></div>
+          ${r.url?`<div><span style="color:var(--txt3)">Enlace:</span> <a href="${r.url}" target="_blank" rel="noopener noreferrer" style="color:var(--bl);word-break:break-all">${r.url}</a></div>`:''}
+          ${r.notas?`<div><span style="color:var(--txt3)">Notas:</span><div style="background:var(--sur2);border-radius:var(--rxs);padding:.5rem .6rem;margin-top:.25rem;white-space:pre-wrap;font-size:.8rem">${r.notas}</div></div>`:''}
+        </div>
+
+        ${metaRows.length?`<div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.6rem">${metaRows.join('')}</div>`:''}
+        ${r.pdf ? pdfBlock : `<div style="margin-top:.7rem;padding:.55rem .6rem;background:var(--g0);border:1px solid var(--bor);border-radius:var(--rxs);font-size:.72rem;color:var(--txt3)">Sin PDF adjunto.</div>`}
+
+        <div style="display:flex;gap:.5rem;margin-top:.9rem;align-items:center;flex-wrap:wrap">
+          <button onclick="bibToggleFavView('${spKey}',${idx})" class="btn btn-secondary btn-sm">${r.fav?'⭐ Quitar de favoritas':'☆ Marcar como favorita'}</button>
+          ${isAdmin?`<button onclick="editRefView('${spKey}',${idx})" class="btn btn-secondary btn-sm" style="flex:1">✏️ Editar</button>`:''}
+          ${isAdmin?`<button onclick="removeRefView('${spKey}',${idx})" class="btn btn-danger btn-sm" style="color:var(--r5)">🗑 Eliminar</button>`:''}
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('ref-view-modal').remove()">Cerrar</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+async function bibToggleFavView(spKey, idx) {
+  await bibToggleFav(spKey, idx);
+  openRefView(spKey, idx);
+}
+
+function editRefView(spKey, idx) {
+  document.getElementById('ref-view-modal')?.remove();
+  if (spKey === '') openEditRefGeneral(idx);
+  else openEditRef(spKey, idx);
+}
+
+async function removeRefView(spKey, idx) {
+  document.getElementById('ref-view-modal')?.remove();
+  if (spKey === '') await removeRefGeneral(idx);
+  else await removeRef(spKey, idx);
 }
 
 // ── Búsqueda global, orden y favoritas ──
@@ -13943,6 +15051,22 @@ function getSpeciesHistory() {
   // Desde fichas de especies (SPECIES_DB)
   SPECIES_DB.forEach(sp => {
     if (sp.name) map[sp.name.toLowerCase()] = { nombre: sp.name, sci: sp.sci||'' };
+  });
+  // Desde dietas guardadas (historial de nutrición)
+  (DIETAS_GUARDADAS||[]).forEach(d => {
+    if (d.especie) map[d.especie.toLowerCase()] = { nombre: d.especie, sci: d.sci||'' };
+  });
+  // Desde enfermedades pendientes por especie
+  Object.keys(ENFERMEDADES_PENDIENTES||{}).forEach(nombreEsp => {
+    if (nombreEsp) map[String(nombreEsp).toLowerCase()] = { nombre: nombreEsp, sci: '' };
+  });
+  // Desde pacientes de historias clínicas
+  (clinicalRecords||[]).forEach(r => {
+    if (r.species) map[r.species.toLowerCase()] = { nombre: r.species, sci: r.sci||'' };
+  });
+  // Desde cálculos de tratamientos guardados
+  (_txHistory||[]).forEach(h => {
+    if (h.especie) map[h.especie.toLowerCase()] = { nombre: h.especie, sci: h.sci||'' };
   });
   return Object.values(map).sort((a,b) => a.nombre.localeCompare(b.nombre));
 }
@@ -17776,8 +18900,9 @@ function _enf_addSignosBulk() {
 
 
 
-function _enf_updateSubtipo(tipo) {
-  const sel = document.getElementById('enf-subtipo');
+function _enf_updateSubtipo(tipo, pf) {
+  pf = pf || _enf_pf();
+  const sel = document.getElementById(pf+'-subtipo');
   if (!sel) return;
   const prev = sel.value;
   sel.innerHTML = _enf_causaOptionsHTML(prev);
@@ -18322,6 +19447,7 @@ function openNuevaEnfGen() {
 
 function openAddEnfGen(sistId, editIdx=-1) {
   _enf_seedHistories();
+  window._enfActivePf = 'enfgen';
   document.getElementById('enfgen-add-modal')?.remove();
   const claseData = ENFERMEDADES_GENERALES[_enfGenClaseActiva] || {};
   const editEnf   = editIdx >= 0 ? claseData.sistemas?.[sistId]?.enfermedades?.[editIdx] : null;
@@ -18359,15 +19485,15 @@ function openAddEnfGen(sistId, editIdx=-1) {
           <div style="display:flex;gap:.3rem;align-items:flex-end">
             <div style="flex:1">
               <div style="font-size:.65rem;font-weight:600;color:var(--txt2);display:block;margin-bottom:.15rem">Causa / Etiología</div>
-              <select id="enf-subtipo" class="form-control" style="font-size:.82rem" onchange="_enf_subtipoChanged(this.value)">
+              <select id="enfgen-subtipo" class="form-control" style="font-size:.82rem" onchange="_enf_subtipoChanged(this.value)">
                 ${_enf_causaOptionsHTML(editEnf?.subtipo||'')}
               </select>
             </div>
             <button class="btn btn-secondary btn-sm" style="font-size:.68rem" onclick="openEnfCausaHistorial()" title="Ver causas personalizadas guardadas">📋 Historial causas</button>
           </div>
-          <div id="enf-causa-nueva-wrap" style="display:none;margin-top:.3rem">
+          <div id="enfgen-causa-nueva-wrap" style="display:none;margin-top:.3rem">
             <div style="display:flex;gap:.3rem">
-              <input id="enf-causa-nueva" class="form-control" placeholder="Escribe la nueva causa..." style="flex:1;font-size:.8rem">
+              <input id="enfgen-causa-nueva" class="form-control" placeholder="Escribe la nueva causa..." style="flex:1;font-size:.8rem">
               <button class="btn btn-primary btn-sm" onclick="_enf_saveCausaNueva()">Guardar causa</button>
             </div>
           </div>
@@ -18376,7 +19502,7 @@ function openAddEnfGen(sistId, editIdx=-1) {
         <!-- Agente / Causa -->
         <div class="form-group"><label>Agente causal</label>
           <input id="enfgen-agente" class="form-control" value="${editEnf?.agente||''}" placeholder="Nombre científico del agente (o descripción del factor causal)..." style="margin-bottom:.4rem">
-          <div id="enf-agente-charact"></div>
+          <div id="enfgen-agente-charact"></div>
           <textarea id="enfgen-agente-info" class="form-control" style="min-height:55px;resize:vertical;font-size:.8rem;margin-top:.4rem"
             placeholder="Información sobre el agente: serotipos, cepas, virulencia, mecanismo de daño...">${editEnf?.agente_info||''}</textarea>
         </div>
@@ -18702,7 +19828,7 @@ function openAddEnfGen(sistId, editIdx=-1) {
         </div>
       </div>
     </div>`);
-  _enf_updateAgente(editEnf?.subtipo || editEnf?.tipo || 'infecciosa', editEnf?.agente_tipo || '');
+  _enf_updateAgente(editEnf?.subtipo || editEnf?.tipo || 'infecciosa', editEnf?.agente_tipo || '', 'enfgen');
   setTimeout(() => { buildSignosHistory?.(); _buildSpeciesDatalist?.(); setTimeout(()=>_enfRenderRefList('enfgen'),50); }, 50);
 }
 
@@ -18775,9 +19901,9 @@ async function saveEnfGen(sistId, editIdx=-1) {
     nombre,
     sinonimos:        document.getElementById('enfgen-sinonimos')?.value.trim()||'',
     tipo:             modal?.querySelector('[name="enfgen-tipo"]:checked')?.value||'infecciosa',
-    subtipo:          (document.getElementById('enf-subtipo')?.value||'').replace('__otra__',''),
+    subtipo:          (document.getElementById('enfgen-subtipo')?.value||'').replace('__otra__',''),
     agente:           document.getElementById('enfgen-agente')?.value.trim()||'',
-    agente_tipo:      (document.getElementById('enf-agente-tipo')?.value||'').replace('__otra__',''),
+    agente_tipo:      (document.getElementById('enfgen-agente-tipo')?.value||'').replace('__otra__',''),
     agente_info:      document.getElementById('enfgen-agente-info')?.value.trim()||'',
     sistemas_afectados: qsC('.enfgen-sistema-chk').length ? qsC('.enfgen-sistema-chk') : [sistId],
     organos:          qsC('.enfgen-organo-chk'),
