@@ -7593,6 +7593,40 @@ async function removeProtocol(i) {
   toast('Protocolo eliminado');
 }
 
+// Fila de goteo con flechas ▲▼ (multiplicador n) y botón ≈ Aproximar.
+function dripRowHtml(p, label, equip) {
+  const key = p + '-' + equip;
+  const cellTd = 'padding:.3rem .5rem;border-bottom:1px solid var(--bor)';
+  const btn = 'background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);color:var(--txt2);cursor:pointer;padding:0 .3rem;font-size:.6rem;line-height:1.3';
+  return `<tr>
+    <td style="${cellTd}">${label}</td>
+    <td style="${cellTd};text-align:center">
+      <button type="button" style="${btn};display:block;margin:0 auto" onclick="dripMult('${key}',1)" title="Multiplicar ×(n+1)">▲</button>
+      <div id="${key}" style="font-family:var(--mono);margin:.1rem 0">—</div>
+      <button type="button" style="${btn};display:block;margin:0 auto" onclick="dripMult('${key}',-1)" title="Reducir ×(n−1)">▼</button>
+    </td>
+    <td style="${cellTd};text-align:center">
+      <div id="${key}-prod" style="font-size:.68rem;color:var(--txt3);font-family:var(--mono)">—</div>
+      <button type="button" style="${btn};font-size:.6rem;margin:.15rem 0" onclick="dripApprox('${key}')" title="Redondear el numerador al entero más cercano">≈ Aproximar</button>
+      <div id="${key}-a" style="font-family:var(--mono);color:var(--am);font-weight:600">—</div>
+    </td>
+    <td style="${cellTd};text-align:center;font-family:var(--mono)" id="${key}-min">—</td>
+  </tr>`;
+}
+
+// Estado del goteo manual: multiplicador n y si se mostró la aproximación.
+window._dripN = window._dripN || {};
+window._dripShowA = window._dripShowA || {};
+function dripMult(key, delta) {
+  const n = Math.max(1, Math.min(600, (window._dripN[key] || 1) + delta));
+  window._dripN[key] = n;
+  calcFluids();
+}
+function dripApprox(key) {
+  window._dripShowA[key] = !window._dripShowA[key];
+  calcFluids();
+}
+
 function renderFluidoterapiaCalcScreen() {
   const el = document.getElementById('calc-fluidoterapia-container');
   if (!el) return;
@@ -7631,14 +7665,14 @@ function renderFluidoterapiaCalcScreen() {
         </div>
       </div>
     </div>
-    <div class="sec-title">Total (ml/día)</div>
+    <div class="sec-title" id="fl-total-title">Total (ml/día)</div>
     <div class="fluid-result-grid">
-      <div class="fluid-result-card" style="border:2px solid var(--g4);grid-column:span 2"><div class="fluid-result-label">TOTAL 24h</div><div class="fluid-result-value" id="fl-tot" style="color:var(--g5);font-size:1.8rem">—</div><div class="fluid-result-unit">ml/día</div></div>
+      <div class="fluid-result-card" style="border:2px solid var(--g4);grid-column:span 2"><div class="fluid-result-label" id="fl-tot-label">TOTAL 24h</div><div class="fluid-result-value" id="fl-tot" style="color:var(--g5);font-size:1.8rem">—</div><div class="fluid-result-unit" id="fl-tot-unit">ml/día</div></div>
     </div>
     <button type="button" class="btn btn-secondary btn-sm" style="width:100%;margin-top:.4rem" onclick="toggleFlComponentes()">🔍 Ver desglose del total</button>
     <div id="fl-componentes" style="display:none;margin-top:.5rem">
       <div class="info-card" style="padding:.6rem .8rem">
-        <div style="font-size:.75rem;color:var(--txt3);font-weight:600;margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.06em">Composición del volumen total (ml/día)</div>
+        <div id="fl-comp-title" style="font-size:.75rem;color:var(--txt3);font-weight:600;margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.06em">Composición del volumen total (ml/día)</div>
         <table style="width:100%;border-collapse:collapse;font-size:.82rem">
           <tbody>
             <tr style="background:var(--sur2)"><td style="padding:.3rem .4rem;border:1px solid var(--bor)">Deshidratación</td><td style="padding:.3rem .4rem;text-align:right;border:1px solid var(--bor);font-family:var(--mono)" id="fl-def">—</td><td style="padding:.3rem .4rem;text-align:right;border:1px solid var(--bor);font-size:.7rem;color:var(--txt3)" id="fl-def-f"></td></tr>
@@ -7672,19 +7706,21 @@ function renderFluidoterapiaCalcScreen() {
         <div class="fluid-result-unit" id="fl-mlh-sub">ml/hora (Total ÷ 24)</div>
       </div>
       <div style="font-size:.7rem;color:var(--txt3);font-weight:600;margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.06em">Goteo y aproximación</div>
+      <div style="overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:.82rem">
         <thead><tr style="background:var(--sur2)">
           <th style="padding:.35rem .5rem;text-align:left;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Equipo</th>
           <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">gts/seg</th>
-          <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--am)">Aproximación (gts/x seg)</th>
+          <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--am)">Aproximación manual</th>
           <th style="padding:.35rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">gts/min</th>
         </tr></thead>
         <tbody>
-          <tr><td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">Microgotero (60)</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-mi">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--am);font-weight:600" id="vd-mi-a">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-mi-min">—</td></tr>
-          <tr><td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">Normogotero (20)</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-no">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--am);font-weight:600" id="vd-no-a">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-no-min">—</td></tr>
-          <tr><td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">Macrogotero (10)</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-ma">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--am);font-weight:600" id="vd-ma-a">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="vd-ma-min">—</td></tr>
+          ${dripRowHtml('vd','Microgotero (60)','mi')}
+          ${dripRowHtml('vd','Normogotero (20)','no')}
+          ${dripRowHtml('vd','Macrogotero (10)','ma')}
         </tbody>
       </table>
+      </div>
     </div>
 
     <!-- 3: DISTRIBUCIÓN -->
@@ -7707,13 +7743,13 @@ function renderFluidoterapiaCalcScreen() {
           <thead><tr style="background:var(--sur2)">
             <th style="padding:.3rem .5rem;text-align:left;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Equipo</th>
             <th style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">gts/seg</th>
-            <th style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--am)">Aproximación (gts/x seg)</th>
+            <th style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--am)">Aproximación manual</th>
             <th style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">gts/min</th>
           </tr></thead>
           <tbody>
-            <tr><td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">Microgotero (60)</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="d1-mi">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--am);font-weight:600" id="d1-mi-a">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="d1-mi-min">—</td></tr>
-            <tr><td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">Normogotero (20)</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="d1-no">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--am);font-weight:600" id="d1-no-a">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="d1-no-min">—</td></tr>
-            <tr><td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">Macrogotero (10)</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="d1-ma">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--am);font-weight:600" id="d1-ma-a">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="d1-ma-min">—</td></tr>
+            ${dripRowHtml('d1','Microgotero (60)','mi')}
+            ${dripRowHtml('d1','Normogotero (20)','no')}
+            ${dripRowHtml('d1','Macrogotero (10)','ma')}
           </tbody>
         </table>
       </div>
@@ -7735,13 +7771,13 @@ function renderFluidoterapiaCalcScreen() {
           <thead><tr style="background:var(--sur2)">
             <th style="padding:.3rem .5rem;text-align:left;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">Equipo</th>
             <th style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">gts/seg</th>
-            <th style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--am)">Aproximación (gts/x seg)</th>
+            <th style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--am)">Aproximación manual</th>
             <th style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-size:.7rem;color:var(--txt3)">gts/min</th>
           </tr></thead>
           <tbody>
-            <tr><td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">Microgotero (60)</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="d2-mi">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--am);font-weight:600" id="d2-mi-a">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="d2-mi-min">—</td></tr>
-            <tr><td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">Normogotero (20)</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="d2-no">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--am);font-weight:600" id="d2-no-a">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="d2-no-min">—</td></tr>
-            <tr><td style="padding:.3rem .5rem;border-bottom:1px solid var(--bor)">Macrogotero (10)</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="d2-ma">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono);color:var(--am);font-weight:600" id="d2-ma-a">—</td><td style="padding:.3rem .5rem;text-align:center;border-bottom:1px solid var(--bor);font-family:var(--mono)" id="d2-ma-min">—</td></tr>
+            ${dripRowHtml('d2','Microgotero (60)','mi')}
+            ${dripRowHtml('d2','Normogotero (20)','no')}
+            ${dripRowHtml('d2','Macrogotero (10)','ma')}
           </tbody>
         </table>
       </div>
@@ -7918,17 +7954,15 @@ async function removeLiquidoIV(i) {
 // Devuelve {w, k}.
 function aproxGoteo(r) {
   if (!isFinite(r) || r <= 0) return { w: 0, k: 0 };
-  const EPS = 0.012, MAXK = 3600;
-  for (let k = 1; k <= MAXK; k++) {
-    if (Math.abs(r * k - 1) <= EPS) return { w: 1, k };
+  // Redondea el numerador al entero más cercano probando n = 1..12;
+  // acepta la primera n cuyo error relativo sea ≤ 10% (favorece denominadores pequeños).
+  const MAXN = 12, REL = 0.1;
+  for (let n = 1; n <= MAXN; n++) {
+    const w = Math.max(1, Math.round(r * n));
+    if (Math.abs(r * n - w) / w <= REL) return { w, k: n };
   }
-  for (let k = 1; k <= MAXK; k++) {
-    const v = r * k;
-    const wi = Math.round(v);
-    if (wi >= 2 && Math.abs(v - wi) <= EPS) return { w: wi, k };
-  }
-  const k = Math.max(1, Math.min(MAXK, Math.round(1 / r)));
-  return { w: 1, k };
+  const k = Math.max(1, Math.round(1 / r));
+  return { w: Math.max(1, Math.round(r * k)), k };
 }
 
 function calcFluids() {
@@ -7940,8 +7974,8 @@ function calcFluids() {
   const dia = parseInt(document.getElementById('fl-dia')?.value)||0;
   // Sin aproximar: valores exactos de cada multiplicación.
   const def = w * d * 10;          // ml: peso(kg) × %deshid × 10
-  // Mantenimiento: por día → ml/kg/día; por hora → ml/kg/h (×24 para el día).
-  const mv  = w * m * (mUnit === 'hora' ? 24 : 1);   // ml/día
+  // Mantenimiento: por día → ml/kg/día; por hora → ml/kg/h (velocidad directa, sin ×24).
+  const mv  = w * m;               // ml (por día) o ml/h (por hora)
   const vomLoss = vom * w * 4;     // ml: episodios × peso × 4 ml/kg
   const diaLoss = dia * w * 6;     // ml: episodios × peso × 6 ml/kg
   const tot = def + mv + vomLoss + diaLoss;
@@ -7954,26 +7988,39 @@ function calcFluids() {
   // Goteo: ml/hora → gts/seg. gtts/ml: mi=60, no=20, ma=10. gts/seg = mlh*gtts/3600. gts/min = mlh*gtts/60.
   const gtts = { mi:60, no:20, ma:10 };
   const drips = (mlh) => ({ mi: mlh*gtts.mi/3600, no: mlh*gtts.no/3600, ma: mlh*gtts.ma/3600, min:(g)=> mlh*g/60 });
-  const approxStr = (r) => { const a = aproxGoteo(r); return (a.w && a.k) ? a.w+' gts / '+a.k+' seg' : '—'; };
   const fmtGts = (r) => {
     if (!isFinite(r)) return '—';
     if (r === 0) return '0';
     return (+r.toFixed(4)).toLocaleString('es-CO');
   };
-  // Velocidad continua (ml/h): por día = Total ÷ 24; por hora = mantenimiento/h tras repartir el resto en 24 h.
-  const mlh = mUnit === 'hora' ? (w * m + (def + vomLoss + diaLoss) / 24) : (tot / 24);
-  // Renderiza una fila de goteo (mi/no/ma) con su aproximación y gts/min bajo un prefijo de IDs.
+  // Velocidad continua (ml/h): por día = Total ÷ 24; por hora = velocidad directa de mantenimiento.
+  const mlh = mUnit === 'hora' ? (w * m) : (tot / 24);
+  // Renderiza una fila de goteo (mi/no/ma) con su aproximación manual bajo un prefijo de IDs.
   const renderDripBlock = (p, mlh) => {
     const dr = drips(mlh);
     set(p+'-mlh', fmtVol(mlh));
-    set(p+'-mi',  fmtGts(dr.mi)); set(p+'-mi-a', approxStr(dr.mi)); set(p+'-mi-min', fmtGts(dr.min(60)));
-    set(p+'-no',  fmtGts(dr.no)); set(p+'-no-a', approxStr(dr.no)); set(p+'-no-min', fmtGts(dr.min(20)));
-    set(p+'-ma',  fmtGts(dr.ma)); set(p+'-ma-a', approxStr(dr.ma)); set(p+'-ma-min', fmtGts(dr.min(10)));
+    const row = (equip, r, g) => {
+      const key = p + '-' + equip;
+      const n = Math.max(1, window._dripN[key] || 1);
+      const prod = r * n;
+      set(key, fmtGts(r));
+      set(key+'-min', fmtGts(dr.min(g)));
+      const prodEl = document.getElementById(key+'-prod');
+      if (prodEl) prodEl.textContent = '× ' + n + ' = ' + (isFinite(prod) ? (+prod.toFixed(3)).toLocaleString('es-CO') : '—');
+      const aEl = document.getElementById(key+'-a');
+      if (aEl) {
+        if (window._dripShowA[key] && isFinite(prod) && prod > 0) aEl.textContent = Math.max(1, Math.round(prod)) + ' gts / ' + n + ' seg';
+        else aEl.textContent = '—';
+      }
+    };
+    row('mi', dr.mi, 60);
+    row('no', dr.no, 20);
+    row('ma', dr.ma, 10);
   };
 
   // Desglose del total (componentes)
   set('fl-def',  fmtVol(def));    set('fl-def-f',  w+' × '+d+'% × 10');
-  set('fl-mv',   fmtVol(mv));     set('fl-mv-f',   mUnit === 'hora' ? w+' × '+m+' ml/kg/h × 24 h' : w+' × '+m+' ml/kg/día');
+  set('fl-mv',   fmtVol(mv));     set('fl-mv-f',   mUnit === 'hora' ? w+' × '+m+' ml/kg/h' : w+' × '+m+' ml/kg/día');
   set('fl-vomv', fmtVol(vomLoss));set('fl-vomv-f', vom+' × '+w+' × 4 ml/kg');
   set('fl-diav', fmtVol(diaLoss));set('fl-diav-f', dia+' × '+w+' × 6 ml/kg');
   set('fl-sum',  fmtVol(tot));
@@ -7987,12 +8034,20 @@ function calcFluids() {
   set('fl-mlh', fmtVol(mlh));
   const msub = document.getElementById('fl-mlh-sub');
   if (msub) msub.textContent = mUnit === 'hora'
-    ? 'ml/hora = (peso × '+m+' ml/kg/h) + (desh. + pérdidas) ÷ 24'
+    ? 'ml/hora = peso × '+m+' ml/kg/h (velocidad directa)'
     : 'ml/hora (Total ÷ 24)';
   const mhint = document.getElementById('fl-m-hint');
   if (mhint) mhint.textContent = mUnit === 'hora'
-    ? 'Dosis por hora (ml/kg/h): el goteo se calcula con la velocidad directa, sin dividir el total entre 24.'
+    ? 'Dosis por hora (ml/kg/h): el goteo usa la velocidad directa (peso × dosis), sin multiplicar ni dividir entre 24.'
     : 'Dosis por día (ml/kg/día): el volumen total se reparte en 24 horas.';
+  const totLabel = document.getElementById('fl-tot-label');
+  if (totLabel) totLabel.textContent = mUnit === 'hora' ? 'TOTAL' : 'TOTAL 24h';
+  const totUnit = document.getElementById('fl-tot-unit');
+  if (totUnit) totUnit.textContent = mUnit === 'hora' ? 'ml' : 'ml/día';
+  const totTitle = document.getElementById('fl-total-title');
+  if (totTitle) totTitle.textContent = mUnit === 'hora' ? 'Total (ml)' : 'Total (ml/día)';
+  const compTitle = document.getElementById('fl-comp-title');
+  if (compTitle) compTitle.textContent = mUnit === 'hora' ? 'Composición del volumen (mantenimiento = 1 h)' : 'Composición del volumen total (ml/día)';
   renderDripBlock('vd', mlh);
 
   // 3: DISTRIBUCIÓN (dos fases: % + horas, el resto en el tiempo restante)
@@ -8050,11 +8105,11 @@ function generarResumenFluidosPDF() {
 
   // Resultados (mismas fórmulas que la calculadora)
   const def = w * d * 10;
-  const mv  = w * m * (mUnit === 'hora' ? 24 : 1);
+  const mv  = w * m;
   const vomLoss = vom * w * 4;
   const diaLoss = dia * w * 6;
   const tot = def + mv + vomLoss + diaLoss;
-  const mlh = mUnit === 'hora' ? (w * m + (def + vomLoss + diaLoss) / 24) : (tot / 24);
+  const mlh = mUnit === 'hora' ? (w * m) : (tot / 24);
   const vol1 = tot * pct1 / 100;
   const vol2 = tot * pct2 / 100;
 
@@ -8133,12 +8188,10 @@ function generarResumenFluidosPDF() {
   blank();
 
   // Componentes del total
-  section('1. Componentes del volumen total (24 h)');
+  section('1. Componentes del volumen total' + (mUnit === 'hora' ? ' (mantenimiento 1 h)' : ' (24 h)'));
   row('V_desh = P × %Desh × 10   [ml]', hasVal ? (w + ' × ' + d + '% × 10 = ' + fmt(def) + ' ml') : '');
-  row('V_mant = ' + (mUnit === 'hora' ? '(P × D_mant) × 24   [ml]' : 'P × D_mant   [ml]'),
-      hasVal ? (mUnit === 'hora'
-        ? '(' + fmt(w) + ' × ' + fmt(m) + ') × 24 = ' + fmt(mv) + ' ml'
-        : fmt(w) + ' × ' + fmt(m) + ' = ' + fmt(mv) + ' ml') : '');
+  row('V_mant = P × D_mant   [' + (mUnit === 'hora' ? 'ml/h' : 'ml') + ']',
+      hasVal ? (fmt(w) + ' × ' + fmt(m) + ' = ' + fmt(mv) + ' ' + (mUnit === 'hora' ? 'ml/h' : 'ml')) : '');
   row('V_vómito = E_vom × P × 4   [ml]', hasVal ? (vom + ' × ' + fmt(w) + ' × 4 = ' + fmt(vomLoss) + ' ml') : '');
   row('V_diarrea = E_dia × P × 6   [ml]', hasVal ? (dia + ' × ' + fmt(w) + ' × 6 = ' + fmt(diaLoss) + ' ml') : '');
   row('V_total = V_desh + V_mant + V_vómito + V_diarrea   [ml]', hasVal ? (fmt(def) + ' + ' + fmt(mv) + ' + ' + fmt(vomLoss) + ' + ' + fmt(diaLoss) + ' = ' + fmt(tot) + ' ml') : '');
@@ -8146,10 +8199,10 @@ function generarResumenFluidosPDF() {
 
   // Volumen diario
   section('2. Volumen diario');
-  row(mUnit === 'hora' ? 'V/h = (P × D_mant) + (V_desh + V_vómito + V_diarrea) ÷ 24   [ml/h]'
+  row(mUnit === 'hora' ? 'V/h = P × D_mant   [ml/h] (velocidad directa)'
                        : 'V/h = V_total ÷ 24   [ml/h]',
       hasVal ? (mUnit === 'hora'
-        ? '(' + fmt(w) + ' × ' + fmt(m) + ') + (' + fmt(def) + ' + ' + fmt(vomLoss) + ' + ' + fmt(diaLoss) + ') ÷ 24 = ' + fmt(mlh) + ' ml/h'
+        ? fmt(w) + ' × ' + fmt(m) + ' = ' + fmt(mlh) + ' ml/h'
         : fmt(tot) + ' ÷ 24 = ' + fmt(mlh) + ' ml/h') : '');
   row('Cada bolo = V_total ÷ N_bolos   [ml]', hasVal ? (fmt(tot) + ' ÷ ' + fmt(bolosN) + ' = ' + fmt(tot / bolosN) + ' ml') : '');
   blank();
@@ -16075,7 +16128,6 @@ async function saveRecinto(editIdx=-1) {
     altura:      document.getElementById('rec-altura')?.value||'',
     tipo:        document.getElementById('rec-tipo')?.value||'',
     capacidad:   document.getElementById('rec-cap')?.value||'',
-
     lineamientos:document.getElementById('rec-lin')?.value||'',
     componentes,
     notas:       document.getElementById('rec-notas')?.value||'',
