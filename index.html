@@ -8004,12 +8004,14 @@ function calcFluids() {
       const n = Math.max(1, window._dripN[key] || 1);
       const prod = r * n;
       set(key, fmtGts(r));
-      set(key+'-min', fmtGts(dr.min(g)));
+      const approxOn = window._dripShowA[key] && isFinite(prod) && prod > 0;
+      // gts/min derivado de la aproximación manual: (w gts / n seg) × 60 → entero.
+      set(key+'-min', approxOn ? fmtGts(Math.round(Math.max(1, Math.round(prod)) * 60 / n)) : fmtGts(dr.min(g)));
       const prodEl = document.getElementById(key+'-prod');
       if (prodEl) prodEl.textContent = '× ' + n + ' = ' + (isFinite(prod) ? (+prod.toFixed(3)).toLocaleString('es-CO') : '—');
       const aEl = document.getElementById(key+'-a');
       if (aEl) {
-        if (window._dripShowA[key] && isFinite(prod) && prod > 0) aEl.textContent = Math.max(1, Math.round(prod)) + ' gts / ' + n + ' seg';
+        if (approxOn) aEl.textContent = Math.max(1, Math.round(prod)) + ' gts / ' + n + ' seg';
         else aEl.textContent = '—';
       }
     };
