@@ -9768,52 +9768,77 @@ function openEditDrug(id) { openAddDrug(id); }
 // celda con una especie por línea (formato: especie|sci|dose_min|dose|dose_max|via|freq|notas).
 const VAD_HEADER_MAP = {
   'nombres':'nombres','nombre':'nombres','nombre_comercial':'nombres','nombres_comerciales':'nombres',
-  'principio_activo':'active','activo':'active','principio':'active','active':'active','pa':'active',
+  'principio_activo':'active','activo':'active','principio':'active','active':'active','pa':'active','farmaco':'active','droga':'active',
   'concentraciones_mg_ml':'concs','concentraciones':'concs','conc':'concs','concentracion':'concs','mg_ml':'concs',
-  'categorias':'cats','categoria':'cats','cats':'cats','categoria_general':'cats',
-  'categoria_especifica':'cat_esp','cat_esp':'cat_esp','subcategoria':'cat_esp',
-  'vias':'routes','vias_de_administracion':'routes','via':'routes','routes':'routes','administration':'routes',
-  'frecuencia':'freq','freq':'freq','frecuencia_administracion':'freq',
+  'categorias':'cats','categoria':'cats','cats':'cats','categoria_general':'cats','seccion':'cats','sec':'cats',
+  'subcategoria':'subcat','subcategorias':'subcat','subcat':'subcat','sub_categoria':'subcat',
+  'sub_subcategoria':'subsubcat','subsubcategoria':'subsubcat','subsubcat':'subsubcat','sub_sub':'subsubcat',
+  'categoria_especifica':'cat_esp','cat_esp':'cat_esp',
+  'vias':'routes','vias_de_administracion':'routes','routes':'routes','administration':'routes',
+  'frecuencia_administracion':'freq','freq':'freq',
   'indicaciones':'indic','indic':'indic','indicacion':'indic',
   'contraindicaciones':'contraindications','contraindicacion':'contraindications','contra':'contraindications',
   'efectos_adversos':'info','efectos':'info','efectos_secundarios':'info','info':'info','reacciones':'info',
-  'notas':'notes','notas_clinicas':'notes','notes':'notes','observaciones':'notes',
+  'notas_clinicas':'notes','notes':'notes','observaciones':'notes',
   'mecanismo_accion':'mech','mecanismo':'mech','mecanismo_tecnico':'mech','mecanismo_de_accion':'mech','mecanismo_tecnico_detallado':'mech',
   'mecanismo_resumido':'mech_simple','mecanismo_simple':'mech_simple','resumen_mecanismo':'mech_simple',
   'descripcion':'desc','desc':'desc','description':'desc',
   'palabras_clave':'keywords','palabras_claves':'keywords','keywords':'keywords','etiquetas':'keywords','tags':'keywords',
+  'bibliografia':'bibliografia','bibliografias':'bibliografia','referencias':'bibliografia','referencia':'bibliografia','link':'bibliografia','url':'bibliografia','urls':'bibliografia','fuente_bibliografica':'bibliografia',
+  'nombre_comun':'sp','nombre_comun_especie':'sp','especie':'sp','animal':'sp','especies':'sp',
+  'nombre_cientifico':'sci','sci':'sci','cientifico':'sci','nombre_ciencia':'sci',
+  'dosis_min':'dmin','dosis_minima':'dmin','minima':'dmin','dosis_min_mg_kg':'dmin',
+  'dosis_max':'dmax','dosis_maxima':'dmax','maxima':'dmax','dosis_max_mg_kg':'dmax',
+  'unidad':'unit','unidad_dosis':'unit','unidad_dosis_mg_kg':'unit','dosis_unidad':'unit',
+  'fuente':'fuente','fuente_dosis':'fuente','referencia_dosis':'fuente',
+  'via':'sp_via','via_dosis':'sp_via','vias_dosis':'sp_via',
+  'frecuencia':'sp_freq','frecuencia_dosis':'sp_freq',
+  'notas':'sp_notes','notas_dosis':'sp_notes','notas_especie':'sp_notes',
   'dosis_por_especie':'species_doses','dosis':'species_doses','dosis_especies':'species_doses'
 };
 const VAD_SUB_SEP = ';';   // separador de valores múltiples
-const VAD_SPEC_SEP = '|';  // separador de campos dentro de una fila de dosis
+const VAD_SPEC_SEP = '|';  // separador de campos dentro de una fila de dosis (compat)
 
-// Descarga una plantilla .csv de ejemplo con los encabezados y columnas que debe llenar el usuario.
+// Descarga una plantilla .csv de ejemplo con los encabezados y columnas del esqueleto (una fila por fármaco+especie).
 function descargarPlantillaVademecum() {
   const headers = [
-    'nombres','principio_activo','concentraciones_mg_ml','categorias','categoria_especifica',
-    'vias','frecuencia','indicaciones','contraindicaciones','efectos_adversos','notas',
-    'mecanismo_accion','mecanismo_resumido','descripcion','palabras_clave','dosis_por_especie'
+    '', 'CATEGORIA','SUBCATEGORIA','SUB-SUBCATEGORIA','PRINCIPIO ACTIVO','NOMBRES COMERCIALES',
+    'CONCENTRACIONES','CATEGORIA ESPECIFICA','VIAS DE ADMINISTRACION','INDICACIONES','CONTRAINDICACIONES',
+    'EFECTOS ADVERSOS','NOTAS CLINICAS','MECANISMO DE ACCION (TECNICO)','MECANISMO DE ACCION RESUMIDO',
+    'DESCRIPCION','PALABRAS CLAVE','BIBLIOGRAFIA',
+    'NOMBRE COMUN','NOMBRE CIENTIFICO','DOSIS MIN','DOSIS MAX','UNIDAD','FUENTE','VIA','FRECUENCIA','NOTAS'
   ];
   const ej = {
-    nombres:'Ketavet;Ketamidor',
-    principio_activo:'Ketamina',
-    concentraciones_mg_ml:'100;50',
-    categorias:'Anestésicos',
-    categoria_especifica:'Anestésico disociativo',
-    vias:'IM;IV;SC',
-    frecuencia:'dosis única',
-    indicaciones:'Anestesia general, contención química',
-    contraindicaciones:'Cardiopatía severa',
-    efectos_adversos:'Hipotensión, bradicardia',
-    notas:'Titular según profundidad anestésica.',
-    mecanismo_accion:'Antagonismo no competitivo de receptores NMDA (glutamatérgicos), bloqueando la entrada de calcio y produciendo disociación sensorial y analgesia profunda.',
-    mecanismo_resumido:'Bloquea los receptores NMDA; produce anestesia disociativa e inmovilización.',
-    descripcion:'Anestésico disociativo de acción rápida usado en contención química y procedimientos cortos.',
-    palabras_clave:'anestésico, disociativo, NMDA, contención',
-    dosis_por_especie:'Perro|Canis lupus familiaris|5|10|15|IM|dosis única|\nGato|Felis catus|3|5|7|IM|dosis única|'
+    0:'',
+    1:'I. ANTIINFECCIOSOS Y ANTIPARASITARIOS SISTÉMICOS',
+    2:'1. Antibacterianos / Antibióticos',
+    3:'Betalactámicos (Penicilinas y Cefalosporinas)',
+    4:'Amoxicilina',
+    5:'',
+    6:'100 mg/ml',
+    7:'Penicilina semisintética',
+    8:'IM; IV',
+    9:'Infecciones bacterianas sensibles',
+    10:'Hipersensibilidad a penicilinas',
+    11:'Náuseas, diarrea',
+    12:'Ajustar en insuficiencia renal.',
+    13:'Inhibe la síntesis de pared celular bacteriana.',
+    14:'Antibiótico betalactámico bactericida.',
+    15:'Antibiótico de amplio espectro.',
+    16:'antibiótico; betalactámico; bactericida',
+    17:'',
+    18:'Perro',
+    19:'Canis lupus familiaris',
+    20:'5',
+    21:'15',
+    22:'mg/kg',
+    23:'PLUMB’s',
+    24:'IM; IV',
+    25:'BID',
+    26:''
   };
   const esc = (v)=>{ v=String(v??''); return /[";\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
-  const csv = headers.map(h=>esc(h)).join(';') + '\n' + headers.map(h=>esc(ej[h])).join(';');
+  const csv = headers.map(h=>esc(h)).join(';') + '\n' + headers.map((h,i)=>esc(ej[i])).join(';');
   const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -9872,60 +9897,120 @@ function _normHeader(h){
     .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
 }
 
-// Construye el objeto fármaco (misma forma que saveDrug) a partir de una fila ya mapeada.
-function _vadRowToDrug(mapped) {
-  const nombres = (mapped.nombres||'').split(VAD_SUB_SEP).map(s=>s.trim()).filter(Boolean);
-  const concs = (mapped.concs||'').split(VAD_SUB_SEP).map(s=>parseFloat(String(s).trim())).filter(v=>!isNaN(v)&&v>0);
-  const cats = (mapped.cats||'').split(VAD_SUB_SEP).map(s=>s.trim()).filter(Boolean);
-  const routes = (mapped.routes||'').split(VAD_SUB_SEP).map(s=>s.trim()).filter(Boolean);
-  const drugName = nombres[0]||'';
-  const active = mapped.active||'';
-  // dosis por especie: una línea por especie, campos separados por "|"
+// ███ Motor expandido: 1 fila por fármaco+especie (esqueleto 27 columnas) ███
+const VAD_GRID_ORDER = [
+  'categoria','subcat','subsubcat','active','nombres','conc','cat_esp','routes',
+  'indic','contraindications','info','notes','mech','mech_simple','desc','keywords',
+  'bibliografia','sp','sci','dmin','dmax','unit','fuente','sp_via','sp_freq','sp_notes'
+];
+
+function _parseBibOne(s) {
+  const arr = vdParseBibStr(s);
+  return arr.length ? arr[0] : null;
+}
+function _bibText(b) {
+  if (!b) return '';
+  return b.kind === 'url' ? b.text : ('bib:' + (b.spKey||'') + ':' + (b.idx||0));
+}
+
+// Agrupa las filas del CSV (celdas vacías heredan el valor superior) en objetos fármaco.
+// colIdx: {índice de columna: nombre de campo}.
+function _groupRowsToDrugs(colIdx, rows) {
+  const drugs = [];
+  let cur = null;
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row.some(c => String(c??'').trim())) continue;
+    const m = {};
+    for (const i of Object.keys(colIdx)) {
+      const key = colIdx[i];
+      const v = String(row[i] ?? '').trim();
+      if (v !== '') m[key] = v;
+    }
+    for (const f of VAD_GRID_ORDER) {
+      if (m[f] === undefined && cur && cur._last && cur._last[f] !== undefined) m[f] = cur._last[f];
+      if (m[f] === undefined) m[f] = '';
+    }
+    const active = (m.active || '').trim();
+    if (!cur || (active && active !== cur._key)) {
+      cur = { _key: active, _last: m, rows: [] };
+      drugs.push(cur);
+    }
+    cur._last = m;
+    cur.rows.push(m);
+  }
+  return drugs.map(g => _drugFromGroup(g));
+}
+
+// Convierte un grupo de filas (un mismo fármaco) al objeto fármaco.
+function _drugFromGroup(g) {
+  const rows = g.rows;
+  const first = rows[0] || {};
+  const pick = (f) => { for (const r of rows) { const v = String(r[f] ?? '').trim(); if (v) return v; } return ''; };
+  const nombres = String(pick('nombres')).split(/[;\/]/).map(s => s.trim()).filter(Boolean);
+  const active = pick('active');
+  const concObjs = vdParseConcStr(pick('conc'));
+  const routes = String(pick('routes')).split(/[,;]/).map(s => s.trim()).filter(Boolean);
+  const catLabel = pick('categoria');
   const species_doses = [];
-  String(mapped.species_doses||'').split(/\r?\n/).forEach(line=>{
-    line=line.trim(); if(!line) return;
-    const p=line.split(VAD_SPEC_SEP).map(s=>s.trim());
-    const sp=p[0]; if(!sp) return;
+  for (const r of rows) {
+    const sp = String(r.sp || '').trim();
+    const min = parseFloat(r.dmin) || 0;
+    const max = parseFloat(r.dmax) || 0;
+    const viaList = String(r.sp_via || '').split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    if (!sp && !min && !max && !r.unit && !r.fuente && !viaList.length && !r.sp_freq && !r.sp_notes) continue;
+    const rec = (min && max) ? Math.round(((min + max) / 2) * 1000) / 1000 : 0;
+    const unit = String(r.unit || '').trim() || 'mg/kg';
+    const dosis = [{ min, rec, max, unit, fuente: _parseBibOne(r.fuente) }];
     species_doses.push({
       species: sp,
-      sci: p[1]||'',
-      dose_min: parseFloat(p[2])||0,
-      dose: parseFloat(p[3])||0,
-      dose_max: parseFloat(p[4])||0,
-      routes: p[5] ? p[5].split(VAD_SUB_SEP).map(s=>s.trim()).filter(Boolean) : (routes.length?routes:['IM']),
-      route: null,
-      freq: p[6]||'',
-      notes: p[7]||''
+      sci: String(r.sci || '').trim(),
+      dosis,
+      dose_min: min, dose: rec, dose_max: max, dose_unit: unit,
+      route: viaList[0] || 'IM',
+      routes: viaList.length ? viaList : ['IM'],
+      freq: String(r.sp_freq || '').trim(),
+      notes: String(r.sp_notes || '').trim()
     });
-    const sdos = species_doses[species_doses.length-1];
-    sdos.route = sdos.routes[0]||'IM';
-  });
+  }
   return {
-    drug: drugName, nombres, active,
-    cats, category: cats[0]||'',
-    cat_esp: mapped.cat_esp||'',
-    conc: concs[0]||0, concs: concs.length?concs:(concs[0]?concs:[]),
-    route: routes[0]||'IM', routes,
-    freq: mapped.freq||'',
-    indic: mapped.indic||'',
-    contraindications: mapped.contraindications||'',
-    info: mapped.info||'',
-    notes: mapped.notes||'',
-    mech: mapped.mech||'',
-    mech_simple: mapped.mech_simple||'',
-    desc: mapped.desc||'',
-    keywords: (mapped.keywords||'').split(/[,;]+/).map(k=>k.trim()).filter(Boolean),
+    drug: nombres[0] || active,
+    nombres: nombres.length ? nombres : (active ? [active] : []),
+    active,
+    catLabel,
+    subcatLabel: pick('subcat'),
+    ssLabel: pick('subsubcat'),
+    cats: catLabel ? [catLabel] : [],
+    category: catLabel,
+    cat_esp: pick('cat_esp'),
+    conc: concObjs[0]?.val || 0,
+    concs: concObjs,
+    conc_units: concObjs.map(c => c.num + '/' + c.den),
+    route: routes[0] || 'IM',
+    routes,
+    freq: pick('freq'),
+    indic: pick('indic'),
+    contraindications: pick('contraindications'),
+    info: pick('info'),
+    notes: pick('notes'),
+    mech: pick('mech'),
+    mech_simple: pick('mech_simple'),
+    desc: pick('desc'),
+    keywords: String(pick('keywords')).split(/[,;]+/).map(k => k.trim()).filter(Boolean),
+    bibliografia: vdParseBibStr(pick('bibliografia')),
     species_doses
   };
 }
 
-// Nombres de columnas del CSV (con orden fijo) para previsualización.
+// Nombres legibles de las columnas del esqueleto (para previsualización).
 const VAD_COL_LABELS = {
-  nombres:'Nombres comerciales', active:'Principio activo', concs:'Conc. (mg/ml)',
-  cats:'Categorías', cat_esp:'Cat. específica', routes:'Vías',
-  freq:'Frecuencia', indic:'Indicaciones', contraindications:'Contraindicaciones',
-  info:'Efectos adversos', notes:'Notas', species_doses:'Dosis por especie',
-  mech:'Mecanismo de acción', mech_simple:'Mecanismo resumido', desc:'Descripción', keywords:'Palabras clave'
+  categoria:'Categoría', subcat:'Subcategoría', subsubcat:'Sub-subcategoría',
+  active:'Principio activo', nombres:'Nombres comerciales', conc:'Concentración', cat_esp:'Cat. específica',
+  routes:'Vías', indic:'Indicaciones', contraindications:'Contraindicaciones',
+  info:'Efectos adversos', notes:'Notas clínicas',
+  mech:'Mecanismo de acción', mech_simple:'Mecanismo resumido', desc:'Descripción', keywords:'Palabras clave',
+  bibliografia:'Bibliografía', sp:'Nombre común', sci:'Nombre científico',
+  dmin:'Dosis min', dmax:'Dosis max', unit:'Unidad', fuente:'Fuente', sp_via:'Vía', sp_freq:'Frecuencia', sp_notes:'Notas (especie)'
 };
 
 // Genera la previsualización en un modal y permite confirmar la importación.
@@ -9938,15 +10023,8 @@ function _vadCsvPreview(text) {
   const usedCols = Object.values(colIdx);
   if (!usedCols.length) { toast('⚠ No se reconocieron columnas válidas. Usa la plantilla descargada.'); return; }
 
-  const drugs = [];
-  for(let r=1; r<rows.length; r++){
-    const row = rows[r];
-    if (!row.some(c=>String(c??'').trim())) continue;
-    const mapped = {};
-    Object.keys(colIdx).forEach(i=>{ const f=colIdx[i]; const v=(row[i]??'').toString(); if(String(v).trim()!=='') mapped[f]=v; });
-    if(!mapped.nombres && !mapped.active) continue; // fila sin nombre ni principio activo → se omite
-    drugs.push(_vadRowToDrug(mapped));
-  }
+  const allDrugs = _groupRowsToDrugs(colIdx, rows);
+  const drugs = allDrugs.filter(d => (d.active || d.drug || d.species_doses.length));
   if (!drugs.length) { toast('⚠ No hay fármacos válidos para importar'); return; }
 
   document.getElementById('modal-vad-csv')?.remove();
@@ -9965,7 +10043,7 @@ function _vadCsvPreview(text) {
           <tbody>
             ${drugs.map(d=>{
               const sps = d.species_doses.map(s=>s.species).join(', ');
-              const conc = d.concs.join(' / ');
+              const conc = vdConcListLabel(d);
               return `<tr style="border-bottom:1px solid var(--bor)">
                 <td style="padding:.3rem .5rem;font-weight:600">${d.drug||'—'}</td>
                 <td style="padding:.3rem .5rem">${d.active||'—'}</td>
@@ -9991,8 +10069,18 @@ function _vadCsvPreview(text) {
 async function confirmImportVademecum(count) {
   const drugs = window._vadCsvImport || [];
   document.getElementById('modal-vad-csv')?.remove();
-  let filled=0, added=0, dup=0, sinCat=0;
+  let filled=0, added=0, dup=0, sinCat=0, catsChanged=false;
   for(const d of drugs){
+    const st = vdEnsureCatStructure(d.catLabel, d.subcatLabel, d.ssLabel);
+    if (st) {
+      d.cat_vad = st.catKey; d.subcat_vad = st.subLabel; d.subsubcat_vad = st.ssLabel;
+      d.category = st.catLabel;
+      if (!(d.cats||[]).includes(st.catLabel)) {
+        d.cats = d.cats || [];
+        if (d.cats.length) d.cats[0] = st.catLabel; else d.cats.push(st.catLabel);
+      }
+      if (st.created) catsChanged = true;
+    }
     vdEnsureCats(d);
     if (!d.cat_vad && !(d.cats||[]).length) sinCat++;
     const addr = _activeCore(d.active) || _normActive(d.active);
@@ -10019,6 +10107,7 @@ async function confirmImportVademecum(count) {
     added++;
   }
   _vadCatActiva='__all__'; _vadSubcatActiva=null; _vadSubSubcatActiva=null;
+  if (catsChanged) await saveVademecumCats();
   renderVademecum();
   const parts=[];
   if(filled) parts.push('Actualizados '+filled+' fármaco(s)');
@@ -10103,6 +10192,68 @@ function vdEnsureCats(d) {
   }
   if (!d.cat_esp && d.subcat_vad) d.cat_esp = d.subcat_vad;
   return !!d.cat_vad;
+}
+
+function _vdSlug(s) {
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+}
+
+// Crea (si faltan) y devuelve categoría/subcategoría/sub-subcategoría en VADEMECUM_CATS.
+// Devuelve {catKey, catLabel, subKey, subLabel, ssKey, ssLabel, created}.
+function vdEnsureCatStructure(catLabel, subLabel, ssLabel) {
+  catLabel = String(catLabel||'').trim();
+  subLabel = String(subLabel||'').trim();
+  ssLabel = String(ssLabel||'').trim();
+  if (!catLabel && !subLabel) return null;
+  let created = false;
+  let catKey = '', catObj = null;
+  for (const [k, v] of Object.entries(VADEMECUM_CATS)) {
+    if (v.label === catLabel) { catKey = k; catObj = v; break; }
+  }
+  if (!catObj && catLabel) {
+    catKey = _vdSlug(catLabel) || 'cat_' + Date.now();
+    catObj = { label: catLabel, icon:'📦', info:'', subcategories:{} };
+    VADEMECUM_CATS[catKey] = catObj;
+    created = true;
+  }
+  if (!catObj && subLabel) {
+    for (const [k, v] of Object.entries(VADEMECUM_CATS)) {
+      if (Object.values(v.subcategories||{}).some(s => s.label === subLabel)) { catKey = k; catObj = v; break; }
+    }
+  }
+  if (!catObj) return null;
+  if (!catObj.subcategories) catObj.subcategories = {};
+  let subKey = '', subObj = null;
+  if (subLabel) {
+    for (const [sk, sv] of Object.entries(catObj.subcategories)) {
+      if (sv.label === subLabel) { subKey = sk; subObj = sv; break; }
+    }
+    if (!subObj) {
+      subKey = _vdSlug(subLabel) || 's' + Date.now();
+      subObj = { label: subLabel, info:'', subcats:{} };
+      catObj.subcategories[subKey] = subObj;
+      created = true;
+    }
+    if (!subObj.subcats) subObj.subcats = {};
+  }
+  let ssKey = '';
+  if (ssLabel && subObj) {
+    for (const [sk, sv] of Object.entries(subObj.subcats)) {
+      if (sv.label === ssLabel) { ssKey = sk; break; }
+    }
+    if (!ssKey) {
+      ssKey = 'ss_' + (_vdSlug(ssLabel) || Date.now());
+      subObj.subcats[ssKey] = { label: ssLabel };
+      created = true;
+    }
+  }
+  return {
+    catKey, catLabel: catObj.label,
+    subKey, subLabel: subObj ? subObj.label : '',
+    ssKey, ssLabel: (subObj && ssKey) ? subObj.subcats[ssKey].label : '',
+    created
+  };
 }
 
 // Opciones de categoría/subcategoría sincronizadas con VADEMECUM_CATS actual
@@ -10255,30 +10406,102 @@ function vdParseBibStr(s) {
   return out;
 }
 
-function vadGridRowHtml(d) {
+// Expande un fármaco a las filas de la tabla (una fila por fármaco + especie + dosis).
+function _vadRowViews(d) {
+  const out = [];
   d = d || {};
-  const id = d.id || '';
-  const secLabel = d.category || (d.cat_vad ? (VADEMECUM_CATS[d.cat_vad]?.label||'') : '') || (d.cats?.[0]||'');
-  const subLabel = d.subcat_vad || '';
-  const ssLabel = d.subsubcat_vad || '';
-  const concVal = d._conc != null ? d._conc : vdExcelConcStr(d);
-  const dosisVal = d._dosis != null ? d._dosis : vdExcelDosisStr(d);
-  const bibVal = d._bib != null ? d._bib : vdExcelBibStr(d);
+  const sps = (d.species_doses && d.species_doses.length) ? d.species_doses : [null];
+  for (const s of sps) {
+    if (!s) {
+      out.push(Object.assign({}, d, { _rowSpecies: null, _sp:'', _sci:'', _dmin:'', _dmax:'', _unit:'mg/kg', _fuente:'', _via:'', _freq:'', _spNotes:'' }));
+      continue;
+    }
+    const entries = (s.dosis && s.dosis.length) ? s.dosis : [{ min:s.dose_min||0, rec:s.dose||0, max:s.dose_max||0, unit:s.dose_unit||'mg/kg', fuente:null }];
+    for (const de of entries) {
+      const minV = de.min == null ? (s.dose_min || '') : de.min;
+      const maxV = de.max == null ? (s.dose_max || '') : de.max;
+      out.push(Object.assign({}, d, {
+        _rowSpecies: s,
+        _sp: s.species || '',
+        _sci: s.sci || '',
+        _dmin: (minV === '' || Number(minV) === 0) ? '' : minV,
+        _dmax: (maxV === '' || Number(maxV) === 0) ? '' : maxV,
+        _unit: de.unit || s.dose_unit || 'mg/kg',
+        _fuente: _bibText(de.fuente),
+        _via: ((s.routes && s.routes.length) ? s.routes.join(', ') : (s.route || '')),
+        _freq: s.freq || '',
+        _spNotes: s.notes || ''
+      }));
+    }
+  }
+  return out;
+}
+
+function _vadResolveSub(catLabel, v) {
+  if (!v) return '';
+  for (const [ck, cv] of Object.entries(VADEMECUM_CATS)) {
+    if (catLabel && cv.label !== catLabel && ck !== catLabel) continue;
+    for (const [sk, sv] of Object.entries(cv.subcategories || {})) {
+      if (sk === v || sv.label === v) return sv.label;
+    }
+  }
+  return v;
+}
+function _vadResolveSs(catLabel, subLabel, v) {
+  if (!v) return '';
+  for (const [ck, cv] of Object.entries(VADEMECUM_CATS)) {
+    if (catLabel && cv.label !== catLabel && ck !== catLabel) continue;
+    for (const [sk, sv] of Object.entries(cv.subcategories || {})) {
+      if (subLabel && sv.label !== subLabel && sk !== subLabel) continue;
+      for (const [ssk, ssv] of Object.entries(sv.subcats || {})) {
+        if (ssk === v || ssv.label === v) return ssv.label;
+      }
+    }
+  }
+  return v;
+}
+
+const VAD_SPECIES_BORDER = 'border-left:2px solid rgba(120,120,120,.25)';
+
+function vadGridRowHtml(rv) {
+  rv = rv || {};
+  const id = rv.id || '';
+  const secLabel = rv.categoria || rv.category || (rv.cat_vad ? (VADEMECUM_CATS[rv.cat_vad]?.label || '') : '') || (rv.cats?.[0] || '');
+  let subLabel = _vadResolveSub(secLabel, rv.subcat || rv.subcatLabel || rv.subcat_vad || '');
+  let ssLabel = _vadResolveSs(secLabel, subLabel, rv.subsubcat || rv.ssLabel || rv.subsubcat_vad || '');
+  const concVal = (rv._conc != null && rv._conc !== '') ? rv._conc : vdExcelConcStr(rv);
+  const bibVal = (rv._bib != null && rv._bib !== '') ? rv._bib : vdExcelBibStr(rv);
+  const nmVal = Array.isArray(rv.nombres) ? rv.nombres.join(' / ') : (rv.nombres || '');
   const estado = id ? '' : '<span style="color:var(--g6);font-weight:600;font-size:.65rem">NUEVO</span>';
+  const c = (v) => vdEsc(v ?? '');
   return `<tr data-row data-id="${id}" style="border-bottom:1px solid var(--bor)">
     <td style="padding:.2rem .3rem">${estado}</td>
-    <td style="padding:.2rem .3rem"><input data-col="active" value="${vdEsc(d.active||'')}" placeholder="Ketamina" style="width:100%;min-width:120px;font-size:.72rem"></td>
-    <td style="padding:.2rem .3rem"><input data-col="nombres" value="${vdEsc((d.nombres||[]).join(' / '))}" placeholder="Ketavet / Ketamidor" style="width:100%;min-width:130px;font-size:.72rem"></td>
     <td style="padding:.2rem .3rem"><select data-col="categoria" onchange="vdExcelCatChanged(this)" style="width:100%;min-width:150px;font-size:.68rem">${_preserveOpt(vdExcelSecOptions(secLabel), secLabel)}</select></td>
-    <td style="padding:.2rem .3rem"><select data-col="subcat" onchange="vdExcelSubChanged(this)" style="width:100%;min-width:170px;font-size:.68rem">${_preserveOpt(vdExcelSubOptions(secLabel, subLabel), subLabel)}</select></td>
-    <td style="padding:.2rem .3rem"><select data-col="subsubcat" style="width:100%;min-width:150px;font-size:.68rem">${_preserveOpt(vdExcelSsOptions(secLabel, subLabel, ssLabel), ssLabel)}</select></td>
-    <td style="padding:.2rem .3rem"><input data-col="cat_esp" value="${vdEsc(d.cat_esp||'')}" placeholder="Ej: AINE" style="width:100%;min-width:90px;font-size:.72rem"></td>
-    <td style="padding:.2rem .3rem"><input data-col="conc" value="${vdEsc(concVal)}" placeholder="Ej: 100 mg/ml" style="width:100%;min-width:110px;font-size:.72rem"></td>
-    <td style="padding:.2rem .3rem"><input data-col="routes" value="${vdEsc((d.routes&&d.routes.length?d.routes.join(', '):d.route||''))}" placeholder="IM, IV" style="width:100%;min-width:90px;font-size:.72rem"></td>
-    <td style="padding:.2rem .3rem"><input data-col="freq" value="${vdEsc(d.freq||'')}" placeholder="SID" style="width:100%;min-width:80px;font-size:.72rem"></td>
-    <td style="padding:.2rem .3rem"><textarea data-col="dosis" rows="2" placeholder="Perro: 5-10-15 mg/kg IM SID&#10;Gato|Felis catus|3|5|7|IM|dosis única" style="width:100%;min-width:150px;font-size:.68rem">${vdEsc(dosisVal)}</textarea></td>
-    <td style="padding:.2rem .3rem"><input data-col="notes" value="${vdEsc(d.notes||'')}" placeholder="Observaciones..." style="width:100%;min-width:110px;font-size:.72rem"></td>
-    <td style="padding:.2rem .3rem"><input data-col="bibliografia" value="${vdEsc(bibVal)}" placeholder="https://... o bib:spKey:idx" style="width:100%;min-width:140px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><select data-col="subcat" onchange="vdExcelSubChanged(this)" style="width:100%;min-width:180px;font-size:.68rem">${_preserveOpt(vdExcelSubOptions(secLabel, subLabel), subLabel)}</select></td>
+    <td style="padding:.2rem .3rem"><select data-col="subsubcat" style="width:100%;min-width:170px;font-size:.68rem">${_preserveOpt(vdExcelSsOptions(secLabel, subLabel, ssLabel), ssLabel)}</select></td>
+    <td style="padding:.2rem .3rem"><input data-col="active" value="${c(rv.active)}" placeholder="Ketamina" style="width:100%;min-width:120px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="nombres" value="${c(nmVal)}" placeholder="Ketavet / Ketamidor" style="width:100%;min-width:130px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="conc" value="${c(concVal)}" placeholder="Ej: 100 mg/ml" style="width:100%;min-width:100px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="cat_esp" value="${c(rv.cat_esp)}" placeholder="Ej: AINE" style="width:100%;min-width:90px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="routes" value="${c((rv.routes&&rv.routes.length)?rv.routes.join(', '):(rv.route||''))}" placeholder="IM, IV" style="width:100%;min-width:90px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="indic" value="${c(rv.indic)}" placeholder="Indicaciones..." style="width:100%;min-width:160px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="contraindications" value="${c(rv.contraindications)}" placeholder="Contraindicaciones..." style="width:100%;min-width:160px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="info" value="${c(rv.info)}" placeholder="Efectos adversos..." style="width:100%;min-width:140px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="notes" value="${c(rv.notes)}" placeholder="Notas clínicas..." style="width:100%;min-width:140px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="mech" value="${c(rv.mech)}" placeholder="Mecanismo (técnico)..." style="width:100%;min-width:180px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="mech_simple" value="${c(rv.mech_simple)}" placeholder="Mecanismo resumido..." style="width:100%;min-width:150px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="desc" value="${c(rv.desc)}" placeholder="Descripción..." style="width:100%;min-width:160px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="keywords" value="${c((rv.keywords||[]).join(', '))}" placeholder="palabras, clave" style="width:100%;min-width:130px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="bibliografia" value="${c(bibVal)}" placeholder="https://... o bib:spKey:idx" style="width:100%;min-width:150px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem;${VAD_SPECIES_BORDER}"><input data-col="sp" value="${c(rv._sp)}" placeholder="Perro" style="width:100%;min-width:90px;font-size:.72rem" list="sp-hist-dl"></td>
+    <td style="padding:.2rem .3rem"><input data-col="sci" value="${c(rv._sci)}" placeholder="Nombre científico" style="width:100%;min-width:120px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="dmin" value="${c(rv._dmin)}" placeholder="5" style="width:100%;min-width:60px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="dmax" value="${c(rv._dmax)}" placeholder="15" style="width:100%;min-width:60px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="unit" value="${c(rv._unit)}" placeholder="mg/kg" style="width:100%;min-width:70px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="fuente" value="${c(rv._fuente)}" placeholder="PLUMB’s..." style="width:100%;min-width:100px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="sp_via" value="${c(rv._via)}" placeholder="IM, IV" style="width:100%;min-width:80px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="sp_freq" value="${c(rv._freq)}" placeholder="SID, BID..." style="width:100%;min-width:90px;font-size:.72rem"></td>
+    <td style="padding:.2rem .3rem"><input data-col="sp_notes" value="${c(rv._spNotes)}" placeholder="Notas de la dosis" style="width:100%;min-width:110px;font-size:.72rem"></td>
     <td style="padding:.2rem .3rem;text-align:center">${id?`<input type="checkbox" data-col="eliminar" title="Marcar para eliminar al guardar">`:''}</td>
   </tr>`;
 }
@@ -10289,13 +10512,13 @@ function openVadExcel() {
   const m = document.createElement('div');
   m.id = 'modal-vad-excel';
   m.style.cssText = 'position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;overflow-y:auto';
-  const rowsHtml = VADEMECUM_DB.map(d => vadGridRowHtml(d)).join('');
+  const rowsHtml = VADEMECUM_DB.flatMap(d => _vadRowViews(d)).map(rv => vadGridRowHtml(rv)).join('');
   m.innerHTML = `
-    <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:1500px;max-height:94vh;display:flex;flex-direction:column;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
+    <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:1700px;max-height:94vh;display:flex;flex-direction:column;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;gap:.5rem;flex-wrap:wrap">
         <div style="min-width:0">
           <div style="font-weight:700;font-size:.95rem">📊 Vademécum en tabla (Excel)</div>
-          <div style="font-size:.72rem;color:var(--txt3)">Todos los fármacos subidos. Edita celdas, pega filas de tu hoja (📋 Pegar) y dale 💾 Guardar. Las categorías y subcategorías se sincronizan con las de la app.</div>
+          <div style="font-size:.72rem;color:var(--txt3)">Una fila por <b>fármaco + especie + dosis</b> con las mismas columnas de tu esqueleto. Copia filas de tu hoja con sus encabezados (o sin ellos) y pégalas (📋 Pegar); luego 💾 Guardar.</div>
         </div>
         <div style="display:flex;gap:.4rem;flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" onclick="vadExcelPaste()">📋 Pegar desde Excel</button>
@@ -10305,21 +10528,35 @@ function openVadExcel() {
         </div>
       </div>
       <div style="overflow:auto;flex:1;border:1px solid var(--bor);border-radius:var(--rsm);background:var(--sur)">
-        <table style="width:100%;border-collapse:collapse;font-size:.72rem;min-width:1560px">
+        <table style="width:100%;border-collapse:collapse;font-size:.72rem;min-width:3300px">
           <thead><tr style="background:var(--sur2);position:sticky;top:0">
             <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Estado</th>
-            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Principio activo</th>
-            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Nombres comerciales</th>
             <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Categoría</th>
             <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Subcategoría</th>
             <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Sub-subcategoría</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Principio activo</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Nombres comerciales</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Concentraciones</th>
             <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Cat. específica</th>
-            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Concentración</th>
-            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Vías</th>
-            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Frecuencia</th>
-            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Dosis por especie</th>
-            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Notas</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Vías (fármaco)</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Indicaciones</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Contraindicaciones</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Efectos adversos</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Notas clínicas</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Mecanismo (técnico)</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Mecanismo resumido</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Descripción</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Palabras clave</th>
             <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Bibliografía</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3);${VAD_SPECIES_BORDER}">Nombre común</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Nombre científico</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Dosis mín</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Dosis máx</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Unidad</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Fuente</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Vía</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Frecuencia</th>
+            <th style="padding:.35rem .3rem;text-align:left;color:var(--txt3)">Notas (esp.)</th>
             <th style="padding:.35rem .3rem;text-align:center;color:var(--txt3)">Eliminar</th>
           </tr></thead>
           <tbody id="vad-excel-tbody">${rowsHtml}</tbody>
@@ -10337,9 +10574,9 @@ function vadExcelPaste() {
         <div style="font-weight:700;font-size:.9rem;margin-bottom:.3rem">📋 Pegar filas de Excel</div>
         <div style="font-size:.72rem;color:var(--txt3);margin-bottom:.6rem">
           Copia las filas de tu hoja y pégalas aquí (Ctrl+V). Se agregarán al final de la tabla como filas NUEVAS; revisa y dale 💾 Guardar.<br>
-          • Si pegas con <b>encabezados</b>, se detectan solos (nombres, principio activo, categorías, vías, dosis...).<br>
-          • Sin encabezados, se toman en este orden: <b>principio activo · nombres · categoría · subcategoría · concentración · vías · frecuencia · dosis · notas · bibliografía</b>.<br>
-          • En "dosis" una línea por especie: <b>Perro: 5-10-15 mg/kg IM SID</b> o <b>Perro|Canis lupus familiaris|5|10|15|IM|SID</b>.
+          • Si pegas con <b>encabezados</b> se detectan solos y se acomodan en las 27 columnas (categoría, subcategoría, sub-subcategoría, principio activo, nombres, concentraciones, vías, indicaciones, y dosis por especie: nombre común, nombre científico, dosis mín/máx, unidad, fuente, vía, frecuencia, notas...).<br>
+          • Sin encabezados se toman en el orden de las columnas de la tabla: <b>categoría · subcategoría · sub-subcategoría · principio activo · nombres · concentración · cat. específica · vías · indicaciones · contraindicaciones · efectos adversos · notas · mecanismo · mecanismo resumido · descripción · palabras clave · bibliografía · nombre común · nombre científico · dosis min · dosis máx · unidad · fuente · vía · frecuencia · notas (esp.)</b>.<br>
+          • Si un fármaco deja en blanco categoría/principio activo, hereda la fila anterior (como en tu esqueleto). Una fila por especie y dosis.
         </div>
         <textarea id="vad-paste-text" class="form-control" rows="9" style="font-family:var(--mono);font-size:.78rem" placeholder="Pega aquí (Ctrl+V)..."></textarea>
         <div style="display:flex;gap:.5rem;margin-top:.6rem">
@@ -10356,17 +10593,49 @@ function _vadGridColFromHeader(h) {
   if (k === 'nombres') return 'nombres';
   if (k === 'concs') return 'conc';
   if (k === 'cats') return 'categoria';
+  if (k === 'subcat') return 'subcat';
+  if (k === 'subsubcat') return 'subsubcat';
   if (k === 'cat_esp') return 'cat_esp';
   if (k === 'routes') return 'routes';
-  if (k === 'freq') return 'freq';
-  if (k === 'species_doses') return 'dosis';
+  if (k === 'freq') return 'sp_freq';
+  if (k === 'indic') return 'indic';
+  if (k === 'contraindications') return 'contraindications';
+  if (k === 'info') return 'info';
   if (k === 'notes') return 'notes';
-  if (h === 'categoria' || h === 'categoria_general' || h === 'seccion' || h === 'sec') return 'categoria';
-  if (h === 'subcategoria' || h === 'subcategorias' || h === 'subcat') return 'subcat';
-  if (h === 'subsubcategoria' || h === 'subsubcat' || h === 'sub_categoria' || h === 'subcat2') return 'subsubcat';
-  if (h === 'dosis' || h === 'dosis_por_especie' || h === 'dosis_especies') return 'dosis';
-  if (h.includes('bibliografia') || h.includes('referencia') || h.includes('fuente') || h === 'urls' || h === 'url') return 'bibliografia';
-  if (h.includes('concentra') || h === 'conc' || h === 'mg_ml') return 'conc';
+  if (k === 'mech') return 'mech';
+  if (k === 'mech_simple') return 'mech_simple';
+  if (k === 'desc') return 'desc';
+  if (k === 'keywords') return 'keywords';
+  if (k === 'bibliografia') return 'bibliografia';
+  if (k === 'sp') return 'sp';
+  if (k === 'sci') return 'sci';
+  if (k === 'dmin') return 'dmin';
+  if (k === 'dmax') return 'dmax';
+  if (k === 'unit') return 'unit';
+  if (k === 'fuente') return 'fuente';
+  if (k === 'sp_via') return 'sp_via';
+  if (k === 'sp_freq') return 'sp_freq';
+  if (k === 'sp_notes') return 'sp_notes';
+  if (h === 'categoria' || h === 'categoria_general' || h === 'seccion' || h === 'sec' || h === 'cats') return 'categoria';
+  if (h === 'subcategoria' || h === 'subcategorias' || h === 'subcat' || h === 'sub_categoria' || h === 'subcat2') return 'subcat';
+  if (h === 'subsubcategoria' || h === 'subsubcat' || h === 'sub_subcategoria' || h === 'sub_sub') return 'subsubcat';
+  if (h.includes('palabra') || h.includes('keyword') || h.includes('etiqueta') || h.includes('tag')) return 'keywords';
+  if (h.includes('descrip') || h === 'desc') return 'desc';
+  if (h.includes('mecanismo')) return h.includes('resumido') || h.includes('simple') ? 'mech_simple' : 'mech';
+  if (h.includes('contraindic')) return 'contraindications';
+  if (h.includes('indicaci')) return 'indic';
+  if (h.includes('efectos') || h.includes('adverso') || h.includes('reacciones')) return 'info';
+  if (h.includes('bibliografia') || h.includes('referencia') || h.includes('link') || h === 'urls' || h === 'url') return 'bibliografia';
+  if (h.includes('nombre_cientifico') || h.includes('cientifico')) return 'sci';
+  if (h.includes('nombre_comun') || h.includes('especie') || h === 'animal' || h === 'sp') return 'sp';
+  if (h.includes('dosis_min') || h.includes('minima') || h === 'dmin') return 'dmin';
+  if (h.includes('dosis_max') || h.includes('maxima') || h === 'dmax') return 'dmax';
+  if (h.includes('unidad')) return 'unit';
+  if (h === 'fuente' || h === 'fuente_dosis' || h === 'referencia_dosis') return 'fuente';
+  if (h === 'via' || h === 'vias_dosis' || h === 'via_dosis') return 'sp_via';
+  if (h.includes('frecuencia')) return 'sp_freq';
+  if (h.includes('notas')) return h.includes('clinica') ? 'notes' : 'sp_notes';
+  if (h === 'dosis' || h.includes('dosis_por_especie') || h.includes('dosis_especies')) return '';
   return '';
 }
 
@@ -10380,14 +10649,14 @@ function vadExcelApplyPaste() {
   const headerCols = firstCells.map(c => _vadGridColFromHeader(_normHeader(c)));
   const hasHeader = headerCols.some(Boolean);
   const dataLines = hasHeader ? lines.slice(1) : lines;
-  const order = ['active','nombres','categoria','subcat','subsubcat','cat_esp','conc','routes','freq','dosis','notes','bibliografia'];
+  const order = ['categoria','subcat','subsubcat','active','nombres','conc','cat_esp','routes','indic','contraindications','info','notes','mech','mech_simple','desc','keywords','bibliografia','sp','sci','dmin','dmax','unit','fuente','sp_via','sp_freq','sp_notes'];
   let added = 0;
   dataLines.forEach(line => {
     const cells = line.split(sep).map(c=>String(c).trim());
     const mapped = {};
     if (hasHeader) headerCols.forEach((col, i) => { if (col && cells[i]) mapped[col] = cells[i]; });
     else order.forEach((key, i) => { if (cells[i]) mapped[key] = cells[i]; });
-    if (!mapped.active && !mapped.nombres && !mapped.categoria) return;
+    if (!mapped.active && !mapped.nombres && !mapped.categoria && !mapped.subcat && !mapped.sp) return;
     addVadExcelRowFromMapped(mapped);
     added++;
   });
@@ -10399,7 +10668,7 @@ function addVadExcelRow() { addVadExcelRowFromMapped({}); }
 function addVadExcelRowFromMapped(m) {
   const tbody = document.getElementById('vad-excel-tbody');
   if (!tbody) return;
-  let catLabel = m.categoria || m.category || '';
+  let catLabel = m.categoria || '';
   let catKey = '';
   if (catLabel) {
     const hit = Object.entries(VADEMECUM_CATS).find(([k,v]) => v.label === catLabel || k === catLabel);
@@ -10408,80 +10677,127 @@ function addVadExcelRowFromMapped(m) {
   tbody.insertAdjacentHTML('beforeend', vadGridRowHtml({
     active: m.active || '',
     nombres: (m.nombres||'').split(/[\/;]/).map(x=>x.trim()).filter(Boolean),
-    cat_vad: catKey,
-    category: catLabel,
-    subcat_vad: m.subcat || '',
-    subsubcat_vad: m.subsubcat || '',
+    categoria: catLabel,
+    subcat: m.subcat || '',
+    subsubcat: m.subsubcat || '',
     cat_esp: m.cat_esp || '',
     route: (m.routes||'').split(/[,;]/)[0]||'',
     routes: (m.routes||'').split(/[,;]/).map(x=>x.trim()).filter(Boolean),
-    freq: m.freq || '',
-    _conc: m.conc || '',
-    _dosis: m.dosis || '',
+    indic: m.indic || '',
+    contraindications: m.contraindications || '',
+    info: m.info || '',
     notes: m.notes || '',
-    _bib: m.bibliografia || ''
+    mech: m.mech || '',
+    mech_simple: m.mech_simple || '',
+    desc: m.desc || '',
+    keywords: (m.keywords||'').split(/[,;]+/).map(x=>x.trim()).filter(Boolean),
+    _conc: m.conc || '',
+    _bib: m.bibliografia || '',
+    _sp: m.sp || '',
+    _sci: m.sci || '',
+    _dmin: m.dmin || '',
+    _dmax: m.dmax || '',
+    _unit: m.unit || '',
+    _fuente: m.fuente || '',
+    _via: m.sp_via || '',
+    _freq: m.sp_freq || '',
+    _spNotes: m.sp_notes || ''
   }));
+}
+
+// Agrupa las filas planas del grid en fármacos (celdas vacías heredan la fila anterior).
+// gridRows: [{ id, m: {campo: valor} }] en orden de tabla.
+function _vadExcelGroups(gridRows) {
+  const groups = [];
+  let cur = null;
+  for (const g of gridRows) {
+    const m = {};
+    for (const f of VAD_GRID_ORDER) {
+      const v = String(g.m?.[f] ?? '').trim();
+      if (v !== '') m[f] = v;
+    }
+    for (const f of VAD_GRID_ORDER) {
+      if (m[f] === undefined && cur && cur._last && cur._last[f] !== undefined) m[f] = cur._last[f];
+      if (m[f] === undefined) m[f] = '';
+    }
+    const active = String(m.active||'').trim();
+    const differentId = g.id && g.id !== cur?._id;
+    const differentActive = active && active !== cur?._key;
+    if (!cur || differentId || differentActive) {
+      cur = { _key: active, _last: m, _id: g.id || '', rows: [] };
+      groups.push(cur);
+    }
+    cur._last = m;
+    cur.rows.push(m);
+  }
+  return groups;
 }
 
 async function saveVadExcel() {
   const rows = document.querySelectorAll('#modal-vad-excel tr[data-row]');
   if (!rows.length) return;
-  const touched = [];
-  let created=0, updated=0, deleted=0, skipped=0, sinCat=0;
+  const gridRows = [];
+  const deletes = [];
   for (const row of rows) {
     const id = row.dataset.id || '';
-    const active = (row.querySelector('[data-col="active"]')?.value||'').trim();
-    const nombresRaw = (row.querySelector('[data-col="nombres"]')?.value||'').trim();
-    if (row.querySelector('[data-col="eliminar"]')?.checked && id) {
-      VADEMECUM_DB = VADEMECUM_DB.filter(x => x.id !== id);
-      try { await dbDeleteSync('vademecum', id); } catch(e) {}
-      deleted++;
-      continue;
+    if (row.querySelector('[data-col="eliminar"]')?.checked && id) { deletes.push(id); continue; }
+    const m = {};
+    let any = false;
+    for (const f of VAD_GRID_ORDER) {
+      const el = row.querySelector('[data-col="'+f+'"]');
+      const v = el ? String(el.value||'').trim() : '';
+      if (v) any = true;
+      m[f] = v;
     }
-    const nombres = nombresRaw ? nombresRaw.split(/[\/;]/).map(x=>x.trim()).filter(Boolean) : [];
-    if (!active && !nombresRaw) { skipped++; continue; }
-    const catLabel = row.querySelector('[data-col="categoria"]')?.value||'';
-    const subLabel = row.querySelector('[data-col="subcat"]')?.value||'';
-    const ssLabel = row.querySelector('[data-col="subsubcat"]')?.value||'';
-    const cat_esp = (row.querySelector('[data-col="cat_esp"]')?.value||'').trim();
-    const concObjs = vdParseConcStr(row.querySelector('[data-col="conc"]')?.value);
-    const routes = (row.querySelector('[data-col="routes"]')?.value||'').split(/[,;]/).map(x=>x.trim()).filter(Boolean);
-    const freq = (row.querySelector('[data-col="freq"]')?.value||'').trim();
-    const species_doses = vdParseDosisStr(row.querySelector('[data-col="dosis"]')?.value);
-    const notes = (row.querySelector('[data-col="notes"]')?.value||'').trim();
-    const bibliografia = vdParseBibStr(row.querySelector('[data-col="bibliografia"]')?.value);
-    if (!catLabel) sinCat++;
+    if (any) gridRows.push({ id, m });
+  }
+  for (const id of deletes) {
+    VADEMECUM_DB = VADEMECUM_DB.filter(x => x.id !== id);
+    try { await dbDeleteSync('vademecum', id); } catch(e) {}
+  }
+  const groups = _vadExcelGroups(gridRows);
+  let created=0, updated=0, sinCat=0, skipped=0, catsChanged=false;
+  const touched = [];
+  for (const g of groups) {
+    const d = _drugFromGroup(g);
+    if (!d.active && !d.drug && !d.nombres.length && !d.species_doses.length) { skipped++; continue; }
+    const st = vdEnsureCatStructure(d.catLabel, d.subcatLabel, d.ssLabel);
+    if (st) {
+      d.cat_vad = st.catKey; d.subcat_vad = st.subLabel; d.subsubcat_vad = st.ssLabel;
+      d.category = st.catLabel;
+      if (!(d.cats||[]).includes(st.catLabel)) {
+        if (d.cats.length) d.cats[0] = st.catLabel; else d.cats.push(st.catLabel);
+      }
+      if (st.created) catsChanged = true;
+    }
+    vdEnsureCats(d);
+    if (!d.cat_vad && !(d.cats||[]).length) sinCat++;
     const drugData = {
-      drug: nombres[0] || active,
-      nombres: nombres.length ? nombres : (active ? [active] : []),
-      active,
-      cats: catLabel ? [catLabel] : [],
-      category: catLabel,
-      cat_vad: catLabel ? (Object.entries(VADEMECUM_CATS).find(([k,v])=>v.label===catLabel||k===catLabel)?.[0]||'') : '',
-      subcat_vad: subLabel || null,
-      subsubcat_vad: ssLabel || null,
-      cat_esp,
-      conc: concObjs[0]?.val || 0,
-      concs: concObjs,
-      conc_units: concObjs.map(c => c.num + '/' + c.den),
-      route: routes[0] || 'IM',
-      routes: routes.length ? routes : [],
-      freq, notes, bibliografia, species_doses
+      drug: d.drug, nombres: d.nombres, active: d.active,
+      cat_vad: d.cat_vad, category: d.category, cats: d.cats,
+      subcat_vad: d.subcat_vad, subsubcat_vad: d.subsubcat_vad,
+      cat_esp: d.cat_esp, conc: d.conc, concs: d.concs, conc_units: d.conc_units,
+      route: d.route, routes: d.routes,
+      indic: d.indic, contraindications: d.contraindications, info: d.info, notes: d.notes,
+      mech: d.mech, mech_simple: d.mech_simple, desc: d.desc, keywords: d.keywords,
+      bibliografia: d.bibliografia, species_doses: d.species_doses
     };
+    if (d.freq) drugData.freq = d.freq;
     let target = null;
-    if (id) target = VADEMECUM_DB.find(x => x.id === id);
-    if (!target && active) {
-      const addr = _activeCore(active) || _normActive(active);
-      target = VADEMECUM_DB.find(x => {
+    if (g._id) target = VADEMECUM_DB.find(x => x.id === g._id);
+    if (!target && (drugData.active || drugData.drug)) {
+      const addr = _activeCore(drugData.active) || _normActive(drugData.active);
+      target = addr ? VADEMECUM_DB.find(x => {
         const c = _activeCore(x.active) || _normActive(x.active);
-        if (addr && c === addr) return true;
+        if (c === addr) return true;
         if (addr && _normActive(x.drug||'') === addr) return true;
         return (x.nombres||[]).some(n => _normActive(n) === addr);
-      });
+      }) : null;
     }
     if (target) {
       Object.assign(target, drugData);
       await dbPutSync('vademecum', target);
+      if (firestore && fbUid()) { try { await fsPut('vademecum', target); } catch(e) {} }
       touched.push(target.id);
       updated++;
     } else {
@@ -10493,12 +10809,13 @@ async function saveVadExcel() {
     }
   }
   document.getElementById('modal-vad-excel')?.remove();
+  if (catsChanged) await saveVademecumCats();
   for (const id of touched) { try { await syncVadToSpecies(id); } catch(e) {} }
   renderVademecum();
   const parts=[];
   if (created) parts.push('Creados '+created);
   if (updated) parts.push('Actualizados '+updated);
-  if (deleted) parts.push('Eliminados '+deleted);
+  if (deletes.length) parts.push('Eliminados '+deletes.length);
   if (skipped) parts.push('Vacías '+skipped);
   if (sinCat) parts.push('⚠ '+sinCat+' sin categoría (visibles en "Todos" y buscador)');
   toast((parts.length ? '✓ ' : '⚠ Sin cambios ') + parts.join(' · '));
