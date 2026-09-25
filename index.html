@@ -12741,23 +12741,30 @@ function toRoman(n) {
 // ═══════════════════════════════════
 // CAMBIO 8: unidades de concentración (numerador/denominador) con "+" persistente
 // ═══════════════════════════════════
-let HC_UNITS_EXTRA = { num:[], den:[] };
+let HC_UNITS_EXTRA = { num:[], den:[], dosenum:[], doseden:[] };
 try { const saved = JSON.parse(localStorage.getItem('hc_units_extra')||'null'); if (saved && saved.num && saved.den) HC_UNITS_EXTRA = saved; } catch(e) {}
 function hcSaveUnits() { try { localStorage.setItem('hc_units_extra', JSON.stringify(HC_UNITS_EXTRA)); } catch(e) {} }
-function hcUnitOpts(which, placeholder) {
-  const defs = which==='num' ? ['mg','µg','UI','g','mEq'] : ['ml','tab','cap','got','sachet'];
+function hcDoseUnitOpts(which, placeholder) {
+  const numLike = (which==='num' || which==='dosenum');
+  const defs = numLike
+    ? ['mg','µg','UI','g','mEq']
+    : (which==='den' ? ['ml','tab','cap','got','sachet'] : ['kg','g','lb','animal']);
   const extra = HC_UNITS_EXTRA[which] || [];
   return `<option value="">${placeholder}</option>` + [...defs, ...extra].map(u=>`<option value="${u}">${u}</option>`).join('');
 }
+function hcUnitOpts(which, placeholder) { return hcDoseUnitOpts(which, placeholder); }
 function hcRefreshUnits(which) {
-  document.querySelectorAll('.treat-conc-'+which).forEach(sel=>{
+  const map = { 'num':'.treat-conc-num', 'den':'.treat-conc-den', 'dosenum':'.treat-dosis-num', 'doseden':'.treat-dosis-den' };
+  const ph = { 'num':'mg/µg/UI...', 'den':'ml/tab/cap...', 'dosenum':'mg/µg/UI...', 'doseden':'kg/g/lb...' };
+  document.querySelectorAll(map[which]||'').forEach(sel=>{
     const keep = sel.value;
-    sel.innerHTML = hcUnitOpts(which, sel.dataset.ph || (which==='num'?'mg/µg/UI...':'ml/tab/cap...'));
+    sel.innerHTML = hcDoseUnitOpts(which, sel.dataset.ph || ph[which]);
     sel.value = keep;
   });
 }
 function hcAddUnit(btn, which) {
-  const u = (prompt(which==='num' ? 'Nueva unidad de numerador (ej: mEq, mmol):' : 'Nueva unidad de denominador (ej: sachet, ampolla):')||'').trim();
+  const ex = { num:'mg, µg, UI...', den:'ml, tab, cap...', dosenum:'mg, µg, UI...', doseden:'kg, g, lb...' };
+  const u = (prompt('Nueva unidad ('+which+') — ej: '+(ex[which]||'...')+':')||'').trim();
   if (!u) return;
   const list = HC_UNITS_EXTRA[which] || (HC_UNITS_EXTRA[which]=[]);
   if (list.some(x=>x.toLowerCase()===u.toLowerCase())) { toast('⚠ Esa unidad ya existe'); return; }
@@ -12769,12 +12776,9 @@ function hcAddUnit(btn, which) {
 function hcConcChanged(sel) {
   const row = sel.closest('[data-trow]');
   if (!row) return;
-  const num = row.querySelector('.treat-conc-num')?.value || '';
   const den = row.querySelector('.treat-conc-den')?.value || '';
   const tu = row.querySelector('.treat-total-u');
   if (tu) tu.value = den;
-  const du = row.querySelector('.treat-dosis-u');
-  if (du) du.textContent = num ? '('+num+'/kg)' : '';
   calcTreatDose(sel);
 }
 // ═══════════════════════════════════
@@ -13001,20 +13005,34 @@ function hcTreatRowHtml(i, prefix) {
         <div class="form-group" style="margin-bottom:.4rem"><label style="font-size:.72rem">Principio activo</label><input class="form-control treat-pa" placeholder="Ketamina..."></div>
         <div class="form-group" style="margin-bottom:.4rem"><label style="font-size:.72rem">Nombre comercial</label><input class="form-control treat-nc" placeholder="Ketaset..."></div>
       </div>
+      <div style="display:grid;grid-template-columns:0.9fr 1.6fr;gap:.3rem;margin-bottom:.4rem;align-items:end">
+        <div><label style="font-size:.72rem;color:var(--txt3)">Peso (kg)</label><input class="form-control treat-peso" type="text" inputmode="decimal" placeholder="kg" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
+        <div>
+          <label style="font-size:.72rem;color:var(--txt3)">Dosis básica <span class="treat-approx-dosis" style="display:none;color:var(--am);font-weight:700">≈ entero</span></label>
+          <div style="display:flex;gap:.2rem">
+            <input class="form-control treat-dosis" type="text" inputmode="decimal" placeholder="Ej: 2" style="flex:1;font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)">
+            <select class="form-control treat-dosis-num" style="flex:0 0 auto;width:96px;font-size:.78rem" data-ph="mg/µg/UI..." onchange="calcTreatDose(this)">${hcUnitOpts('dosenum','mg/µg/UI...')}</select>
+            <select class="form-control treat-dosis-den" style="flex:0 0 auto;width:92px;font-size:.78rem" data-ph="kg/g/lb..." onchange="calcTreatDose(this)">${hcUnitOpts('doseden','kg/g/lb...')}</select>
+            <button type="button" class="icon-btn" data-apx="dosis" style="width:26px;height:34px;flex-shrink:0" onclick="treatApprox(this,'dosis')" title="Redondear la dosis básica al entero más cercano">≈</button>
+          </div>
+          <span class="treat-exact-dosis" style="font-size:.62rem;color:var(--txt3)"></span>
+        </div>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;margin-bottom:.4rem">
         <div><label style="font-size:.72rem;color:var(--txt3)">Concentración</label><input class="form-control treat-conc" type="text" inputmode="decimal" placeholder="Ej: 100" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
         <div><label style="font-size:.72rem;color:var(--txt3)">Unidad numerador</label><div style="display:flex;gap:.2rem"><select class="form-control treat-conc-num" style="flex:1;font-size:.82rem" data-ph="mg/µg/UI..." onchange="hcConcChanged(this)">${hcUnitOpts('num','mg/µg/UI...')}</select><button type="button" class="icon-btn" style="width:30px;height:34px;flex-shrink:0" onclick="hcAddUnit(this,'num')" title="Agregar unidad al numerador">+</button></div></div>
         <div><label style="font-size:.72rem;color:var(--txt3)">Unidad denominador</label><div style="display:flex;gap:.2rem"><select class="form-control treat-conc-den" style="flex:1;font-size:.82rem" data-ph="ml/tab/cap..." onchange="hcConcChanged(this)">${hcUnitOpts('den','ml/tab/cap...')}</select><button type="button" class="icon-btn" style="width:30px;height:34px;flex-shrink:0" onclick="hcAddUnit(this,'den')" title="Agregar unidad al denominador">+</button></div></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.4rem">
-        <div><label style="font-size:.72rem;color:var(--txt3)">Dosis básica <span class="treat-dosis-u" style="color:var(--txt3);font-weight:400">(mg/kg)</span></label><input class="form-control treat-dosis" type="text" inputmode="decimal" placeholder="Ej: 2" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
-        <div><label style="font-size:.72rem;color:var(--txt3)">Peso (kg)</label><input class="form-control treat-peso" type="text" inputmode="decimal" placeholder="kg" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
-      </div>
       <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem">
         <label style="font-size:.72rem;color:var(--txt3);flex-shrink:0">⚡ Cálculo automático: completa 3 de las 4 variables (dosis, peso, concentración, dosis total) y la app calcula la que falta.</label>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;margin-bottom:.4rem">
-        <div><label style="font-size:.72rem;color:var(--txt3)">Dosis total <span style="font-size:.62rem;color:var(--txt3)">(editable)</span></label><input class="form-control treat-total" type="text" inputmode="decimal" placeholder="auto / manual" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
+        <div>
+          <label style="font-size:.72rem;color:var(--txt3)">Dosis total / práctica <span class="treat-approx-total" style="display:none;color:var(--am);font-weight:700">≈ entero</span></label>
+          <input class="form-control treat-total" type="text" inputmode="decimal" placeholder="auto / manual" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)">
+          <span class="treat-exact-total" style="font-size:.62rem;color:var(--txt3)"></span>
+          <div style="margin-top:.15rem"><button type="button" class="icon-btn" data-apx="total" onclick="treatApprox(this,'total')" title="Redondear la dosis total al entero más cercano" style="font-size:.62rem;padding:.12rem .35rem">≈ Aproximar</button></div>
+        </div>
         <div><label style="font-size:.72rem;color:var(--txt3)">Unidad dosis total</label><input class="form-control treat-total-u" value="" readonly placeholder="ml/tab/cap..." style="font-size:.82rem;background:var(--sur)"></div>
         <div><label style="font-size:.72rem;color:var(--txt3)">Vía</label>
           <select class="form-control treat-via" style="font-size:.82rem">
@@ -13043,6 +13061,36 @@ function _tcalcMissing(dosis, peso, conc, total) {
   const others = ['dosis','peso','conc','total'].filter(k=>k!==e);
   return others.every(k => [dosis,peso,conc,total][['dosis','peso','conc','total'].indexOf(k)]>0) ? e : null;
 }
+// Conversión de unidades para tratamientos: numerador → mg; denominador de dosis → kg-equivalente
+const _T_MG = { 'mg':1, 'µg':0.001, 'mcg':0.001, 'g':1000, 'kg':1000000, 'meq':1, 'ui':1 };
+const _T_KG = { 'kg':1, 'g':0.001, 'lb':0.453592, 'mg':0.000001 };
+function _tUnitMg(u) { return _T_MG[String(u||'').toLowerCase()] || 1; }
+function _tUnitKg(u) { return _T_KG[String(u||'').toLowerCase()] || 1; }
+// Estado de aproximación "≈" por fila y campo (igual que el goteo de fluidoterapia)
+window._treatApprox = window._treatApprox || {};
+function treatApprox(btn, which) {
+  const row = (btn && btn.closest) ? btn.closest('[data-trow]') : null;
+  if (!row) return;
+  const key = row.id + ':' + which;
+  window._treatApprox[key] = !window._treatApprox[key];
+  calcTreatDose(row);
+}
+// Escribe el valor calculado: con ≈ activo lo redondea al entero más cercano (mín. 1) y muestra el exacto.
+function _tRounded(v, row, which) {
+  const key = row.id + ':' + which;
+  const on = !!(window._treatApprox || {})[key];
+  const ind = row.querySelector('.treat-approx-' + which);
+  if (ind) ind.style.display = on ? 'inline' : 'none';
+  const apxBtn = row.querySelector('[data-apx="' + which + '"]');
+  if (apxBtn) {
+    if (on) { apxBtn.style.background = 'var(--g1)'; apxBtn.style.color = 'var(--am)'; apxBtn.style.borderColor = 'var(--am)'; }
+    else { apxBtn.style.background = ''; apxBtn.style.color = ''; apxBtn.style.borderColor = ''; }
+  }
+  const exactEl = row.querySelector('.treat-exact-' + which);
+  if (exactEl) exactEl.textContent = (on && isFinite(v)) ? 'exacto: ' + fmtNum(v) : '';
+  if (!on || !isFinite(v)) return fmtNum(v);
+  return fmtNum(Math.max(1, Math.round(v)));
+}
 function calcTreatDose(input) {
   const row = (input && input.closest) ? input.closest('[data-trow]') : (input||null);
   if (!row) return;
@@ -13052,6 +13100,8 @@ function calcTreatDose(input) {
   const elTotal = row.querySelector('.treat-total');
   const elNum = row.querySelector('.treat-conc-num');
   const elDen = row.querySelector('.treat-conc-den');
+  const elDN = row.querySelector('.treat-dosis-num');
+  const elDD = row.querySelector('.treat-dosis-den');
   if (!elDosis || !elPeso || !elConc || !elTotal) return;
   const peso = parseNum(elPeso.value)||0;
   const conc = parseNum(elConc.value)||0;
@@ -13059,26 +13109,33 @@ function calcTreatDose(input) {
   const total = parseNum(elTotal.value)||0;
   const den = elDen?.value || '';
   const num = elNum?.value || '';
+  const dn = elDN?.value || '';
+  const dd = elDD?.value || '';
   const tu = row.querySelector('.treat-total-u');
   if (tu && den) tu.value = den;
-  const du = row.querySelector('.treat-dosis-u');
-  if (du) du.textContent = num ? '('+num+'/kg)' : '';
-
-  // Sin selector manual: la app calcula la variable que falta, sin aproximar.
   const miss = _tcalcMissing(dosis, peso, conc, total);
   row.dataset.calcVar = miss || '';
+
+  // Unidades: dosis en {dn} por {dd}; concentración en {num} por {den}.
+  const perAnimal = dd === 'animal';
+  const kf = perAnimal ? 1 : _tUnitKg(dd);         // kg que vale 1 unidad de dden
+  const mgDosis = dosis * _tUnitMg(dn);            // mg por unidad de dden (o por animal)
+  const mgConc  = conc * _tUnitMg(num);            // mg por 1 unidad de den (ml/tab/cap...)
+  const mgTot = perAnimal ? mgDosis : mgDosis * peso / kf;
   if (miss === 'total') {
     row.dataset.calc = 'calc';
-    elTotal.value = fmtNum(dosis*peso/conc);
+    elTotal.value = _tRounded(mgConc > 0 ? mgTot / mgConc : 0, row, 'total');
   } else if (miss === 'conc') {
     row.dataset.calc = 'calc';
-    elConc.value = fmtNum(dosis*peso/total);
+    elConc.value = total > 0 ? _tRounded(mgTot / total / (_tUnitMg(num)||1), row, 'conc') : '0';
   } else if (miss === 'peso') {
     row.dataset.calc = 'calc';
-    elPeso.value = fmtNum(total*conc/dosis);
+    elPeso.value = perAnimal ? '' : _tRounded(total * mgConc * kf / Math.max(mgDosis, 0.0000001), row, 'peso');
   } else if (miss === 'dosis') {
     row.dataset.calc = 'calc';
-    elDosis.value = fmtNum(total*conc/peso);
+    elDosis.value = perAnimal
+      ? _tRounded((total * mgConc) / (_tUnitMg(dn)||1), row, 'dosis')
+      : _tRounded((total * mgConc) * kf / Math.max(peso, 0.0000001) / (_tUnitMg(dn)||1), row, 'dosis');
   } else {
     row.dataset.calc = row.dataset.calc || 'calc';
   }
@@ -13128,10 +13185,10 @@ function hcPresuntivos(r) {
 }
 function treatDesc(t) {
   const arr = [];
-  if (t.conc_num) {
-    arr.push(['Concentración', `${fmtNum(t.conc)} ${t.conc_num}/${t.conc_den}`]);
-    if (t.dosis) arr.push(['Dosis básica', `${fmtNum(t.dosis)} ${t.conc_num}/kg`]);
-    if (t.total) arr.push(['Dosis total', `${fmtNum(t.total)} ${t.total_u||t.conc_den||''}`]);
+if (t.conc_num) {
+      arr.push(['Concentración', `${fmtNum(t.conc)} ${t.conc_num}/${t.conc_den}`]);
+      if (t.dosis) arr.push(['Dosis básica', `${fmtNum(t.dosis)} ${t.dosis_num||t.conc_num}/${t.dosis_den||'kg'}`]);
+      if (t.total) arr.push(['Dosis total', `${fmtNum(t.total)} ${t.total_u||t.conc_den||''}`]);
   } else {
     if (t.conc) arr.push(['Concentración', t.conc]);
     if (t.dosis) arr.push(['Dosis', `${fmtNum(t.dosis)} mg/kg`]);
@@ -13461,6 +13518,8 @@ function calcCollectRows() {
       conc_num: row.querySelector('.treat-conc-num')?.value,
       conc_den: row.querySelector('.treat-conc-den')?.value,
       dosis: row.querySelector('.treat-dosis')?.value,
+      dosis_num: row.querySelector('.treat-dosis-num')?.value,
+      dosis_den: row.querySelector('.treat-dosis-den')?.value,
       peso: row.querySelector('.treat-peso')?.value,
       total: row.querySelector('.treat-total')?.value,
       total_u: row.querySelector('.treat-total-u')?.value,
@@ -13528,6 +13587,8 @@ function loadCalcTratamiento(id) {
     row.querySelector('.treat-conc') && (row.querySelector('.treat-conc').value = t.conc || '');
     if (row.querySelector('.treat-conc-num')) row.querySelector('.treat-conc-num').value = t.conc_num || '';
     if (row.querySelector('.treat-conc-den')) row.querySelector('.treat-conc-den').value = t.conc_den || '';
+    if (row.querySelector('.treat-dosis-num')) row.querySelector('.treat-dosis-num').value = t.dosis_num || '';
+    if (row.querySelector('.treat-dosis-den')) row.querySelector('.treat-dosis-den').value = t.dosis_den || '';
     row.querySelector('.treat-dosis') && (row.querySelector('.treat-dosis').value = t.dosis || '');
     row.querySelector('.treat-peso') && (row.querySelector('.treat-peso').value = t.peso || '');
     row.querySelector('.treat-total') && (row.querySelector('.treat-total').value = t.total || '');
@@ -13596,7 +13657,7 @@ function _txvFormulaText(t, miss) {
     return 'Completa 3 campos para calcular el peso';
   }
   if (miss === 'dosis') {
-    if (peso>0 && conc>0 && total>0) return `Dosis básica = ${fmtNum(total)} × ${fmtNum(conc)} ÷ ${fmtNum(peso)} = <strong>${fmtNum(total*conc/peso)}</strong> ${nu}/kg`;
+    if (peso>0 && conc>0 && total>0) return `Dosis básica = ${fmtNum(total)} × ${fmtNum(conc)} ÷ ${fmtNum(peso)} = <strong>${fmtNum(total*conc/peso)}</strong> ${t.dosis_num||nu}/${t.dosis_den||'kg'}`;
     return 'Completa 3 campos para calcular la dosis básica';
   }
   return '';
@@ -13629,7 +13690,7 @@ function viewCalcTratamiento(id) {
       <div style="font-size:.82rem;font-weight:700;margin-bottom:.35rem">💊 ${t.pa||'Sin nombre'}${t.nc?' <span style="font-weight:400;color:var(--txt3);font-size:.72rem">('+t.nc+')</span>':''}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.3rem">
         <div><label style="font-size:.65rem;color:var(--txt3)">Concentración (${nu}/${de})</label><input class="form-control txv-conc" value="${t.conc||''}" style="font-size:.8rem" oninput="_txvRecalc(${i})"></div>
-        <div><label style="font-size:.65rem;color:var(--txt3)">Dosis básica (${nu}/kg)</label><input class="form-control txv-dosis" value="${t.dosis||''}" style="font-size:.8rem" oninput="_txvRecalc(${i})"></div>
+        <div><label style="font-size:.65rem;color:var(--txt3)">Dosis básica (${t.dosis_num||nu}/${t.dosis_den||'kg'})</label><input class="form-control txv-dosis" value="${t.dosis||''}" style="font-size:.8rem" oninput="_txvRecalc(${i})"></div>
         <div><label style="font-size:.65rem;color:var(--txt3)">Peso (kg)</label><input class="form-control txv-peso" value="${t.peso||''}" style="font-size:.8rem" oninput="_txvRecalc(${i})"></div>
         <div><label style="font-size:.65rem;color:var(--txt3)">Dosis total (${de})</label><input class="form-control txv-total" value="${t.total||''}" style="font-size:.8rem" oninput="_txvRecalc(${i})"></div>
       </div>
@@ -13782,9 +13843,11 @@ async function saveRecord() {
       pa,
       nc: row.querySelector('.treat-nc')?.value,
       conc: row.querySelector('.treat-conc')?.value,
-      conc_num: row.querySelector('.treat-conc-num')?.value,
+conc_num: row.querySelector('.treat-conc-num')?.value,
       conc_den: row.querySelector('.treat-conc-den')?.value,
       dosis: row.querySelector('.treat-dosis')?.value,
+      dosis_num: row.querySelector('.treat-dosis-num')?.value,
+      dosis_den: row.querySelector('.treat-dosis-den')?.value,
       peso: row.querySelector('.treat-peso')?.value,
       total: row.querySelector('.treat-total')?.value,
       total_u: row.querySelector('.treat-total-u')?.value,
@@ -13796,6 +13859,7 @@ async function saveRecord() {
       calc_var: row.dataset.calcVar || ''
     });
   });
+});
 
   // Planes (cambio 11)
   const plans = [];
@@ -15665,6 +15729,7 @@ function openAddEnriquecimiento(editIdx=-1) {
   const existing = editIdx >= 0 ? ENRIQUECIMIENTOS_DB[editIdx] : null;
   document.getElementById('enriq-modal')?.remove();
   window._enriqFotosToRemove = []; // limpiar al abrir
+  window._enriqGruposVinc = (existing?.gruposVinc||[]).slice(); // grupos vinculados de esta ficha
   document.body.insertAdjacentHTML('beforeend', `
     <div id="enriq-modal" style="position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center" onclick="if(event.target===this)this.remove()">
       <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.25rem;width:100%;max-width:540px;max-height:94vh;overflow-y:auto;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom,0px))">
@@ -15698,6 +15763,10 @@ function openAddEnriquecimiento(editIdx=-1) {
           </div>
           <button onclick="addEnriqSpRow()" class="btn btn-secondary btn-sm" style="margin-top:.2rem">+ Agregar especie</button>
         </div>
+        <div class="form-group">
+          <label>Grupos vinculados <span style="font-weight:400;color:var(--txt3);font-size:.72rem">(los grupos usados en "Agregar grupo". Luego puedes actualizar estas fichas desde 🗂 Grupos → "📎 Enriq")</span></label>
+          <div id="enriq-grupos-vinc-list" style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.25rem"></div>
+        </div>
         <div class="form-group"><label>Descripción</label><textarea id="enriq-desc" class="form-control" style="min-height:70px" placeholder="Describe el enriquecimiento...">${existing?.descripcion||''}</textarea></div>
         <div class="form-group"><label>Objetivo</label><textarea id="enriq-obj" class="form-control" style="min-height:50px" placeholder="Qué se busca estimular...">${existing?.objetivo||''}</textarea></div>
         <div class="form-group">
@@ -15723,6 +15792,7 @@ function openAddEnriquecimiento(editIdx=-1) {
       </div>
     </div>`);
   buildSpeciesDatalist('sp-hist-dl'); // Actualizar historial con grupos
+  _enriqRenderGruposVinc();
 }
 
 let _enriqFotosNew = [];
@@ -15840,13 +15910,15 @@ function renderGroupsList() {
   const history = getSpeciesHistory();
   el.innerHTML = SPECIES_GROUPS.map((g, gi) => `
     <div style="border:1px solid var(--bor);border-radius:var(--rsm);padding:.65rem .75rem;margin-bottom:.5rem;background:var(--sur2)">
-      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
+<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap">
         ${g.iconImg?`<img src="${g.iconImg}" style="width:20px;height:20px;object-fit:contain;border-radius:0;vertical-align:middle">`:`<span style="font-size:1rem">${g.icon||'🐾'}</span>`}
         <span style="font-weight:700;font-size:.9rem;flex:1">${g.nombre}</span>
+        <button onclick="applyGroupToEnriquecimientos(${gi})" title="Agrega las especies del grupo a todas las fichas de enriquecimiento vinculadas" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);cursor:pointer;font-size:.72rem;padding:.15rem .4rem">📎 Enriq</button>
         <button onclick="openEditGroup(${gi})" style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rxs);cursor:pointer;font-size:.72rem;padding:.15rem .4rem">✏️ Editar</button>
         <button onclick="confirmDeleteGroup(${gi})" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;font-size:.72rem;padding:.15rem .4rem">✕</button>
-</div>
+      </div>
       ${(g.incluyeGroups||[]).length?`<div style="font-size:.68rem;color:var(--txt3);margin-bottom:.3rem">🧩 Incluye: <b>${g.incluyeGroups.join(', ')}</b></div>`:''}
+${countEnriqConGrupo(g.nombre)?`<div style="font-size:.68rem;color:var(--g6);margin-bottom:.3rem">📎 Vinculado a <b>${countEnriqConGrupo(g.nombre)}</b> ficha(s) de enriquecimiento</div>`:''}
       <div style="display:flex;flex-wrap:wrap;gap:.25rem">
         ${(g.especies||[]).length
           ? g.especies.map(e=>`<span style="font-size:.7rem;background:var(--g1);color:var(--g7);border-radius:20px;padding:.1rem .45rem">${e.sp}${e.sci?` <em style="font-weight:400">(${e.sci})</em>`:''}</span>`).join('')
@@ -16011,11 +16083,92 @@ async function confirmDeleteGroup(gi) {
   toast('Grupo eliminado');
 }
 
+// Chips de grupos vinculados en el formulario de enriquecimiento
+function _enriqRenderGruposVinc() {
+  const chipBox = document.getElementById('enriq-grupos-vinc-list');
+  if (!chipBox) return;
+  const v = window._enriqGruposVinc || [];
+  chipBox.innerHTML = v.length
+    ? v.map(g => `<span data-grp="${vdEsc(g)}" style="display:inline-flex;align-items:center;gap:.3rem;background:var(--g1);border:1px solid var(--g4);color:var(--g7);border-radius:20px;padding:.15rem .5rem;font-size:.75rem">🧩 <b>${vdEsc(g)}</b> <button onclick="_enriqQuitarGrupoVinc(this)" title="Quitar vínculo" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.9rem;padding:0;line-height:1">✕</button></span>`).join('')
+    : '<span style="font-size:.72rem;color:var(--txt3);font-style:italic">Ninguno. Usa "Agregar grupo" arriba para vincular especies.</span>';
+}
+function _enriqQuitarGrupoVinc(btn) {
+  const chip = btn.closest('span[data-grp]');
+  if (!chip) return;
+  const name = chip.dataset.grp;
+  window._enriqGruposVinc = (window._enriqGruposVinc||[]).filter(g => g !== name);
+  _enriqRenderGruposVinc();
+}
+
+// Cuenta las fichas de enriquecimiento vinculadas a un grupo
+function countEnriqConGrupo(nombre) {
+  return ENRIQUECIMIENTOS_DB.filter(e => (e.gruposVinc||[]).includes(nombre)).length;
+}
+
+// Agrega las especies del grupo a todas las fichas de enriquecimiento vinculadas
+async function applyGroupToEnriquecimientos(gi) {
+  const grp = SPECIES_GROUPS[gi];
+  if (!grp) { toast('⚠ Grupo no encontrado'); return; }
+  const grpList = [];
+  const seen = new Set();
+  for (const e of (grp.especies||[])) {
+    const nm = String(e.sp||e.nombre||'').trim();
+    if (!nm) continue;
+    const key = nm.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    grpList.push({ sp: nm, sci: String(e.sci||'').trim() });
+  }
+  if (!grpList.length) { toast('⚠ El grupo "' + grp.nombre + '" no tiene especies'); return; }
+  const target = ENRIQUECIMIENTOS_DB.filter(enr => (enr.gruposVinc||[]).includes(grp.nombre));
+  if (!target.length) {
+    toast('⚠ Ninguna ficha de enriquecimiento está vinculada a "' + grp.nombre + '". Agrega el grupo en una ficha y quedará vinculada desde ahora.');
+    return;
+  }
+  let fichas = 0, added = 0, sciFilled = 0;
+  for (const enr of target) {
+    let lista = Array.isArray(enr.especies)
+      ? enr.especies.map(e => ({ sp: String(e.sp||e.nombre||'').trim(), sci: String(e.sci||'').trim() })).filter(e => e.sp)
+      : (enr.especie ? [{ sp: String(enr.especie||'').trim(), sci: String(enr.sci||'').trim() }].filter(e => e.sp) : []);
+    const map = new Map(lista.map(e => [e.sp.toLowerCase(), e]));
+    let changed = false;
+    for (const g of grpList) {
+      const cur = map.get(g.sp.toLowerCase());
+      if (!cur) {
+        const item = { sp: g.sp, sci: g.sci };
+        lista.push(item);
+        map.set(g.sp.toLowerCase(), item);
+        added++; changed = true;
+      } else if (g.sci && !cur.sci) {
+        cur.sci = g.sci; sciFilled++; changed = true;
+      }
+    }
+    if (changed) {
+      enr.especies = lista;
+      enr.especie = lista[0]?.sp || ''; // compat
+      enr.sci = lista[0]?.sci || '';     // compat
+      fichas++;
+    }
+  }
+  if (!fichas) { toast('✓ Las ' + target.length + ' ficha(s) vinculada(s) a "' + grp.nombre + '" ya tenían todas sus especies'); return; }
+  await saveEnriquecimientos();
+  if (document.getElementById('screen-enriquecimiento')) renderEnriquecimientoScreen();
+  toast('✓ "' + grp.nombre + '" aplicado a ' + fichas + ' ficha(s) de enriquecimiento' + (added ? ' · +' + added + ' especie(s)' : '') + (sciFilled ? ' · ' + sciFilled + ' científico(s) completados' : ''));
+}
+
 function addGroupSpeciesToEnriq(groupIdx) {
   const grp = SPECIES_GROUPS[groupIdx];
   if (!grp?.especies?.length) { toast('⚠ Este grupo no tiene especies'); return; }
   const list = document.getElementById('enriq-sp-list') || document.getElementById('enriq-especies-list');
   if (!list) return;
+  // Vincular el grupo a esta ficha (solo en el formulario principal de enriquecimiento)
+  if (list.id === 'enriq-sp-list') {
+    window._enriqGruposVinc = window._enriqGruposVinc || [];
+    if (!window._enriqGruposVinc.includes(grp.nombre)) {
+      window._enriqGruposVinc.push(grp.nombre);
+      _enriqRenderGruposVinc();
+    }
+  }
   // Get existing species to avoid duplicates
   const existing = new Set(Array.from(list.querySelectorAll('.enriq-sp-inp, .enriq-sp')).map(el=>el.value.toLowerCase()));
   let added = 0;
@@ -16231,6 +16384,7 @@ async function saveEnriquecimiento(editIdx=-1) {
     especie:     especies[0]?.sp||'',           // compat
     sci:         especies[0]?.sci||'',          // compat
     especies,
+    gruposVinc: (window._enriqGruposVinc||[]).slice(),
     descripcion: document.getElementById('enriq-desc')?.value||'',
     objetivo:    document.getElementById('enriq-obj')?.value||'',
     materiales,
