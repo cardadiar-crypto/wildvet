@@ -944,6 +944,11 @@ textarea.form-control{resize:vertical;min-height:70px}
 </div>
 
 <script>
+// ─────────────────────────────────────
+// VERSIÓN DE LA APP (para detectar si una caché vieja está sirviendo otra build)
+// ─────────────────────────────────────
+const APP_VERSION = '48';
+
 // ═══════════════════════════════════
 // DEFAULT SPECIES DB
 // ═══════════════════════════════════
@@ -13113,8 +13118,6 @@ function calcTreatDose(input) {
   const dd = elDD?.value || '';
   const tu = row.querySelector('.treat-total-u');
   if (tu && den) tu.value = den;
-  const miss = _tcalcMissing(dosis, peso, conc, total);
-  row.dataset.calcVar = miss || '';
 
   // Unidades: dosis en {dn} por {dd}; concentración en {num} por {den}.
   const perAnimal = dd === 'animal';
@@ -13122,20 +13125,46 @@ function calcTreatDose(input) {
   const mgDosis = dosis * _tUnitMg(dn);            // mg por unidad de dden (o por animal)
   const mgConc  = conc * _tUnitMg(num);            // mg por 1 unidad de den (ml/tab/cap...)
   const mgTot = perAnimal ? mgDosis : mgDosis * peso / kf;
-  if (miss === 'total') {
+
+  // ¿Qué campo está escribiendo el usuario ahora mismo? (no pelear con el tecleo)
+  let active = '';
+  if (input && input.classList) {
+    if (input.classList.contains('treat-peso')) active = 'peso';
+    else if (input.classList.contains('treat-dosis')) active = 'dosis';
+    else if (input.classList.contains('treat-conc')) active = 'conc';
+    else if (input.classList.contains('treat-total')) active = 'total';
+  }
+
+  // Campos de entrada = dosis/peso/conc; "Dosis total / práctica" es la SALIDA.
+  // Reglas:
+  //  · si falta exactamente una variable → la calculo (pero sin machacar la que escribes);
+  //  · si están las 4 llenas → recalculo SIEMPRE el total, salvo que estés escribiendo en él.
+  const inputsOk = dosis>0 && peso>0 && conc>0;
+  const totalOk = total>0;
+  let target = null;
+  if (!totalOk && inputsOk) target = 'total';
+  else if (!conc && dosis>0 && peso>0 && totalOk) target = 'conc';
+  else if (!peso && dosis>0 && conc>0 && totalOk) target = 'peso';
+  else if (!dosis && peso>0 && conc>0 && totalOk) target = 'dosis';
+  else if (inputsOk && totalOk && active !== 'total') target = 'total';
+
+  row.dataset.calcVar = target || '';
+  if (target === 'total') {
     row.dataset.calc = 'calc';
-    elTotal.value = _tRounded(mgConc > 0 ? mgTot / mgConc : 0, row, 'total');
-  } else if (miss === 'conc') {
+    if (active !== 'total') elTotal.value = _tRounded(mgConc > 0 ? mgTot / mgConc : 0, row, 'total');
+  } else if (target === 'conc') {
     row.dataset.calc = 'calc';
-    elConc.value = total > 0 ? _tRounded(mgTot / total / (_tUnitMg(num)||1), row, 'conc') : '0';
-  } else if (miss === 'peso') {
+    if (active !== 'conc') elConc.value = total > 0 ? _tRounded(mgTot / total / (_tUnitMg(num)||1), row, 'conc') : '0';
+  } else if (target === 'peso') {
     row.dataset.calc = 'calc';
-    elPeso.value = perAnimal ? '' : _tRounded(total * mgConc * kf / Math.max(mgDosis, 0.0000001), row, 'peso');
-  } else if (miss === 'dosis') {
+    if (active !== 'peso') elPeso.value = perAnimal ? '' : _tRounded(total * mgConc * kf / Math.max(mgDosis, 0.0000001), row, 'peso');
+  } else if (target === 'dosis') {
     row.dataset.calc = 'calc';
-    elDosis.value = perAnimal
-      ? _tRounded((total * mgConc) / (_tUnitMg(dn)||1), row, 'dosis')
-      : _tRounded((total * mgConc) * kf / Math.max(peso, 0.0000001) / (_tUnitMg(dn)||1), row, 'dosis');
+    if (active !== 'dosis') {
+      elDosis.value = perAnimal
+        ? _tRounded((total * mgConc) / (_tUnitMg(dn)||1), row, 'dosis')
+        : _tRounded((total * mgConc) * kf / Math.max(peso, 0.0000001) / (_tUnitMg(dn)||1), row, 'dosis');
+    }
   } else {
     row.dataset.calc = row.dataset.calc || 'calc';
   }
@@ -18110,8 +18139,10 @@ function installApp() {
 window.addEventListener('online', ()=>document.getElementById('offline-badge').classList.remove('show'));
 window.addEventListener('offline', ()=>document.getElementById('offline-badge').classList.add('show'));
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').then(reg => {
-    // Detectar actualización disponible
+  // Re-registra y fuerza update para desalojar un service worker viejo que cachee una versión anterior.
+  navigator.serviceWorker.register('sw.js?v=' + APP_VERSION, { scope: './' }).then(reg => {
+    reg.update().catch(() => {});
+    navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.update().catch(() => {})));
     reg.addEventListener('updatefound', () => {
       const newWorker = reg.installing;
       newWorker?.addEventListener('statechange', () => {
@@ -18122,6 +18153,17 @@ if ('serviceWorker' in navigator) {
     });
   }).catch(() => {});
 }
+
+// Aviso único por versión: permite confirmar visualmente qué build está corriendo.
+try {
+  const seenKey = 'wildvet_seen_v' + APP_VERSION;
+  if (localStorage.getItem(seenKey) !== '1') {
+    const showV = () => { const t = document.getElementById('toast'); if (t) toast('WildVet v' + APP_VERSION + ' — si no ves esta versión, limpia caché / Service Worker'); };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showV);
+    else setTimeout(showV, 600);
+    localStorage.setItem(seenKey, '1');
+  }
+} catch(e) {}
 
 // ═══════════════════════════════════
 // INIT
