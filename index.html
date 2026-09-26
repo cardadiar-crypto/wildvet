@@ -573,6 +573,16 @@ textarea.form-control{resize:vertical;min-height:70px}
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"/></svg>
         </div>
       </div>
+      <div class="calc-option" style="text-align:left;padding:.9rem" onclick="showScreen('calc-diluciones')">
+        <div style="display:flex;align-items:center;gap:.6rem">
+          <span style="font-size:1.6rem">🧪</span>
+          <div style="flex:1">
+            <div style="font-size:.82rem;font-weight:700">Calculadora de diluciones</div>
+            <div style="font-size:.72rem;color:var(--txt3)">Dilución simple (C₁·V₁ = C₂·V₂) y sólido a suspensión (V = M/C)</div>
+          </div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"/></svg>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -615,6 +625,16 @@ textarea.form-control{resize:vertical;min-height:70px}
       </div>
       <div id="tcalc-hist-list"><p style="font-size:.8rem;color:var(--txt3);font-style:italic;text-align:center;padding:.5rem">Sin cálculos guardados</p></div>
     </div>
+  </div>
+
+  <!-- CALCULADORA DE DILUCIONES -->
+  <div id="screen-calc-diluciones" class="screen">
+    <div class="flex-between mb-2">
+      <h2 style="font-size:1.1rem;font-weight:700">🧪 Calculadora de Diluciones</h2>
+      <button class="btn btn-secondary btn-sm" onclick="showScreen('calculadoras')">← Calculadoras</button>
+    </div>
+    <p style="font-size:.82rem;color:var(--txt3);margin-bottom:1rem">Dilución simple (C₁·V₁ = C₂·V₂) y sólido a suspensión (V = M/C). Completa todas las variables menos una y la app calcula la que falta.</p>
+    <div id="calc-diluciones-container"></div>
   </div>
 
   <!-- CALCULADORAS NUTRICIONALES -->
@@ -947,7 +967,7 @@ textarea.form-control{resize:vertical;min-height:70px}
 // ─────────────────────────────────────
 // VERSIÓN DE LA APP (para detectar si una caché vieja está sirviendo otra build)
 // ─────────────────────────────────────
-const APP_VERSION = '48';
+const APP_VERSION = '49';
 
 // ═══════════════════════════════════
 // DEFAULT SPECIES DB
@@ -3556,6 +3576,7 @@ function showScreen(name, trackNav=true) {
   if (name==='nutricion-calc') { renderNutricionCalcScreen(); }
   if (name==='calc-fluidoterapia') { renderFluidoterapiaCalcScreen(); }
   if (name==='calc-tratamientos') { renderCalcTratamientosScreen(); }
+  if (name==='calc-diluciones') { renderCalcDilucionesScreen(); }
   if (name==='historias') renderRecordsList();
   if (name==='vademecum') { syncAndRenderVademecum(); }
 }
@@ -13175,6 +13196,101 @@ function calcTreatDose(input) {
     }
   } else {
     row.dataset.calc = row.dataset.calc || 'calc';
+  }
+}
+// ═══════════════════════════════════
+// CAMBIO v49: calculadora de diluciones (simple y sólido a suspensión)
+// ═══════════════════════════════════
+function renderCalcDilucionesScreen() {
+  const c = document.getElementById('calc-diluciones-container');
+  if (!c) return;
+  c.innerHTML = `
+    <div style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rsm);padding:.9rem;margin-bottom:1rem">
+      <div style="font-size:.82rem;font-weight:700;margin-bottom:.1rem">💉 1 · Dilución simple — concentración final</div>
+      <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.5rem">Fórmula: <b>C₁ × V₁ = C₂ × V₂</b> — escribe 3 de las 4 variables y la app calcula la restante al instante. Si tienes V₁ y V₂, verás el volumen de diluyente a agregar (V₂ − V₁).</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem">
+        <div><label style="font-size:.72rem;color:var(--txt3)">C₁ — Concentración inicial</label><input id="dil-c1" class="form-control" type="text" inputmode="decimal" placeholder="Ej: 100" style="font-size:.82rem" oninput="calcDilucion(this)" onblur="fmtInput(this)"></div>
+        <div><label style="font-size:.72rem;color:var(--txt3)">V₁ — Volumen inicial (del fármaco)</label><input id="dil-v1" class="form-control" type="text" inputmode="decimal" placeholder="Ej: 5" style="font-size:.82rem" oninput="calcDilucion(this)" onblur="fmtInput(this)"></div>
+        <div><label style="font-size:.72rem;color:var(--txt3)">C₂ — Concentración final deseada</label><input id="dil-c2" class="form-control" type="text" inputmode="decimal" placeholder="Ej: 50" style="font-size:.82rem" oninput="calcDilucion(this)" onblur="fmtInput(this)"></div>
+        <div><label style="font-size:.72rem;color:var(--txt3)">V₂ — Volumen final deseado</label><input id="dil-v2" class="form-control" type="text" inputmode="decimal" placeholder="Ej: 10" style="font-size:.82rem" oninput="calcDilucion(this)" onblur="fmtInput(this)"></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.6rem">
+        <div id="dil-res-v1" style="flex:1 1 200px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.4rem .6rem;font-size:.82rem;color:var(--txt3)">💉 V₁ · volumen inicial → —</div>
+        <div id="dil-res-dil" style="flex:1 1 200px;background:var(--g1);border:1px solid var(--g4);border-radius:var(--rxs);padding:.4rem .6rem;font-size:.82rem;color:var(--g7);font-weight:600">🧴 Diluyente a agregar (V₂ − V₁) → —</div>
+      </div>
+    </div>
+    <div style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rsm);padding:.9rem">
+      <div style="font-size:.82rem;font-weight:700;margin-bottom:.1rem">🧂 2 · Sólido a suspensión</div>
+      <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.5rem">Fórmula: <b>V = M / C</b> (variante C = M / V) — escribe 2 de las 3 variables (M masa del soluto, C concentración deseada, V volumen final) y la app calcula la restante al instante.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem">
+        <div><label style="font-size:.72rem;color:var(--txt3)">M — Masa del soluto (mg)</label><input id="sus-m" class="form-control" type="text" inputmode="decimal" placeholder="Ej: 500" style="font-size:.82rem" oninput="calcSuspension(this)" onblur="fmtInput(this)"></div>
+        <div><label style="font-size:.72rem;color:var(--txt3)">C — Concentración deseada (mg/mL)</label><input id="sus-c" class="form-control" type="text" inputmode="decimal" placeholder="Ej: 50" style="font-size:.82rem" oninput="calcSuspension(this)" onblur="fmtInput(this)"></div>
+        <div><label style="font-size:.72rem;color:var(--txt3)">V — Volumen final (mL)</label><input id="sus-v" class="form-control" type="text" inputmode="decimal" placeholder="Ej: 10" style="font-size:.82rem" oninput="calcSuspension(this)" onblur="fmtInput(this)"></div>
+      </div>
+      <div id="sus-res" style="margin-top:.6rem;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.4rem .6rem;font-size:.82rem;color:var(--txt3)">Resultado → —</div>
+    </div>`;
+}
+// Devuelve la ÚNICA variable vacía de `vals` (todas las demás > 0), o null si no es exactamente 1
+function _calcMissing(vals) {
+  const keys = Object.keys(vals);
+  const empty = keys.filter(k => !(vals[k] > 0));
+  if (empty.length !== 1) return null;
+  return empty[0];
+}
+function _dlcSet(id, v) {
+  const el = document.getElementById(id);
+  if (el && el !== document.activeElement) el.value = fmtNum(v);
+  return (el && parseNum(el.value)) || 0;
+}
+function calcDilucion(input) {
+  const g = id => { const el = document.getElementById(id); return el ? (parseNum(el.value)||0) : 0; };
+  const vals = { c1: g('dil-c1'), v1: g('dil-v1'), c2: g('dil-c2'), v2: g('dil-v2') };
+  const miss = _calcMissing(vals);
+  let computed = '';
+  if (miss) {
+    const c1 = vals.c1, v1 = vals.v1, c2 = vals.c2, v2 = vals.v2;
+    if (miss === 'c1' && c2 > 0 && v2 > 0 && v1 > 0) { _dlcSet('dil-c1', c2 * v2 / v1); computed = 'c1'; }
+    else if (miss === 'v1' && c2 > 0 && v2 > 0 && c1 > 0) { _dlcSet('dil-v1', c2 * v2 / c1); computed = 'v1'; }
+    else if (miss === 'c2' && c1 > 0 && v1 > 0 && v2 > 0) { _dlcSet('dil-c2', c1 * v1 / v2); computed = 'c2'; }
+    else if (miss === 'v2' && c1 > 0 && v1 > 0 && c2 > 0) { _dlcSet('dil-v2', c1 * v1 / c2); computed = 'v2'; }
+  }
+  const v1f = g('dil-v1'), v2f = g('dil-v2');
+  const rV1 = document.getElementById('dil-res-v1');
+  const rDil = document.getElementById('dil-res-dil');
+  if (rV1) {
+    if (v1f > 0) rV1.innerHTML = '<b>💉 V₁ · volumen inicial = ' + fmtNum(v1f) + '</b>' + (computed === 'v1' ? ' <span style="color:var(--g5)">· auto-calculado</span>' : '');
+    else rV1.textContent = '💉 V₁ · volumen inicial → —';
+  }
+  if (rDil) {
+    if (v1f > 0 && v2f > 0) {
+      const dil = v2f - v1f;
+      if (dil >= 0) rDil.innerHTML = '🧴 Diluyente a agregar (V₂ − V₁) = <b>' + fmtNum(dil) + '</b> · agua destilada / solución  hasta completar <b>' + fmtNum(v2f) + '</b>';
+      else rDil.innerHTML = '⚠ V₂ (' + fmtNum(v2f) + ') es MENOR que V₁ (' + fmtNum(v1f) + ') — revisa los datos';
+    } else rDil.textContent = '🧴 Diluyente a agregar (V₂ − V₁) → —';
+  }
+}
+function calcSuspension(input) {
+  const g = id => { const el = document.getElementById(id); return el ? (parseNum(el.value)||0) : 0; };
+  const vals = { m: g('sus-m'), c: g('sus-c'), v: g('sus-v') };
+  const miss = _calcMissing(vals);
+  let computed = '';
+  if (miss) {
+    const m = vals.m, c = vals.c, v = vals.v;
+    if (miss === 'm' && c > 0 && v > 0) { _dlcSet('sus-m', c * v); computed = 'm'; }
+    else if (miss === 'c' && m > 0 && v > 0) { _dlcSet('sus-c', m / v); computed = 'c'; }
+    else if (miss === 'v' && m > 0 && c > 0) { _dlcSet('sus-v', m / c); computed = 'v'; }
+  }
+  const M = g('sus-m'), C = g('sus-c'), V = g('sus-v');
+  const r = document.getElementById('sus-res');
+  if (r) {
+    if (M > 0 && C > 0 && V > 0) {
+      r.innerHTML = '✅ Suspensión: <b>' + fmtNum(M) + ' mg</b> de soluto + diluyente hasta <b>' + fmtNum(V) + ' mL</b> → concentración <b>' + fmtNum(C) + ' mg/mL</b>';
+      if (computed) r.innerHTML += ' <span style="color:var(--g5)">· ' + ({m:'M',c:'C',v:'V'})[computed] + ' auto-calculada</span>';
+    } else if (miss) {
+      r.textContent = 'Faltan datos: completa 2 de las 3 variables (M, C, V).';
+    } else {
+      r.textContent = 'Resultado → —';
+    }
   }
 }
 // ═══════════════════════════════════
