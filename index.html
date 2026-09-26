@@ -13010,42 +13010,48 @@ function hcTreatRowHtml(i, prefix) {
         <div class="form-group" style="margin-bottom:.4rem"><label style="font-size:.72rem">Principio activo</label><input class="form-control treat-pa" placeholder="Ketamina..."></div>
         <div class="form-group" style="margin-bottom:.4rem"><label style="font-size:.72rem">Nombre comercial</label><input class="form-control treat-nc" placeholder="Ketaset..."></div>
       </div>
-      <div style="display:grid;grid-template-columns:0.9fr 1.6fr;gap:.3rem;margin-bottom:.4rem;align-items:end">
-        <div><label style="font-size:.72rem;color:var(--txt3)">Peso (kg)</label><input class="form-control treat-peso" type="text" inputmode="decimal" placeholder="kg" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
-        <div>
-          <label style="font-size:.72rem;color:var(--txt3)">Dosis básica <span class="treat-approx-dosis" style="display:none;color:var(--am);font-weight:700">≈ entero</span></label>
-          <div style="display:flex;gap:.2rem">
-            <input class="form-control treat-dosis" type="text" inputmode="decimal" placeholder="Ej: 2" style="flex:1;font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)">
-            <select class="form-control treat-dosis-num" style="flex:0 0 auto;width:96px;font-size:.78rem" data-ph="mg/µg/UI..." onchange="calcTreatDose(this)">${hcUnitOpts('dosenum','mg/µg/UI...')}</select>
-            <select class="form-control treat-dosis-den" style="flex:0 0 auto;width:92px;font-size:.78rem" data-ph="kg/g/lb..." onchange="calcTreatDose(this)">${hcUnitOpts('doseden','kg/g/lb...')}</select>
-            <button type="button" class="icon-btn" data-apx="dosis" style="width:26px;height:34px;flex-shrink:0" onclick="treatApprox(this,'dosis')" title="Redondear la dosis básica al entero más cercano">≈</button>
-          </div>
-          <span class="treat-exact-dosis" style="font-size:.62rem;color:var(--txt3)"></span>
-        </div>
+      <div style="margin-bottom:.4rem">
+        <label style="font-size:.72rem;color:var(--txt3)">Peso (kg)</label>
+        <input class="form-control treat-peso" type="text" inputmode="decimal" placeholder="kg" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)">
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;margin-bottom:.4rem">
-        <div><label style="font-size:.72rem;color:var(--txt3)">Concentración</label><input class="form-control treat-conc" type="text" inputmode="decimal" placeholder="Ej: 100" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)"></div>
-        <div><label style="font-size:.72rem;color:var(--txt3)">Unidad numerador</label><div style="display:flex;gap:.2rem"><select class="form-control treat-conc-num" style="flex:1;font-size:.82rem" data-ph="mg/µg/UI..." onchange="hcConcChanged(this)">${hcUnitOpts('num','mg/µg/UI...')}</select><button type="button" class="icon-btn" style="width:30px;height:34px;flex-shrink:0" onclick="hcAddUnit(this,'num')" title="Agregar unidad al numerador">+</button></div></div>
-        <div><label style="font-size:.72rem;color:var(--txt3)">Unidad denominador</label><div style="display:flex;gap:.2rem"><select class="form-control treat-conc-den" style="flex:1;font-size:.82rem" data-ph="ml/tab/cap..." onchange="hcConcChanged(this)">${hcUnitOpts('den','ml/tab/cap...')}</select><button type="button" class="icon-btn" style="width:30px;height:34px;flex-shrink:0" onclick="hcAddUnit(this,'den')" title="Agregar unidad al denominador">+</button></div></div>
+      <div style="margin-bottom:.4rem">
+        <label style="font-size:.72rem;color:var(--txt3)">Dosis básica <span class="treat-approx-dosis" style="display:none;color:var(--am);font-weight:700"></span></label>
+        <div style="display:flex;gap:.2rem">
+          <input class="form-control treat-dosis" type="text" inputmode="decimal" placeholder="Ej: 2" style="flex:1;font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)">
+          <select class="form-control treat-apx" data-apx="dosis" onchange="treatSetApprox(this,'dosis')" title="Aproximar la dosis básica a N decimales" style="flex:0 0 auto;width:96px;font-size:.72rem"><option value="">Exacto</option><option value="4">4 dec</option><option value="3">3 dec</option><option value="2">2 dec</option><option value="1">1 dec</option><option value="0">Entero</option></select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-top:.3rem">
+          <div><label style="font-size:.68rem;color:var(--txt3)">Unidad numerador</label><div style="display:flex;gap:.2rem"><select class="form-control treat-dosis-num" style="flex:1;font-size:.78rem" data-ph="mg/µg/UI..." onchange="calcTreatDose(this)">${hcUnitOpts('dosenum','mg/µg/UI...')}</select><button type="button" class="icon-btn" style="width:30px;height:34px;flex-shrink:0" onclick="hcAddUnit(this,'dosenum')" title="Agregar unidad al numerador">+</button></div></div>
+          <div><label style="font-size:.68rem;color:var(--txt3)">Unidad denominador</label><div style="display:flex;gap:.2rem"><select class="form-control treat-dosis-den" style="flex:1;font-size:.78rem" data-ph="kg/g/lb..." onchange="calcTreatDose(this)">${hcUnitOpts('doseden','kg/g/lb...')}</select><button type="button" class="icon-btn" style="width:30px;height:34px;flex-shrink:0" onclick="hcAddUnit(this,'doseden')" title="Agregar unidad al denominador">+</button></div></div>
+        </div>
+        <span class="treat-exact-dosis" style="font-size:.62rem;color:var(--txt3)"></span>
+      </div>
+      <div style="margin-bottom:.4rem">
+        <label style="font-size:.72rem;color:var(--txt3)">Concentración</label>
+        <input class="form-control treat-conc" type="text" inputmode="decimal" placeholder="Ej: 100" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-top:.3rem">
+          <div><label style="font-size:.68rem;color:var(--txt3)">Unidad numerador</label><div style="display:flex;gap:.2rem"><select class="form-control treat-conc-num" style="flex:1;font-size:.78rem" data-ph="mg/µg/UI..." onchange="hcConcChanged(this)">${hcUnitOpts('num','mg/µg/UI...')}</select><button type="button" class="icon-btn" style="width:30px;height:34px;flex-shrink:0" onclick="hcAddUnit(this,'num')" title="Agregar unidad al numerador">+</button></div></div>
+          <div><label style="font-size:.68rem;color:var(--txt3)">Unidad denominador</label><div style="display:flex;gap:.2rem"><select class="form-control treat-conc-den" style="flex:1;font-size:.78rem" data-ph="ml/tab/cap..." onchange="hcConcChanged(this)">${hcUnitOpts('den','ml/tab/cap...')}</select><button type="button" class="icon-btn" style="width:30px;height:34px;flex-shrink:0" onclick="hcAddUnit(this,'den')" title="Agregar unidad al denominador">+</button></div></div>
+        </div>
       </div>
       <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem">
-        <label style="font-size:.72rem;color:var(--txt3);flex-shrink:0">⚡ Cálculo automático: completa 3 de las 4 variables (dosis, peso, concentración, dosis total) y la app calcula la que falta.</label>
+        <label style="font-size:.72rem;color:var(--txt3);flex-shrink:0">⚡ Cálculo automático: completa 3 de las 4 variables (peso, dosis, concentración, dosis total) y la app calcula la que falta.</label>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;margin-bottom:.4rem">
-        <div>
-          <label style="font-size:.72rem;color:var(--txt3)">Dosis total / práctica <span class="treat-approx-total" style="display:none;color:var(--am);font-weight:700">≈ entero</span></label>
-          <input class="form-control treat-total" type="text" inputmode="decimal" placeholder="auto / manual" style="font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)">
-          <span class="treat-exact-total" style="font-size:.62rem;color:var(--txt3)"></span>
-          <div style="margin-top:.15rem"><button type="button" class="icon-btn" data-apx="total" onclick="treatApprox(this,'total')" title="Redondear la dosis total al entero más cercano" style="font-size:.62rem;padding:.12rem .35rem">≈ Aproximar</button></div>
+      <div style="margin-bottom:.4rem">
+        <label style="font-size:.72rem;color:var(--txt3)">Dosis total / práctica <span class="treat-approx-total" style="display:none;color:var(--am);font-weight:700"></span></label>
+        <div style="display:flex;gap:.2rem">
+          <input class="form-control treat-total" type="text" inputmode="decimal" placeholder="auto / manual" style="flex:1;font-size:.82rem" oninput="calcTreatDose(this)" onblur="fmtInput(this)">
+          <select class="form-control treat-apx" data-apx="total" onchange="treatSetApprox(this,'total')" title="Aproximar la dosis total a N decimales" style="flex:0 0 auto;width:96px;font-size:.72rem"><option value="">Exacto</option><option value="4">4 dec</option><option value="3">3 dec</option><option value="2">2 dec</option><option value="1">1 dec</option><option value="0">Entero</option></select>
+          <input class="form-control treat-total-u" value="" readonly placeholder="ml/tab/cap..." style="flex:0 0 auto;width:120px;font-size:.82rem;background:var(--sur)">
         </div>
-        <div><label style="font-size:.72rem;color:var(--txt3)">Unidad dosis total</label><input class="form-control treat-total-u" value="" readonly placeholder="ml/tab/cap..." style="font-size:.82rem;background:var(--sur)"></div>
+        <span class="treat-exact-total" style="font-size:.62rem;color:var(--txt3)"></span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 2fr 1fr;gap:.3rem;margin-bottom:.4rem;align-items:end">
         <div><label style="font-size:.72rem;color:var(--txt3)">Vía</label>
           <select class="form-control treat-via" style="font-size:.82rem">
             <option value="">Vía</option><option>IM</option><option>IV</option><option>SC</option><option>VO</option><option>Tópico</option><option>IN</option><option>Inhalatorio</option>
           </select>
         </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.4rem">
         <div><label style="font-size:.72rem;color:var(--txt3)">Frecuencia</label><input class="form-control treat-freq" placeholder="SID, BID, TID..." style="font-size:.82rem"></div>
         <div><label style="font-size:.72rem;color:var(--txt3)">Duración (días)</label><input class="form-control treat-dur" type="text" inputmode="decimal" placeholder="7" style="font-size:.82rem" onblur="fmtInput(this)"></div>
       </div>
@@ -13071,30 +13077,35 @@ const _T_MG = { 'mg':1, 'µg':0.001, 'mcg':0.001, 'g':1000, 'kg':1000000, 'meq':
 const _T_KG = { 'kg':1, 'g':0.001, 'lb':0.453592, 'mg':0.000001 };
 function _tUnitMg(u) { return _T_MG[String(u||'').toLowerCase()] || 1; }
 function _tUnitKg(u) { return _T_KG[String(u||'').toLowerCase()] || 1; }
-// Estado de aproximación "≈" por fila y campo (igual que el goteo de fluidoterapia)
+// Estado de aproximación por decimales, por fila y campo (null = exacto, 0 = entero, 1-4 = decimales)
 window._treatApprox = window._treatApprox || {};
-function treatApprox(btn, which) {
-  const row = (btn && btn.closest) ? btn.closest('[data-trow]') : null;
+function treatSetApprox(sel, which) {
+  const row = (sel && sel.closest) ? sel.closest('[data-trow]') : null;
   if (!row) return;
   const key = row.id + ':' + which;
-  window._treatApprox[key] = !window._treatApprox[key];
+  const v = sel.value;
+  window._treatApprox[key] = (v === '' || v == null) ? null : parseInt(v, 10);
   calcTreatDose(row);
 }
-// Escribe el valor calculado: con ≈ activo lo redondea al entero más cercano (mín. 1) y muestra el exacto.
+// Escribe el valor calculado: con aproximación activa redondea a N decimales (nunca a entero por defecto) y muestra el exacto.
 function _tRounded(v, row, which) {
   const key = row.id + ':' + which;
-  const on = !!(window._treatApprox || {})[key];
+  const dec = (window._treatApprox || {})[key];
+  const on = (dec != null) && isFinite(v);
   const ind = row.querySelector('.treat-approx-' + which);
-  if (ind) ind.style.display = on ? 'inline' : 'none';
-  const apxBtn = row.querySelector('[data-apx="' + which + '"]');
-  if (apxBtn) {
-    if (on) { apxBtn.style.background = 'var(--g1)'; apxBtn.style.color = 'var(--am)'; apxBtn.style.borderColor = 'var(--am)'; }
-    else { apxBtn.style.background = ''; apxBtn.style.color = ''; apxBtn.style.borderColor = ''; }
+  if (ind) {
+    ind.style.display = on ? 'inline' : 'none';
+    if (on) ind.textContent = dec === 0 ? '≈ entero' : ('≈ ' + dec + ' dec');
   }
+  const apxSel = row.querySelector('[data-apx="' + which + '"]');
+  const selVal = (dec == null) ? '' : String(dec);
+  if (apxSel && apxSel.value !== selVal) apxSel.value = selVal;
   const exactEl = row.querySelector('.treat-exact-' + which);
-  if (exactEl) exactEl.textContent = (on && isFinite(v)) ? 'exacto: ' + fmtNum(v) : '';
-  if (!on || !isFinite(v)) return fmtNum(v);
-  return fmtNum(Math.max(1, Math.round(v)));
+  if (exactEl) exactEl.textContent = on ? 'exacto: ' + fmtNum(v) : '';
+  if (!isFinite(v)) return fmtNum(v);
+  if (dec == null) return fmtNum(v);
+  const mult = Math.pow(10, dec);
+  return fmtNum(Math.round(v * mult + 1e-9) / mult);
 }
 function calcTreatDose(input) {
   const row = (input && input.closest) ? input.closest('[data-trow]') : (input||null);
@@ -16121,6 +16132,7 @@ function _enriqRenderGruposVinc() {
     : '<span style="font-size:.72rem;color:var(--txt3);font-style:italic">Ninguno. Usa "Agregar grupo" arriba para vincular especies.</span>';
 }
 function _enriqQuitarGrupoVinc(btn) {
+
   const chip = btn.closest('span[data-grp]');
   if (!chip) return;
   const name = chip.dataset.grp;
