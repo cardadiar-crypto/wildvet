@@ -966,7 +966,7 @@ textarea.form-control{resize:vertical;min-height:70px}
 // ─────────────────────────────────────
 // VERSIÓN DE LA APP (para detectar si una caché vieja está sirviendo otra build)
 // ─────────────────────────────────────
-const APP_VERSION = '50';
+const APP_VERSION = '51';
 
 // ═══════════════════════════════════
 // DEFAULT SPECIES DB
@@ -13962,25 +13962,50 @@ function renderCalcDilucionesScreen() {
   c.innerHTML = `
     <div style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rsm);padding:.9rem;margin-bottom:1rem">
       <div style="font-size:.82rem;font-weight:700;margin-bottom:.1rem">💉 1 · Dilución simple — concentración final</div>
-      <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.5rem">Fórmula: <b>C₁ × V₁ = C₂ × V₂</b> — escribe 3 de las 4 variables y la app calcula la restante al instante. Si tienes V₁ y V₂, verás el volumen de diluyente a agregar (V₂ − V₁).</div>
+      <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.5rem">Fórmula: <b>C₁ × V₁ = C₂ × V₂</b> — escribe 3 de las 4 variables y la app calcula la restante al instante (los resultados aparecen abajo, sin pisar tus datos). Si tienes V₁ y V₂, verás el volumen de diluyente a agregar (V₂ − V₁).</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem">
         <div><label style="font-size:.72rem;color:var(--txt3)">C₁ — Concentración inicial</label><input id="dil-c1" class="form-control" type="text" inputmode="decimal" placeholder="Ej: 100" style="font-size:.82rem" oninput="calcDilucion(this)" onblur="fmtInput(this)"></div>
         <div><label style="font-size:.72rem;color:var(--txt3)">V₁ — Volumen inicial (del fármaco)</label><input id="dil-v1" class="form-control" type="text" inputmode="decimal" placeholder="Ej: 5" style="font-size:.82rem" oninput="calcDilucion(this)" onblur="fmtInput(this)"></div>
         <div><label style="font-size:.72rem;color:var(--txt3)">C₂ — Concentración final deseada</label><input id="dil-c2" class="form-control" type="text" inputmode="decimal" placeholder="Ej: 50" style="font-size:.82rem" oninput="calcDilucion(this)" onblur="fmtInput(this)"></div>
         <div><label style="font-size:.72rem;color:var(--txt3)">V₂ — Volumen final deseado</label><input id="dil-v2" class="form-control" type="text" inputmode="decimal" placeholder="Ej: 10" style="font-size:.82rem" oninput="calcDilucion(this)" onblur="fmtInput(this)"></div>
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.6rem">
-        <div id="dil-res-v1" style="flex:1 1 200px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.4rem .6rem;font-size:.82rem;color:var(--txt3)">💉 V₁ · volumen inicial → —</div>
-        <div id="dil-res-dil" style="flex:1 1 200px;background:var(--g1);border:1px solid var(--g4);border-radius:var(--rxs);padding:.4rem .6rem;font-size:.82rem;color:var(--g7);font-weight:600">🧴 Diluyente a agregar (V₂ − V₁) → —</div>
+      <div style="display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin-top:.55rem">
+        <label style="font-size:.7rem;color:var(--txt3);margin:0">≈ Aproximar resultados:</label>
+        <select data-apx="dil" class="form-control" style="width:auto;padding:.25rem .5rem;font-size:.72rem;border-radius:var(--rxs)" onchange="_dlcSetApprox(this,'dil')" title="Aproxima los decimales de los resultados">
+          <option value="">Exacto</option>
+          <option value="4">4 decimales</option>
+          <option value="3">3 decimales</option>
+          <option value="2">2 decimales</option>
+          <option value="1">1 decimal</option>
+          <option value="0">Entero</option>
+        </select>
       </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-top:.6rem">
+        <div id="dil-res-c1" style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.4rem .6rem;font-size:.82rem;color:var(--txt3)">C₁ · concentración inicial → —</div>
+        <div id="dil-res-v1" style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.4rem .6rem;font-size:.82rem;color:var(--txt3)">V₁ · volumen inicial → —</div>
+        <div id="dil-res-c2" style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.4rem .6rem;font-size:.82rem;color:var(--txt3)">C₂ · concentración final → —</div>
+        <div id="dil-res-v2" style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.4rem .6rem;font-size:.82rem;color:var(--txt3)">V₂ · volumen final → —</div>
+      </div>
+      <div id="dil-res-dil" style="margin-top:.4rem;background:var(--g1);border:1px solid var(--g4);border-radius:var(--rxs);padding:.4rem .6rem;font-size:.82rem;color:var(--g7);font-weight:600">🧴 Diluyente a agregar (V₂ − V₁) → —</div>
     </div>
     <div style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rsm);padding:.9rem">
       <div style="font-size:.82rem;font-weight:700;margin-bottom:.1rem">🧂 2 · Sólido a suspensión</div>
       <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.5rem">Fórmula: <b>V = M / C</b> (variante C = M / V) — escribe 2 de las 3 variables (M masa del soluto, C concentración deseada, V volumen final) y la app calcula la restante al instante.</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem">
         <div><label style="font-size:.72rem;color:var(--txt3)">M — Masa del soluto (mg)</label><input id="sus-m" class="form-control" type="text" inputmode="decimal" placeholder="Ej: 500" style="font-size:.82rem" oninput="calcSuspension(this)" onblur="fmtInput(this)"></div>
         <div><label style="font-size:.72rem;color:var(--txt3)">C — Concentración deseada (mg/mL)</label><input id="sus-c" class="form-control" type="text" inputmode="decimal" placeholder="Ej: 50" style="font-size:.82rem" oninput="calcSuspension(this)" onblur="fmtInput(this)"></div>
         <div><label style="font-size:.72rem;color:var(--txt3)">V — Volumen final (mL)</label><input id="sus-v" class="form-control" type="text" inputmode="decimal" placeholder="Ej: 10" style="font-size:.82rem" oninput="calcSuspension(this)" onblur="fmtInput(this)"></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin-top:.55rem">
+        <label style="font-size:.7rem;color:var(--txt3);margin:0">≈ Aproximar resultados:</label>
+        <select data-apx="sus" class="form-control" style="width:auto;padding:.25rem .5rem;font-size:.72rem;border-radius:var(--rxs)" onchange="_dlcSetApprox(this,'sus')" title="Aproxima los decimales de los resultados">
+          <option value="">Exacto</option>
+          <option value="4">4 decimales</option>
+          <option value="3">3 decimales</option>
+          <option value="2">2 decimales</option>
+          <option value="1">1 decimal</option>
+          <option value="0">Entero</option>
+        </select>
       </div>
       <div id="sus-res" style="margin-top:.6rem;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.4rem .6rem;font-size:.82rem;color:var(--txt3)">Resultado → —</div>
     </div>`;
@@ -13997,6 +14022,39 @@ function _dlcSet(id, v) {
   if (el && el !== document.activeElement) el.value = fmtNum(v);
   return (el && parseNum(el.value)) || 0;
 }
+// Decimales elegidos por el usuario en el aproximador ('', '4'..'0'); null = exacto
+window._dlcApx = { dil: '', sus: '' };
+function _dlcSetApprox(sel, which) {
+  window._dlcApx[which] = String(sel ? sel.value : '');
+  if (which === 'dil') calcDilucion();
+  else calcSuspension();
+}
+function _dlcDec(which) {
+  const v = window._dlcApx[which];
+  if (v === null || v === undefined || v === '') return null;
+  const d = parseInt(v, 10);
+  return isNaN(d) ? null : d;
+}
+function _dlcFmt(n, which) {
+  const exact = fmtNum(n);
+  const d = _dlcDec(which);
+  if (d === null) return { text: exact, red: false, exact };
+  const mult = Math.pow(10, d);
+  const r = Math.round((n + 1e-9) * mult) / mult;
+  const red = Math.abs(r - n) > 1e-9;
+  return { text: fmtNum(r), red, exact };
+}
+function _dlcLbl(el, label, val, computed, which) {
+  if (!el) return;
+  if (val > 0) {
+    const f = _dlcFmt(val, which);
+    el.style.color = computed ? 'var(--g7)' : 'var(--txt3)';
+    el.innerHTML = label + ' → <b>' + f.text + '</b>' + (f.red ? ' <span style="font-size:.66rem;color:var(--txt3)">(exacto ' + f.exact + ')</span>' : '') + (computed ? ' <span style="color:var(--g5);font-size:.7rem">· auto-calculado</span>' : '');
+  } else {
+    el.style.color = 'var(--txt3)';
+    el.textContent = label + ' → —';
+  }
+}
 function calcDilucion(input) {
   const g = id => { const el = document.getElementById(id); return el ? (parseNum(el.value)||0) : 0; };
   const vals = { c1: g('dil-c1'), v1: g('dil-v1'), c2: g('dil-c2'), v2: g('dil-v2') };
@@ -14004,23 +14062,24 @@ function calcDilucion(input) {
   let computed = '';
   if (miss) {
     const c1 = vals.c1, v1 = vals.v1, c2 = vals.c2, v2 = vals.v2;
-    if (miss === 'c1' && c2 > 0 && v2 > 0 && v1 > 0) { _dlcSet('dil-c1', c2 * v2 / v1); computed = 'c1'; }
-    else if (miss === 'v1' && c2 > 0 && v2 > 0 && c1 > 0) { _dlcSet('dil-v1', c2 * v2 / c1); computed = 'v1'; }
-    else if (miss === 'c2' && c1 > 0 && v1 > 0 && v2 > 0) { _dlcSet('dil-c2', c1 * v1 / v2); computed = 'c2'; }
-    else if (miss === 'v2' && c1 > 0 && v1 > 0 && c2 > 0) { _dlcSet('dil-v2', c1 * v1 / c2); computed = 'v2'; }
+    if (miss === 'c1' && c2 > 0 && v2 > 0 && v1 > 0) { vals.c1 = c2 * v2 / v1; computed = 'c1'; }
+    else if (miss === 'v1' && c2 > 0 && v2 > 0 && c1 > 0) { vals.v1 = c2 * v2 / c1; computed = 'v1'; }
+    else if (miss === 'c2' && c1 > 0 && v1 > 0 && v2 > 0) { vals.c2 = c1 * v1 / v2; computed = 'c2'; }
+    else if (miss === 'v2' && c1 > 0 && v1 > 0 && c2 > 0) { vals.v2 = c1 * v1 / c2; computed = 'v2'; }
   }
-  const v1f = g('dil-v1'), v2f = g('dil-v2');
-  const rV1 = document.getElementById('dil-res-v1');
+  const labels = { c1: 'C₁ · concentración inicial', v1: 'V₁ · volumen inicial', c2: 'C₂ · concentración final', v2: 'V₂ · volumen final' };
+  const cards = { c1: 'dil-res-c1', v1: 'dil-res-v1', c2: 'dil-res-c2', v2: 'dil-res-v2' };
+  for (const k of Object.keys(cards)) _dlcLbl(document.getElementById(cards[k]), labels[k], vals[k], computed === k, 'dil');
+  const v1f = vals.v1, v2f = vals.v2;
   const rDil = document.getElementById('dil-res-dil');
-  if (rV1) {
-    if (v1f > 0) rV1.innerHTML = '<b>💉 V₁ · volumen inicial = ' + fmtNum(v1f) + '</b>' + (computed === 'v1' ? ' <span style="color:var(--g5)">· auto-calculado</span>' : '');
-    else rV1.textContent = '💉 V₁ · volumen inicial → —';
-  }
   if (rDil) {
     if (v1f > 0 && v2f > 0) {
       const dil = v2f - v1f;
-      if (dil >= 0) rDil.innerHTML = '🧴 Diluyente a agregar (V₂ − V₁) = <b>' + fmtNum(dil) + '</b> · agua destilada / solución  hasta completar <b>' + fmtNum(v2f) + '</b>';
-      else rDil.innerHTML = '⚠ V₂ (' + fmtNum(v2f) + ') es MENOR que V₁ (' + fmtNum(v1f) + ') — revisa los datos';
+      const fV2 = _dlcFmt(v2f, 'dil');
+      if (dil >= 0) {
+        const f = _dlcFmt(dil, 'dil');
+        rDil.innerHTML = '🧴 Diluyente a agregar (V₂ − V₁) = <b>' + f.text + '</b>' + (f.red ? ' <span style="font-size:.66rem;color:var(--txt3)">(exacto ' + f.exact + ')</span>' : '') + ' · agua destilada / solución hasta completar <b>' + fV2.text + '</b>' + (fV2.red ? ' <span style="font-size:.66rem;color:var(--txt3)">(exacto ' + fV2.exact + ')</span>' : '');
+      } else rDil.innerHTML = '⚠ V₂ (' + fmtNum(v2f) + ') es MENOR que V₁ (' + fmtNum(v1f) + ') — revisa los datos';
     } else rDil.textContent = '🧴 Diluyente a agregar (V₂ − V₁) → —';
   }
 }
@@ -14031,21 +14090,28 @@ function calcSuspension(input) {
   let computed = '';
   if (miss) {
     const m = vals.m, c = vals.c, v = vals.v;
-    if (miss === 'm' && c > 0 && v > 0) { _dlcSet('sus-m', c * v); computed = 'm'; }
-    else if (miss === 'c' && m > 0 && v > 0) { _dlcSet('sus-c', m / v); computed = 'c'; }
-    else if (miss === 'v' && m > 0 && c > 0) { _dlcSet('sus-v', m / c); computed = 'v'; }
+    if (miss === 'm' && c > 0 && v > 0) { vals.m = c * v; computed = 'm'; }
+    else if (miss === 'c' && m > 0 && v > 0) { vals.c = m / v; computed = 'c'; }
+    else if (miss === 'v' && m > 0 && c > 0) { vals.v = m / c; computed = 'v'; }
   }
-  const M = g('sus-m'), C = g('sus-c'), V = g('sus-v');
+  const av = { m: 'M', c: 'C', v: 'V' };
   const r = document.getElementById('sus-res');
-  if (r) {
-    if (M > 0 && C > 0 && V > 0) {
-      r.innerHTML = '✅ Suspensión: <b>' + fmtNum(M) + ' mg</b> de soluto + diluyente hasta <b>' + fmtNum(V) + ' mL</b> → concentración <b>' + fmtNum(C) + ' mg/mL</b>';
-      if (computed) r.innerHTML += ' <span style="color:var(--g5)">· ' + ({m:'M',c:'C',v:'V'})[computed] + ' auto-calculada</span>';
-    } else if (miss) {
-      r.textContent = 'Faltan datos: completa 2 de las 3 variables (M, C, V).';
-    } else {
-      r.textContent = 'Resultado → —';
-    }
+  if (!r) return;
+  if (vals.m > 0 && vals.c > 0 && vals.v > 0) {
+    const fM = _dlcFmt(vals.m, 'sus'), fC = _dlcFmt(vals.c, 'sus'), fV = _dlcFmt(vals.v, 'sus');
+    r.style.color = 'var(--g7)';
+    r.innerHTML = '✅ Suspensión: <b>' + fM.text + ' mg</b> de soluto + diluyente hasta <b>' + fV.text + ' mL</b> → concentración <b>' + fC.text + ' mg/mL</b>' + (computed ? ' <span style="color:var(--g5)">· ' + av[computed] + ' auto-calculada</span>' : '');
+    const reds = [];
+    if (fM.red) reds.push('M=' + fM.exact);
+    if (fC.red) reds.push('C=' + fC.exact);
+    if (fV.red) reds.push('V=' + fV.exact);
+    if (reds.length) r.innerHTML += '<div style="font-size:.66rem;color:var(--txt3);margin-top:.15rem">exacto: ' + reds.join(' · ') + '</div>';
+  } else if (miss) {
+    r.style.color = 'var(--txt3)';
+    r.textContent = 'Faltan datos: completa 2 de las 3 variables (M, C, V).';
+  } else {
+    r.style.color = 'var(--txt3)';
+    r.textContent = 'Resultado → —';
   }
 }
 // ═══════════════════════════════════
