@@ -684,9 +684,12 @@ textarea.form-control{resize:vertical;min-height:70px}
       </div>
       <div id="admin-add-drug-btn" style="display:none;gap:.3rem;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="openAddDrug()">+ Fármaco</button>
-        <button class="btn btn-admin btn-sm" onclick="openVadSheet()">📊 Hoja de cálculo</button>
+        <button class="btn btn-admin btn-sm" onclick="gsheetOpen()">📊 Google Sheets</button>
+        <button class="btn btn-admin btn-sm" onclick="gsheetSync()">🔄 Sincronizar</button>
+        <button class="btn btn-admin btn-sm" onclick="openVadSheet()">🧮 Hoja interna</button>
         <button class="btn btn-admin btn-sm" onclick="importVadSheetXlsx()">📥 Importar .xlsx</button>
         <button class="btn btn-admin btn-sm" onclick="exportVadSheetXlsx()">📤 Exportar .xlsx</button>
+        <span id="gsheet-toolbusy" style="align-self:center;font-size:.7rem;color:var(--g5)"></span>
       </div>
     </div>
     <input type="text" class="form-control" placeholder="Buscar fármaco..." oninput="filterVademecum(this.value)" style="margin-bottom:.75rem">
@@ -717,6 +720,11 @@ textarea.form-control{resize:vertical;min-height:70px}
       </div>
       <p class="text-muted" style="margin-bottom:.75rem">Los fármacos del vademécum son visibles para todos los usuarios.</p>
       <button class="btn btn-primary btn-block" onclick="openAddDrug()">+ Agregar fármaco al vademécum</button>
+    </div>
+
+    <div class="admin-section" id="admin-gsheet-section">
+      <div class="admin-section-title">📊 Google Sheets · Vademécum</div>
+      <div id="gsheet-config-box"></div>
     </div>
 
     <div class="admin-section">
@@ -966,7 +974,7 @@ textarea.form-control{resize:vertical;min-height:70px}
 // ─────────────────────────────────────
 // VERSIÓN DE LA APP (para detectar si una caché vieja está sirviendo otra build)
 // ─────────────────────────────────────
-const APP_VERSION = '52';
+const APP_VERSION = '53';
 
 // ═══════════════════════════════════
 // DEFAULT SPECIES DB
@@ -3567,7 +3575,7 @@ function showScreen(name, trackNav=true) {
     if (name !== 'home') navHistory.push({ type: 'screen', name });
   }
   if (name==='home') document.getElementById('bnav-home').classList.add('active');
-  if (name==='admin') { renderAdminSpeciesList(); loadAdminEmails().then(renderAdminEmailsList); renderHcOptsAdmin(); renderHcGroupsAdmin(); }
+  if (name==='admin') { renderAdminSpeciesList(); loadAdminEmails().then(renderAdminEmailsList); renderHcOptsAdmin(); renderHcGroupsAdmin(); renderGSheetConfig(); }
   if (name==='biblioteca') { loadBibliotecaGeneral().then(renderBiblioteca); }
   if (name==='enfermedades-gen') { loadEnfermedadesGenerales().then(renderEnfGenContent); }
   if (name==='enriquecimiento') { renderEnriquecimientoScreen(); }
@@ -10847,7 +10855,7 @@ async function saveVadExcel() {
 }
 
 // ─────────────────────────────────────────────
-// Vademécum — Hoja de cálculo (estilo Excel) · v52
+// Vademécum — Hoja de cálculo (estilo Excel) · v53
 // Rejilla en blanco organizable: la columna A muestra TODOS los principios
 // activos (desplegable que VINCULA a la ficha). El resto de celdas están
 // vacías para que tú pongas la información. Arrastra la cabecera (letra)
@@ -10995,6 +11003,7 @@ function _vadSheetBuildRows() {
   });
   _vadApplyColOrder();
   _vadApplyRowOrder();
+  _vadRefreshOptsCache();
 }
 
 function _vadActiveListed(v) {
@@ -11004,26 +11013,35 @@ function _vadActiveListed(v) {
   return false;
 }
 
-// Contiene la lista de principios activos disponibles para el desplegable A.
+// Lista de principios activos para el desplegable A (cacheada: se reconstruye
+// solo cuando cambia VADEMECUM_DB, no por fila ni por tecla).
+let _vsOptsCache = null;
+function _vadRefreshOptsCache() { _vsOptsCache = null; }
 function vadSheetActiveOptions(r) {
-  let o = '<option value="">— elegir / vincular principio activo —</option>';
-  const seen = new Set();
-  for (const d of _vadSheetOrder()) {
-    const v = String(d.active||d.drug||'').trim();
-    if (!v || seen.has(v)) continue;
-    seen.add(v);
-    o += '<option value="'+vdEsc(v)+'"'+((r.m.active||'')===v?' selected':'')+'>'+vdEsc(v)+'</option>';
+  if (!_vsOptsCache) {
+    const seen = new Set();
+    _vsOptsCache = [];
+    for (const d of _vadSheetOrder()) {
+      const v = String(d.active||d.drug||'').trim();
+      if (v && !seen.has(v)) { seen.add(v); _vsOptsCache.push(v); }
+    }
+    _vsOptsCache.sort((a, b) => String(a).localeCompare(String(b), 'es'));
   }
-  o = _preserveOpt(o, r.m.active);
+  const cur = r.m.active;
+  let o = '<option value=""></option>';
+  for (const v of _vsOptsCache) {
+    o += '<option value="' + vdEsc(v) + '"' + (v === cur ? ' selected' : '') + '>' + vdEsc(v) + '</option>';
+  }
+  o = _preserveOpt(o, cur);
   o += '<option value="__new__">✎ Nuevo principio activo…</option>';
   return o;
 }
 
-function _vsIn(rowIdx, f, val, placeholder, extraCss) {
-  return '<input type="text" value="'+vdEsc(val??'')+'" placeholder="'+vdEsc(placeholder||'')+'" data-f="'+f+'" onchange="vadSheetSet('+rowIdx+',\''+f+'\',this.value)" style="'+(extraCss||'')+'">';
+function _vsIn(rowIdx, f, val, extraCss) {
+  return '<input type="text" value="' + vdEsc(val ?? '') + '" data-f="' + f + '" onchange="vadSheetSet(' + rowIdx + ',\'' + f + '\',this.value)" style="' + (extraCss || '') + '">';
 }
-function _vsSpIn(rowIdx, si, f, val, placeholder, extraCss) {
-  return '<input type="text" value="'+vdEsc(val??'')+'" placeholder="'+vdEsc(placeholder||'')+'" onchange="vadSheetSpSet('+rowIdx+','+si+',\''+f+'\',this.value)" style="'+(extraCss||'')+'">';
+function _vsSpIn(rowIdx, si, f, val, extraCss) {
+  return '<input type="text" value="' + vdEsc(val ?? '') + '" onchange="vadSheetSpSet(' + rowIdx + ',' + si + ',\'' + f + '\',this.value)" style="' + (extraCss || '') + '">';
 }
 
 function _vadViewSetScroll() {
@@ -11052,27 +11070,27 @@ function _vsCell(k, r, idx) {
         ? '<span class="vads-state" id="vad-sheet-st-' + idx + '" style="color:var(--g6)" title="Vinculado a su ficha">●</span>'
         : '<span class="vads-state" id="vad-sheet-st-' + idx + '" style="color:#b9b9b9" title="Sin ficha todavía: se creará al guardar">○</span>');
     const activeCell = r._newActive
-      ? '<input type="text" value="' + c(r.m.active) + '" placeholder="Escribe el principio activo…" data-f="active" autofocus onchange="vadSheetNewActive(' + idx + ',this)" onkeydown="if(event.key===\'Escape\'){vadSheetCancelNew(' + idx + ')}" style="min-width:170px">'
+      ? '<input type="text" value="' + c(r.m.active) + '" data-f="active" onchange="vadSheetNewActive(' + idx + ',this)" onkeydown="if(event.key===\'Escape\'){vadSheetCancelNew(' + idx + ')}" style="min-width:170px">'
       : '<select data-f="active" onchange="vadSheetActiveChanged(' + idx + ',this)">' + vadSheetActiveOptions(r) + '</select>';
     return '<div style="display:flex;gap:3px;align-items:center">' + est + activeCell + '<button class="vads-btn vads-link" title="' + (linked ? 'Abrir la ficha vinculada' : 'Sin ficha aún (se creará al guardar)') + '" onclick="vadSheetFichaOn(' + idx + ')" style="' + (linked ? '' : 'opacity:.35') + '">↗</button></div>';
   }
-  if (k === 'drug')     return _vsIn(idx, 'drug', r.m.drug, 'Ketamina', 'min-width:130px;font-weight:600');
-  if (k === 'nombres')  return _vsIn(idx, 'nombres', r.m.nombres, 'Ketavet / Ketamidor', 'min-width:130px');
-  if (k === 'conc')     return _vsIn(idx, 'conc', r.m.conc, '100 mg/ml; 50 mg/ml', 'min-width:110px');
+  if (k === 'drug')     return _vsIn(idx, 'drug', r.m.drug, 'min-width:130px;font-weight:600');
+  if (k === 'nombres')  return _vsIn(idx, 'nombres', r.m.nombres, 'min-width:130px');
+  if (k === 'conc')     return _vsIn(idx, 'conc', r.m.conc, 'min-width:110px');
   if (k === 'cat_label') return '<select data-f="cat_label" onchange="vadSheetCatChanged(' + idx + ',this)">' + _preserveOpt(vdExcelSecOptions(r.m.cat_label), r.m.cat_label) + '</select>';
   if (k === 'subcat_label') return '<select data-f="subcat_label" onchange="vadSheetSubChanged(' + idx + ',this)">' + _preserveOpt(vdExcelSubOptions(r.m.cat_label, r.m.subcat_label), r.m.subcat_label) + '</select>';
   if (k === 'ss_label') return '<select data-f="ss_label" onchange="vadSheetSet(' + idx + ',\'ss_label\',this.value)">' + _preserveOpt(vdExcelSsOptions(r.m.cat_label, r.m.subcat_label, r.m.ss_label), r.m.ss_label) + '</select>';
-  if (k === 'cat_esp')  return _vsIn(idx, 'cat_esp', r.m.cat_esp, 'AINE', 'min-width:95px');
-  if (k === 'routes')   return _vsIn(idx, 'routes', r.m.routes, 'IM, IV', 'min-width:95px');
-  if (k === 'indic')    return _vsIn(idx, 'indic', r.m.indic, 'Indicaciones…', 'min-width:160px');
-  if (k === 'ci')       return _vsIn(idx, 'ci', r.m.ci, 'Contraindicaciones…', 'min-width:160px');
-  if (k === 'info')     return _vsIn(idx, 'info', r.m.info, 'Efectos adversos…', 'min-width:140px');
-  if (k === 'notes')    return _vsIn(idx, 'notes', r.m.notes, 'Notas clínicas…', 'min-width:140px');
-  if (k === 'mech')     return _vsIn(idx, 'mech', r.m.mech, 'Mecanismo (técnico)…', 'min-width:170px');
-  if (k === 'mech_simple') return _vsIn(idx, 'mech_simple', r.m.mech_simple, 'Mecanismo resumido…', 'min-width:140px');
-  if (k === 'desc')     return _vsIn(idx, 'desc', r.m.desc, 'Descripción…', 'min-width:150px');
-  if (k === 'keywords') return _vsIn(idx, 'keywords', r.m.keywords, 'palabras, clave', 'min-width:120px');
-  if (k === 'bib')      return _vsIn(idx, 'bib', r.m.bib, 'https://… o bib:spKey:idx', 'min-width:140px');
+  if (k === 'cat_esp')  return _vsIn(idx, 'cat_esp', r.m.cat_esp, 'min-width:95px');
+  if (k === 'routes')   return _vsIn(idx, 'routes', r.m.routes, 'min-width:95px');
+  if (k === 'indic')    return _vsIn(idx, 'indic', r.m.indic, 'min-width:160px');
+  if (k === 'ci')       return _vsIn(idx, 'ci', r.m.ci, 'min-width:160px');
+  if (k === 'info')     return _vsIn(idx, 'info', r.m.info, 'min-width:140px');
+  if (k === 'notes')    return _vsIn(idx, 'notes', r.m.notes, 'min-width:140px');
+  if (k === 'mech')     return _vsIn(idx, 'mech', r.m.mech, 'min-width:170px');
+  if (k === 'mech_simple') return _vsIn(idx, 'mech_simple', r.m.mech_simple, 'min-width:140px');
+  if (k === 'desc')     return _vsIn(idx, 'desc', r.m.desc, 'min-width:150px');
+  if (k === 'keywords') return _vsIn(idx, 'keywords', r.m.keywords, 'min-width:120px');
+  if (k === 'bib')      return _vsIn(idx, 'bib', r.m.bib, 'min-width:140px');
   if (k === 'sps') {
     const spresumen = r.sps.map(s => {
       const rng = (s.dmin && s.dmax) ? s.dmin + '-' + s.dmax : (s.dmin ? '≥' + s.dmin : (s.dmax ? '≤' + s.dmax : ''));
@@ -11082,13 +11100,12 @@ function _vsCell(k, r, idx) {
   }
   return '';
 }
-function vadSheetRowHtml(r, idx) {
+function _vsSpRowHtml(r, idx) {
   const c = (v) => vdEsc(v ?? '');
-  const linked = !!r.id;
-  const order = _vadOrderNow();
-  const spBlock = r.open ? `
+  if (!r.open) return '';
+  return `
     <tr class="vads-sps" id="vad-sheet-sps-${idx}">
-      <td colspan="${order.length + 2}" style="padding:6px 8px;background:#fafafa">
+      <td colspan="${_vadOrderNow().length + 2}" style="padding:6px 8px;background:#fafafa">
         <div style="font-weight:700;font-size:.68rem;color:#445;margin-bottom:4px">🩺 Especies y dosis — ${c(r.m.drug || r.m.active || 'nuevo fármaco')}</div>
         <div style="overflow:auto;border:1px solid #dfe6ee;border-radius:6px;margin-bottom:4px">
           <table class="vads-sub" style="width:100%;border-collapse:collapse;font-size:.68rem">
@@ -11098,15 +11115,15 @@ function vadSheetRowHtml(r, idx) {
             <tbody>
               ${(r.sps||[]).map((s, si) => `
                 <tr data-sp="${si}">
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(idx, si, 'sp', s.sp, 'Perro', 'min-width:90px')}</td>
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(idx, si, 'sci', s.sci, 'Canis lupus', 'min-width:120px')}</td>
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(idx, si, 'dmin', s.dmin, '5', 'min-width:50px')}</td>
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(idx, si, 'dmax', s.dmax, '15', 'min-width:50px')}</td>
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(idx, si, 'unit', s.unit, 'mg/kg', 'min-width:62px')}</td>
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee">${_vsSpIn(idx, si, 'fuente', s.fuente, 'PLUMB’s…', 'min-width:110px')}</td>
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(idx, si, 'via', s.via, 'IM, IV', 'min-width:70px')}</td>
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(idx, si, 'freq', s.freq, 'SID, BID', 'min-width:50px')}</td>
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee">${_vsSpIn(idx, si, 'notes', s.notes, 'Notas de la dosis', 'min-width:130px')}</td>
+                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(idx, si, 'sp', s.sp, 'min-width:90px')}</td>
+                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(idx, si, 'sci', s.sci, 'min-width:120px')}</td>
+                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(idx, si, 'dmin', s.dmin, 'min-width:50px')}</td>
+                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(idx, si, 'dmax', s.dmax, 'min-width:50px')}</td>
+                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(idx, si, 'unit', s.unit, 'min-width:62px')}</td>
+                  <td style="padding:1px 3px;border:1px solid #dfe6ee">${_vsSpIn(idx, si, 'fuente', s.fuente, 'min-width:110px')}</td>
+                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(idx, si, 'via', s.via, 'min-width:70px')}</td>
+                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(idx, si, 'freq', s.freq, 'min-width:50px')}</td>
+                  <td style="padding:1px 3px;border:1px solid #dfe6ee">${_vsSpIn(idx, si, 'notes', s.notes, 'min-width:130px')}</td>
                   <td style="padding:2px 3px;border:1px solid #dfe6ee;text-align:center"><button class="vads-btn vads-del" onclick="vadSheetDelSp(${idx},${si})">✕</button></td>
                 </tr>`).join('') || '<tr><td colspan="10" style="padding:4px;color:#999;font-size:.64rem">Sin especies todavía → añade la primera:</td></tr>'}
             </tbody>
@@ -11114,14 +11131,58 @@ function vadSheetRowHtml(r, idx) {
         </div>
         <button class="btn btn-secondary btn-sm" style="font-size:.66rem" onclick="vadSheetAddSp(${idx})">➕ Añadir especie</button>
       </td>
-    </tr>`
-    : '';
+    </tr>`;
+}
+// Las celdas <td> de la fila principal (virgen de <tr>/<tbody>).
+function _vsTdsHtml(data, idx) {
+  return _vadOrderNow().map(k => '<td style="' + _vsTdMin(k) + '">' + _vsCell(k, data, idx) + '</td>').join('');
+}
+// Refresca SOLO las celdas de una fila sin reconstruir toda la tabla.
+function _vsRefreshRowCells(idx) {
+  const tbody = document.getElementById('vad-sheet-tbody');
+  const tr = tbody ? tbody.querySelector('tr.vads-row[data-idx="' + idx + '"]') : null;
+  if (!tbody || !tr) { vadSheetRender(); return; }
+  const data = _vadSheetRows[idx];
+  if (!data) return;
+  const tds = _vsTdsHtml(data, idx);
+  const wrap = document.createElement('tbody');
+  wrap.innerHTML = '<tr>' + tds + '</tr>';
+  const newTr = wrap.firstElementChild;
+  newTr.className = tr.className;
+  newTr.dataset.idx = String(idx);
+  newTr.dataset.linked = data.id ? '1' : '0';
+  newTr.dataset.rid = String(_vadRowKey(data));
+  if (data.del) newTr.style.opacity = '.55';
+  [tr.id, tr.draggable, tr.title] = [tr.id, tr.draggable, tr.title];
+  newTr.firstElementChild.className = 'rownum';
+  newTr.firstElementChild.draggable = true;
+  newTr.firstElementChild.title = 'Arrastra para reordenar la fila';
+  newTr.firstElementChild.textContent = '';
+  const el = newTr.firstElementChild;
+  el.innerHTML = (idx + 1) + ' ⇅';
+  el.setAttribute('ondragstart', 'vadRowDragStart(event,this)');
+  el.setAttribute('ondragover', 'vadRowDragOver(event)');
+  el.setAttribute('ondrop', 'vadRowDrop(event,this)');
+  el.setAttribute('ondragend', 'vadRowDragEnd()');
+  tr.replaceWith(newTr);
+  const spsTr = tbody.querySelector('#vad-sheet-sps-' + idx);
+  if (spsTr) spsTr.remove();
+  if (data.open) {
+    const wrap2 = document.createElement('tbody');
+    wrap2.innerHTML = _vsSpRowHtml(data, idx);
+    const spsNew = wrap2.firstElementChild;
+    if (spsNew) tbody.insertBefore(spsNew, newTr.nextSibling);
+  }
+}
+function vadSheetRowHtml(r, idx) {
+  const c = (v) => vdEsc(v ?? '');
+  const linked = !!r.id;
   return `
   <tr class="vads-row" data-idx="${idx}" data-linked="${linked?'1':'0'}" data-rid="${c(_vadRowKey(r))}" style="${r.del?'opacity:.55':''}">
     <td class="rownum" draggable="true" ondragstart="vadRowDragStart(event,this)" ondragover="vadRowDragOver(event)" ondrop="vadRowDrop(event,this)" ondragend="vadRowDragEnd()" title="Arrastra para reordenar la fila">${idx+1} ⇅</td>
-    ${order.map(k => '<td style="' + _vsTdMin(k) + '">' + _vsCell(k, r, idx) + '</td>').join('')}
+    ${_vsTdsHtml(r, idx)}
     <td style="text-align:center;min-width:40px"><input type="checkbox" data-del onclick="vadSheetToggleDel(${idx},this)" ${r.del?'checked':''} title="Marcar para eliminar al Guardar"></td>
-  </tr>${spBlock}`;
+  </tr>${_vsSpRowHtml(r, idx)}`;
 }
 function _vsMarkAllDirty(r) {
   const m = r.m || {};
@@ -11181,7 +11242,7 @@ async function openVadSheet() {
   <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.1rem 1.25rem;width:100%;max-width:1920px;height:96vh;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">
       <div style="min-width:0">
-        <div style="font-weight:700;font-size:.95rem">📊 Vademécum · Hoja de cálculo</div>
+        <div style="font-weight:700;font-size:.95rem">🧮 Vademécum · Hoja interna (avanzado)</div>
         <div style="font-size:.7rem;color:var(--txt3);margin-top:1px">Plantilla en blanco para que tú pongas la información. La columna <b><span class="ltr" style="display:inline">A</span> Principio activo</b> (desplegable) lista todos los fármacos y <b>vincula a su ficha</b>. <b>Arrastra la letra</b> de una columna para reordenarla y el <b>número de fila</b> para reordenar filas — el orden se queda guardado. 💾 Guardar actualiza <b>solo lo editado</b>: las celdas vacías no pisan la ficha.</div>
       </div>
       <div style="display:flex;gap:.4rem;flex-wrap:wrap">
@@ -11331,7 +11392,7 @@ function vadSheetActiveChanged(idx, sel) {
   const v = sel.value;
   if (v === '__new__') {
     r.m.active = ''; r._newActive = true; r.id = '';
-    vadSheetRender();
+    _vsRefreshRowCells(idx);
     const inp = document.querySelector('#vad-sheet-tbody tr[data-idx="'+idx+'"] input[data-f="active"]');
     if (inp) inp.focus();
     return;
@@ -11342,7 +11403,7 @@ function vadSheetActiveChanged(idx, sel) {
   r._dirty.m.active = 1;
   const t = _vadMatchDrug(v);
   r.id = t ? t.id : '';
-  vadSheetRender();
+  _vsRefreshRowCells(idx);
   toast(t ? ('🔗 Vinculado con la ficha de ' + (t.drug||v)) : '⚡ Nuevo principio activo — se creará su ficha al guardar');
 }
 function vadSheetNewActive(idx, inp) {
@@ -11354,14 +11415,14 @@ function vadSheetNewActive(idx, inp) {
   r._dirty.m.active = 1;
   const t = _vadMatchDrug(r.m.active);
   r.id = t ? t.id : '';
-  vadSheetRender();
+  _vsRefreshRowCells(idx);
   toast(t ? ('🔗 Vinculado con la ficha de ' + (t.drug||r.m.active)) : '⚡ Nuevo principio activo — se creará su ficha al guardar');
 }
 function vadSheetCancelNew(idx) {
   const r = _vadSheetRows[idx];
   if (!r) return;
   r._newActive = false;
-  vadSheetRender();
+  _vsRefreshRowCells(idx);
 }
 function vadSheetFichaOn(idx) {
   const r = _vadSheetRows[idx];
@@ -11388,14 +11449,16 @@ function vadSheetAddSp(idx) {
   r.sps.push({ sp:'', sci:'', dmin:'', dmax:'', unit:'mg/kg', fuente:'', via:'', freq:'', notes:'' });
   r.open = true;
   r._spsDirty = true;
-  vadSheetRender();
+  _vsRefreshRowCells(idx);
+  const inp = document.querySelector('#vad-sheet-sps-'+idx+' tr[data-sp="'+(r.sps.length-1)+'"] input');
+  if (inp) inp.focus();
 }
 function vadSheetDelSp(idx, si) {
   const r = _vadSheetRows[idx];
   if (!r) return;
   r.sps.splice(si, 1);
   r._spsDirty = true;
-  vadSheetRender();
+  _vsRefreshRowCells(idx);
   vadSheetPersistRow(idx);
 }
 function vadSheetAddRow() {
@@ -11552,6 +11615,7 @@ async function _vadSheetPutRow(r) {
     await dbPutSync('vademecum', target);
     if (firestore && fbUid()) { try { await fsPut('vademecum', target); } catch(e) {} }
     try { await syncVadToSpecies(target.id); } catch(e) {}
+    _vadRefreshOptsCache();
     return { updated: true, id: target.id, catChanged };
   }
   const st = vdEnsureCatStructure(d.catLabel, d.subcatLabel, d.ssLabel);
@@ -11575,25 +11639,36 @@ async function _vadSheetPutRow(r) {
   await dbPutSync('vademecum', newDrug);
   if (firestore && fbUid()) { try { await fsPut('vademecum', newDrug); } catch(e) {} }
   try { await syncVadToSpecies(newDrug.id); } catch(e) {}
+  _vadRefreshOptsCache();
   return { created: true, id: newDrug.id, catChanged: !!st?.created };
 }
 
 // Autoguardado: si la fila está vinculada a una ficha existente, cada cambio
 // se persiste al instante (sin re-render para no perder el foco).
+const _vadPersistTimers = {};
 function vadSheetPersistRow(idx) {
+  clearTimeout(_vadPersistTimers[idx]);
+  _vadPersistTimers[idx] = setTimeout(() => { delete _vadPersistTimers[idx]; _vadDoPersistRow(idx); }, 500);
+}
+function _vadFlushPersistTimers() {
+  for (const k of Object.keys(_vadPersistTimers)) { clearTimeout(_vadPersistTimers[k]); delete _vadPersistTimers[k]; }
+}
+async function _vadDoPersistRow(idx) {
   const r = _vadSheetRows[idx];
   if (!r || r.del || !r.id) return;
-  _vadSheetPutRow(r).then(res => {
+  try {
+    const res = await _vadSheetPutRow(r);
     if (!res || !res.id) return;
     const tr = document.querySelector('#vad-sheet-tbody tr[data-idx="'+idx+'"]');
     if (tr) tr.dataset.linked = '1';
     const st = document.getElementById('vad-sheet-st-'+idx);
     if (st) { st.textContent = '●'; st.style.color = 'var(--g6)'; }
-  }).catch(() => {});
+  } catch (e) {}
 }
 
 // Guarda TODAS las filas a las fichas.
 async function saveVadSheet() {
+  _vadFlushPersistTimers();
   let created=0, updated=0, skipped=0, deletes=0, sinCat=0, catsChanged=false;
   for (const r of _vadSheetRows.slice()) {
     if (r.del) {
@@ -11622,6 +11697,321 @@ async function saveVadSheet() {
   if (skipped) parts.push('Vacías '+skipped);
   if (sinCat) parts.push('⚠ '+sinCat+' sin categoría (visibles en "Todos" y buscador)');
   toast((parts.length ? '✓ ' : '⚠ Sin cambios ') + parts.join(' · '));
+}
+
+// ── Google Sheets (Drive): hoja real enlazada al Vademécum · v53 ──
+let _gsClientId = '';
+let _gsSheetId = '';
+let _gsToken = null;
+let _gsTokExp = 0;
+let _gsTokenClient = null;
+let _gsSdkPromise = null;
+let _gsGidCache = null;
+const GS_SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+
+function _gsLoadSdk() {
+  if (_gsSdkPromise) return _gsSdkPromise;
+  _gsSdkPromise = new Promise((resolve, reject) => {
+    if (window.google && google.accounts && google.accounts.oauth2) return resolve();
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true; s.defer = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('No se pudo cargar el SDK de Google (revisa la conexión)'));
+    document.head.appendChild(s);
+  });
+  return _gsSdkPromise;
+}
+
+async function _gsLoadCfg() {
+  const a = await dbGet('settings', 'gsheets_client_id');
+  const b = await dbGet('settings', 'gsheets_vademecum_id');
+  _gsClientId = (a && a.value) ? String(a.value).trim() : '';
+  _gsSheetId = (b && b.value) ? String(b.value).trim() : '';
+  return { clientId: _gsClientId, sheetId: _gsSheetId };
+}
+
+async function _gsSaveClientId(id) {
+  _gsClientId = String(id || '').trim();
+  await dbPut('settings', { id: 'gsheets_client_id', value: _gsClientId });
+  if (firestore && fbUid()) { try { await firestore.collection('settings').doc('gsheets_client_id').set({ value: _gsClientId }); } catch (e) {} }
+}
+async function _gsSaveSheetId(id) {
+  _gsSheetId = String(id || '').trim();
+  _gsGidCache = null;
+  await dbPut('settings', { id: 'gsheets_vademecum_id', value: _gsSheetId });
+  if (firestore && fbUid()) { try { await firestore.collection('settings').doc('gsheets_vademecum_id').set({ value: _gsSheetId }); } catch (e) {} }
+}
+
+// Token OAuth 2.0 (GIS) — force=true pide consentimiento otra vez.
+async function _gsGetToken(force) {
+  await _gsLoadSdk();
+  if (!_gsClientId) throw new Error('Primero configura el ID de cliente OAuth en Panel de Admin → 📊 Google Sheets.');
+  const oauth2 = google.accounts.oauth2;
+  if (!_gsTokenClient) {
+    _gsTokenClient = oauth2.initTokenClient({
+      client_id: _gsClientId,
+      scope: GS_SCOPES,
+      callback: (resp) => {
+        if (resp && !resp.error && resp.access_token) {
+          _gsToken = resp.access_token;
+          _gsTokExp = Date.now() + (parseInt(resp.expires_in || '3600', 10) - 120) * 1000;
+        } else {
+          _gsToken = null;
+        }
+      }
+    });
+  }
+  const valid = _gsToken && !force && Date.now() < _gsTokExp;
+  if (!valid) {
+    const got = await new Promise((resolve) => {
+      const prev = _gsTokenClient.callback;
+      _gsTokenClient.callback = (resp) => { prev && prev(resp); resolve(!!(resp && !resp.error && resp.access_token)); };
+      try { _gsTokenClient.requestAccessToken({ prompt: force ? 'consent' : '' }); } catch (e) { resolve(false); }
+    });
+    if (!got) _gsToken = null;
+    if (!got) throw new Error('Autorización cancelada o fallida. Revisa que el ID de cliente y su origen autorizado sean correctos.');
+  }
+  return _gsToken;
+}
+
+async function _gsApi(method, url, body) {
+  const tok = await _gsGetToken(false);
+  const opts = { method: method || 'GET', headers: { Authorization: 'Bearer ' + tok } };
+  if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const res = await fetch(url, opts);
+  const txt = await res.text();
+  let data = null;
+  try { data = txt ? JSON.parse(txt) : null; } catch (e) { data = null; }
+  if (!res.ok) {
+    const msg = (data && data.error && data.error.message) || ('HTTP ' + res.status);
+    const err = new Error(String(msg));
+    err.detail = data;
+    throw err;
+  }
+  return data;
+}
+
+async function _gsSheetGid() {
+  if (_gsGidCache != null) return _gsGidCache;
+  const meta = await _gsApi('GET', 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(_gsSheetId) + '?fields=sheets.properties');
+  const sh = (meta.sheets || []).find(s => s.properties && s.properties.title === 'Vademécum') || (meta.sheets || [])[0];
+  _gsGidCache = sh && typeof sh.properties.sheetId === 'number' ? sh.properties.sheetId : 0;
+  return _gsGidCache;
+}
+
+// Asegura que la hoja existe (la crea en Drive la primera vez) y tiene la pestaña Vademécum.
+async function _gsEnsureSheet() {
+  if (_gsSheetId) {
+    try {
+      await _gsApi('GET', 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(_gsSheetId) + '/values/PRINCIPIOS%20ACTIVOS!A1:A1');
+      return;
+    } catch (e) { /* por si es una hoja creada a mano: la reutilizamos igual */ }
+  }
+  const data = await _gsApi('POST', 'https://sheets.googleapis.com/v4/spreadsheets', {
+    properties: { title: 'WildVet — Vademécum' },
+    sheets: [
+      { properties: { title: 'Vademécum' } },
+      { properties: { title: 'PRINCIPIOS ACTIVOS' } }
+    ]
+  });
+  if (!data || !data.spreadsheetId) throw new Error('Google no devolvió la hoja creada.');
+  await _gsSaveSheetId(data.spreadsheetId);
+  toast('✓ Hoja "WildVet — Vademécum" creada en tu Drive.');
+}
+
+function _gsCurrentOrder() { return (_vadColOrder && _vadColOrder.length ? _vadColOrder : _vadDefaultColKeys()); }
+
+async function _gsWriteHeaders() {
+  const header = _gsCurrentOrder().map(k => {
+    const col = VAD_GRID_COLS.find(x => x.k === k);
+    return col ? col.t : k;
+  });
+  await _gsApi('PUT', 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(_gsSheetId) + '/values/Vademécum!A1?valueInputOption=RAW', { values: [header], majorDimension: 'ROWS' });
+}
+
+async function _gsUpdatePrinciples() {
+  const maxCol = Math.max(1, String.fromCharCode(64 + _gsCurrentOrder().length));
+  try {
+    const out = [['PRINCIPIO ACTIVO']];
+    const seen = new Set();
+    const list = [];
+    for (const d of _vadSheetOrder()) {
+      const v = String(d.active || d.drug || '').trim();
+      if (v && !seen.has(v)) { seen.add(v); list.push(v); }
+    }
+    list.sort((a, b) => String(a).localeCompare(String(b), 'es'));
+    for (const v of list) out.push([v]);
+    await _gsApi('PUT', 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(_gsSheetId) + '/values/PRINCIPIOS%20ACTIVOS!A1:A' + out.length + '?valueInputOption=RAW', { values: out, majorDimension: 'ROWS' });
+    // Lista desplegable en la columna A del Vademécum
+    try {
+      const gid = await _gsSheetGid();
+      if (gid != null) {
+        await _gsApi('POST', 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(_gsSheetId) + ':batchUpdate', {
+          requests: [{
+            setDataValidation: {
+              range: { sheetId: gid, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: 1 },
+              rule: { condition: { type: 'ONE_OF_RANGE', values: [{ userEnteredValue: "'PRINCIPIOS ACTIVOS'!A2:A" + Math.max(1, out.length) }] }, strict: false, showCustomUi: true }
+            }
+          }]
+        });
+      }
+    } catch (e) {}
+  } catch (e) {}
+}
+
+// Convierte lo leído de Google Sheets en filas de la hoja interna (con contexto
+// de categoría rellenado hacia abajo) y persiste las fichas.
+async function _gsApplyValues(values) {
+  _vadFlushPersistTimers();
+  const header = values[0] || [];
+  const colOf = {};
+  const colIdx = {};
+  header.forEach((h, i) => { const k = _vsColMapForHeader(h); if (k) { colOf[i] = k; colIdx[k] = i; } });
+  const hasHeader = Object.keys(colOf).length > 0;
+  if (!hasHeader) {
+    for (let i = 0; i < 26 && i < header.length; i++) { const k = VAD_GRID_KEYS[i]; if (k) { colOf[i] = k; colIdx[k] = i; } }
+  }
+  const rows = values.slice(hasHeader ? 1 : 0);
+  const ctx = { cat_label: '', subcat_label: '', ss_label: '' };
+  const filled = rows.map(raw => {
+    const row = raw.slice();
+    const hasKey = ['active', 'drug', 'nombres'].some(k => {
+      const ci = colIdx[k];
+      return typeof ci === 'number' && String(row[ci] || '').trim() !== '';
+    });
+    if (!hasKey) {
+      const anyCat = ['cat_label', 'subcat_label', 'ss_label'].some(k => {
+        const ci = colIdx[k];
+        return typeof ci === 'number' && String(row[ci] || '').trim() !== '';
+      });
+      if (anyCat) {
+        for (const k of ['cat_label', 'subcat_label', 'ss_label']) {
+          const ci = colIdx[k];
+          if (typeof ci === 'number') ctx[k] = String(row[ci] || '').trim();
+        }
+      }
+    }
+    if (hasKey) {
+      for (const k of ['cat_label', 'subcat_label', 'ss_label']) {
+        const ci = colIdx[k];
+        if (typeof ci === 'number' && !String(row[ci] || '').trim() && ctx[k]) row[ci] = ctx[k];
+      }
+    }
+    return row;
+  });
+  const src = (hasHeader ? [header] : []).concat(filled);
+  const { groups } = _sheetRowsFromCsV(src);
+  let created = 0, updated = 0, skipped = 0, catsChanged = false;
+  for (const g of groups) {
+    const m = g.m || {};
+    const active = String(m.active || '').trim();
+    const key = active || String(m.drug || '').trim() || String(m.nombres || '').trim();
+    if (!key) { skipped++; continue; }
+    const row = _vadNewRow(active || key);
+    for (const k of Object.keys(m)) {
+      if (k === 'active') continue;
+      if (typeof row.m[k] === 'undefined') row.m[k] = '';
+      row.m[k] = String(m[k] || '').trim();
+    }
+    if (!String(row.m.active || '').trim()) row.m.active = active || key;
+    row.sps = (g.sps || []).slice();
+    row._spsDirty = !!row.sps.length;
+    row._dirty = { m: {}, s: {} };
+    for (const k of Object.keys(row.m)) { if (String(row.m[k] || '').trim() !== '') row._dirty.m[k] = 1; }
+    const match = (active && _vadMatchDrug(active)) || _vadMatchDrug(row.m.drug);
+    row.id = match ? match.id : '';
+    const res = await _vadSheetPutRow(row);
+    if (!res || res.skipped) { skipped++; continue; }
+    if (res.catChanged) catsChanged = true;
+    if (res.created) created++; else if (res.updated) updated++;
+  }
+  if (catsChanged) await saveVademecumCats();
+  renderVademecum();
+  const parts = [];
+  if (created) parts.push(created + ' ficha(s) nueva(s)');
+  if (updated) parts.push(updated + ' actualizada(s)');
+  if (skipped) parts.push(skipped + ' vacía(s)/sin ficha');
+  if (!parts.length) parts.push('sin cambios');
+  return { parts, created, updated, skipped };
+}
+
+async function gsheetOpen() {
+  try {
+    await _gsLoadCfg();
+    _gsBusy(true, 'Abriendo Google Sheets…');
+    await _gsGetToken(false);
+    await _gsEnsureSheet();
+    await _gsWriteHeaders();
+    try { await _gsUpdatePrinciples(); } catch (e) {}
+    window.open('https://docs.google.com/spreadsheets/d/' + _gsSheetId, '_blank');
+    toast('✓ Hoja lista. Edítala en Google Sheets y pulsa 🔄 Sincronizar para volcar los cambios.');
+  } catch (e) {
+    toast('⚠ ' + (e && e.message || e));
+  } finally { _gsBusy(false); }
+}
+
+async function gsheetSync() {
+  try {
+    await _gsLoadCfg();
+    if (!_gsSheetId) { toast('⚠ Primero pulsa 📊 Google Sheets para crear/abrir la hoja.'); return; }
+    _gsBusy(true, 'Leyendo Google Sheets…');
+    await _gsGetToken(false);
+    const data = await _gsApi('GET', 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(_gsSheetId) + '/values/Vademécum!A1:AB4000');
+    const values = data && data.values ? data.values : [];
+    if (!values.length) { toast('⚠ La hoja está vacía.'); return; }
+    const res = await _gsApplyValues(values);
+    try { await _gsUpdatePrinciples(); } catch (e) {}
+    toast('✓ Sincronizado: ' + res.parts.join(' · '));
+  } catch (e) {
+    toast('⚠ ' + (e && e.message || e));
+  } finally { _gsBusy(false); }
+}
+
+async function gsheetSaveClientId() {
+  const inp = document.getElementById('gsheets-client-id');
+  const id = inp ? String(inp.value || '').trim() : '';
+  if (!id) { toast('⚠ Escribe el ID de cliente OAuth.'); return; }
+  await _gsSaveClientId(id);
+  await renderGSheetConfig();
+  toast('✓ ID de cliente guardado.');
+}
+
+function _gsBusy(on, msg) {
+  const b = document.getElementById('gsheet-busy');
+  if (b) b.textContent = on ? '⏳ ' + msg : '';
+  const t = document.getElementById('gsheet-toolbusy');
+  if (t) t.textContent = on ? ('⏳ ' + msg) : '';
+}
+
+async function renderGSheetConfig() {
+  const box = document.getElementById('gsheet-config-box');
+  if (!box) return;
+  await _gsLoadCfg();
+  const esc = (v) => vdEsc(String(v || ''));
+  const originPath = (location && location.origin || 'TU_DOMINIO') + '/';
+  box.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:.5rem">
+      <div style="font-size:.75rem;color:var(--txt2)">Editas el vademécum como una <b>hoja real de Google Sheets</b> en Drive (añadir/mezclar filas y columnas, redimensionar, pegar rangos de Excel…). El botón <b>🔄 Sincronizar</b> lee la hoja, empareja por <b>principio activo</b> y actualiza o crea cada ficha en su sección automáticamente.</div>
+      <label style="font-size:.75rem;font-weight:600">ID de cliente OAuth (Google Cloud)</label>
+      <input id="gsheets-client-id" class="form-control" type="text" value="${esc(_gsClientId)}" placeholder="xxxxxxxx.apps.googleusercontent.com">
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" onclick="gsheetSaveClientId()">💾 Guardar ID</button>
+        <button class="btn btn-primary btn-sm" onclick="gsheetOpen()">📊 Abrir / Crear hoja</button>
+        <button class="btn btn-admin btn-sm" onclick="gsheetSync()">🔄 Sincronizar</button>
+      </div>
+      <div id="gsheet-busy" style="font-size:.75rem;color:var(--g5);min-height:1rem"></div>
+      ${_gsSheetId
+        ? '<div style="font-size:.72rem;color:var(--g6)">✅ Hoja enlazada: <a href="https://docs.google.com/spreadsheets/d/' + esc(_gsSheetId) + '" target="_blank" style="color:var(--g5)">abrir en Google Sheets →</a></div>'
+        : '<div style="font-size:.72rem;color:var(--am)">⚠ Aún sin hoja enlazada. Pulsa "📊 Abrir / Crear hoja" (pedirá autorización de Google la primera vez).</div>'}
+      <div style="font-size:.68rem;color:var(--txt3);border-top:1px dashed var(--bor);padding-top:.45rem;line-height:1.55">
+        <b>Configuración única:</b><br>
+        · En <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--g5)">Google Cloud → APIs y servicios → Credenciales</a> crea un <b>ID de cliente OAuth</b> tipo <b>App web</b>.<br>
+        · En <b>Orígenes de JavaScript autorizados</b> añade la URL donde está publicada esta app: <code style="background:#f1f4f8;padding:0 3px">${esc(originPath)}</code> (debe ser https).<br>
+        · Activa la API <b>Google Sheets API</b> en el mismo proyecto.<br>
+        · Pega el ID aquí, Guardar, y pulsa 📊 Abrir/Crear.
+      </div>
+    </div>`;
 }
 
 // ── Pegar desde Excel (agrega filas al final de la hoja) ──
@@ -11794,6 +12184,7 @@ function _vadsAppendGroups(groups) {
     _vadSheetRows.push(r);
     added++;
   }
+  _vadRefreshOptsCache();
   return added;
 }
 
