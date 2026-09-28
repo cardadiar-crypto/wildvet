@@ -966,7 +966,7 @@ textarea.form-control{resize:vertical;min-height:70px}
 // ─────────────────────────────────────
 // VERSIÓN DE LA APP (para detectar si una caché vieja está sirviendo otra build)
 // ─────────────────────────────────────
-const APP_VERSION = '51';
+const APP_VERSION = '52';
 
 // ═══════════════════════════════════
 // DEFAULT SPECIES DB
@@ -10847,14 +10847,48 @@ async function saveVadExcel() {
 }
 
 // ─────────────────────────────────────────────
-// Vademécum — Hoja de cálculo (estilo Excel) · v50
-// Una fila por PRINCIPIO ACTIVO, en el mismo orden que la app.
-// Principio activo = desplegable con TODOS los principios subidos en la
-// sección de fármacos; al elegir uno se VINCULA a su ficha y la fila se
-// rellena automáticamente. Lo editado se guarda en la ficha al instante
-// (si ya existe) y con 💾 Guardar se crean/actualizan todas.
+// Vademécum — Hoja de cálculo (estilo Excel) · v52
+// Rejilla en blanco organizable: la columna A muestra TODOS los principios
+// activos (desplegable que VINCULA a la ficha). El resto de celdas están
+// vacías para que tú pongas la información. Arrastra la cabecera (letra)
+// para mover columnas y el número de fila para reordenarlas; el orden se
+// guarda.💾 Guardar actualiza SOLO los campos que editaste (los vacíos no
+// pisan la ficha existente).
 // ─────────────────────────────────────────────
+const VAD_GRID_COLS = [
+  { k:'active',       l:'A', t:'PRINCIPIO ACTIVO' },
+  { k:'drug',         l:'B', t:'FÁRMACO' },
+  { k:'nombres',      l:'C', t:'NOMBRES COMERCIALES' },
+  { k:'conc',         l:'D', t:'CONCENTRACIONES' },
+  { k:'cat_label',    l:'E', t:'CATEGORÍA' },
+  { k:'subcat_label', l:'F', t:'SUBCATEGORÍA' },
+  { k:'ss_label',     l:'G', t:'SUB-SUBCATEGORÍA' },
+  { k:'cat_esp',      l:'H', t:'CAT. ESPECÍFICA' },
+  { k:'routes',       l:'I', t:'VÍAS' },
+  { k:'indic',        l:'J', t:'INDICACIONES' },
+  { k:'ci',           l:'K', t:'CONTRAINDICACIONES' },
+  { k:'info',         l:'L', t:'EFECTOS ADVERSOS' },
+  { k:'notes',        l:'M', t:'NOTAS CLÍNICAS' },
+  { k:'mech',         l:'N', t:'MECANISMO (TÉCNICO)' },
+  { k:'mech_simple',  l:'O', t:'MECANISMO RESUMIDO' },
+  { k:'desc',         l:'P', t:'DESCRIPCIÓN' },
+  { k:'keywords',     l:'Q', t:'PALABRAS CLAVE' },
+  { k:'bib',          l:'R', t:'BIBLIOGRAFÍA' },
+  { k:'sps',          l:'S', t:'ESPECIES Y DOSIS' }
+];
+function _vadDefaultColKeys() { return VAD_GRID_COLS.map(c => c.k); }
+// Orden posicional sin encabezados (esqueleto clásico del CSV)
+const VAD_GRID_KEYS = [
+  'cat_label','subcat_label','ss_label','active','drug','nombres','conc','cat_esp','routes',
+  'indic','ci','info','notes','mech','mech_simple','desc','keywords','bib',
+  'sp','sci','dmin','dmax','unit','fuente','sp_via','sp_freq','sp_notes'
+];
 let _vadSheetRows = [];
+let _vadColOrder = null;
+let _vadColOrderSaved = null;
+let _vadRowOrderSaved = null;
+let _vadDragCol = null;
+let _vadDragRowKey = null;
 
 function _vadSheetOrder() {
   return VADEMECUM_DB.slice().sort((a,b)=>String(a.drug||'').localeCompare(String(b.drug||''),'es'));
@@ -10922,8 +10956,45 @@ function _vadSheetDrugToRow(d) {
   };
 }
 
+function _vadRowKey(r) {
+  return r.id || r._uid || (r._uid = 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+}
+async function _vadSaveLayout() {
+  try { await dbPut('settings', { id: 'vademecum_sheet_colorder', value: _vadColOrder || _vadDefaultColKeys() }); } catch(e){}
+  try { await dbPut('settings', { id: 'vademecum_sheet_roworder', value: _vadSheetRows.map(_vadRowKey) }); } catch(e){}
+}
+function _vadApplyColOrder() {
+  const saved = Array.isArray(_vadColOrderSaved) ? _vadColOrderSaved : null;
+  const def = _vadDefaultColKeys();
+  const order = [];
+  if (saved) for (const k of saved) if (def.includes(k) && !order.includes(k)) order.push(k);
+  for (const k of def) if (!order.includes(k)) order.push(k);
+  _vadColOrder = order;
+}
+function _vadApplyRowOrder() {
+  if (!Array.isArray(_vadRowOrderSaved) || !_vadRowOrderSaved.length) return;
+  _vadSheetRows.sort((a, b) => {
+    const ia = _vadRowOrderSaved.indexOf(_vadRowKey(a));
+    const ib = _vadRowOrderSaved.indexOf(_vadRowKey(b));
+    if (ia === -1 && ib === -1) return 0;
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+}
+function _vadNewRow(activeVal) {
+  return { id:'', _uid:null, m:{ active: String(activeVal||'').trim() }, sps:[], open:false, del:false, _newActive:false, _dirty:{ m:{}, s:{} }, _spsDirty:false };
+}
+function _vadOrderNow() { return _vadColOrder || _vadDefaultColKeys(); }
+
 function _vadSheetBuildRows() {
-  _vadSheetRows = _vadSheetOrder().map(_vadSheetDrugToRow);
+  _vadSheetRows = _vadSheetOrder().map(d => {
+    const r = _vadNewRow(d.active || d.drug);
+    r.id = d.id || '';
+    return r;
+  });
+  _vadApplyColOrder();
+  _vadApplyRowOrder();
 }
 
 function _vadActiveListed(v) {
@@ -10964,25 +11035,61 @@ function _vadViewRestoreScroll(s) {
   if (c && s) { c.scrollLeft = s.sx; c.scrollTop = s.sy; }
 }
 
+function _vsThHtml(col) {
+  return '<th draggable="true" ondragstart="vadColDragStart(event,\'' + col.k + '\')" ondragover="vadColDragOver(event)" ondrop="vadColDrop(event,\'' + col.k + '\')" ondragend="vadColDragEnd()" style="white-space:nowrap;cursor:grab" title="Arrastra para cambiar el orden de la columna"><span class="ltr">' + col.l + '</span><span class="sub">' + col.t + '</span></th>';
+}
+function _vsTdMin(k) {
+  const w = { active:190, drug:150, nombres:140, conc:120, cat_label:170, subcat_label:180, ss_label:170, cat_esp:110, routes:110, indic:170, ci:170, info:150, notes:150, mech:180, mech_simple:150, desc:160, keywords:130, bib:150, sps:160 }[k] || 120;
+  return 'min-width:' + w + 'px';
+}
+function _vsCell(k, r, idx) {
+  const c = (v) => vdEsc(v ?? '');
+  const linked = !!r.id;
+  if (k === 'active') {
+    const est = r.del
+      ? '<span style="color:#c0392b;font-size:.6rem;font-weight:700">ELIMINAR</span>'
+      : (linked
+        ? '<span class="vads-state" id="vad-sheet-st-' + idx + '" style="color:var(--g6)" title="Vinculado a su ficha">●</span>'
+        : '<span class="vads-state" id="vad-sheet-st-' + idx + '" style="color:#b9b9b9" title="Sin ficha todavía: se creará al guardar">○</span>');
+    const activeCell = r._newActive
+      ? '<input type="text" value="' + c(r.m.active) + '" placeholder="Escribe el principio activo…" data-f="active" autofocus onchange="vadSheetNewActive(' + idx + ',this)" onkeydown="if(event.key===\'Escape\'){vadSheetCancelNew(' + idx + ')}" style="min-width:170px">'
+      : '<select data-f="active" onchange="vadSheetActiveChanged(' + idx + ',this)">' + vadSheetActiveOptions(r) + '</select>';
+    return '<div style="display:flex;gap:3px;align-items:center">' + est + activeCell + '<button class="vads-btn vads-link" title="' + (linked ? 'Abrir la ficha vinculada' : 'Sin ficha aún (se creará al guardar)') + '" onclick="vadSheetFichaOn(' + idx + ')" style="' + (linked ? '' : 'opacity:.35') + '">↗</button></div>';
+  }
+  if (k === 'drug')     return _vsIn(idx, 'drug', r.m.drug, 'Ketamina', 'min-width:130px;font-weight:600');
+  if (k === 'nombres')  return _vsIn(idx, 'nombres', r.m.nombres, 'Ketavet / Ketamidor', 'min-width:130px');
+  if (k === 'conc')     return _vsIn(idx, 'conc', r.m.conc, '100 mg/ml; 50 mg/ml', 'min-width:110px');
+  if (k === 'cat_label') return '<select data-f="cat_label" onchange="vadSheetCatChanged(' + idx + ',this)">' + _preserveOpt(vdExcelSecOptions(r.m.cat_label), r.m.cat_label) + '</select>';
+  if (k === 'subcat_label') return '<select data-f="subcat_label" onchange="vadSheetSubChanged(' + idx + ',this)">' + _preserveOpt(vdExcelSubOptions(r.m.cat_label, r.m.subcat_label), r.m.subcat_label) + '</select>';
+  if (k === 'ss_label') return '<select data-f="ss_label" onchange="vadSheetSet(' + idx + ',\'ss_label\',this.value)">' + _preserveOpt(vdExcelSsOptions(r.m.cat_label, r.m.subcat_label, r.m.ss_label), r.m.ss_label) + '</select>';
+  if (k === 'cat_esp')  return _vsIn(idx, 'cat_esp', r.m.cat_esp, 'AINE', 'min-width:95px');
+  if (k === 'routes')   return _vsIn(idx, 'routes', r.m.routes, 'IM, IV', 'min-width:95px');
+  if (k === 'indic')    return _vsIn(idx, 'indic', r.m.indic, 'Indicaciones…', 'min-width:160px');
+  if (k === 'ci')       return _vsIn(idx, 'ci', r.m.ci, 'Contraindicaciones…', 'min-width:160px');
+  if (k === 'info')     return _vsIn(idx, 'info', r.m.info, 'Efectos adversos…', 'min-width:140px');
+  if (k === 'notes')    return _vsIn(idx, 'notes', r.m.notes, 'Notas clínicas…', 'min-width:140px');
+  if (k === 'mech')     return _vsIn(idx, 'mech', r.m.mech, 'Mecanismo (técnico)…', 'min-width:170px');
+  if (k === 'mech_simple') return _vsIn(idx, 'mech_simple', r.m.mech_simple, 'Mecanismo resumido…', 'min-width:140px');
+  if (k === 'desc')     return _vsIn(idx, 'desc', r.m.desc, 'Descripción…', 'min-width:150px');
+  if (k === 'keywords') return _vsIn(idx, 'keywords', r.m.keywords, 'palabras, clave', 'min-width:120px');
+  if (k === 'bib')      return _vsIn(idx, 'bib', r.m.bib, 'https://… o bib:spKey:idx', 'min-width:140px');
+  if (k === 'sps') {
+    const spresumen = r.sps.map(s => {
+      const rng = (s.dmin && s.dmax) ? s.dmin + '-' + s.dmax : (s.dmin ? '≥' + s.dmin : (s.dmax ? '≤' + s.dmax : ''));
+      return (s.sp || '?') + (rng ? ': ' + rng + (s.unit ? ' ' + s.unit : '') : '') + (s.via ? ' (' + s.via + ')' : '');
+    }).join('\n');
+    return '<div class="vads-spcell"><button class="vads-btn" id="vad-sheet-spbtn-' + idx + '" onclick="vadSheetToggleSps(' + idx + ')">' + (r.open ? '▾' : '▸') + ' 🐾 ' + (r.sps || []).length + '</button><div class="vads-spsum">' + c(spresumen) + '</div></div>';
+  }
+  return '';
+}
 function vadSheetRowHtml(r, idx) {
   const c = (v) => vdEsc(v ?? '');
   const linked = !!r.id;
-  const est = r.del
-    ? '<span style="color:#c0392b;font-size:.6rem;font-weight:700">ELIMINAR</span>'
-    : (linked
-      ? '<span class="vads-state" id="vad-sheet-st-'+idx+'" style="color:var(--g6)" title="Vinculado a su ficha">●</span>'
-      : '<span class="vads-state" id="vad-sheet-st-'+idx+'" style="color:#b9b9b9" title="Sin ficha todavía: se creará al guardar">○</span>');
-  const activeCell = r._newActive
-    ? '<input type="text" value="'+c(r.m.active)+'" placeholder="Escribe el principio activo…" data-f="active" autofocus onchange="vadSheetNewActive('+idx+',this)" onkeydown="if(event.key===\'Escape\'){vadSheetCancelNew('+idx+')}" style="min-width:170px">'
-    : '<select data-f="active" onchange="vadSheetActiveChanged('+idx+',this)">'+vadSheetActiveOptions(r)+'</select>';
-  const spresumen = r.sps.map(s => {
-    const rng = (s.dmin && s.dmax) ? s.dmin+'-'+s.dmax : (s.dmin ? '≥'+s.dmin : (s.dmax ? '≤'+s.dmax : ''));
-    return (s.sp||'?') + (rng ? ': '+rng+(s.unit?' '+s.unit:'') : '') + (s.via ? ' ('+s.via+')' : '');
-  }).join('\n');
+  const order = _vadOrderNow();
   const spBlock = r.open ? `
     <tr class="vads-sps" id="vad-sheet-sps-${idx}">
-      <td colspan="21" style="padding:6px 8px;background:#fafafa">
-        <div style="font-weight:700;font-size:.68rem;color:#445;margin-bottom:4px">🩺 Especies y dosis — ${c(r.m.drug||r.m.active||'nuevo fármaco')}</div>
+      <td colspan="${order.length + 2}" style="padding:6px 8px;background:#fafafa">
+        <div style="font-weight:700;font-size:.68rem;color:#445;margin-bottom:4px">🩺 Especies y dosis — ${c(r.m.drug || r.m.active || 'nuevo fármaco')}</div>
         <div style="overflow:auto;border:1px solid #dfe6ee;border-radius:6px;margin-bottom:4px">
           <table class="vads-sub" style="width:100%;border-collapse:collapse;font-size:.68rem">
             <thead><tr>
@@ -11010,40 +11117,19 @@ function vadSheetRowHtml(r, idx) {
     </tr>`
     : '';
   return `
-  <tr class="vads-row" data-idx="${idx}" data-linked="${linked?'1':'0'}" style="${r.del?'opacity:.55':''}">
-    <td class="rownum">${idx+1}</td>
-    <td style="min-width:190px">
-      <div style="display:flex;gap:3px;align-items:center">
-        ${est}
-        ${activeCell}
-        <button class="vads-btn vads-link" title="${linked?'Abrir la ficha vinculada':'Sin ficha aún (se creará al guardar)'}" onclick="vadSheetFichaOn(${idx})" style="${linked?'':'opacity:.35'}">↗</button>
-      </div>
-    </td>
-    <td style="min-width:150px">${_vsIn(idx,'drug',r.m.drug,'Ketamina', 'min-width:130px;font-weight:600')}</td>
-    <td style="min-width:140px">${_vsIn(idx,'nombres',r.m.nombres,'Ketavet / Ketamidor','min-width:130px')}</td>
-    <td style="min-width:120px">${_vsIn(idx,'conc',r.m.conc,'100 mg/ml; 50 mg/ml','min-width:110px')}</td>
-    <td style="min-width:170px"><select data-f="cat_label" onchange="vadSheetCatChanged(${idx},this)">${_preserveOpt(vdExcelSecOptions(r.m.cat_label), r.m.cat_label)}</select></td>
-    <td style="min-width:180px"><select data-f="subcat_label" onchange="vadSheetSubChanged(${idx},this)">${_preserveOpt(vdExcelSubOptions(r.m.cat_label, r.m.subcat_label), r.m.subcat_label)}</select></td>
-    <td style="min-width:170px"><select data-f="ss_label" onchange="vadSheetSet(${idx},'ss_label',this.value)">${_preserveOpt(vdExcelSsOptions(r.m.cat_label, r.m.subcat_label, r.m.ss_label), r.m.ss_label)}</select></td>
-    <td style="min-width:110px">${_vsIn(idx,'cat_esp',r.m.cat_esp,'AINE','min-width:95px')}</td>
-    <td style="min-width:110px">${_vsIn(idx,'routes',r.m.routes,'IM, IV','min-width:95px')}</td>
-    <td style="min-width:170px">${_vsIn(idx,'indic',r.m.indic,'Indicaciones…','min-width:160px')}</td>
-    <td style="min-width:170px">${_vsIn(idx,'ci',r.m.ci,'Contraindicaciones…','min-width:160px')}</td>
-    <td style="min-width:150px">${_vsIn(idx,'info',r.m.info,'Efectos adversos…','min-width:140px')}</td>
-    <td style="min-width:150px">${_vsIn(idx,'notes',r.m.notes,'Notas clínicas…','min-width:140px')}</td>
-    <td style="min-width:180px">${_vsIn(idx,'mech',r.m.mech,'Mecanismo (técnico)…','min-width:170px')}</td>
-    <td style="min-width:150px">${_vsIn(idx,'mech_simple',r.m.mech_simple,'Mecanismo resumido…','min-width:140px')}</td>
-    <td style="min-width:160px">${_vsIn(idx,'desc',r.m.desc,'Descripción…','min-width:150px')}</td>
-    <td style="min-width:130px">${_vsIn(idx,'keywords',r.m.keywords,'palabras, clave','min-width:120px')}</td>
-    <td style="min-width:150px">${_vsIn(idx,'bib',r.m.bib,'https://… o bib:spKey:idx','min-width:140px')}</td>
-    <td style="min-width:160px">
-      <div class="vads-spcell">
-        <button class="vads-btn" id="vad-sheet-spbtn-${idx}" onclick="vadSheetToggleSps(${idx})">${r.open?'▾':'▸'} 🐾 ${(r.sps||[]).length}</button>
-        <div class="vads-spsum">${c(spresumen)}</div>
-      </div>
-    </td>
+  <tr class="vads-row" data-idx="${idx}" data-linked="${linked?'1':'0'}" data-rid="${c(_vadRowKey(r))}" style="${r.del?'opacity:.55':''}">
+    <td class="rownum" draggable="true" ondragstart="vadRowDragStart(event,this)" ondragover="vadRowDragOver(event)" ondrop="vadRowDrop(event,this)" ondragend="vadRowDragEnd()" title="Arrastra para reordenar la fila">${idx+1} ⇅</td>
+    ${order.map(k => '<td style="' + _vsTdMin(k) + '">' + _vsCell(k, r, idx) + '</td>').join('')}
     <td style="text-align:center;min-width:40px"><input type="checkbox" data-del onclick="vadSheetToggleDel(${idx},this)" ${r.del?'checked':''} title="Marcar para eliminar al Guardar"></td>
   </tr>${spBlock}`;
+}
+function _vsMarkAllDirty(r) {
+  const m = r.m || {};
+  for (const k of Object.keys(m)) {
+    const v = m[k];
+    if (v !== undefined && v !== null && String(v).trim() !== '') r._dirty.m[k] = 1;
+  }
+  if (r.sps && r.sps.length) r._spsDirty = true;
 }
 
 function vadSheetRender() {
@@ -11054,10 +11140,15 @@ function vadSheetRender() {
   _vadViewRestoreScroll(s);
 }
 
-function openVadSheet() {
+async function openVadSheet() {
   mergeDefaultVademecumCats();
   document.getElementById('modal-vad-sheet')?.remove();
+  _vadColOrderSaved = null;
+  _vadRowOrderSaved = null;
+  try { const c = await dbGet('settings','vademecum_sheet_colorder'); _vadColOrderSaved = c ? c.value : null; } catch(_) { _vadColOrderSaved = null; }
+  try { const r = await dbGet('settings','vademecum_sheet_roworder'); _vadRowOrderSaved = r ? r.value : null; } catch(_) { _vadRowOrderSaved = null; }
   _vadSheetBuildRows();
+  const order = _vadOrderNow();
   const m = document.createElement('div');
   m.id = 'modal-vad-sheet';
   m.style.cssText = 'position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;overflow:hidden';
@@ -11065,11 +11156,13 @@ function openVadSheet() {
   <style>
     .vads{ width:100%; border-collapse:collapse; font-size:.7rem; min-width:2000px; }
     .vads th{ position:sticky; top:0; background:#eef0f3; border:1px solid #d5d8dd; padding:3px 5px; text-align:center; font-weight:600; color:#333; font-size:.6rem; z-index:5; }
+    .vads th.dragover{ background:#e3ecf5; box-shadow:inset 0 3px 0 0 #2e6da4; }
     .vads th .ltr{ font-weight:800; color:#1d2b3a; font-size:.74rem; display:block; letter-spacing:.02em; }
     .vads th .sub{ font-weight:500; color:#6b7480; display:block; margin-top:1px; font-size:.6rem; }
     .vads thead th.rnc{ left:0; z-index:7; }
     .vads td{ border:1px solid #d5d8dd; padding:2px; background:#fff; vertical-align:top; }
-    .vads td.rownum{ position:sticky; left:0; background:#f2f3f5; text-align:center; color:#8a8f98; font-size:.62rem; min-width:30px; z-index:4; border-right:2px solid #c9ccd1; }
+    .vads td.rownum{ position:sticky; left:0; background:#f2f3f5; text-align:center; color:#8a8f98; font-size:.66rem; min-width:34px; z-index:4; border-right:2px solid #c9ccd1; cursor:grab; white-space:nowrap; }
+    .vads td.rownum.dragover{ background:#e3ecf5; box-shadow:inset 3px 0 0 0 #2e6da4; }
     .vads input[type=text], .vads input[type=text]:focus, .vads select{ border:none; background:transparent; width:100%; padding:2px; font-size:.7rem; outline:none; color:#212529; }
     .vads select{ cursor:pointer; appearance:auto; }
     .vads input:focus, .vads select:focus{ background:#fffbe6; }
@@ -11089,23 +11182,24 @@ function openVadSheet() {
     <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">
       <div style="min-width:0">
         <div style="font-weight:700;font-size:.95rem">📊 Vademécum · Hoja de cálculo</div>
-        <div style="font-size:.7rem;color:var(--txt3);margin-top:1px">Una <b>fila por principio activo</b> (mismo orden que la app). Desplegable <b>A</b> = todos los principios subidos en la sección de fármacos; al elegir uno la fila se <b>vincula a su ficha</b> y se rellena sola. Edita celdas y se guardan en la ficha al instante; 💾 Guardar crea/actualiza todas las fichas.</div>
+        <div style="font-size:.7rem;color:var(--txt3);margin-top:1px">Plantilla en blanco para que tú pongas la información. La columna <b><span class="ltr" style="display:inline">A</span> Principio activo</b> (desplegable) lista todos los fármacos y <b>vincula a su ficha</b>. <b>Arrastra la letra</b> de una columna para reordenarla y el <b>número de fila</b> para reordenar filas — el orden se queda guardado. 💾 Guardar actualiza <b>solo lo editado</b>: las celdas vacías no pisan la ficha.</div>
       </div>
       <div style="display:flex;gap:.4rem;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="saveVadSheet()">💾 Guardar</button>
         <button class="btn btn-secondary btn-sm" onclick="vadSheetPaste()">📋 Pegar</button>
         <button class="btn btn-secondary btn-sm" onclick="vadSheetAddRow()">➕ Fármaco</button>
+        <button class="btn btn-secondary btn-sm" onclick="vadSheetResetCols()">↺ Col.</button>
+        <button class="btn btn-secondary btn-sm" onclick="vadSheetResetRows()">↺ Filas</button>
         <button class="btn btn-secondary btn-sm" onclick="exportVadSheetXlsx()">📤 Excel (.xlsx)</button>
         <button class="btn btn-secondary btn-sm" onclick="importVadSheetXlsx()">📥 .xlsx</button>
-        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('modal-vad-sheet').remove()">Cerrar</button>
+        <button class="btn btn-secondary btn-sm" onclick="vadSheetClose()">Cerrar</button>
       </div>
     </div>
     <div id="vad-sheet-scroll" style="overflow:auto;flex:1;border:1px solid #c7cbd1;border-radius:10px;background:var(--sur)">
       <table class="vads">
         <thead><tr>
-          <th class="rnc"></th>
-          ${[['A','Principio activo'],['B','Fármaco'],['C','Nombres comerciales'],['D','Concentraciones'],['E','Categoría'],['F','Subcategoría'],['G','Sub-subcategoría'],['H','Cat. específica'],['I','Vías'],['J','Indicaciones'],['K','Contraindicaciones'],['L','Efectos adversos'],['M','Notas clínicas'],['N','Mecanismo (técnico)'],['O','Mecanismo resumido'],['P','Descripción'],['Q','Palabras clave'],['R','Bibliografía'],['S','Especies y dosis']]
-            .map(x=>'<th style="white-space:nowrap"><span class="ltr">'+x[0]+'</span><span class="sub">'+x[1]+'</span></th>').join('')}
+          <th class="rnc" title="Arrastra los números de fila para reordenarlas"># ⇅</th>
+          ${order.map(k => _vsThHtml(VAD_GRID_COLS.find(c => c.k === k))).join('')}
           <th style="white-space:nowrap" title="Marcar para eliminar al Guardar">Acciones</th>
         </tr></thead>
         <tbody id="vad-sheet-tbody"></tbody>
@@ -11116,16 +11210,95 @@ function openVadSheet() {
   vadSheetRender();
 }
 
+function vadSheetClose() {
+  _vadSaveLayout();
+  document.getElementById('modal-vad-sheet')?.remove();
+}
+function vadSheetResetCols() {
+  _vadColOrder = _vadDefaultColKeys();
+  _vadColOrderSaved = _vadColOrder.slice();
+  _vadSaveLayout();
+  vadSheetRender();
+  toast('↺ Columnas restauradas al orden original');
+}
+function vadSheetResetRows() {
+  _vadRowOrderSaved = null;
+  _vadSheetBuildRows();
+  _vadSaveLayout();
+  vadSheetRender();
+  toast('↺ Fármacos restaurados en orden alfabético (se pierden filas añadidas/orden manual)');
+}
+// ── Arrastrar columnas y filas ──
+function vadColDragStart(e, k) {
+  _vadDragCol = k;
+  try { e.dataTransfer.setData('text/plain', k); } catch(_) {}
+  e.dataTransfer.effectAllowed = 'move';
+}
+function vadColDragOver(e) {
+  e.preventDefault();
+  const t = e.currentTarget;
+  if (t && !t.classList.contains('dragover')) t.classList.add('dragover');
+}
+function vadColDragLeave(e) { if (e.currentTarget) e.currentTarget.classList.remove('dragover'); }
+function vadColDrop(e, k) {
+  e.preventDefault();
+  if (e.currentTarget) e.currentTarget.classList.remove('dragover');
+  const kd = _vadDragCol; _vadDragCol = null;
+  if (!kd || kd === k) return;
+  const order = _vadOrderNow();
+  const cur = order.filter(x => x !== kd);
+  cur.splice(cur.indexOf(k), 0, kd);
+  _vadColOrder = cur;
+  _vadSaveLayout();
+  vadSheetRender();
+}
+function vadColDragEnd() { _vadDragCol = null; }
+function vadRowDragStart(e, td) {
+  const tr = td && td.closest('tr');
+  _vadDragRowKey = (tr && tr.dataset.rid) || null;
+  try { e.dataTransfer.setData('text/plain', _vadDragRowKey || ''); } catch(_) {}
+  e.dataTransfer.effectAllowed = 'move';
+}
+function vadRowDragOver(e) {
+  e.preventDefault();
+  const t = e.currentTarget;
+  if (t && !t.classList.contains('dragover')) t.classList.add('dragover');
+}
+function vadRowDragLeave(e) { if (e.currentTarget) e.currentTarget.classList.remove('dragover'); }
+function vadRowDrop(e, td) {
+  e.preventDefault();
+  if (td) td.classList.remove('dragover');
+  const kd = _vadDragRowKey; _vadDragRowKey = null;
+  if (!kd) return;
+  const tr = td && td.closest('tr');
+  const kt = (tr && tr.dataset.rid) || '';
+  if (!kt || kt === kd) return;
+  const ri = _vadSheetRows.findIndex(x => _vadRowKey(x) === kd);
+  const ti = _vadSheetRows.findIndex(x => _vadRowKey(x) === kt);
+  if (ri < 0 || ti < 0) return;
+  const row = _vadSheetRows.splice(ri, 1)[0];
+  _vadSheetRows.splice(ti, 0, row);
+  _vadSaveLayout();
+  vadSheetRender();
+}
+function vadRowDragEnd() { _vadDragRowKey = null; }
+
 function vadSheetSet(idx, f, v) {
   const r = _vadSheetRows[idx];
   if (!r) return;
   r.m[f] = v;
+  if (!r._dirty.m) r._dirty.m = {};
+  r._dirty.m[f] = 1;
   vadSheetPersistRow(idx);
 }
 function vadSheetSpSet(idx, si, f, v) {
   const r = _vadSheetRows[idx];
   if (!r || !r.sps[si]) return;
   r.sps[si][f] = v;
+  if (!r._dirty.s) r._dirty.s = {};
+  if (!r._dirty.s[si]) r._dirty.s[si] = {};
+  r._dirty.s[si][f] = 1;
+  r._spsDirty = true;
   vadSheetPersistRow(idx);
 }
 
@@ -11133,6 +11306,8 @@ function vadSheetCatChanged(idx, sel) {
   const r = _vadSheetRows[idx];
   if (!r) return;
   r.m.cat_label = sel.value;
+  if (!r._dirty.m) r._dirty.m = {};
+  r._dirty.m.cat_label = 1;
   const tr = sel.closest('tr');
   const subSel = tr.querySelector('select[data-f="subcat_label"]');
   const ssSel = tr.querySelector('select[data-f="ss_label"]');
@@ -11143,6 +11318,8 @@ function vadSheetSubChanged(idx, sel) {
   const r = _vadSheetRows[idx];
   if (!r) return;
   r.m.subcat_label = sel.value;
+  if (!r._dirty.m) r._dirty.m = {};
+  r._dirty.m.subcat_label = 1;
   const tr = sel.closest('tr');
   const ssSel = tr.querySelector('select[data-f="ss_label"]');
   if (ssSel) ssSel.innerHTML = _preserveOpt(vdExcelSsOptions(r.m.cat_label, r.m.subcat_label, r.m.ss_label), r.m.ss_label);
@@ -11161,29 +11338,10 @@ function vadSheetActiveChanged(idx, sel) {
   }
   r.m.active = v;
   r._newActive = false;
+  if (!r._dirty.m) r._dirty.m = {};
+  r._dirty.m.active = 1;
   const t = _vadMatchDrug(v);
   r.id = t ? t.id : '';
-  if (t) {
-    const d = t;
-    if (!r.m.drug) r.m.drug = d.drug||'';
-    if (!r.m.nombres) r.m.nombres = (d.nombres||[]).join(' / ');
-    if (!r.m.conc) r.m.conc = vdExcelConcStr(d);
-    if (!r.m.cat_label) r.m.cat_label = d.category || (d.cat_vad ? (VADEMECUM_CATS[d.cat_vad]?.label||'') : '') || (d.cats?.[0]||'');
-    if (!r.m.subcat_label) r.m.subcat_label = d.subcat_vad||'';
-    if (!r.m.ss_label) r.m.ss_label = d.subsubcat_vad||'';
-    if (!r.m.cat_esp) r.m.cat_esp = d.cat_esp||'';
-    if (!r.m.routes) r.m.routes = (d.routes&&d.routes.length) ? d.routes.join(', ') : (d.route||'');
-    if (!r.m.indic) r.m.indic = d.indic||'';
-    if (!r.m.ci) r.m.ci = d.contraindications||'';
-    if (!r.m.info) r.m.info = d.info||'';
-    if (!r.m.notes) r.m.notes = d.notes||'';
-    if (!r.m.mech) r.m.mech = d.mech||'';
-    if (!r.m.mech_simple) r.m.mech_simple = d.mech_simple||'';
-    if (!r.m.desc) r.m.desc = d.desc||'';
-    if (!r.m.keywords) r.m.keywords = (d.keywords||[]).join(', ');
-    if (!r.m.bib) r.m.bib = vdExcelBibStr(d);
-    if (!r.sps.length) r.sps = (d.species_doses||[]).map(_vadSheetSpFromSd);
-  }
   vadSheetRender();
   toast(t ? ('🔗 Vinculado con la ficha de ' + (t.drug||v)) : '⚡ Nuevo principio activo — se creará su ficha al guardar');
 }
@@ -11192,6 +11350,8 @@ function vadSheetNewActive(idx, inp) {
   if (!r) return;
   r.m.active = String(inp.value||'').trim();
   r._newActive = false;
+  if (!r._dirty.m) r._dirty.m = {};
+  r._dirty.m.active = 1;
   const t = _vadMatchDrug(r.m.active);
   r.id = t ? t.id : '';
   vadSheetRender();
@@ -11227,20 +11387,19 @@ function vadSheetAddSp(idx) {
   if (!r) return;
   r.sps.push({ sp:'', sci:'', dmin:'', dmax:'', unit:'mg/kg', fuente:'', via:'', freq:'', notes:'' });
   r.open = true;
+  r._spsDirty = true;
   vadSheetRender();
 }
 function vadSheetDelSp(idx, si) {
   const r = _vadSheetRows[idx];
   if (!r) return;
   r.sps.splice(si, 1);
+  r._spsDirty = true;
   vadSheetRender();
   vadSheetPersistRow(idx);
 }
 function vadSheetAddRow() {
-  _vadSheetRows.push({
-    id:'', m:{ active:'', drug:'', nombres:'', conc:'', cat_label:'', subcat_label:'', ss_label:'', cat_esp:'', routes:'', indic:'', ci:'', info:'', notes:'', mech:'', mech_simple:'', desc:'', keywords:'', bib:'' },
-    sps:[], open:false, del:false, _newActive:false
-  });
+  _vadSheetRows.push(_vadNewRow(''));
   vadSheetRender();
   const c = document.getElementById('vad-sheet-scroll');
   if (c) c.scrollTop = c.scrollHeight;
@@ -11309,44 +11468,108 @@ function _vadSheetRowToDrug(r) {
   };
 }
 
-// Guarda UNA fila a su ficha (crea o actualiza). Devuelve {created/updated/updated/id/skipped} (catChanged=true si se creó categoría).
-async function _vadSheetPutRow(r) {
-  const d = _vadSheetRowToDrug(r);
-  if (!d.active && !d.drug && !d.nombres.length && !d.species_doses.length) return { skipped: true };
-  const st = vdEnsureCatStructure(d.catLabel, d.subcatLabel, d.ssLabel);
-  if (st) {
-    d.cat_vad = st.catKey; d.subcat_vad = st.subLabel; d.subsubcat_vad = st.ssLabel;
-    d.category = st.catLabel;
-    if (!(d.cats||[]).includes(st.catLabel)) {
-      if (d.cats.length) d.cats[0] = st.catLabel; else d.cats.push(st.catLabel);
+// Construye species_doses desde las filas de especies de la hoja.
+function _spsFromRow(r) {
+  const sps = (r.sps||[]).filter(s =>
+    String(s.sp||'').trim() || String(s.sci||'').trim() ||
+    s.dmin || s.dmax || s.unit || s.via || s.freq || s.fuente || s.notes);
+  const species_doses = [];
+  for (const s of sps) {
+    const min = parseFloat(s.dmin) || 0;
+    const max = parseFloat(s.dmax) || 0;
+    const viaList = String(s.via||'').split(/[,;]/).map(x=>x.trim()).filter(Boolean);
+    const rec = (min && max) ? Math.round(((min + max) / 2) * 1000) / 1000 : 0;
+    const unit = String(s.unit||'').trim() || 'mg/kg';
+    species_doses.push({
+      species: String(s.sp||'').trim(),
+      sci: String(s.sci||'').trim(),
+      dosis: [{ min, rec, max, unit, fuente: _parseBibOne(s.fuente) }],
+      dose_min: min, dose: rec, dose_max: max, dose_unit: unit,
+      route: viaList[0] || 'IM',
+      routes: viaList.length ? viaList : ['IM'],
+      freq: String(s.freq||'').trim(),
+      notes: String(s.notes||'').trim()
+    });
+  }
+  return species_doses;
+}
+
+// Aplica a la ficha SOLO los campos modificados por el usuario.
+function _vsApplyDirty(d, r) {
+  const m = r.m || {};
+  const dm = (r._dirty && r._dirty.m) || {};
+  let catChanged = false;
+  const set = (k, fn) => { if (dm[k]) fn(); };
+  set('active', () => { d.active = String(m.active||'').trim(); });
+  set('drug', () => { d.drug = String(m.drug||'').trim(); });
+  set('nombres', () => { d.nombres = String(m.nombres||'').split(/[;\/]/).map(x=>x.trim()).filter(Boolean); });
+  set('conc', () => { const o = vdParseConcStr(m.conc); d.conc = (o[0]?.val)||0; d.concs = o; d.conc_units = o.map(cc => cc.num + '/' + cc.den); });
+  if (dm['cat_label'] || dm['subcat_label'] || dm['ss_label']) {
+    const cl = String(m.cat_label||'').trim(), sl = String(m.subcat_label||'').trim(), al = String(m.ss_label||'').trim();
+    const st = vdEnsureCatStructure(cl, sl, al);
+    if (st) {
+      d.cat_vad = st.catKey; d.subcat_vad = st.subLabel; d.subsubcat_vad = st.ssLabel;
+      d.category = st.catLabel;
+      if (!d.cats || !d.cats.length) d.cats = [st.catLabel]; else d.cats[0] = st.catLabel;
+      if (st.created) catChanged = true;
+      if (!d.cat_vad) d.cat_vad = st.catKey;
+    } else {
+      d.cat_vad = ''; d.subcat_vad = ''; d.subsubcat_vad = ''; d.category = ''; d.cats = d.cats || [];
     }
   }
+  set('cat_esp', () => { d.cat_esp = String(m.cat_esp||'').trim(); });
+  set('routes', () => { const rr = String(m.routes||'').split(/[,;]/).map(x=>x.trim()).filter(Boolean); d.routes = rr.length ? rr : []; d.route = rr[0] || 'IM'; });
+  set('indic', () => { d.indic = String(m.indic||'').trim(); });
+  set('ci', () => { d.contraindications = String(m.ci||'').trim(); });
+  set('info', () => { d.info = String(m.info||'').trim(); });
+  set('notes', () => { d.notes = String(m.notes||'').trim(); });
+  set('mech', () => { d.mech = String(m.mech||'').trim(); });
+  set('mech_simple', () => { d.mech_simple = String(m.mech_simple||'').trim(); });
+  set('desc', () => { d.desc = String(m.desc||'').trim(); });
+  set('keywords', () => { d.keywords = String(m.keywords||'').split(/[,;]+/).map(x=>x.trim()).filter(Boolean); });
+  set('bib', () => { d.bibliografia = vdParseBibStr(m.bib); });
+  if (r._spsDirty) d.species_doses = _spsFromRow(r);
+  return catChanged;
+}
+function _vsHasDirty(r) {
+  return !!Object.keys((r._dirty && r._dirty.m) || {}).length || !!r._spsDirty;
+}
+
+// Guarda UNA fila a su ficha (crea o actualiza). Solo aplica a la ficha los
+// campos modificados; las celdas vacías no pisan lo existente. Devuelve {created/updated/id/skipped}.
+async function _vadSheetPutRow(r) {
+  const hasReal = String((r.m && r.m.active)||'').trim() || String((r.m && r.m.drug)||'').trim() || (r.sps||[]).some(s => String(s.sp||'').trim());
+  if (!_vsHasDirty(r) || !hasReal) return { skipped: true };
+  const d = _vadSheetRowToDrug(r);
+  let target = r.id ? VADEMECUM_DB.find(x => x.id === r.id) : null;
+  if (!target && (d.active || d.drug)) target = _vadMatchDrug(d.active) || _vadMatchDrug(d.drug);
+  if (target) {
+    const base = Object.assign({}, target);
+    const catChanged = _vsApplyDirty(base, r);
+    Object.assign(target, base);
+    r.id = target.id;
+    r.m.active = String(r.m.active||'').trim() || target.active || '';
+    await dbPutSync('vademecum', target);
+    if (firestore && fbUid()) { try { await fsPut('vademecum', target); } catch(e) {} }
+    try { await syncVadToSpecies(target.id); } catch(e) {}
+    return { updated: true, id: target.id, catChanged };
+  }
+  const st = vdEnsureCatStructure(d.catLabel, d.subcatLabel, d.ssLabel);
+  if (st && d.catLabel) {
+    d.cat_vad = st.catKey; d.subcat_vad = st.subLabel; d.subsubcat_vad = st.ssLabel;
+    d.category = st.catLabel;
+    if (!(d.cats||[]).includes(st.catLabel)) { if (d.cats.length) d.cats[0] = st.catLabel; else d.cats.push(st.catLabel); }
+  }
   vdEnsureCats(d);
-  const drugData = {
+  const newDrug = { id:'vad_'+Date.now()+'_'+Math.random().toString(36).slice(2,5),
     drug: d.drug, nombres: d.nombres, active: d.active,
     cat_vad: d.cat_vad, category: d.category, cats: d.cats,
     subcat_vad: d.subcat_vad, subsubcat_vad: d.subsubcat_vad,
     cat_esp: d.cat_esp, conc: d.conc, concs: d.concs, conc_units: d.conc_units,
-    route: d.route, routes: d.routes,
+    route: d.route, routes: d.routes, freq: d.freq || '',
     indic: d.indic, contraindications: d.contraindications, info: d.info, notes: d.notes,
     mech: d.mech, mech_simple: d.mech_simple, desc: d.desc, keywords: d.keywords,
-    bibliografia: d.bibliografia, species_doses: d.species_doses
-  };
-  if (d.freq) drugData.freq = d.freq;
-  let target = r.id ? VADEMECUM_DB.find(x => x.id === r.id) : null;
-  if (!target && (drugData.active || drugData.drug)) {
-    const m2 = _vadMatchDrug(drugData.active) || _vadMatchDrug(drugData.drug);
-    if (m2) target = m2;
-  }
-  if (target) {
-    Object.assign(target, drugData);
-    r.id = target.id;
-    await dbPutSync('vademecum', target);
-    if (firestore && fbUid()) { try { await fsPut('vademecum', target); } catch(e) {} }
-    try { await syncVadToSpecies(target.id); } catch(e) {}
-    return { updated: true, id: target.id, catChanged: !!st?.created };
-  }
-  const newDrug = { id:'vad_'+Date.now()+'_'+Math.random().toString(36).slice(2,5), ...drugData };
+    bibliografia: d.bibliografia, species_doses: d.species_doses };
   VADEMECUM_DB.push(newDrug);
   r.id = newDrug.id;
   await dbPutSync('vademecum', newDrug);
@@ -11461,6 +11684,119 @@ function _vadExpandAndMap(rows, colIdx) {
   return { expanded: out, colIdx: colIdx2 };
 }
 
+// Mapea el encabezado de una columna (Excel importado/pegado) a la clave de
+// columna de la hoja. Evita la ambigüedad 'FÁRMACO'→'active'.
+function _vsColMapForHeader(h) {
+  const n = _normHeader(h);
+  if (['principio_activo','activo','principio','active','pa'].includes(n)) return 'active';
+  if (['farmaco','droga'].includes(n)) return 'drug';
+  if (['nombres','nombre','nombre_comercial','nombres_comerciales'].includes(n)) return 'nombres';
+  if (['concentraciones_mg_ml','concentraciones','conc','concentracion','mg_ml'].includes(n)) return 'conc';
+  if (['categorias','categoria','cats','categoria_general','seccion','sec','grupo'].includes(n)) return 'cat_label';
+  if (['subcategoria','subcategorias','subcat','sub_categoria'].includes(n)) return 'subcat_label';
+  if (['sub_subcategoria','subsubcategoria','subsubcat','sub_sub'].includes(n)) return 'ss_label';
+  if (['categoria_especifica','cat_esp'].includes(n)) return 'cat_esp';
+  if (['vias','vias_de_administracion','routes','administration'].includes(n)) return 'routes';
+  if (['indicaciones','indic','indicacion'].includes(n)) return 'indic';
+  if (['contraindicaciones','contraindicacion','contra'].includes(n)) return 'ci';
+  if (['efectos_adversos','efectos','efectos_secundarios','info','reacciones_adversas','reacciones'].includes(n)) return 'info';
+  if (['notas_clinicas','notes','observaciones'].includes(n)) return 'notes';
+  if (['mecanismo_accion','mecanismo','mecanismo_tecnico','mecanismo_de_accion','mecanismo_tecnico_detallado'].includes(n)) return 'mech';
+  if (['mecanismo_resumido','mecanismo_simple','resumen_mecanismo'].includes(n)) return 'mech_simple';
+  if (['descripcion','desc','description'].includes(n)) return 'desc';
+  if (['palabras_clave','palabras_claves','keywords','etiquetas','tags'].includes(n)) return 'keywords';
+  if (['bibliografia','bibliografias','referencias','referencia','fuente_bibliografica','link','links','url','urls'].includes(n)) return 'bib';
+  if (['dosis_por_especie','dosis','dosis_especies'].includes(n)) return 'sps';
+  if (['nombre_comun','nombre_comun_especie','especie','animal','especies'].includes(n)) return 'sp';
+  if (['nombre_cientifico','sci','cientifico','nombre_ciencia'].includes(n)) return 'sci';
+  if (['dosis_min','dosis_minima','minima','dosis_min_mg_kg'].includes(n)) return 'dmin';
+  if (['dosis_max','dosis_maxima','maxima','dosis_max_mg_kg'].includes(n)) return 'dmax';
+  if (['unidad','unidad_dosis','unidad_dosis_mg_kg','dosis_unidad'].includes(n)) return 'unit';
+  if (['fuente','fuente_dosis','referencia_dosis'].includes(n)) return 'fuente';
+  if (['via','via_dosis','vias_dosis'].includes(n)) return 'sp_via';
+  if (['frecuencia','frecuencia_dosis','frecuencia_administracion','freq'].includes(n)) return 'sp_freq';
+  if (['notas','notas_dosis','notas_especie'].includes(n)) return 'sp_notes';
+  return null;
+}
+
+// Convierte una matriz de filas pegadas/importadas en grupos {m, sps} (uno por
+// fármaco, en orden de aparición). Soporta cabeceras, orden posicional clásico,
+// columna "DOSIS POR ESPECIE" y filas de especie heredadas del fármaco superior.
+function _sheetRowsFromCsV(rows) {
+  if (!rows || !rows.length) return { groups: [], colOf: {} };
+  const header = rows[0];
+  const colOf = {};
+  header.forEach((h, i) => { const k = _vsColMapForHeader(h); if (k) colOf[i] = k; });
+  const hasHeader = Object.keys(colOf).length > 0;
+  if (!hasHeader) {
+    for (let i = 0; i < 26 && i < header.length; i++) { const k = VAD_GRID_KEYS[i]; if (k) colOf[i] = k; }
+  }
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+  const groups = [];
+  const map = new Map();
+  for (const raw of dataRows) {
+    if (!raw.some(cc => String(cc||'').trim())) continue;
+    const m = {};
+    for (const i of Object.keys(colOf)) { const v = String(raw[i]||'').trim(); if (v !== '') m[colOf[i]] = v; }
+    const isSpRow = (m.sp || m.sci || m.dmin || m.dmax || m.unit || m.unit !== undefined && m.fuente || m.sp_via || m.sp_freq || m.sp_notes);
+    const SKIP = ['sp','sci','dmin','dmax','unit','fuente','sp_via','sp_freq','sp_notes','sps'];
+    const key = String(m.active || m.drug || m.nombres || '').trim();
+    let grp = null;
+    if (!key && isSpRow && groups.length) {
+      grp = groups[groups.length - 1];
+    } else if (key) {
+      grp = map.get(key);
+      if (!grp) { grp = { m: {}, sps: [] }; map.set(key, grp); groups.push(grp); }
+    }
+    if (!grp) continue;
+    for (const k of Object.keys(m)) { if (SKIP.includes(k)) continue; if (!grp.m[k]) grp.m[k] = m[k]; }
+    if (m.sps) {
+      String(m.sps).split(/\r?\n/).forEach(line => {
+        const f2 = String(line).split('|').map(x => x.trim());
+        grp.sps.push({ sp:f2[0]||'', sci:f2[1]||'', dmin:f2[2]||'', dmax:f2[3]||'', unit:f2[4]||'mg/kg', fuente:f2[5]||'', via:f2[6]||'', freq:f2[7]||'', notes:f2[8]||'' });
+      });
+    } else if (isSpRow) {
+      grp.sps.push({ sp:m.sp||'', sci:m.sci||'', dmin:m.dmin||'', dmax:m.dmax||'', unit:m.unit||'mg/kg', fuente:m.fuente||'', via:m.sp_via||'', freq:m.sp_freq||'', notes:m.sp_notes||'' });
+    }
+  }
+  return { groups, colOf };
+}
+
+// Añade grupos {m, sps} al final de la hoja. Devuelve cuántos se agregaron.
+function _vadsAppendGroups(groups) {
+  let added = 0;
+  for (const g of groups) {
+    const m = g.m || {};
+    const r = _vadNewRow(m.active || m.drug || m.nombres || '');
+    r.m.drug = String(m.drug||'').trim() || '';
+    r.m.nombres = String(m.nombres||'').trim() || '';
+    r.m.conc = String(m.conc||'').trim() || '';
+    r.m.cat_label = String(m.cat_label||'').trim() || '';
+    r.m.subcat_label = String(m.subcat_label||'').trim() || '';
+    r.m.ss_label = String(m.ss_label||'').trim() || '';
+    r.m.cat_esp = String(m.cat_esp||'').trim() || '';
+    r.m.routes = String(m.routes||'').trim() || '';
+    r.m.indic = String(m.indic||'').trim() || '';
+    r.m.ci = String(m.ci||'').trim() || '';
+    r.m.info = String(m.info||'').trim() || '';
+    r.m.notes = String(m.notes||'').trim() || '';
+    r.m.mech = String(m.mech||'').trim() || '';
+    r.m.mech_simple = String(m.mech_simple||'').trim() || '';
+    r.m.desc = String(m.desc||'').trim() || '';
+    r.m.keywords = String(m.keywords||'').trim() || '';
+    r.m.bib = String(m.bib||'').trim() || '';
+    r.sps = (g.sps||[]).slice();
+    r._spsDirty = !!r.sps.length;
+    r._dirty = { m: { active:1 }, s: {} };
+    for (const k of Object.keys(r.m)) { if (String(r.m[k]||'').trim()) r._dirty.m[k] = 1; }
+    const mm = _vadMatchDrug(r.m.active) || _vadMatchDrug(r.m.drug);
+    r.id = mm ? mm.id : '';
+    _vadSheetRows.push(r);
+    added++;
+  }
+  return added;
+}
+
 function vadSheetApplyPaste() {
   const text = document.getElementById('vad-paste-text')?.value || '';
   document.getElementById('modal-vad-paste')?.remove();
@@ -11468,31 +11804,12 @@ function vadSheetApplyPaste() {
   if (!lines.length) { toast('⚠ Nada que pegar'); return; }
   const sep = lines[0].indexOf('\t') !== -1 ? '\t' : (lines[0].indexOf(';') !== -1 ? ';' : ',');
   const cells = lines.map(l => l.split(sep).map(cc => String(cc).trim()));
-  const firstCaps = cells[0];
-  const colIdx = {};
-  let hasHeader = false;
-  firstCaps.forEach((h, i) => { const k = VAD_HEADER_MAP[_normHeader(h)]; if (k) { colIdx[i] = k; hasHeader = true; } });
-  if (!hasHeader) {
-    for (let i = 0; i < 26 && i < firstCaps.length; i++) colIdx[i] = VAD_GRID_ORDER[i];
-  }
-  const dataRows = hasHeader ? cells.slice(1) : cells;
-  if (!dataRows.length) { toast('⚠ No se reconocieron filas válidas'); return; }
-  const rows = [hasHeader ? firstCaps : []].concat(dataRows);
-  const { expanded, colIdx: ci2 } = _vadExpandAndMap(rows, colIdx);
-  let added = 0;
-  try {
-    const drugs = _groupRowsToDrugs(ci2, expanded);
-    for (const d of drugs) {
-      if (!d.active && !d.drug && !d.nombres.length && !d.species_doses.length) continue;
-      const r = _vadSheetDrugToRow(d);
-      const mm = _vadMatchDrug(r.m.active) || _vadMatchDrug(r.m.drug);
-      r.id = mm ? mm.id : '';
-      _vadSheetRows.push(r);
-      added++;
-    }
-  } catch(err) { toast('⚠ Error al procesar: ' + (err && err.message || err)); return; }
+  let groups = null;
+  try { groups = _sheetRowsFromCsV(cells).groups; } catch(err) { toast('⚠ Error al procesar: ' + (err && err.message || err)); return; }
+  if (!groups || !groups.length) { toast('⚠ No se reconocieron filas válidas'); return; }
+  const added = _vadsAppendGroups(groups);
   vadSheetRender();
-  toast(added ? ('✓ ' + added + ' fila(s) agregada(s) a la hoja. Revisa y dale 💾 Guardar.') : '⚠ No se reconocieron filas válidas');
+  toast(added ? ('✓ ' + added + ' fármaco(s) agregado(s) a la hoja. Revisa y dale 💾 Guardar.') : '⚠ No se reconocieron filas válidas');
 }
 
 // ── Excel .xlsx real: exportar / importar ──
@@ -11521,51 +11838,25 @@ function _pickVadSheetFile() {
   });
 }
 
-// Exporta un archivo .xlsx de verdad (una fila por fármaco, orden de la app)
-// + hoja "PRINCIPIOS ACTIVOS" para el desplegable de la columna A.
+// Exporta un .xlsx real respetando el orden de filas (array _vadSheetRows) y
+// de columnas (_vadColOrder) que el usuario ve + hoja "PRINCIPIOS ACTIVOS".
 async function exportVadSheetXlsx() {
   await _ensureXlsx();
-  const headers = [
-    'PRINCIPIO ACTIVO','FÁRMACO','NOMBRES COMERCIALES','CONCENTRACIONES','CATEGORÍA','SUBCATEGORÍA','SUB-SUBCATEGORÍA',
-    'CAT. ESPECÍFICA','VÍAS','INDICACIONES','CONTRAINDICACIONES','EFECTOS ADVERSOS','NOTAS CLÍNICAS',
-    'MECANISMO (TÉCNICO)','MECANISMO RESUMIDO','DESCRIPCIÓN','PALABRAS CLAVE','BIBLIOGRAFÍA','DOSIS POR ESPECIE'
-  ];
-  const aoa = [headers];
-  for (const d of _vadSheetOrder()) {
-    const catLabel = d.category || (d.cat_vad ? (VADEMECUM_CATS[d.cat_vad]?.label||'') : '') || (d.cats?.[0]||'');
-    const dosisStr = (d.species_doses||[]).map(sd => {
-      const parts = [];
-      parts.push(sd.species || '');
-      if (Array.isArray(sd.dosis) && sd.dosis.length) {
-        sd.dosis.forEach(de => {
-          const rng = [de.min, de.rec, de.max].filter(v => v != null && v !== '').join('-');
-          if (rng) parts.push(rng + ' ' + (de.unit || 'mg/kg'));
-        });
-      } else {
-        const rng = [sd.dose_min, sd.dose, sd.dose_max].filter(v => v != null && v !== '').join('-');
-        if (rng) parts.push(rng + ' ' + (sd.dose_unit || 'mg/kg'));
-      }
-      if (sd.routes && sd.routes.length) parts.push(sd.routes.join(', ')); else if (sd.route) parts.push(sd.route);
-      if (sd.freq) parts.push(sd.freq);
-      if (sd.notes) parts.push('[' + sd.notes + ']');
-      return parts.join(' | ');
-    }).join('\n');
-    aoa.push([
-      d.active||'', d.drug||'', (d.nombres||[]).join(' / '), vdExcelConcStr(d), catLabel,
-      d.subcat_vad||'', d.subsubcat_vad||'', d.cat_esp||'',
-      (d.routes&&d.routes.length) ? d.routes.join(', ') : (d.route||''),
-      d.indic||'', d.contraindications||'', d.info||'', d.notes||'',
-      d.mech||'', d.mech_simple||'', d.desc||'',
-      (d.keywords||[]).join(', '), vdExcelBibStr(d), dosisStr
-    ]);
+  const order = _vadOrderNow();
+  const cols = [];
+  for (const k of order) { const c = VAD_GRID_COLS.find(x => x.k === k); if (c) cols.push(c); }
+  const aoa = [cols.map(c => c.t)];
+  for (const r of _vadSheetRows) {
+    if (!r || r.del) continue;
+    aoa.push(cols.map(c => c.k === 'sps' ? _spsToDosisStr(r.sps) : String((r.m && r.m[c.k]) || '')));
   }
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = headers.map((h, i) => ({ wch: i === 18 ? 60 : 18 }));
+  ws['!cols'] = cols.map(c => ({ wch: c.k === 'sps' ? 60 : 20 }));
   const seen = new Set();
   const princ = [['PRINCIPIOS ACTIVOS', 'Lista vinculada al desplegable de la columna A. Puedes añadir filas aquí y volver a importar.']];
-  for (const d of _vadSheetOrder()) {
-    const v = String(d.active||d.drug||'').trim();
-    if (v && !seen.has(v)) { seen.add(v); princ.push([v]); }
+  for (const r of _vadSheetRows) {
+    const v = String((r.m && r.m.active) || '').trim();
+    if (v && !seen.has(v) && !r.del) { seen.add(v); princ.push([v]); }
   }
   const ws2 = XLSX.utils.aoa_to_sheet(princ);
   ws2['!cols'] = [{ wch: 42 }, { wch: 60 }];
@@ -11581,11 +11872,22 @@ async function exportVadSheetXlsx() {
   a.download = f;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 3000);
-  toast('📤 Exportado: ' + f + ' (una fila por fármaco + hoja PRINCIPIOS ACTIVOS)');
+  toast('📤 Exportado: ' + f + ' (columnas y filas en el orden que ves + hoja PRINCIPIOS ACTIVOS)');
 }
 
-// Importa un .xlsx (editable en Excel de tu PC) y actualiza las fichas:
-// los fármacos existentes se completan/actualizan y los nuevos se añaden.
+// Serie de especies → texto "DOSIS POR ESPECIE" (líneas Especie|Cient|Min|Max|…).
+function _spsToDosisStr(sps) {
+  const lines = (sps||[]).map(s => {
+    const p = [s.sp||'', s.sci||'', s.dmin||'', s.dmax||'', s.unit||'mg/kg', s.fuente||'', s.via||'', s.freq||'', s.notes||''];
+    while (p.length && p[p.length-1] === '') p.pop();
+    return p.join('|');
+  }).filter(Boolean);
+  return lines.join('\n');
+}
+
+// Importa un .xlsx (editable en Excel de tu PC) y AÑADE los fármacos nuevos a
+// la hoja (no a las fichas). Los que ya estén vinculados aparecen como filas.
+// Después, con 💾 Guardar, se crean/actualizan las fichas.
 async function importVadSheetXlsx() {
   const f = await _pickVadSheetFile();
   if (!f) return;
@@ -11593,10 +11895,11 @@ async function importVadSheetXlsx() {
     const text = await readExcel(f);
     const first = text.split(/=== Hoja:[^\n]*===\n?/).map(x=>x.trim()).filter(Boolean)[0] || text;
     const rows = _parseCsv(first);
-    const colIdx = {};
-    (rows[0]||[]).forEach((h, i) => { const k = VAD_HEADER_MAP[_normHeader(h)]; if (k) colIdx[i] = k; });
-    const { expanded } = _vadExpandAndMap(rows, colIdx);
-    _vadCsvPreview(_rowsToCsv(expanded));
+    const { groups } = _sheetRowsFromCsV(rows);
+    if (!groups || !groups.length) { toast('⚠ No se reconocieron filas válidas en el .xlsx'); return; }
+    const added = _vadsAppendGroups(groups);
+    vadSheetRender();
+    toast(added ? ('📥 ' + added + ' fármaco(s) importado(s) a la hoja. Revisa y dale 💾 Guardar.') : '⚠ No se reconocieron filas válidas');
   } catch(err) {
     toast('⚠ Error al leer el .xlsx: ' + (err && err.message || err));
   }
