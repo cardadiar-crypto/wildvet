@@ -974,7 +974,7 @@ textarea.form-control{resize:vertical;min-height:70px}
 // ─────────────────────────────────────
 // VERSIÓN DE LA APP (para detectar si una caché vieja está sirviendo otra build)
 // ─────────────────────────────────────
-const APP_VERSION = '53';
+const APP_VERSION = '54';
 
 // ═══════════════════════════════════
 // DEFAULT SPECIES DB
@@ -10232,61 +10232,179 @@ function _vdSlug(s) {
     .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
 }
 
-// Crea (si faltan) y devuelve categoría/subcategoría/sub-subcategoría en VADEMECUM_CATS.
-// Devuelve {catKey, catLabel, subKey, subLabel, ssKey, ssLabel, created}.
-function vdEnsureCatStructure(catLabel, subLabel, ssLabel) {
-  catLabel = String(catLabel||'').trim();
-  subLabel = String(subLabel||'').trim();
-  ssLabel = String(ssLabel||'').trim();
-  if (!catLabel && !subLabel) return null;
+// ── Jerarquía de profundidad arbitraria ──
+// Recorre/crea un camino de etiquetas en VADEMECUM_CATS con la profundidad que
+// tenga el camino (categoría → subcategoría → sub-subcategoría → …).
+// Devuelve {catKey, keys, labels, created} o null si no hay etiquetas.
+function vdEnsureHierPath(labels) {
+  labels = (labels || []).map(l => String(l || '').trim()).filter(l => l !== '');
+  if (!labels.length) return null;
   let created = false;
   let catKey = '', catObj = null;
   for (const [k, v] of Object.entries(VADEMECUM_CATS)) {
-    if (v.label === catLabel) { catKey = k; catObj = v; break; }
+    if (v.label === labels[0]) { catKey = k; catObj = v; break; }
   }
-  if (!catObj && catLabel) {
-    catKey = _vdSlug(catLabel) || 'cat_' + Date.now();
-    catObj = { label: catLabel, icon:'📦', info:'', subcategories:{} };
+  if (!catObj) {
+    catKey = _vdSlug(labels[0]) || 'cat_' + Date.now();
+    catObj = { label: labels[0], icon: '📦', info: '', subcategories: {} };
     VADEMECUM_CATS[catKey] = catObj;
     created = true;
   }
-  if (!catObj && subLabel) {
-    for (const [k, v] of Object.entries(VADEMECUM_CATS)) {
-      if (Object.values(v.subcategories||{}).some(s => s.label === subLabel)) { catKey = k; catObj = v; break; }
-    }
-  }
-  if (!catObj) return null;
   if (!catObj.subcategories) catObj.subcategories = {};
-  let subKey = '', subObj = null;
-  if (subLabel) {
-    for (const [sk, sv] of Object.entries(catObj.subcategories)) {
-      if (sv.label === subLabel) { subKey = sk; subObj = sv; break; }
-    }
-    if (!subObj) {
-      subKey = _vdSlug(subLabel) || 's' + Date.now();
-      subObj = { label: subLabel, info:'', subcats:{} };
-      catObj.subcategories[subKey] = subObj;
+  const keys = [catKey];
+  const seen = [labels[0]];
+  let node = catObj;
+  for (let i = 1; i < labels.length; i++) {
+    const childs = (i === 1) ? node.subcategories : (node.subcats || (node.subcats = {}));
+    let k2 = '';
+    for (const k of Object.keys(childs)) { if (childs[k].label === labels[i]) { k2 = k; break; } }
+    if (!k2) {
+      k2 = (i === 1 ? 's' : 'ss_') + (_vdSlug(labels[i]) || String(Date.now()));
+      childs[k2] = { label: labels[i], info: '' };
       created = true;
     }
-    if (!subObj.subcats) subObj.subcats = {};
+    const child = childs[k2];
+    if (!child.subcats) child.subcats = {};
+    keys.push(k2);
+    seen.push(child.label);
+    node = child;
   }
-  let ssKey = '';
-  if (ssLabel && subObj) {
-    for (const [sk, sv] of Object.entries(subObj.subcats)) {
-      if (sv.label === ssLabel) { ssKey = sk; break; }
-    }
-    if (!ssKey) {
-      ssKey = 'ss_' + (_vdSlug(ssLabel) || Date.now());
-      subObj.subcats[ssKey] = { label: ssLabel };
-      created = true;
-    }
-  }
+  return { catKey, keys, labels: seen, created };
+}
+
+// Crea (si faltan) y devuelve categoría/subcategoría/sub-subcategoría en VADEMECUM_CATS.
+// Devuelve {catKey, catLabel, subKey, subLabel, ssKey, ssLabel, created} o null.
+function vdEnsureCatStructure(catLabel, subLabel, ssLabel) {
+  const path = [catLabel, subLabel, ssLabel].map(s => String(s||'').trim()).filter(l => l !== '');
+  const st = vdEnsureHierPath(path);
+  if (!st) return null;
   return {
-    catKey, catLabel: catObj.label,
-    subKey, subLabel: subObj ? subObj.label : '',
-    ssKey, ssLabel: (subObj && ssKey) ? subObj.subcats[ssKey].label : '',
-    created
+    catKey: st.keys[0] || '',
+    catLabel: st.labels[0] || '',
+    subKey: st.keys[1] || '',
+    subLabel: st.labels[1] || '',
+    ssKey: st.keys[2] || '',
+    ssLabel: st.labels[2] || '',
+    created: st.created
   };
+}
+
+// Nodo de la jerarquía correspondiente a la navegación actual
+// (categoría → subcategoría → sub-subcategoría → …).
+function _vadCurrentVadNode() {
+  if (!_vadCatActiva || _vadCatActiva === '__all__') return null;
+  let node = VADEMECUM_CATS[_vadCatActiva];
+  if (!node) return null;
+  if (_vadSubcatActiva) {
+    node = (node.subcategories || {})[_vadSubcatActiva] || null;
+    if (!node) return null;
+  }
+  if (_vadSubSubcatActiva) {
+    node = (node.subcats || {})[_vadSubSubcatActiva] || null;
+    if (!node) return null;
+  }
+  for (const k of (_vadDeepPath || [])) {
+    node = ((node && node.subcats) || {})[k] || null;
+    if (!node) return null;
+  }
+  return node;
+}
+
+// Ruta de ETIQUETAS de la navegación actual (categoría → sub → ss → …).
+function _vadNodePathLabels() {
+  const out = [];
+  if (!_vadCatActiva || _vadCatActiva === '__all__') return out;
+  const cat = VADEMECUM_CATS[_vadCatActiva];
+  if (!cat) return out;
+  out.push(cat.label);
+  if (_vadSubcatActiva) {
+    const sub = (cat.subcategories || {})[_vadSubcatActiva];
+    if (!sub) return out;
+    out.push(sub.label);
+    let node = sub;
+    if (_vadSubSubcatActiva) {
+      const ss = (node.subcats || {})[_vadSubSubcatActiva];
+      if (!ss) return out;
+      out.push(ss.label);
+      node = ss;
+    }
+    for (const k of (_vadDeepPath || [])) {
+      const n = (node.subcats || {})[k];
+      if (!n) return out;
+      out.push(n.label);
+      node = n;
+    }
+  }
+  return out;
+}
+
+// Ruta de etiquetas de un fármaco: si tiene hier_vad se usa esa; si no, se
+// reconstruye desde los campos clásicos (cat_vad + subcat_vad + subsubcat_vad).
+function _vadDrugPath(d) {
+  if (!d) return [];
+  if (Array.isArray(d.hier_vad) && d.hier_vad.length) return d.hier_vad.filter(Boolean);
+  const p = [];
+  const cat = d.cat_vad && VADEMECUM_CATS[d.cat_vad];
+  if (cat) p.push(cat.label);
+  if (d.subcat_vad) p.push(d.subcat_vad);
+  if (d.subsubcat_vad) p.push(d.subsubcat_vad);
+  return p;
+}
+
+// ¿El fármaco pertenece al camino `labels` (o a un descendiente)?
+function _vadDrugUnderPath(d, labels) {
+  if (!labels || !labels.length) return true;
+  const p = _vadDrugPath(d);
+  if (p.length < labels.length) return false;
+  for (let i = 0; i < labels.length; i++) { if (p[i] !== labels[i]) return false; }
+  return true;
+}
+
+// ¿El fármaco pertenece EXACTAMENTE al camino `labels` (mismo nivel)?
+function _vadDrugExactPath(d, labels) {
+  const p = _vadDrugPath(d);
+  return p.length === labels.length && _vadDrugUnderPath(d, labels);
+}
+
+// Cuenta los fármacos dentro de un camino (incluyendo descendientes).
+function _vadCountDrugsUnder(labels) {
+  return VADEMECUM_DB.filter(d => _vadDrugUnderPath(d, labels)).length;
+}
+
+// Coloca en la jerarquía la celda del fármaco actual. Actualiza los campos
+// clásicos (subcat_vad / subsubcat_vad) y la ruta completa hier_vad.
+function vdApplyHierFields(d, labels, keepIfDeeper) {
+  const hier = labels.filter(Boolean);
+  if (!hier.length) return d;
+  if (keepIfDeeper && Array.isArray(d.hier_vad) && d.hier_vad.length > hier.length) {
+    const base = d.hier_vad;
+    let same = hier.length <= base.length;
+    for (let i = 0; same && i < hier.length; i++) same = base[i] === hier[i];
+    if (same) return d;
+  }
+  const st = vdEnsureHierPath(hier);
+  if (!st) return d;
+  d.cat_vad = st.catKey;
+  d.category = st.labels[0] || '';
+  if (!d.cats || !d.cats.length) d.cats = [st.labels[0]]; else d.cats[0] = st.labels[0];
+  d.subcat_vad = st.labels[1] || d.subcat_vad;
+  d.subsubcat_vad = st.labels[2] || d.subsubcat_vad;
+  d.hier_vad = st.labels.slice();
+  return d;
+}
+
+// Devuelve la lista de etiquetas de jerarquía legibles desde m (cat_label,
+// subcat_label, ss_label y columnas profundas hier_N), hasta el primer vacío.
+function _hierLabelsFromM(m) {
+  const extras = Object.keys(m || {}).filter(k => /^hier_\d+$/.test(k))
+    .sort((a, b) => parseInt(a.slice(5), 10) - parseInt(b.slice(5), 10));
+  const out = [];
+  for (const k of ['cat_label', 'subcat_label', 'ss_label'].concat(extras)) {
+    const v = String(m[k] || '').trim();
+    if (!v) break;
+    out.push(v);
+  }
+  return out;
 }
 
 // Opciones de categoría/subcategoría sincronizadas con VADEMECUM_CATS actual
@@ -10797,6 +10915,7 @@ async function saveVadExcel() {
     const st = vdEnsureCatStructure(d.catLabel, d.subcatLabel, d.ssLabel);
     if (st) {
       d.cat_vad = st.catKey; d.subcat_vad = st.subLabel; d.subsubcat_vad = st.ssLabel;
+      d.hier_vad = [st.catLabel, st.subLabel, st.ssLabel].filter(Boolean);
       d.category = st.catLabel;
       if (!(d.cats||[]).includes(st.catLabel)) {
         if (d.cats.length) d.cats[0] = st.catLabel; else d.cats.push(st.catLabel);
@@ -10808,7 +10927,7 @@ async function saveVadExcel() {
     const drugData = {
       drug: d.drug, nombres: d.nombres, active: d.active,
       cat_vad: d.cat_vad, category: d.category, cats: d.cats,
-      subcat_vad: d.subcat_vad, subsubcat_vad: d.subsubcat_vad,
+      subcat_vad: d.subcat_vad, subsubcat_vad: d.subsubcat_vad, hier_vad: d.hier_vad,
       cat_esp: d.cat_esp, conc: d.conc, concs: d.concs, conc_units: d.conc_units,
       route: d.route, routes: d.routes,
       indic: d.indic, contraindications: d.contraindications, info: d.info, notes: d.notes,
@@ -11509,6 +11628,7 @@ function _vadSheetRowToDrug(r) {
     catLabel,
     subcatLabel: String(m.subcat_label||'').trim(),
     ssLabel: String(m.ss_label||'').trim(),
+    hierLabels: _hierLabelsFromM(m),
     cats: catLabel ? [catLabel] : [],
     category: catLabel,
     cat_esp: String(m.cat_esp||'').trim(),
@@ -11567,17 +11687,38 @@ function _vsApplyDirty(d, r) {
   set('drug', () => { d.drug = String(m.drug||'').trim(); });
   set('nombres', () => { d.nombres = String(m.nombres||'').split(/[;\/]/).map(x=>x.trim()).filter(Boolean); });
   set('conc', () => { const o = vdParseConcStr(m.conc); d.conc = (o[0]?.val)||0; d.concs = o; d.conc_units = o.map(cc => cc.num + '/' + cc.den); });
-  if (dm['cat_label'] || dm['subcat_label'] || dm['ss_label']) {
-    const cl = String(m.cat_label||'').trim(), sl = String(m.subcat_label||'').trim(), al = String(m.ss_label||'').trim();
-    const st = vdEnsureCatStructure(cl, sl, al);
-    if (st) {
-      d.cat_vad = st.catKey; d.subcat_vad = st.subLabel; d.subsubcat_vad = st.ssLabel;
-      d.category = st.catLabel;
-      if (!d.cats || !d.cats.length) d.cats = [st.catLabel]; else d.cats[0] = st.catLabel;
+  if (dm['cat_label'] || dm['subcat_label'] || dm['ss_label'] || Object.keys(dm).some(k => /^hier_\d+$/.test(k))) {
+    let labels = _hierLabelsFromM(m);
+    let catLabel = labels[0] || '';
+    if (!catLabel) {
+      const sl0 = labels[0] || '';
+      if (sl0) {
+        for (const [k, v] of Object.entries(VADEMECUM_CATS)) {
+          if (Object.keys(v.subcategories||{}).some(sk => v.subcategories[sk].label === sl0)) {
+            labels = [v.label].concat(labels);
+            catLabel = v.label;
+            break;
+          }
+        }
+      }
+    }
+    const st = vdEnsureHierPath(labels);
+    if (st && st.labels && st.labels[0]) {
+      d.cat_vad = st.catKey;
+      d.category = st.labels[0];
+      if (!d.cats || !d.cats.length) d.cats = [st.labels[0]]; else d.cats[0] = st.labels[0];
+      if (st.labels[1]) d.subcat_vad = st.labels[1];
+      if (st.labels[2]) d.subsubcat_vad = st.labels[2];
+      const wantsDeep = Object.keys(dm).some(k => /^hier_\d+$/.test(k));
+      if (!wantsDeep && Array.isArray(d.hier_vad) && d.hier_vad.length > st.labels.length) {
+        let keep = st.labels.length <= d.hier_vad.length;
+        for (let i = 0; keep && i < st.labels.length; i++) keep = d.hier_vad[i] === st.labels[i];
+        if (keep) { /* conserva los niveles más profundos existentes */ }
+        else d.hier_vad = st.labels.slice();
+      } else {
+        d.hier_vad = st.labels.slice();
+      }
       if (st.created) catChanged = true;
-      if (!d.cat_vad) d.cat_vad = st.catKey;
-    } else {
-      d.cat_vad = ''; d.subcat_vad = ''; d.subsubcat_vad = ''; d.category = ''; d.cats = d.cats || [];
     }
   }
   set('cat_esp', () => { d.cat_esp = String(m.cat_esp||'').trim(); });
@@ -11618,17 +11759,18 @@ async function _vadSheetPutRow(r) {
     _vadRefreshOptsCache();
     return { updated: true, id: target.id, catChanged };
   }
-  const st = vdEnsureCatStructure(d.catLabel, d.subcatLabel, d.ssLabel);
-  if (st && d.catLabel) {
-    d.cat_vad = st.catKey; d.subcat_vad = st.subLabel; d.subsubcat_vad = st.ssLabel;
-    d.category = st.catLabel;
-    if (!(d.cats||[]).includes(st.catLabel)) { if (d.cats.length) d.cats[0] = st.catLabel; else d.cats.push(st.catLabel); }
+  const st = vdEnsureHierPath(d.hierLabels || [d.catLabel, d.subcatLabel, d.ssLabel].filter(Boolean));
+  if (st && d.hierLabels && d.hierLabels[0]) {
+    d.cat_vad = st.catKey; d.subcat_vad = st.labels[1] || ''; d.subsubcat_vad = st.labels[2] || '';
+    d.hier_vad = st.labels.slice();
+    d.category = st.labels[0] || '';
+    if (st.labels[0] && !(d.cats||[]).includes(st.labels[0])) { if (d.cats.length) d.cats[0] = st.labels[0]; else d.cats.push(st.labels[0]); }
   }
   vdEnsureCats(d);
   const newDrug = { id:'vad_'+Date.now()+'_'+Math.random().toString(36).slice(2,5),
     drug: d.drug, nombres: d.nombres, active: d.active,
     cat_vad: d.cat_vad, category: d.category, cats: d.cats,
-    subcat_vad: d.subcat_vad, subsubcat_vad: d.subsubcat_vad,
+    subcat_vad: d.subcat_vad, subsubcat_vad: d.subsubcat_vad, hier_vad: d.hier_vad,
     cat_esp: d.cat_esp, conc: d.conc, concs: d.concs, conc_units: d.conc_units,
     route: d.route, routes: d.routes, freq: d.freq || '',
     indic: d.indic, contraindications: d.contraindications, info: d.info, notes: d.notes,
@@ -11827,6 +11969,12 @@ async function _gsWriteHeaders() {
     const col = VAD_GRID_COLS.find(x => x.k === k);
     return col ? col.t : k;
   });
+  let maxDepth = 3;
+  for (const d of VADEMECUM_DB) {
+    const p = _vadDrugPath(d);
+    if (p.length > maxDepth) maxDepth = p.length;
+  }
+  for (let i = 3; i < maxDepth; i++) header.push('SUB-SUBCATEGORÍA ' + (i + 1));
   await _gsApi('PUT', 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(_gsSheetId) + '/values/Vademécum!A1?valueInputOption=RAW', { values: [header], majorDimension: 'ROWS' });
 }
 
@@ -11860,6 +12008,38 @@ async function _gsUpdatePrinciples() {
   } catch (e) {}
 }
 
+// Anota el orden de aparición en la hoja de cada nodo de la jerarquía
+// (categoría → subcategoría → sub-subcategoría → …) y lo asigna como `order`
+// para que la app muestre las secciones tal como vienen del Excel.
+function _gsApplyOrder(f, st) {
+  if (!f || !f.cat_vad) return false;
+  let changed = false;
+  const cat = VADEMECUM_CATS[f.cat_vad];
+  if (!cat) return false;
+  if (!st.catSeen.has(f.cat_vad)) {
+    st.catSeen.add(f.cat_vad);
+    cat.order = st.next++;
+    changed = true;
+  }
+  const path = _vadDrugPath(f);
+  let node = cat, parentKey = f.cat_vad, container = node.subcategories || {};
+  for (let i = 1; i < path.length; i++) {
+    const label = path[i];
+    const childKey = Object.keys(container).find(k => { const c = container[k]; return c && c.label === label; });
+    if (!childKey) break;
+    const child = container[childKey];
+    if (!st.nodeSeen.has(parentKey + '\u0001' + childKey)) {
+      st.nodeSeen.add(parentKey + '\u0001' + childKey);
+      st.nodeNext[parentKey] = (st.nodeNext[parentKey] || 0);
+      child.order = st.nodeNext[parentKey]++;
+      changed = true;
+    }
+    node = child; parentKey = childKey; container = child.subcats || {};
+    if (i === 1 && !container && child.subcats) container = child.subcats;
+  }
+  return changed;
+}
+
 // Convierte lo leído de Google Sheets en filas de la hoja interna (con contexto
 // de categoría rellenado hacia abajo) y persiste las fichas.
 async function _gsApplyValues(values) {
@@ -11873,7 +12053,16 @@ async function _gsApplyValues(values) {
     for (let i = 0; i < 26 && i < header.length; i++) { const k = VAD_GRID_KEYS[i]; if (k) { colOf[i] = k; colIdx[k] = i; } }
   }
   const rows = values.slice(hasHeader ? 1 : 0);
-  const ctx = { cat_label: '', subcat_label: '', ss_label: '' };
+  const hierLevels = { cat_label:0, subcat_label:1, ss_label:2 };
+  const hierCols = [];
+  for (const k of Object.keys(colIdx)) {
+    let lvl = hierLevels[k];
+    if (typeof lvl !== 'number' && /^hier_(\d+)$/.test(k)) lvl = parseInt(k.slice(5), 10);
+    if (typeof lvl !== 'number') continue;
+    hierCols.push({ lvl, ci: colIdx[k] });
+  }
+  hierCols.sort((a, b) => a.lvl - b.lvl);
+  const ctxHier = [];
   const filled = rows.map(raw => {
     const row = raw.slice();
     const hasKey = ['active', 'drug', 'nombres'].some(k => {
@@ -11881,21 +12070,14 @@ async function _gsApplyValues(values) {
       return typeof ci === 'number' && String(row[ci] || '').trim() !== '';
     });
     if (!hasKey) {
-      const anyCat = ['cat_label', 'subcat_label', 'ss_label'].some(k => {
-        const ci = colIdx[k];
-        return typeof ci === 'number' && String(row[ci] || '').trim() !== '';
-      });
+      const anyCat = hierCols.some(c => String(row[c.ci] || '').trim() !== '');
       if (anyCat) {
-        for (const k of ['cat_label', 'subcat_label', 'ss_label']) {
-          const ci = colIdx[k];
-          if (typeof ci === 'number') ctx[k] = String(row[ci] || '').trim();
-        }
+        for (const c of hierCols) ctxHier[c.lvl] = String(row[c.ci] || '').trim();
       }
     }
     if (hasKey) {
-      for (const k of ['cat_label', 'subcat_label', 'ss_label']) {
-        const ci = colIdx[k];
-        if (typeof ci === 'number' && !String(row[ci] || '').trim() && ctx[k]) row[ci] = ctx[k];
+      for (const c of hierCols) {
+        if (!String(row[c.ci] || '').trim() && ctxHier[c.lvl]) row[c.ci] = ctxHier[c.lvl];
       }
     }
     return row;
@@ -11903,6 +12085,7 @@ async function _gsApplyValues(values) {
   const src = (hasHeader ? [header] : []).concat(filled);
   const { groups } = _sheetRowsFromCsV(src);
   let created = 0, updated = 0, skipped = 0, catsChanged = false;
+  const oSt = { next: 0, nodeNext: {}, nodeSeen: new Set(), catSeen: new Set() };
   for (const g of groups) {
     const m = g.m || {};
     const active = String(m.active || '').trim();
@@ -11925,6 +12108,8 @@ async function _gsApplyValues(values) {
     if (!res || res.skipped) { skipped++; continue; }
     if (res.catChanged) catsChanged = true;
     if (res.created) created++; else if (res.updated) updated++;
+    const f = VADEMECUM_DB.find(x => x.id === row.id);
+    if (f && f.cat_vad && _gsApplyOrder(f, oSt)) catsChanged = true;
   }
   if (catsChanged) await saveVademecumCats();
   renderVademecum();
@@ -11957,7 +12142,7 @@ async function gsheetSync() {
     if (!_gsSheetId) { toast('⚠ Primero pulsa 📊 Google Sheets para crear/abrir la hoja.'); return; }
     _gsBusy(true, 'Leyendo Google Sheets…');
     await _gsGetToken(false);
-    const data = await _gsApi('GET', 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(_gsSheetId) + '/values/Vademécum!A1:AB4000');
+    const data = await _gsApi('GET', 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(_gsSheetId) + '/values/Vademécum!A1:ZZ4000');
     const values = data && data.values ? data.values : [];
     if (!values.length) { toast('⚠ La hoja está vacía.'); return; }
     const res = await _gsApplyValues(values);
@@ -12085,7 +12270,15 @@ function _vsColMapForHeader(h) {
   if (['categorias','categoria','cats','categoria_general','seccion','sec','grupo'].includes(n)) return 'cat_label';
   if (['subcategoria','subcategorias','subcat','sub_categoria'].includes(n)) return 'subcat_label';
   if (['sub_subcategoria','subsubcategoria','subsubcat','sub_sub'].includes(n)) return 'ss_label';
-  if (['categoria_especifica','cat_esp'].includes(n)) return 'cat_esp';
+  const _mNum = String(n).match(/^(sub_subcategoria|subcategoria|categoria|nivel)[_]?(\d+)$/);
+  if (_mNum) {
+    const idx = parseInt(_mNum[2], 10) - 1;
+    if (idx === 0) return 'cat_label';
+    if (idx === 1) return 'subcat_label';
+    if (idx === 2) return 'ss_label';
+    if (idx >= 3) return 'hier_' + idx;
+  }
+  if (['categoria_especifica','cat_esp','cat_especifica'].includes(n)) return 'cat_esp';
   if (['vias','vias_de_administracion','routes','administration'].includes(n)) return 'routes';
   if (['indicaciones','indic','indicacion'].includes(n)) return 'indic';
   if (['contraindicaciones','contraindicacion','contra'].includes(n)) return 'ci';
@@ -12096,7 +12289,7 @@ function _vsColMapForHeader(h) {
   if (['descripcion','desc','description'].includes(n)) return 'desc';
   if (['palabras_clave','palabras_claves','keywords','etiquetas','tags'].includes(n)) return 'keywords';
   if (['bibliografia','bibliografias','referencias','referencia','fuente_bibliografica','link','links','url','urls'].includes(n)) return 'bib';
-  if (['dosis_por_especie','dosis','dosis_especies'].includes(n)) return 'sps';
+  if (['dosis_por_especie','dosis','dosis_especies','especies_y_dosis','especies_dosis','dosis_especie','especies'].includes(n)) return 'sps';
   if (['nombre_comun','nombre_comun_especie','especie','animal','especies'].includes(n)) return 'sp';
   if (['nombre_cientifico','sci','cientifico','nombre_ciencia'].includes(n)) return 'sci';
   if (['dosis_min','dosis_minima','minima','dosis_min_mg_kg'].includes(n)) return 'dmin';
@@ -12299,6 +12492,7 @@ async function importVadSheetXlsx() {
 let _vadCatActiva = '__all__';
 let _vadSubcatActiva = null;
 let _vadSubSubcatActiva = null;
+let _vadDeepPath = [];
 let _vadView = 'categories';
 let _vadSearchQ = '';
 
@@ -12315,6 +12509,7 @@ function selectVadCategory(catId) {
   _vadCatActiva = catId;
   _vadSubcatActiva = null;
   _vadSubSubcatActiva = null;
+  _vadDeepPath = [];
   history.pushState({vadNav:true}, '');
   renderVademecum();
 }
@@ -12325,10 +12520,12 @@ function selectVadSubcategory(subId) {
   if (sub?.subcats && Object.keys(sub.subcats).length) {
     _vadSubcatActiva = subId;
     _vadSubSubcatActiva = null;
+    _vadDeepPath = [];
     _vadView = 'subsubcategories';
   } else {
     _vadSubcatActiva = subId;
     _vadSubSubcatActiva = null;
+    _vadDeepPath = [];
   }
   history.pushState({vadNav:true}, '');
   renderVademecum();
@@ -12336,22 +12533,47 @@ function selectVadSubcategory(subId) {
 
 function selectVadSubSubcategory(subSubId) {
   _vadSubSubcatActiva = subSubId;
+  _vadDeepPath = [];
+  history.pushState({vadNav:true}, '');
+  renderVademecum();
+}
+
+// Selecciona un nodo hijo del nodo actual, sea cual sea su profundidad.
+function _vadSelectChild(key) {
+  if (key === '') return;
+  if (!_vadSubSubcatActiva && !_vadDeepPath.length) _vadSubSubcatActiva = key;
+  else _vadDeepPath.push(key);
+  _vadView = 'subsubcategories';
+  history.pushState({vadNav:true}, '');
+  renderVademecum();
+}
+
+function selectVadDeepNode(key) {
+  const node = _vadCurrentVadNode();
+  if (!node || !(node.subcats || {})[key]) return;
+  _vadDeepPath.push(key);
+  _vadView = 'subsubcategories';
   history.pushState({vadNav:true}, '');
   renderVademecum();
 }
 
 function vadGoBack() {
   if (_vadView === 'drugs' || _vadView === 'subsubcategories') {
-    if (_vadSubSubcatActiva) {
+    if (_vadDeepPath.length) {
+      _vadDeepPath.pop();
+    } else if (_vadSubSubcatActiva) {
       _vadSubSubcatActiva = null;
+      _vadDeepPath = [];
     } else if (_vadSubcatActiva) {
       _vadSubcatActiva = null;
       _vadSubSubcatActiva = null;
+      _vadDeepPath = [];
     }
   } else if (_vadView === 'subcategories') {
     _vadCatActiva = '__all__';
     _vadSubcatActiva = null;
     _vadSubSubcatActiva = null;
+    _vadDeepPath = [];
   } else {
     showScreen('home');
     return;
@@ -12487,8 +12709,15 @@ async function renameVadSubcategory(subId) {
   const oldLabel = sub.label;
   sub.label = newName.trim();
   for (const d of VADEMECUM_DB) {
-    if (d.cat_esp === oldLabel && d.cat_vad === _vadCatActiva) d.cat_esp = newName.trim();
-    await dbPutSync('vademecum', d);
+    const p = _vadDrugPath(d);
+    if (p.length >= 2 && p[0] === cat.label && p[1] === oldLabel) {
+      const np = p.slice(); np[1] = sub.label;
+      d.hier_vad = np;
+      d.subcat_vad = sub.label;
+      if (np.length >= 3) d.subsubcat_vad = np[2];
+      if (d.cat_esp === oldLabel) d.cat_esp = sub.label;
+      await dbPutSync('vademecum', d);
+    }
   }
   await saveVademecumCats();
   renderVademecum();
@@ -12497,18 +12726,21 @@ async function renameVadSubcategory(subId) {
 
 async function deleteVadSubcategory(subId) {
   const cat = VADEMECUM_CATS[_vadCatActiva];
-  if (!cat?.subcategories?.[subId]) return;
-  const sub = cat.subcategories[subId];
-  const drugCount = VADEMECUM_DB.filter(d => d.subcat_vad === subId && d.cat_vad === _vadCatActiva).length;
+  const sub = cat?.subcategories?.[subId];
+  if (!sub) return;
+  const pp = [cat.label, sub.label];
+  const drugCount = VADEMECUM_DB.filter(d => _vadDrugUnderPath(d, pp)).length;
   const ok = await confirmDelete('¿Eliminar subcategoría?', `Se eliminará "${sub.label}" y ${drugCount} fármaco(s).`, '🗑️');
   if (!ok) return;
-  const toDelete = VADEMECUM_DB.filter(d => d.subcat_vad === subId && d.cat_vad === _vadCatActiva);
+  const toDelete = VADEMECUM_DB.filter(d => _vadDrugUnderPath(d, pp));
   for (const d of toDelete) {
     await dbDeleteSync('vademecum', d.id);
   }
-  VADEMECUM_DB = VADEMECUM_DB.filter(d => !(d.subcat_vad === subId && d.cat_vad === _vadCatActiva));
+  VADEMECUM_DB = VADEMECUM_DB.filter(d => !_vadDrugUnderPath(d, pp));
   delete cat.subcategories[subId];
   _vadSubcatActiva = null;
+  _vadSubSubcatActiva = null;
+  _vadDeepPath = [];
   await saveVademecumCats();
   renderVademecum();
   toast('✓ Subcategoría eliminada');
@@ -12562,8 +12794,11 @@ async function renameVadSubSubcat(subSubId) {
   const oldLabel = ss.label;
   ss.label = newName.trim();
   for (const d of VADEMECUM_DB) {
-    if (d.subsubcat_vad === oldLabel && d.cat_vad === _vadCatActiva && d.subcat_vad === _vadSubcatActiva) {
-      d.subsubcat_vad = newName.trim();
+    const p = _vadDrugPath(d);
+    if (p.length >= 3 && p[0] === cat.label && p[1] === sub.label && p[2] === oldLabel) {
+      const np = p.slice(); np[2] = ss.label;
+      d.hier_vad = np;
+      if (np.length >= 3) d.subsubcat_vad = np[2];
       await dbPutSync('vademecum', d);
     }
   }
@@ -12577,16 +12812,18 @@ async function deleteVadSubSubcat(subSubId) {
   const sub = cat?.subcategories?.[_vadSubcatActiva];
   if (!sub?.subcats?.[subSubId]) return;
   const ss = sub.subcats[subSubId];
-  const drugCount = VADEMECUM_DB.filter(d => d.subsubcat_vad === ss.label && d.cat_vad === _vadCatActiva && d.subcat_vad === _vadSubcatActiva).length;
+  const pp = [cat.label, sub.label, ss.label];
+  const drugCount = VADEMECUM_DB.filter(d => _vadDrugUnderPath(d, pp)).length;
   const ok = await confirmDelete('¿Eliminar sub-subcategoría?', `Se eliminará "${ss.label}" y ${drugCount} fármaco(s).`, '🗑️');
   if (!ok) return;
-  const toDelete = VADEMECUM_DB.filter(d => d.subsubcat_vad === ss.label && d.cat_vad === _vadCatActiva && d.subcat_vad === _vadSubcatActiva);
+  const toDelete = VADEMECUM_DB.filter(d => _vadDrugUnderPath(d, pp));
   for (const d of toDelete) {
     await dbDeleteSync('vademecum', d.id);
   }
-  VADEMECUM_DB = VADEMECUM_DB.filter(d => !(d.subsubcat_vad === ss.label && d.cat_vad === _vadCatActiva && d.subcat_vad === _vadSubcatActiva));
+  VADEMECUM_DB = VADEMECUM_DB.filter(d => !_vadDrugUnderPath(d, pp));
   delete sub.subcats[subSubId];
   _vadSubSubcatActiva = null;
+  _vadDeepPath = [];
   await saveVademecumCats();
   renderVademecum();
   toast('✓ Sub-subcategoría eliminada');
@@ -12600,6 +12837,83 @@ function editVadSubSubcatInfo(subSubId) {
   const info = prompt('Información para "' + ss.label + '":\n(Ej: dosis máximas, notas clínicas...)', ss.info || '');
   if (info === null) return;
   ss.info = info.trim();
+  saveVademecumCats();
+  renderVademecum();
+  toast('✓ Información actualizada');
+}
+
+// ── CRUD genérico de nodos (sub-subcategorías y niveles más profundos) ──
+function _vadCurrentChild(key) {
+  const node = _vadCurrentVadNode();
+  return (node && node.subcats && node.subcats[key]) || null;
+}
+
+// Añade una subcategoría hija al nodo actual (cualquier profundidad).
+function vadAddChildUnderCurrent() {
+  const node = _vadCurrentVadNode();
+  if (!node) return;
+  if (!node.subcats) node.subcats = {};
+  const nombre = prompt('Nombre de la nueva subcategoría:');
+  if (!nombre?.trim()) return;
+  const id = _vdSlug(nombre.trim()) || 'c' + Date.now();
+  if (node.subcats[id]) { toast('⚠ Ya existe una subcategoría con ese nombre'); return; }
+  node.subcats[id] = { label: nombre.trim(), info: '' };
+  saveVademecumCats();
+  renderVademecum();
+  toast('✓ Subcategoría creada');
+}
+
+async function renameVadChild(key) {
+  const child = _vadCurrentChild(key);
+  if (!child) return;
+  const pp = _vadNodePathLabels();
+  const newName = prompt('Nuevo nombre para "' + child.label + '":', child.label);
+  if (!newName || newName.trim() === child.label) return;
+  const oldLabel = child.label;
+  child.label = newName.trim();
+  for (const d of VADEMECUM_DB) {
+    const p = _vadDrugPath(d);
+    if (p.length > pp.length && p.slice(0, pp.length).every((x, i) => x === pp[i]) && p[pp.length] === oldLabel) {
+      const np = p.slice(); np[pp.length] = child.label;
+      d.hier_vad = np;
+      if (np.length >= 2) d.subcat_vad = np[1];
+      if (np.length >= 3) d.subsubcat_vad = np[2];
+      if (d.cat_esp === oldLabel) d.cat_esp = child.label;
+      await dbPutSync('vademecum', d);
+    }
+  }
+  await saveVademecumCats();
+  renderVademecum();
+  toast('✓ Subcategoría renombrada');
+}
+
+async function deleteVadChild(key) {
+  const node = _vadCurrentVadNode();
+  const child = node?.subcats?.[key];
+  if (!child) return;
+  const pp = _vadNodePathLabels();
+  const inChild = d => {
+    const p = _vadDrugPath(d);
+    return p.length > pp.length && p.slice(0, pp.length).every((x, i) => x === pp[i]) && p[pp.length] === child.label;
+  };
+  const drugCount = VADEMECUM_DB.filter(inChild).length;
+  const ok = await confirmDelete('¿Eliminar subcategoría?', `Se eliminará "${child.label}" y ${drugCount} fármaco(s).`, '🗑️');
+  if (!ok) return;
+  const toDelete = VADEMECUM_DB.filter(inChild);
+  for (const d of toDelete) { await dbDeleteSync('vademecum', d.id); }
+  VADEMECUM_DB = VADEMECUM_DB.filter(d => !inChild(d));
+  delete node.subcats[key];
+  await saveVademecumCats();
+  renderVademecum();
+  toast('✓ Subcategoría eliminada');
+}
+
+function editVadChildInfo(key) {
+  const child = _vadCurrentChild(key);
+  if (!child) return;
+  const info = prompt('Información para "' + child.label + '":\n(Ej: dosis máximas, notas clínicas...)', child.info || '');
+  if (info === null) return;
+  child.info = info.trim();
   saveVademecumCats();
   renderVademecum();
   toast('✓ Información actualizada');
@@ -12650,7 +12964,12 @@ function _vadSortNum(label) {
   return Infinity;
 }
 function _vadSortByNum(arr) {
-  return arr.sort((a,b) => (_vadSortNum(a[1].label) - _vadSortNum(b[1].label)) || a[0].localeCompare(b[0], 'es'));
+  return arr.sort((a,b) => {
+    const ao = typeof a[1].order === 'number' ? a[1].order : Infinity;
+    const bo = typeof b[1].order === 'number' ? b[1].order : Infinity;
+    if (ao !== bo) return ao - bo;
+    return (_vadSortNum(a[1].label) - _vadSortNum(b[1].label)) || a[0].localeCompare(b[0], 'es');
+  });
 }
 
 // ── Render: main dispatcher ──
@@ -12691,27 +13010,21 @@ function renderVademecum(filter='') {
     return;
   }
 
-  if (_vadCatActiva && _vadSubcatActiva && !_vadSubSubcatActiva) {
-    const sub = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva];
-    if (sub?.subcats && Object.keys(sub.subcats).length) {
-      _vadView = 'subsubcategories';
-      if (backBtn) backBtn.style.display = 'block';
-      if (titleEl) titleEl.textContent = sub.label || _vadSubcatActiva;
-      _renderVadSubSubcategories(list, isAdmin);
-      return;
-    }
+  // A partir de la subcategoría, el nodo actual puede tener hijos (nivel más
+  // profundo) o fármacos: si tiene subcategorías se muestran éstas; si no, fármacos.
+  const node = _vadCurrentVadNode();
+  const nodeKids = node && (node.subcats || {}) && Object.keys(node.subcats || {}).length;
+  if (node && nodeKids) {
+    _vadView = 'subsubcategories';
+    if (backBtn) backBtn.style.display = 'block';
+    if (titleEl) titleEl.textContent = node.label || _vadSubcatActiva || '';
+    _renderVadSubSubcategories(list, isAdmin);
+    return;
   }
 
   _vadView = 'drugs';
   if (backBtn) backBtn.style.display = 'block';
-  let title = '';
-  if (_vadSubSubcatActiva) {
-    const subSub = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva]?.subcats?.[_vadSubSubcatActiva];
-    title = subSub?.label || _vadSubSubcatActiva;
-  } else if (_vadSubcatActiva) {
-    title = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva]?.label || _vadSubcatActiva;
-  }
-  if (titleEl) titleEl.textContent = title;
+  if (titleEl) titleEl.textContent = (node && node.label) || (VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva]?.label) || _vadSubcatActiva || '';
   _renderVadDrugs(list, isAdmin);
 }
 
@@ -12727,17 +13040,7 @@ function _renderVadCategories(el, isAdmin) {
   }
   el.innerHTML = cats.map(([id, cat]) => {
     const subCount = Object.keys(cat.subcategories||{}).length;
-    let drugCount = 0;
-    Object.values(cat.subcategories||{}).forEach((sub, si) => {
-      const subId = Object.keys(cat.subcategories)[si];
-      if (sub.subcats && Object.keys(sub.subcats).length) {
-        Object.keys(sub.subcats).forEach(ssId => {
-          drugCount += VADEMECUM_DB.filter(d => d.cat_vad === id && (d.subcat_vad === sub.label || d.subcat_vad === subId) && d.subsubcat_vad === sub.subcats[ssId].label).length;
-        });
-      }
-      drugCount += VADEMECUM_DB.filter(d => d.cat_vad === id && (d.subcat_vad === sub.label || d.subcat_vad === subId) && !d.subsubcat_vad).length;
-    });
-    drugCount += VADEMECUM_DB.filter(d => d.cat_vad === id && !d.subcat_vad).length;
+    const drugCount = VADEMECUM_DB.filter(d => d.cat_vad === id || _vadDrugUnderPath(d, [cat.label])).length;
     return `
     <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.5rem;overflow:hidden">
       <div style="display:flex;align-items:center;gap:.5rem;padding:.7rem .85rem;cursor:pointer" onclick="selectVadCategory('${id}')">
@@ -12773,13 +13076,7 @@ function _renderVadSubcategories(el, isAdmin) {
   if (subcats.length) {
     html = subcats.map(([id, sub]) => {
     const hasSubcats = sub.subcats && Object.keys(sub.subcats).length;
-    let drugCount = 0;
-    if (hasSubcats) {
-      Object.values(sub.subcats).forEach(ss => {
-        drugCount += VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && (d.subcat_vad === sub.label || d.subcat_vad === id) && d.subsubcat_vad === ss.label).length;
-      });
-    }
-    drugCount += VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && (d.subcat_vad === sub.label || d.subcat_vad === id) && !d.subsubcat_vad).length;
+    const drugCount = _vadCountDrugsUnder([cat.label, sub.label]);
     return `
     <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.5rem;overflow:hidden">
       <div style="display:flex;align-items:center;gap:.5rem;padding:.6rem .85rem;cursor:pointer" onclick="selectVadSubcategory('${id}')">
@@ -12812,40 +13109,41 @@ function _renderVadSubcategories(el, isAdmin) {
   el.innerHTML = html;
 }
 
-// ── Render: Level 2.5 — Sub-subcategories ──
+// ── Render: hijos del nodo actual (sub-subcategorías o niveles más profundos) ──
 function _renderVadSubSubcategories(el, isAdmin) {
-  const cat = VADEMECUM_CATS[_vadCatActiva];
-  const sub = cat?.subcategories?.[_vadSubcatActiva];
-  if (!sub?.subcats) { el.innerHTML = '<div class="empty-state"><p>No hay sub-subcategorías</p></div>'; return; }
-  const subsubs = _vadSortByNum(Object.entries(sub.subcats));
-  // Fármacos asignados directamente a esta subcategoría (sin sub-subcategoría)
-  const directDrugs = VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && (d.subcat_vad === sub.label || d.subcat_vad === _vadSubcatActiva) && !d.subsubcat_vad);
-  let html = subsubs.map(([id, ss]) => {
-    const drugCount = VADEMECUM_DB.filter(d => d.cat_vad === _vadCatActiva && (d.subcat_vad === sub.label || d.subcat_vad === _vadSubcatActiva) && d.subsubcat_vad === ss.label).length;
+  const node = _vadCurrentVadNode();
+  if (!node) { el.innerHTML = '<div class="empty-state"><p>Nodo no encontrado</p></div>'; return; }
+  const kids = _vadSortByNum(Object.entries(node.subcats || {}));
+  const pathLbl = _vadNodePathLabels();
+  const directDrugs = VADEMECUM_DB.filter(d => _vadDrugExactPath(d, pathLbl));
+  let html = kids.map(([id, ss]) => {
+    const deeper = ss.subcats && Object.keys(ss.subcats).length;
+    const drugCount = _vadCountDrugsUnder(pathLbl.concat(ss.label));
+    const chip = (deeper ? String(deeper) + ' subcategoría(s) · ' : '') + drugCount + ' fármaco(s)';
     return `
     <div style="background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);margin-bottom:.5rem;overflow:hidden">
-      <div style="display:flex;align-items:center;gap:.5rem;padding:.6rem .85rem;cursor:pointer" onclick="selectVadSubSubcategory('${id}')">
+      <div style="display:flex;align-items:center;gap:.5rem;padding:.6rem .85rem;cursor:pointer" onclick="_vadSelectChild('${id}')">
         <div style="flex:1;min-width:0">
           <div style="font-size:.88rem;font-weight:700;color:var(--txt)">${ss.label}</div>
           ${ss.info ? `<div style="font-size:.7rem;color:var(--txt3);margin-top:.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ss.info}</div>` : ''}
-          <div style="font-size:.68rem;color:var(--g6);margin-top:.15rem">${drugCount} fármaco(s)</div>
+          <div style="font-size:.68rem;color:var(--g6);margin-top:.15rem">${chip}</div>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
       ${isAdmin ? `<div style="display:flex;gap:.3rem;padding:0 .85rem .4rem;flex-wrap:wrap">
-        <button onclick="event.stopPropagation();editVadSubSubcatInfo('${id}')" class="btn btn-secondary btn-sm" style="font-size:.68rem">📝 Info</button>
-        <button onclick="event.stopPropagation();renameVadSubSubcat('${id}')" class="btn btn-secondary btn-sm" style="font-size:.68rem">✏️ Renombrar</button>
-        <button onclick="event.stopPropagation();deleteVadSubSubcat('${id}')" class="btn btn-secondary btn-sm" style="font-size:.68rem;color:var(--r5)">✕ Eliminar</button>
+        <button onclick="event.stopPropagation();editVadChildInfo('${id}')" class="btn btn-secondary btn-sm" style="font-size:.68rem">📝 Info</button>
+        <button onclick="event.stopPropagation();renameVadChild('${id}')" class="btn btn-secondary btn-sm" style="font-size:.68rem">✏️ Renombrar</button>
+        <button onclick="event.stopPropagation();deleteVadChild('${id}')" class="btn btn-secondary btn-sm" style="font-size:.68rem;color:var(--r5)">✕ Eliminar</button>
       </div>` : ''}
     </div>`;
   }).join('');
   if (directDrugs.length) {
-    html += `<div style="font-size:.7rem;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;margin:.75rem 0 .4rem">Fármacos de esta subcategoría</div>`;
+    html += `<div style="font-size:.7rem;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;margin:.75rem 0 .4rem">Fármacos de ${node.label}</div>`;
     html += directDrugs.map(d => _buildVadDrugCard(d, isAdmin, true)).join('');
   }
   html += isAdmin ? `
-    <button onclick="openAddVadSubSubcategory()" class="btn btn-secondary btn-sm" style="width:100%;margin-top:.5rem">
-      + Nueva sub-subcategoría
+    <button onclick="vadAddChildUnderCurrent()" class="btn btn-secondary btn-sm" style="width:100%;margin-top:.5rem">
+      + Nueva subcategoría
     </button>` : '';
   el.innerHTML = html;
 }
@@ -12859,6 +13157,7 @@ function _renderVadSearch(el, isAdmin, q) {
     (d.cat_vad||'').toLowerCase().includes(q) ||
     (d.subcat_vad||'').toLowerCase().includes(q) ||
     (d.subsubcat_vad||'').toLowerCase().includes(q) ||
+    (d.hier_vad||[]).some(h=>h.toLowerCase().includes(q)) ||
     (d.indic||'').toLowerCase().includes(q) ||
     (d.info||'').toLowerCase().includes(q) ||
     (d.mech||'').toLowerCase().includes(q) ||
@@ -12890,33 +13189,24 @@ function _renderVadSearch(el, isAdmin, q) {
 
 // ── Render: Level 3 — Drugs (sorted alphabetically) ──
 function _renderVadDrugs(el, isAdmin) {
-  let items = VADEMECUM_DB.filter(d => {
-    if (_vadCatActiva && _vadCatActiva !== '__all__') {
-      if (d.cat_vad !== _vadCatActiva) {
-        const catLabel = VADEMECUM_CATS[_vadCatActiva]?.label || '';
-        if (!(d.cats||[]).includes(catLabel) && d.category !== catLabel) return false;
+  const nodePath = _vadNodePathLabels();
+  let items = VADEMECUM_DB.filter(d => _vadDrugUnderPath(d, nodePath));
+  if (nodePath.length === 0) {
+    items = VADEMECUM_DB.filter(d => {
+      if (_vadCatActiva && _vadCatActiva !== '__all__') {
+        if (d.cat_vad !== _vadCatActiva) {
+          const catLabel = VADEMECUM_CATS[_vadCatActiva]?.label || '';
+          if (!(d.cats||[]).includes(catLabel) && d.category !== catLabel) return false;
+        }
       }
-    }
-    if (_vadSubcatActiva) {
-      const subLabel = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva]?.label || '';
-      if (d.subcat_vad !== _vadSubcatActiva && d.cat_esp !== subLabel && d.subcat_vad !== subLabel) return false;
-    }
-    if (_vadSubSubcatActiva) {
-      const ssLabel = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva]?.subcats?.[_vadSubSubcatActiva]?.label || '';
-      if (d.subsubcat_vad !== _vadSubSubcatActiva && d.subsubcat_vad !== ssLabel) return false;
-    }
-    return true;
-  });
+      return true;
+    });
+  }
   items.sort((a,b) => (a.drug||'').localeCompare(b.drug||'', 'es'));
 
   let infoHtml = '';
-  if (_vadSubSubcatActiva) {
-    const ss = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva]?.subcats?.[_vadSubSubcatActiva];
-    if (ss?.info) infoHtml = `<div style="background:var(--g0);border:1px solid var(--g3);border-radius:var(--rsm);padding:.5rem .7rem;margin-bottom:.6rem;font-size:.78rem;color:var(--g7)"><strong>ℹ️ ${ss.label}:</strong> ${ss.info}</div>`;
-  } else if (_vadSubcatActiva) {
-    const sub = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva];
-    if (sub?.info) infoHtml = `<div style="background:var(--g0);border:1px solid var(--g3);border-radius:var(--rsm);padding:.5rem .7rem;margin-bottom:.6rem;font-size:.78rem;color:var(--g7)"><strong>ℹ️ ${sub.label}:</strong> ${sub.info}</div>`;
-  }
+  const curNode = _vadCurrentVadNode();
+  if (curNode?.info) infoHtml = `<div style="background:var(--g0);border:1px solid var(--g3);border-radius:var(--rsm);padding:.5rem .7rem;margin-bottom:.6rem;font-size:.78rem;color:var(--g7)"><strong>ℹ️ ${curNode.label}:</strong> ${curNode.info}</div>`;
 
   if (!items.length) {
     el.innerHTML = infoHtml + `<div class="empty-state"><p>Sin fármacos en esta categoría</p></div>` +
@@ -12930,23 +13220,19 @@ function _renderVadDrugs(el, isAdmin) {
 }
 
 function openMultiDeleteVademecum() {
-  let items = VADEMECUM_DB.filter(d => {
-    if (_vadCatActiva && _vadCatActiva !== '__all__') {
-      if (d.cat_vad !== _vadCatActiva) {
-        const catLabel = VADEMECUM_CATS[_vadCatActiva]?.label || '';
-        if (!(d.cats||[]).includes(catLabel) && d.category !== catLabel) return false;
+  const nodePath = _vadNodePathLabels();
+  let items = VADEMECUM_DB.filter(d => _vadDrugUnderPath(d, nodePath));
+  if (nodePath.length === 0) {
+    items = VADEMECUM_DB.filter(d => {
+      if (_vadCatActiva && _vadCatActiva !== '__all__') {
+        if (d.cat_vad !== _vadCatActiva) {
+          const catLabel = VADEMECUM_CATS[_vadCatActiva]?.label || '';
+          if (!(d.cats||[]).includes(catLabel) && d.category !== catLabel) return false;
+        }
       }
-    }
-    if (_vadSubcatActiva) {
-      const subLabel = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva]?.label || '';
-      if (d.subcat_vad !== _vadSubcatActiva && d.cat_esp !== subLabel && d.subcat_vad !== subLabel) return false;
-    }
-    if (_vadSubSubcatActiva) {
-      const ssLabel = VADEMECUM_CATS[_vadCatActiva]?.subcategories?.[_vadSubcatActiva]?.subcats?.[_vadSubSubcatActiva]?.label || '';
-      if (d.subsubcat_vad !== _vadSubSubcatActiva && d.subsubcat_vad !== ssLabel) return false;
-    }
-    return true;
-  });
+      return true;
+    });
+  }
   openMultiDelete({
     title: 'Fármacos del vademécum',
     items: items.map(d => ({ id: d.id, label: d.drug || d.active || 'Sin nombre', sub: `${(d.species_doses||[]).length} especie(s) ${d.active?'· '+d.active:''}` })),
@@ -12965,10 +13251,7 @@ function _buildVadDrugCard(d, isAdmin, showBreadcrumb) {
   const displayName = d.nombres?.length>1 ? d.nombres.join(' / ') : (d.drug||d.active||'Sin nombre');
   let breadcrumb = '';
   if (showBreadcrumb) {
-    const parts = [];
-    if (d.cat_vad && VADEMECUM_CATS[d.cat_vad]) parts.push(VADEMECUM_CATS[d.cat_vad].label);
-    if (d.subcat_vad) parts.push(d.subcat_vad);
-    if (d.subsubcat_vad) parts.push(d.subsubcat_vad);
+    const parts = _vadDrugPath(d);
     if (parts.length) breadcrumb = `<div style="font-size:.65rem;color:var(--g6);margin-bottom:.2rem">${parts.join(' › ')}</div>`;
   }
   return `
