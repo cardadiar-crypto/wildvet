@@ -9224,7 +9224,10 @@ async function saveProtocol() {
 const DEFAULT_VADEMECUM_CATS = {
   "sec0": { "label": "I. ANTIINFECCIOSOS Y ANTIPARASITARIOS SISTÉMICOS", "icon": "\u{1F48A}", "info": "", "subcategories": {
     "sec0_s0": { "label": "1. Antibacterianos / Antibióticos", "info": "", "subcats": {
-      "sec0_s0_ss0": { "label": "Betalactámicos (Penicilinas y Cefalosporinas)" }
+      "sec0_s0_ss0": { "label": "Betalactámicos (Penicilinas y Cefalosporinas)", "info": "", "subcats": {
+        "penicilinas": { "label": "Penicilinas", "info": "" },
+        "cefalosporinas": { "label": "Cefalosporinas", "info": "" }
+      } }
 ,
       "sec0_s0_ss1": { "label": "Fluoroquinolonas" }
 ,
@@ -13208,15 +13211,20 @@ function _renderVadDrugs(el, isAdmin) {
   const curNode = _vadCurrentVadNode();
   if (curNode?.info) infoHtml = `<div style="background:var(--g0);border:1px solid var(--g3);border-radius:var(--rsm);padding:.5rem .7rem;margin-bottom:.6rem;font-size:.78rem;color:var(--g7)"><strong>ℹ️ ${curNode.label}:</strong> ${curNode.info}</div>`;
 
+  const adminTools = isAdmin ? `
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem">
+      <button onclick="vadAddChildUnderCurrent()" class="btn btn-secondary btn-sm" style="flex:1">＋ Nueva subcategoría</button>
+      <button onclick="openAddDrug()" class="btn btn-primary btn-sm" style="flex:1">+ Agregar fármaco</button>
+    </div>` : '';
+
   if (!items.length) {
-    el.innerHTML = infoHtml + `<div class="empty-state"><p>Sin fármacos en esta categoría</p></div>` +
-      (isAdmin ? `<button onclick="openAddDrug()" class="btn btn-primary btn-sm" style="width:100%;margin-top:.5rem">+ Agregar fármaco</button>` : '');
+    el.innerHTML = infoHtml + adminTools + `<div class="empty-state"><p>Sin fármacos en esta categoría</p></div>`;
     return;
   }
   const multiBtn = isAdmin
     ? `<div style="display:flex;justify-content:flex-end;margin-bottom:.4rem"><button onclick="openMultiDeleteVademecum()" class="btn btn-secondary btn-sm" style="font-size:.7rem">🗑 Eliminar varios</button></div>`
     : '';
-  el.innerHTML = multiBtn + infoHtml + items.map(d => _buildVadDrugCard(d, isAdmin, false)).join('');
+  el.innerHTML = multiBtn + infoHtml + adminTools + items.map(d => _buildVadDrugCard(d, isAdmin, false)).join('');
 }
 
 function openMultiDeleteVademecum() {
@@ -13463,26 +13471,27 @@ function _normActive(s) {
 // Es aditivo: nunca borra ni pisa lo que el usuario ya tenga. Devuelve true si cambió algo.
 function mergeDefaultVademecumCats() {
   let changed = false;
+  const mergeKids = (containerKey, curNode, defNode) => {
+    let ch = false;
+    const curKids = curNode[containerKey] || (curNode[containerKey] = {});
+    const defKids = defNode[containerKey] || {};
+    for (const [kk, kv] of Object.entries(defKids)) {
+      if (!Object.prototype.hasOwnProperty.call(curKids, kk)) {
+        curKids[kk] = JSON.parse(JSON.stringify(kv));
+        ch = true;
+      } else {
+        ch = mergeKids('subcats', curKids[kk], kv) || ch;
+      }
+    }
+    return ch;
+  };
   for (const [k, def] of Object.entries(DEFAULT_VADEMECUM_CATS)) {
     if (!VADEMECUM_CATS[k]) {
       VADEMECUM_CATS[k] = JSON.parse(JSON.stringify(def));
       changed = true;
       continue;
     }
-    const cur = VADEMECUM_CATS[k];
-    if (!cur.subcategories) { cur.subcategories = {}; changed = true; }
-    for (const [sk, sdef] of Object.entries(def.subcategories||{})) {
-      if (!cur.subcategories[sk]) {
-        cur.subcategories[sk] = JSON.parse(JSON.stringify(sdef));
-        changed = true;
-      } else {
-        const cs = cur.subcategories[sk];
-        if (!cs.subcats) { cs.subcats = {}; }
-        for (const [ssk, ssdef] of Object.entries(sdef.subcats||{})) {
-          if (!cs.subcats[ssk]) { cs.subcats[ssk] = JSON.parse(JSON.stringify(ssdef)); changed = true; }
-        }
-      }
-    }
+    changed = mergeKids('subcategories', VADEMECUM_CATS[k], def) || changed;
   }
   return changed;
 }
