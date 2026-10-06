@@ -974,7 +974,7 @@ textarea.form-control{resize:vertical;min-height:70px}
 // ─────────────────────────────────────
 // VERSIÓN DE LA APP (para detectar si una caché vieja está sirviendo otra build)
 // ─────────────────────────────────────
-const APP_VERSION = '55';
+const APP_VERSION = '56';
 
 // ═══════════════════════════════════
 // DEFAULT SPECIES DB
@@ -11019,8 +11019,40 @@ const VAD_COL_PRESETS = VAD_GRID_COLS.concat([
 function _vsPreset(k) {
   return VAD_COL_PRESETS.find(c => c.k === k) || { k, l:'?', t:String(k||'').toUpperCase() };
 }
-// Columnas de texto largo: se muestran con ajuste de línea (textarea auto-creciente).
-const _vadWrapKeys = { drug:1, nombres:1, indic:1, ci:1, info:1, notes:1, mech:1, mech_simple:1, desc:1, keywords:1, bib:1 };
+// Columnas de texto largo: con "↔ Ajuste texto" activo se muestran en un
+// textarea que crece solo (varias líneas). v56: se amplió la lista y además
+// parte palabras largas (URL, nombres químicos) para que SIEMBRA quepa el texto.
+const _vadWrapKeys = { drug:1, nombres:1, conc:1, cat_esp:1, routes:1, indic:1, ci:1, info:1, notes:1, mech:1, mech_simple:1, desc:1, keywords:1, bib:1 };
+// Anchura por defecto de cada columna (px) — v56 también es el valor inicial
+// del redimensionado arrastrando el borde del título.
+function _vsTdDefaultW(k) {
+  if (k === '__rn') return 44;
+  if (k === '__ac') return 48;
+  if (/^hier_\d+$/.test(k)) return 150;
+  return { active:190, drug:150, nombres:140, conc:130, cat_label:170, subcat_label:180, ss_label:170, cat_esp:120, routes:120, indic:170, ci:170, info:150, notes:150, mech:180, mech_simple:150, desc:160, keywords:130, bib:150, sps:160 }[k] || 120;
+}
+// Ancho elegido por el usuario (arrastrando el borde del título). Se guarda.
+let _vadColW = {};
+function _vadColWidth(k) {
+  const w = _vadColW ? _vadColW[k] : null;
+  return (typeof w === 'number' && w >= 40) ? Math.round(w) : _vsTdDefaultW(k);
+}
+// table-layout:fixed sólo respeta los <col> si la tabla tiene ancho DEFINIDO;
+// con width:auto Blink usa el min-width de cada celda y los <col> se ignoran.
+function _vadTableWidthPx() {
+  const order = _vadOrderNow();
+  let w = _vadColWidth('__rn') + _vadColWidth('__ac');
+  for (const k of order) {
+    // mientras se arrastra, _vadColW aún no tiene el ancho nuevo: usarlo evita
+    // que queden px sueltos (el navegador los repartiría entre todas columnas)
+    w += (_vadResizing && _vadResizing.ck === k) ? _vadResizing.w : _vadColWidth(k);
+  }
+  return w;
+}
+function _vadSetTableWidth() {
+  const t = document.querySelector('#modal-vad-sheet table.vads');
+  if (t) t.style.width = _vadTableWidthPx() + 'px';
+}
 // Opciones por defecto para columnas con datos repetitivos (desplegables suaves).
 const _vadDefaultColOpts = {
   routes: ['IM','IV','SC','VO','IN','Tópico','Tópica','Oftálmico','Auricular','Rectal','Intranasal'],
@@ -11216,8 +11248,10 @@ function _vadSyncActiveSelections(root) {
 
 function _vsTextTag(f, val) {
   const list = (_vadColOpts && _vadColOpts[f] && _vadColOpts[f].length) ? ' list="vadl-' + f + '"' : '';
-  if (_vadSheetWrap && _vadWrapKeys[f]) {
-    return '<textarea rows="1" class="vads-ta" data-f="' + f + '"' + list + '>' + vdEsc(val ?? '') + '</textarea>';
+  if (_vadSheetWrap && (_vadWrapKeys[f] || /^hier_\d+$/.test(f))) {
+    // textarea: 2 renglones de arranque y pista gris en vacío, para que se vea
+    // de inmediato que el ajuste de texto está activo.
+    return '<textarea rows="2" class="vads-ta" data-f="' + f + '"' + list + ' placeholder="escribe aquí…">' + vdEsc(val ?? '') + '</textarea>';
   }
   return '<input type="text" value="' + vdEsc(val ?? '') + '" data-f="' + f + '"' + list + '>';
 }
@@ -11238,14 +11272,38 @@ function _vadViewRestoreScroll(s) {
   if (c && s) { c.scrollLeft = s.sx; c.scrollTop = s.sy; }
 }
 
-function _vsThHtml(col) {
+// ═══ v56: título con flechas ◀ ▶ (mover columna) y tirador de ancho en el borde ═══
+function _vsThHtml(col, ci, total) {
   const p = _vsPreset(col.k);
-  return '<th draggable="true" ondragstart="vadColDragStart(event,\'' + col.k + '\')" ondragover="vadColDragOver(event)" ondragleave="vadColDragLeave(event)" ondrop="vadColDrop(event,\'' + col.k + '\')" ondragend="vadColDragEnd()" data-colkey="' + col.k + '" style="white-space:nowrap;cursor:grab" title="Arrastra para cambiar el orden de la columna"><div class="throw"><span class="ltr">' + p.l + '</span><span class="thtools"><button type="button" class="vads-btn vads-thbtn" draggable="false" data-cbtn="cols:' + col.k + '" title="Cambiar el nombre/tipo de columna (nombres compatibles con la app)">✎</button><button type="button" class="vads-btn vads-thbtn" draggable="false" data-cbtn="lists:' + col.k + '" title="Agregar o editar las opciones desplegables de esta columna">▦</button></span></div><span class="sub">' + p.t + '</span></th>';
+  const i = (typeof ci === 'number') ? ci : 0;
+  const last = (typeof total === 'number') ? total - 1 : i;
+  const mv = (dir, dis, txt) => '<button type="button" class="vads-btn vads-thbtn" draggable="false" data-cbtn="' + dir + ':' + col.k + '" title="' + txt + '"' + (dis ? ' disabled style="opacity:.3;cursor:default"' : '') + '>' + (dir === 'left' ? '◀' : '▶') + '</button>';
+  return '<th draggable="true" ondragstart="vadColDragStart(event,\'' + col.k + '\')" ondragover="vadColDragOver(event)" ondragleave="vadColDragLeave(event)" ondrop="vadColDrop(event,\'' + col.k + '\')" ondragend="vadColDragEnd()" data-colkey="' + col.k + '" style="white-space:nowrap;cursor:grab" title="Arrastra la letra para cambiar el orden, o usa las flechas ◀ ▶ del título">' +
+    '<div class="throw"><span class="ltr">' + p.l + '</span><span class="thtools"><button type="button" class="vads-btn vads-thbtn" draggable="false" data-cbtn="cols:' + col.k + '" title="Cambiar el nombre/tipo de columna (nombres compatibles con la app)">✎</button><button type="button" class="vads-btn vads-thbtn" draggable="false" data-cbtn="lists:' + col.k + '" title="Agregar o editar las opciones desplegables de esta columna">▦</button></span></div>' +
+    '<span class="sub">' + p.t + '</span>' +
+    '<span class="thmove">' + mv('left', i <= 0, 'Mover esta columna a la izquierda') + mv('right', i >= last, 'Mover esta columna a la derecha') + '</span>' +
+    '<span class="vresizer" data-ck="' + col.k + '" title="Arrastra para agrandar o reducir esta columna (doble clic para volver al ancho normal)"></span>' +
+  '</th>';
+}
+// Mueve la columna `key` una posición a la izquierda (-1) o derecha (+1).
+function vadSheetMoveCol(key, dir) {
+  const order = _vadOrderNow();
+  const i = order.indexOf(key);
+  const j = i + (dir < 0 ? -1 : 1);
+  if (i < 0 || j < 0 || j >= order.length) { toast('↔ «' + _vsPreset(key).t + '» ya está en el extremo'); return; }
+  const next = order.slice();
+  next[i] = next[j];
+  next[j] = key;
+  _vadColOrder = next;
+  _vadColOrderSaved = next.slice();
+  _vadClearMerges('columnas movidas');
+  _vadClearSel();
+  _vadSaveLayout();
+  vadSheetRender();
+  toast('↔ «' + _vsPreset(key).t + '» → columna ' + (j + 1) + ' de ' + order.length);
 }
 function _vsTdMin(k) {
-  if (/^hier_\d+$/.test(k)) return 'min-width:150px';
-  const w = { active:190, drug:150, nombres:140, conc:120, cat_label:170, subcat_label:180, ss_label:170, cat_esp:110, routes:110, indic:170, ci:170, info:150, notes:150, mech:180, mech_simple:150, desc:160, keywords:130, bib:150, sps:160 }[k] || 120;
-  return 'min-width:' + w + 'px';
+  return 'min-width:' + Math.min(_vsTdDefaultW(k), _vadColWidth(k)) + 'px';
 }
 function _vsCell(k, r, idx) {
   const c = (v) => vdEsc(v ?? '');
@@ -11256,8 +11314,8 @@ function _vsCell(k, r, idx) {
       : (linked
         ? '<span class="vads-state" id="vad-sheet-st-' + idx + '" style="color:var(--g6)" title="Vinculado a su ficha">●</span>'
         : '<span class="vads-state" id="vad-sheet-st-' + idx + '" style="color:#b9b9b9" title="Sin ficha todavía: se creará al guardar">○</span>');
-    const activeCell = '<input type="text" list="vadl-active" data-f="active" value="' + c(r.m.active) + '" placeholder="Escribe o elige un principio activo… (si no existe, se crea al guardar)" style="min-width:170px">';
-    return '<div style="display:flex;gap:3px;align-items:center">' + est + activeCell + '<button type="button" class="vads-btn vads-link" data-act="ficha" title="' + (linked ? 'Abrir la ficha vinculada' : 'Sin ficha aún (se creará al guardar)') + '" style="' + (linked ? '' : 'opacity:.35') + '">↗</button></div>';
+    const activeCell = '<input type="text" list="vadl-active" data-f="active" value="' + c(r.m.active) + '" placeholder="Escribe o elige un principio activo… (si no existe, se crea al guardar)" style="min-width:0;flex:1 1 auto">';
+    return '<div class="vads-acell">' + est + activeCell + '<button type="button" class="vads-btn vads-link" data-act="ficha" title="' + (linked ? 'Abrir la ficha vinculada' : 'Sin ficha aún (se creará al guardar)') + '" style="' + (linked ? '' : 'opacity:.35') + '">↗</button></div>';
   }
   if (/^hier_\d+$/.test(k)) return _vsTextTag(k, r.m[k]);
   if (k === 'drug')     return _vsTextTag('drug', r.m.drug);
@@ -11466,11 +11524,114 @@ function vadSheetRender() {
   const tbody = document.getElementById('vad-sheet-tbody');
   if (!tbody) return;
   const s = _vadViewSetScroll();
+  _vadSyncColgroup();
+  _vadSyncThead();
   tbody.innerHTML = _vadSheetRows.map((r, i) => vadSheetRowHtml(r, i)).join('');
   _vadViewRestoreScroll(s);
   _vadSyncActiveSelections(tbody);
   _vadGrowTa(tbody);
   _vadUpdateSelInfo();
+}
+// ═══ v56: anchos de columna (arrastrando el borde del título) ═══
+function _vadColgroupHtml() {
+  const order = _vadOrderNow();
+  let h = '<colgroup id="vad-sheet-colgroup"><col data-ck="__rn" style="width:' + _vadColWidth('__rn') + 'px">';
+  for (const k of order) h += '<col data-ck="' + k + '" style="width:' + _vadColWidth(k) + 'px">';
+  h += '<col data-ck="__ac" style="width:' + _vadColWidth('__ac') + 'px"></colgroup>';
+  return h;
+}
+// La cabecera se repinta al mover/ocultar/añadir columnas: si no, los títulos
+// quedarían desfasados respecto a las celdas (v56).
+function _vadTheadHtml() {
+  const order = _vadOrderNow();
+  return '<thead><tr>' +
+    '<th class="rnc" title="Arrastra los números de fila para reordenarlas"># ⇅<span class="vresizer" data-ck="__rn" title="Arrastra para cambiar el ancho de la columna de números"></span></th>' +
+    order.map((k, i) => _vsThHtml(_vsPreset(k), i, order.length)).join('') +
+    '<th style="white-space:nowrap" title="Marcar para eliminar al Guardar">Acciones<span class="vresizer" data-ck="__ac" title="Arrastra para cambiar el ancho de esta columna"></span></th>' +
+    '</tr></thead>';
+}
+function _vadSyncColgroup() {
+  const cg = document.getElementById('vad-sheet-colgroup');
+  if (cg) cg.outerHTML = _vadColgroupHtml();
+  _vadSetTableWidth();
+}
+function _vadSyncThead() {
+  const th = document.querySelector('#modal-vad-sheet table.vads > thead');
+  if (!th) return;
+  th.outerHTML = _vadTheadHtml();
+}
+function _vadColEl(ck) {
+  const cg = document.getElementById('vad-sheet-colgroup');
+  if (!cg) return null;
+  if (ck === '__rn') return cg.querySelector('col');
+  if (ck === '__ac') return cg.querySelectorAll('col')[cg.querySelectorAll('col').length - 1];
+  return cg.querySelector('col[data-ck="' + ck + '"]');
+}
+let _vadResizing = null;
+function _vadResizeTip(show, x, y, txt) {
+  const t = document.getElementById('vad-resize-tip');
+  if (!t) return;
+  if (!show) { t.style.display = 'none'; return; }
+  t.style.display = 'block';
+  t.textContent = txt;
+  t.style.left = Math.max(4, (x + 10)) + 'px';
+  t.style.top = Math.max(4, (y - 28)) + 'px';
+}
+function _vadSheetOnMouseDown(e) {
+  const h = e.target && e.target.closest ? e.target.closest('.vresizer') : null;
+  if (!h) return;
+  const ck = String(h.dataset.ck || '');
+  const colEl = _vadColEl(ck);
+  if (!colEl) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const startW = colEl.getBoundingClientRect().width || _vadColWidth(ck);
+  const startX = e.clientX;
+  _vadResizing = { ck: ck, colEl: colEl, startW: startW, startX: startX, w: startW };
+  document.body.style.userSelect = 'none';
+  document.body.style.cursor = 'col-resize';
+  _vadResizeTip(true, e.clientX, e.clientY, Math.round(startW) + ' px');
+  const move = (ev) => {
+    if (!_vadResizing) return;
+    const w = Math.max(40, Math.round(_vadResizing.startW + (ev.clientX - _vadResizing.startX)));
+    _vadResizing.w = w;
+    _vadResizing.colEl.style.width = w + 'px';
+    _vadSetTableWidth();
+    _vadResizeTip(true, ev.clientX, ev.clientY, w + ' px');
+    if (ev.preventDefault) ev.preventDefault();
+  };
+  const up = () => {
+    document.removeEventListener('mousemove', move, true);
+    document.removeEventListener('mouseup', up, true);
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+    _vadResizeTip(false);
+    const rz = _vadResizing;
+    _vadResizing = null;
+    if (rz) {
+      _vadColW = _vadColW || {};
+      _vadColW[rz.ck] = rz.w;
+      _vadSaveSheetPrefs();
+    }
+  };
+  document.addEventListener('mousemove', move, true);
+  document.addEventListener('mouseup', up, true);
+}
+// Doble clic sobre el tirador: vuelve esa columna a su ancho normal.
+function _vadSheetOnDblClick(e) {
+  const h = e.target && e.target.closest ? e.target.closest('.vresizer') : null;
+  if (!h) return;
+  const ck = String(h.dataset.ck || '');
+  if (_vadColW) delete _vadColW[ck];
+  _vadSaveSheetPrefs();
+  _vadSyncColgroup();
+  toast('⇹ «' + (ck === '__rn' ? 'Nº de fila' : ck === '__ac' ? 'Acciones' : _vsPreset(ck).t) + '» vuelve al ancho normal');
+}
+function vadSheetResetWidths() {
+  _vadColW = {};
+  _vadSaveSheetPrefs();
+  _vadSyncColgroup();
+  toast('⇹ Anchos de columna restaurados');
 }
 // Ajuste de texto: hace crecer los textareas vacíos no, con contenido sí.
 function _vadGrowTa(root) {
@@ -11478,8 +11639,9 @@ function _vadGrowTa(root) {
   const tas = root.querySelectorAll('textarea.vads-ta');
   for (let i = 0; i < tas.length; i++) {
     const t = tas[i];
-    if (!String(t.value || '').trim()) { t.style.height = '1.4em'; continue; }
+    const empty = !String(t.value || '').trim();
     t.style.height = 'auto';
+    if (empty) { t.style.height = (t.rows > 1 ? '2.9em' : '1.4em'); continue; }
     t.style.height = (t.scrollHeight + 2) + 'px';
   }
 }
@@ -11506,10 +11668,7 @@ function _vadSheetOnInput(e) {
     if (f === 'active') return;          // el principio activo se confirma al salir de la celda (change)
     if (!r._dirty.m) r._dirty.m = {};
     r._dirty.m[f] = 1;
-    if (el.tagName === 'TEXTAREA') {
-      el.style.height = 'auto';
-      el.style.height = (el.scrollHeight + 2) + 'px';
-    }
+    if (el.tagName === 'TEXTAREA') _vadGrowTa(el.parentNode || el);
     vadSheetPersistRow(idx);
     return;
   }
@@ -11559,7 +11718,7 @@ function _vadSheetOnChange(e) {
 function _vadSheetOnClick(e) {
   const t = e.target;
   if (!t || !t.closest) return;
-  // Botones de cabecera (✎ / ▦)
+  // Botones de cabecera (✎ / ▦ / ◀ ▶)
   const btn = t.closest('[data-cbtn]');
   if (btn) {
     const spec = String(btn.dataset.cbtn || '');
@@ -11567,6 +11726,8 @@ function _vadSheetOnClick(e) {
     const key = idx >= 0 ? spec.slice(idx + 1) : '';
     if (spec.startsWith('cols')) vadSheetColsModal(key);
     else if (spec.startsWith('lists')) vadSheetListsModal(key);
+    else if (spec.startsWith('left')) vadSheetMoveCol(key, -1);
+    else if (spec.startsWith('right')) vadSheetMoveCol(key, 1);
     return;
   }
   // Botones de acción dentro de celdas
@@ -11600,6 +11761,7 @@ async function openVadSheet() {
   try { const mk = await dbGet('settings','vademecum_sheet_merges'); _vadMerges = (mk && Array.isArray(mk.value)) ? mk.value : []; } catch(_) { _vadMerges = []; }
   try { const w = await dbGet('settings','vademecum_sheet_wrap'); _vadSheetWrap = w ? !!w.value : true; } catch(_) { _vadSheetWrap = true; }
   try { const o = await dbGet('settings','vademecum_sheet_colopts'); _vadColOpts = (o && o.value) ? o.value : {}; } catch(_) { _vadColOpts = {}; }
+  try { const cw = await dbGet('settings','vademecum_sheet_colw'); _vadColW = (cw && cw.value && typeof cw.value === 'object') ? cw.value : {}; } catch(_) { _vadColW = {}; }
   for (const k of Object.keys(_vadDefaultColOpts)) {
     if (!Array.isArray(_vadColOpts[k])) _vadColOpts[k] = _vadDefaultColOpts[k].slice();
   }
@@ -11613,25 +11775,33 @@ async function openVadSheet() {
   m.style.cssText = 'position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;overflow:hidden';
   m.innerHTML = `
   <style>
-    .vads{ width:100%; border-collapse:collapse; font-size:.7rem; min-width:2000px; }
-    .vads th{ position:sticky; top:0; background:#eef0f3; border:1px solid #d5d8dd; padding:3px 5px; text-align:center; font-weight:600; color:#333; font-size:.6rem; z-index:5; }
+    .vads{ width:auto; border-collapse:collapse; font-size:.7rem; table-layout:fixed; }
+    .vads th{ position:sticky; top:0; background:#eef0f3; border:1px solid #d5d8dd; padding:3px 5px 3px 5px; text-align:center; font-weight:600; color:#333; font-size:.6rem; z-index:5; overflow:visible; }
     .vads th.dragover{ background:#e3ecf5; box-shadow:inset 0 3px 0 0 #2e6da4; }
     .vads th .ltr{ font-weight:800; color:#1d2b3a; font-size:.74rem; display:block; letter-spacing:.02em; }
-    .vads th .sub{ font-weight:500; color:#6b7480; display:block; margin-top:1px; font-size:.6rem; }
+    .vads th .sub{ font-weight:500; color:#6b7480; display:block; margin-top:1px; font-size:.6rem; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
     .vads th .throw{ display:flex; justify-content:space-between; align-items:center; gap:2px; }
     .vads th .thtools{ display:inline-flex; gap:2px; }
+    .vads th .thmove{ display:flex; gap:3px; justify-content:center; margin-top:2px; }
+    .vads th .thmove .vads-thbtn{ line-height:1; padding:0 5px; font-size:.7rem; cursor:pointer; }
+    .vads th .vresizer{ position:absolute; top:0; right:-4px; width:9px; height:100%; cursor:col-resize; z-index:8; }
+    .vads th .vresizer:hover{ background:rgba(46,109,164,.28); }
     .vads thead th.rnc{ left:0; z-index:7; }
-    .vads td{ border:1px solid #d5d8dd; padding:2px; background:#fff; vertical-align:top; }
+    .vads td{ border:1px solid #d5d8dd; padding:2px; background:#fff; vertical-align:top; overflow:hidden; }
     .vads td.rownum{ position:sticky; left:0; background:#f2f3f5; text-align:center; color:#8a8f98; font-size:.66rem; min-width:34px; z-index:4; border-right:2px solid #c9ccd1; cursor:grab; white-space:nowrap; }
     .vads td.rownum.dragover{ background:#e3ecf5; box-shadow:inset 3px 0 0 0 #2e6da4; }
     .vads td.vads-data{ cursor:cell; }
+    .vads .vads-acell{ display:flex; gap:3px; align-items:center; min-width:0; }
+    .vads .vads-acell input[type=text]{ min-width:0; }
     .vads td.vads-data.sel{ outline:2px solid #2e6da4; outline-offset:-2px; background:#eef5ff; }
     .vads td.vads-merged{ background:#fbfcff; box-shadow:inset 0 0 0 1px #b9c6d8; }
-    .vads input[type=text], .vads input[type=text]:focus, .vads select{ border:none; background:transparent; width:100%; padding:2px; font-size:.7rem; outline:none; color:#212529; }
+    .vads input[type=text], .vads input[type=text]:focus, .vads select{ border:none; background:transparent; width:100%; min-width:0; padding:2px; font-size:.7rem; outline:none; color:#212529; }
     .vads select{ cursor:pointer; appearance:auto; }
     .vads input:focus, .vads select:focus{ background:#fffbe6; }
-    .vads textarea{ border:none; background:transparent; width:100%; padding:2px; font-size:.7rem; outline:none; color:#212529; resize:none; overflow:hidden; font-family:inherit; line-height:1.35; display:block; min-height:1.4em; }
-    .vads textarea:focus{ background:#fffbe6; }
+    /* v56: el ajuste de texto parte palabras largas (URL, nombres químicos) para
+       que el texto SIEMBRA quepa en la celda en vez de recortarse. */
+    .vads textarea{ border:none; background:transparent; width:100%; min-width:0; padding:2px; font-size:.7rem; outline:none; color:#212529; resize:none; overflow:hidden; font-family:inherit; line-height:1.35; display:block; min-height:1.4em; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; }
+    .vads textarea::placeholder{ color:#a9b0b8; }
     .vads .vads-btn{ border:1px solid #cdd2d9; border-radius:5px; background:#fff; padding:2px 6px; font-size:.62rem; cursor:pointer; color:#333; }
     .vads .vads-btn:hover{ background:#f0f4ff; }
     .vads .vads-thbtn{ line-height:1; padding:1px 3px; font-size:.58rem; }
@@ -11648,8 +11818,8 @@ async function openVadSheet() {
   <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.1rem 1.25rem;width:100%;max-width:1920px;height:96vh;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">
       <div style="min-width:0">
-        <div style="font-weight:700;font-size:.95rem">🧮 Vademécum · Hoja interna (v55)</div>
-        <div style="font-size:.7rem;color:var(--txt3);margin-top:1px">Plantilla en blanco para que tú pongas la información. La columna <b><span class="ltr" style="display:inline">A</span> Principio activo</b> (desplegable) lista todos los fármacos y <b>vincula a su ficha</b>. <b>Arrastra la letra</b> de una columna (su nombre va con ella) o el <b>número de fila</b> para reordenarlos; el orden se guarda. <b>💾 Guardar</b> actualiza <b>solo lo editado</b>: las celdas vacías no pisan la ficha.</div>
+        <div style="font-weight:700;font-size:.95rem">🧮 Vademécum · Hoja interna (v56)</div>
+        <div style="font-size:.7rem;color:var(--txt3);margin-top:1px">Plantilla en blanco para que tú pongas la información. La columna <b><span class="ltr" style="display:inline">A</span> Principio activo</b> lista todos los fármacos y <b>vincula a su ficha</b>. Cada título tiene <b>◀ ▶</b> para <b>mover la columna entera</b> (o <b>arrastra la letra</b>); en su <b>borde derecho</b> aparece la flecha ↔: <b>arrastrándola agrandas o reduces</b> esa columna y el ancho se guarda (doble clic para volver al normal, o <b>⇹ Anchos</b> para todas). <b>↔ Ajuste texto</b> parte el texto largo en varios renglones para que quepa entero. <b>💾 Guardar</b> actualiza <b>solo lo editado</b>: las celdas vacías no pisan la ficha.</div>
       </div>
       <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center">
         <button class="btn btn-primary btn-sm" onclick="saveVadSheet()" title="Aplica a las fichas solo las celdas que editaste (los vacíos no pisan)">💾 Guardar</button>
@@ -11662,6 +11832,7 @@ async function openVadSheet() {
         <button class="btn btn-secondary btn-sm" onclick="vadSheetPaste()" title="Copia filas de Excel y pégalas aquí para agregarlas a la hoja">📋 Pegar</button>
         <button class="btn btn-secondary btn-sm" onclick="vadSheetAddRow()" title="Añadir una fila en blanco al final de la hoja">➕ Fármaco</button>
         <button class="btn btn-secondary btn-sm" onclick="vadSheetResetCols()" title="Restaurar el orden original de columnas">↺ Col.</button>
+        <button class="btn btn-secondary btn-sm" id="vads-widthbtn" onclick="vadSheetResetWidths()" title="Devolver a todas las columnas su ancho original (para una sola columna: doble clic en su tirador del borde)">⇹ Anchos</button>
         <button class="btn btn-secondary btn-sm" onclick="vadSheetResetRows()" title="Ordenar los fármacos alfabéticamente (se pierden filas añadidas, orden manual y fusiones)">↺ Filas</button>
         <button class="btn btn-secondary btn-sm" onclick="exportVadSheetXlsx()" title="Exportar a Excel .xlsx con el orden de filas y columnas que ves">📤 Excel</button>
         <button class="btn btn-secondary btn-sm" onclick="importVadSheetXlsx()" title="Leer un .xlsx y añadir sus fármacos a la hoja">📥 .xlsx</button>
@@ -11674,20 +11845,20 @@ async function openVadSheet() {
       </div>
     </div>
     <div id="vad-sheet-scroll" style="overflow:auto;flex:1;border:1px solid #c7cbd1;border-radius:10px;background:var(--sur)">
-      <table class="vads">
-        <thead><tr>
-          <th class="rnc" title="Arrastra los números de fila para reordenarlas"># ⇅</th>
-          ${order.map(k => _vsThHtml(_vsPreset(k))).join('')}
-          <th style="white-space:nowrap" title="Marcar para eliminar al Guardar">Acciones</th>
-        </tr></thead>
+      <table class="vads" style="width:${_vadTableWidthPx()}px">
+        ${_vadColgroupHtml()}
+        ${_vadTheadHtml()}
         <tbody id="vad-sheet-tbody"></tbody>
       </table>
     </div>
+    <div id="vad-resize-tip" style="position:fixed;display:none;z-index:1300;background:#1d2b3a;color:#fff;font-size:.66rem;padding:2px 7px;border-radius:5px;pointer-events:none;box-shadow:0 2px 6px rgba(0,0,0,.25)"></div>
   </div>`;
   document.body.appendChild(m);
   m.addEventListener('input', _vadSheetOnInput);
   m.addEventListener('change', _vadSheetOnChange);
   m.addEventListener('click', _vadSheetOnClick);
+  m.addEventListener('mousedown', _vadSheetOnMouseDown);
+  m.addEventListener('dblclick', _vadSheetOnDblClick);
   vadSheetRender();
   _vadInjectDatalists(m);
   _vadUpdateWrapBtn();
@@ -11798,6 +11969,7 @@ async function _vadSaveSheetPrefs() {
   try { await dbPut('settings', { id: 'vademecum_sheet_merges', value: _vadMerges }); } catch(_) {}
   try { await dbPut('settings', { id: 'vademecum_sheet_colopts', value: _vadColOpts }); } catch(_) {}
   try { await dbPut('settings', { id: 'vademecum_sheet_wrap', value: !!_vadSheetWrap }); } catch(_) {}
+  try { await dbPut('settings', { id: 'vademecum_sheet_colw', value: _vadColW || {} }); } catch(_) {}
 }
 function _vadInjectDatalists(m) {
   if (!m) return;
@@ -11820,14 +11992,19 @@ function _vadInjectDatalists(m) {
 }
 function _vadUpdateWrapBtn() {
   const b = document.getElementById('vads-wrapbtn');
-  if (b) b.textContent = '↔ Ajuste texto: ' + (_vadSheetWrap ? 'ON' : 'OFF');
+  if (!b) return;
+  b.textContent = '↔ Ajuste texto: ' + (_vadSheetWrap ? 'SÍ' : 'NO');
+  b.classList.toggle('btn-success', !!_vadSheetWrap);
+  b.classList.toggle('btn-secondary', !_vadSheetWrap);
+  b.setAttribute('aria-pressed', _vadSheetWrap ? 'true' : 'false');
+  b.style.outline = _vadSheetWrap ? '2px solid #2e9e5b' : '';
 }
 function vadSheetToggleWrap() {
   _vadSheetWrap = !_vadSheetWrap;
   _vadSaveSheetPrefs();
   _vadUpdateWrapBtn();
   vadSheetRender();
-  toast('↔ Ajuste de texto ' + (_vadSheetWrap ? 'activado: el texto largo se muestra en varias renglones' : 'desactivado'));
+  toast('↔ Ajuste de texto ' + (_vadSheetWrap ? 'ACTIVADO: las columnas largas se muestran en varias líneas' : 'DESACTIVADO: cada celda en una sola línea'));
 }
 // ── Autoguardado: aplica los cambios a las fichas cada 30 s ──
 function _vadStartAutoSave() {
