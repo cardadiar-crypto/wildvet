@@ -6242,7 +6242,7 @@ function _enfSpImportarDesdeGeneral() {
     const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===item.sistId)||{icon:'📋',label:item.sistId};
     return `<label style="display:flex;align-items:center;gap:.4rem;padding:.3rem .4rem;border-radius:var(--rxs);cursor:pointer;font-size:.82rem;border-bottom:1px solid var(--bor)">
       <input type="checkbox" value="${i}" style="accent-color:var(--g5);flex-shrink:0">
-      <span><strong>${item.enf.nombre}</strong> <span style="font-size:.7rem;color:var(--txt3)">${sist.icon} ${sist.label}${item.enf.subtipo?' · '+item.enf.subtipo:''}</span></span>
+      <span><strong>${item.enf.nombre}</strong> ⇅<span style="font-size:.7rem;color:var(--txt3)">${sist.icon} ${sist.label}${item.enf.subtipo?' · '+item.enf.subtipo:''}</span></span>
     </label>`;
   }).join('');
 
@@ -6823,7 +6823,7 @@ function _enfSpCargarDesdeGeneral() {
     const sist = SISTEMAS_ENFERMEDAD.find(s=>s.id===item.sistId)||{icon:'📋',label:item.sistId};
     return `<label style="display:flex;align-items:center;gap:.4rem;padding:.3rem .4rem;border-radius:var(--rxs);cursor:pointer;font-size:.82rem;border-bottom:1px solid var(--bor)">
       <input type="radio" name="cargar-gen-enf" value="${i}" style="accent-color:var(--g5);flex-shrink:0">
-      <span><strong>${item.enf.nombre}</strong> <span style="font-size:.7rem;color:var(--txt3)">${sist.icon} ${sist.label}</span></span>
+      <span><strong>${item.enf.nombre}</strong> ⇅<span style="font-size:.7rem;color:var(--txt3)">${sist.icon} ${sist.label}</span></span>
     </label>`;
   }).join('');
 
@@ -10414,7 +10414,7 @@ function _hierLabelsFromM(m) {
 function vdExcelSecOptions(selected) {
   let o = '<option value="">— Sin categoría —</option>';
   Object.entries(VADEMECUM_CATS).forEach(([k,v]) => {
-    o += '<option value="'+vdEsc(v.label)+'"'+(v.label===selected?' selected':'')+'>'+vdEsc(v.label)+'</option>';
+    o += '<option value="'+vdEsc(v.label)+'"'+(v.label===selected?' selected':'')+'▶'+vdEsc(v.label)+'</option>';
   });
   return o;
 }
@@ -10423,7 +10423,7 @@ function vdExcelSubOptions(secLabel, selected) {
   Object.entries(VADEMECUM_CATS).forEach(([k,v]) => {
     if (secLabel && v.label !== secLabel) return;
     Object.entries(v.subcategories||{}).forEach(([sk,sv]) => {
-      o += '<option value="'+vdEsc(sv.label)+'"'+(sv.label===selected?' selected':'')+'>'+vdEsc(sv.label)+'</option>';
+      o += '<option value="'+vdEsc(sv.label)+'"'+(sv.label===selected?' selected':'')+'▶'+vdEsc(sv.label)+'</option>';
     });
   });
   return o;
@@ -10435,7 +10435,7 @@ function vdExcelSsOptions(secLabel, subLabel, selected) {
     Object.entries(v.subcategories||{}).forEach(([sk,sv]) => {
       if (subLabel && sv.label !== subLabel) return;
       Object.entries(sv.subcats||{}).forEach(([ssk,ssv]) => {
-        o += '<option value="'+vdEsc(ssv.label)+'"'+(ssv.label===selected?' selected':'')+'>'+vdEsc(ssv.label)+'</option>';
+        o += '<option value="'+vdEsc(ssv.label)+'"'+(ssv.label===selected?' selected':'')+'▶'+vdEsc(ssv.label)+'</option>';
       });
     });
   });
@@ -11037,6 +11037,14 @@ function _vadColWidth(k) {
   const w = _vadColW ? _vadColW[k] : null;
   return (typeof w === 'number' && w >= 40) ? Math.round(w) : _vsTdDefaultW(k);
 }
+// v56: alto por fila elegido arrastrando el borde inferior de la celda del
+// número de fila. Se guarda por clave de fila (id o _uid), así sobrevive al
+// orden alfabético y a las recargas.
+let _vadRowHs = {};
+function _vadRowHeight(r) {
+  const h = _vadRowHs ? _vadRowHs[_vadRowKey(r)] : null;
+  return (typeof h === 'number' && h >= 20) ? Math.round(h) : 0;
+}
 // table-layout:fixed sólo respeta los <col> si la tabla tiene ancho DEFINIDO;
 // con width:auto Blink usa el min-width de cada celda y los <col> se ignoran.
 function _vadTableWidthPx() {
@@ -11121,6 +11129,11 @@ function _vadSheetSpFromSd(sd) {
 
 function _vadSheetDrugToRow(d) {
   const catLabel = d.category || (d.cat_vad ? (VADEMECUM_CATS[d.cat_vad]?.label||'') : '') || (d.cats?.[0]||'');
+  // Niveles profundos (SUB-SUBCATEGORÍA 4…9 = columnas T…Y): se leen de la
+  // ruta completa para que, al añadir esa columna, ya se vea el nivel existente.
+  const deep = {};
+  const hv = Array.isArray(d.hier_vad) ? d.hier_vad : [];
+  for (let i = 3; i <= 8; i++) deep['hier_' + i] = String(hv[i] || '');
   return {
     id: d.id,
     m: {
@@ -11141,7 +11154,8 @@ function _vadSheetDrugToRow(d) {
       mech_simple: d.mech_simple||'',
       desc: d.desc||'',
       keywords: (d.keywords||[]).join(', '),
-      bib: vdExcelBibStr(d)
+      bib: vdExcelBibStr(d),
+      ...deep
     },
     sps: (d.species_doses||[]).map(_vadSheetSpFromSd),
     open: false,
@@ -11157,11 +11171,21 @@ async function _vadSaveLayout() {
   try { await dbPut('settings', { id: 'vademecum_sheet_colorder', value: _vadColOrder || _vadDefaultColKeys() }); } catch(e){}
   try { await dbPut('settings', { id: 'vademecum_sheet_roworder', value: _vadSheetRows.map(_vadRowKey) }); } catch(e){}
 }
+// Una clave es "conocida" si la app sabe qué es: columna delCsv, una profunda
+// (SUB-SUBCATEGORÍA 4...) o una columna con lista propia. v56: antes solo se
+// aceptaban las del CSV, así que al recargar se descartaban las columnas
+// profundas que el usuario había añadido y con ellas se perdía lo escrito.
+function _vadIsKnownKey(k) {
+  if (!k) return false;
+  if (VAD_COL_PRESETS.some(c => c.k === k)) return true;
+  if (/^hier_\d+$/.test(k)) return true;
+  return !!(VAD_GRID_KEYS.includes(k)) || (k === 'sps') || !!(_vadColOpts && _vadColOpts[k]);
+}
 function _vadApplyColOrder() {
   const def = _vadDefaultColKeys();
   const order = [];
   const saved = Array.isArray(_vadColOrderSaved) ? _vadColOrderSaved : null;
-  if (saved) for (const k of saved) if (def.includes(k) && !order.includes(k)) order.push(k);
+  if (saved) for (const k of saved) if (_vadIsKnownKey(k) && !order.includes(k)) order.push(k);
   for (const k of def) if (!order.includes(k)) order.push(k);
   if (!order.includes('active')) order.unshift('active');
   _vadColOrder = order;
@@ -11186,6 +11210,11 @@ function _vadSheetBuildRows() {
   _vadSheetRows = _vadSheetOrder().map(d => {
     const r = _vadNewRow(d.active || d.drug);
     r.id = d.id || '';
+    // v56: la fila se arma con los DATOS REALES de la ficha. Antes solo se
+    // copiaba el nombre del principio activo y el resto de celdas salía vacío.
+    const full = _vadSheetDrugToRow(d);
+    Object.assign(r.m, full.m);
+    r.sps = full.sps;
     return r;
   });
   _vadApplyColOrder();
@@ -11246,21 +11275,71 @@ function _vadSyncActiveSelections(root) {
   }
 }
 
-function _vsTextTag(f, val) {
+// ── v56 banda de filas con ajuste de texto ──
+// Los textareas solo existen en las filas visibles; el resto se pinta como
+// input normal y se convierte en textarea al entrar en pantalla.
+// La banda se estima con la altura media de fila: leer la posición real de las
+// 500+ filas obliga a Blink a rehacer la maquetación de toda la tabla en cada
+// lectura y la hoja se queda colgada.
+let _vadWrapBand = null;
+let _vadRowH = 60;
+function _vadBandEstimate() {
+  const box = document.getElementById('vad-sheet-scroll');
+  if (!box) return { from: 0, to: 40 };
+  const h = Math.max(240, box.clientHeight || 600);
+  const vis = Math.ceil(h / _vadRowH) + 12;
+  const first = Math.max(0, Math.floor((box.scrollTop || 0) / _vadRowH) - vis);
+  return { from: first, to: first + vis * 2 + 24 };
+}
+function _vadWrapOk(idx) {
+  if (!_vadSheetWrap) return false;
+  if (!_vadWrapBand) _vadWrapBand = _vadBandEstimate();
+  return idx >= _vadWrapBand.from && idx <= _vadWrapBand.to;
+}
+function _vadRefreshBandRows(force) {
+  if (!_vadSheetWrap) return;
+  const band = _vadBandEstimate();
+  const prev = _vadWrapBand || { from: -1, to: -2 };
+  _vadWrapBand = band;
+  if (!force && band.from <= prev.from && band.to >= prev.to) return;
+  const ok = (i) => i >= 0 && i < _vadSheetRows.length;
+  for (let i = prev.from; i <= prev.to; i++) if (ok(i) && (i < band.from || i > band.to)) _vsRefreshRowCells(i);
+  for (let i = band.from; i <= band.to; i++) if (ok(i) && (i < prev.from || i > band.to)) _vsRefreshRowCells(i);
+}
+// Al pulsar una celda de ajuste fuera de pantalla, se convierte al instante.
+function _vadFocusInUpgrade(e) {
+  const el = e.target;
+  if (!el || !el.dataset || !el.dataset.wrapcol || !_vadSheetWrap) return;
+  const idx = _vadIdxForEl(el);
+  if (idx < 0) return;
+  const f = el.dataset.f, pos = String(el.value || '').length;
+  _vsRefreshRowCells(idx);
+  const nx = document.querySelector('#vad-sheet-tbody tr.vads-row[data-idx="' + idx + '"] [data-f="' + f + '"]');
+  if (nx && nx.focus) { nx.focus(); try { nx.setSelectionRange(pos, pos); } catch (err) {} }
+}
+
+function _vsTextTag(f, val, wrapOK) {
   const list = (_vadColOpts && _vadColOpts[f] && _vadColOpts[f].length) ? ' list="vadl-' + f + '"' : '';
   if (_vadSheetWrap && (_vadWrapKeys[f] || /^hier_\d+$/.test(f))) {
     // textarea: 2 renglones de arranque y pista gris en vacío, para que se vea
     // de inmediato que el ajuste de texto está activo.
+    // Con muchas filas el textarea solo se crea en las filas a la vista:
+    // miles de textareas a la vez hacen la hoja ilegible. Las filas fuera de
+    // pantalla se pintan como input y se convierten al entrar en pantalla.
+    if (wrapOK === false) {
+      return '<input type="text" value="' + vdEsc(val ?? '') + '" data-f="' + f + '"' +
+             ' data-wrapcol="' + f + '" title="pulsa para ajustar el texto"' + list + '▶';
+    }
     return '<textarea rows="2" class="vads-ta" data-f="' + f + '"' + list + ' placeholder="escribe aquí…">' + vdEsc(val ?? '') + '</textarea>';
   }
-  return '<input type="text" value="' + vdEsc(val ?? '') + '" data-f="' + f + '"' + list + '>';
+  return '<input type="text" value="' + vdEsc(val ?? '') + '" data-f="' + f + '"' + list + '▶';
 }
 function _vsIn(rowIdx, f, val) {
   return _vsTextTag(f, val);
 }
 function _vsSpIn(si, f, val) {
   const list = (_vadColOpts && _vadColOpts[f] && _vadColOpts[f].length) ? ' list="vadl-' + f + '"' : '';
-  return '<input type="text" value="' + vdEsc(val ?? '') + '" data-sp="' + si + '" data-spf="' + f + '"' + list + '>';
+  return '<input type="text" value="' + vdEsc(val ?? '') + '" data-sp="' + si + '" data-spf="' + f + '"' + list + '▶';
 }
 
 function _vadViewSetScroll() {
@@ -11272,16 +11351,17 @@ function _vadViewRestoreScroll(s) {
   if (c && s) { c.scrollLeft = s.sx; c.scrollTop = s.sy; }
 }
 
-// ═══ v56: título con flechas ◀ ▶ (mover columna) y tirador de ancho en el borde ═══
+// ═══ v56: título con flechas < > (mover columna) y tirador de ancho en el borde ═══
 function _vsThHtml(col, ci, total) {
   const p = _vsPreset(col.k);
   const i = (typeof ci === 'number') ? ci : 0;
   const last = (typeof total === 'number') ? total - 1 : i;
-  const mv = (dir, dis, txt) => '<button type="button" class="vads-btn vads-thbtn" draggable="false" data-cbtn="' + dir + ':' + col.k + '" title="' + txt + '"' + (dis ? ' disabled style="opacity:.3;cursor:default"' : '') + '>' + (dir === 'left' ? '◀' : '▶') + '</button>';
-  return '<th draggable="true" ondragstart="vadColDragStart(event,\'' + col.k + '\')" ondragover="vadColDragOver(event)" ondragleave="vadColDragLeave(event)" ondrop="vadColDrop(event,\'' + col.k + '\')" ondragend="vadColDragEnd()" data-colkey="' + col.k + '" style="white-space:nowrap;cursor:grab" title="Arrastra la letra para cambiar el orden, o usa las flechas ◀ ▶ del título">' +
+  const mv = (dir, dis, txt) => '<button type="button" class="vads-btn vads-thbtn" draggable="false" data-cbtn="' + dir + ':' + col.k + '" title="' + txt + '"' + (dis ? ' disabled style="opacity:.3;cursor:default"' : '') + '▶' + (dir === 'left' ? '◀' : '▶') + '</button>';
+  return '<th draggable="true" ondragstart="vadColDragStart(event,\'' + col.k + '\')" ondragover="vadColDragOver(event)" ondragleave="vadColDragLeave(event)" ondrop="vadColDrop(event,\'' + col.k + '\')" ondragend="vadColDragEnd()" data-colkey="' + col.k + '" style="white-space:nowrap;cursor:grab" title="Arrastra la letra para cambiar el orden, o usa las flechas < > del título">' +
     '<div class="throw"><span class="ltr">' + p.l + '</span><span class="thtools"><button type="button" class="vads-btn vads-thbtn" draggable="false" data-cbtn="cols:' + col.k + '" title="Cambiar el nombre/tipo de columna (nombres compatibles con la app)">✎</button><button type="button" class="vads-btn vads-thbtn" draggable="false" data-cbtn="lists:' + col.k + '" title="Agregar o editar las opciones desplegables de esta columna">▦</button></span></div>' +
     '<span class="sub">' + p.t + '</span>' +
-    '<span class="thmove">' + mv('left', i <= 0, 'Mover esta columna a la izquierda') + mv('right', i >= last, 'Mover esta columna a la derecha') + '</span>' +
+    '<span class="thmove">' + mv('left', i <= 0, 'Mover esta columna a la izquierda') + mv('right', i >= last, 'Mover esta columna a la derecha') +
+      '<button type="button" class="vads-btn vads-thbtn vads-plus" draggable="false" data-cbtn="addcol" title="Añadir una columna nueva a la hoja (por ejemplo otra sub-sub-subcategoría)">＋</button></span>' +
     '<span class="vresizer" data-ck="' + col.k + '" title="Arrastra para agrandar o reducir esta columna (doble clic para volver al ancho normal)"></span>' +
   '</th>';
 }
@@ -11308,6 +11388,7 @@ function _vsTdMin(k) {
 function _vsCell(k, r, idx) {
   const c = (v) => vdEsc(v ?? '');
   const linked = !!r.id;
+  const wk = _vadWrapOk(idx);
   if (k === 'active') {
     const est = r.del
       ? '<span style="color:#c0392b;font-size:.6rem;font-weight:700">ELIMINAR</span>'
@@ -11317,24 +11398,24 @@ function _vsCell(k, r, idx) {
     const activeCell = '<input type="text" list="vadl-active" data-f="active" value="' + c(r.m.active) + '" placeholder="Escribe o elige un principio activo… (si no existe, se crea al guardar)" style="min-width:0;flex:1 1 auto">';
     return '<div class="vads-acell">' + est + activeCell + '<button type="button" class="vads-btn vads-link" data-act="ficha" title="' + (linked ? 'Abrir la ficha vinculada' : 'Sin ficha aún (se creará al guardar)') + '" style="' + (linked ? '' : 'opacity:.35') + '">↗</button></div>';
   }
-  if (/^hier_\d+$/.test(k)) return _vsTextTag(k, r.m[k]);
-  if (k === 'drug')     return _vsTextTag('drug', r.m.drug);
-  if (k === 'nombres')  return _vsTextTag('nombres', r.m.nombres);
-  if (k === 'conc')     return _vsTextTag('conc', r.m.conc);
+  if (/^hier_\d+$/.test(k)) return _vsTextTag(k, r.m[k], wk);
+  if (k === 'drug')     return _vsTextTag('drug', r.m.drug, wk);
+  if (k === 'nombres')  return _vsTextTag('nombres', r.m.nombres, wk);
+  if (k === 'conc')     return _vsTextTag('conc', r.m.conc, wk);
   if (k === 'cat_label') return '<select data-f="cat_label">' + _preserveOpt(vdExcelSecOptions(r.m.cat_label), r.m.cat_label) + '</select>';
   if (k === 'subcat_label') return '<select data-f="subcat_label">' + _preserveOpt(vdExcelSubOptions(r.m.cat_label, r.m.subcat_label), r.m.subcat_label) + '</select>';
   if (k === 'ss_label') return '<select data-f="ss_label">' + _preserveOpt(vdExcelSsOptions(r.m.cat_label, r.m.subcat_label, r.m.ss_label), r.m.ss_label) + '</select>';
-  if (k === 'cat_esp')  return _vsTextTag('cat_esp', r.m.cat_esp);
-  if (k === 'routes')   return _vsTextTag('routes', r.m.routes);
-  if (k === 'indic')    return _vsTextTag('indic', r.m.indic);
-  if (k === 'ci')       return _vsTextTag('ci', r.m.ci);
-  if (k === 'info')     return _vsTextTag('info', r.m.info);
-  if (k === 'notes')    return _vsTextTag('notes', r.m.notes);
-  if (k === 'mech')     return _vsTextTag('mech', r.m.mech);
-  if (k === 'mech_simple') return _vsTextTag('mech_simple', r.m.mech_simple);
-  if (k === 'desc')     return _vsTextTag('desc', r.m.desc);
-  if (k === 'keywords') return _vsTextTag('keywords', r.m.keywords);
-  if (k === 'bib')      return _vsTextTag('bib', r.m.bib);
+  if (k === 'cat_esp')  return _vsTextTag('cat_esp', r.m.cat_esp, wk);
+  if (k === 'routes')   return _vsTextTag('routes', r.m.routes, wk);
+  if (k === 'indic')    return _vsTextTag('indic', r.m.indic, wk);
+  if (k === 'ci')       return _vsTextTag('ci', r.m.ci, wk);
+  if (k === 'info')     return _vsTextTag('info', r.m.info, wk);
+  if (k === 'notes')    return _vsTextTag('notes', r.m.notes, wk);
+  if (k === 'mech')     return _vsTextTag('mech', r.m.mech, wk);
+  if (k === 'mech_simple') return _vsTextTag('mech_simple', r.m.mech_simple, wk);
+  if (k === 'desc')     return _vsTextTag('desc', r.m.desc, wk);
+  if (k === 'keywords') return _vsTextTag('keywords', r.m.keywords, wk);
+  if (k === 'bib')      return _vsTextTag('bib', r.m.bib, wk);
   if (k === 'sps') {
     const spresumen = r.sps.map(s => {
       const rng = (s.dmin && s.dmax) ? s.dmin + '-' + s.dmax : (s.dmin ? '≥' + s.dmin : (s.dmax ? '≤' + s.dmax : ''));
@@ -11397,7 +11478,7 @@ function _vadUpdateSelInfo() {
   const el = document.getElementById('vads-selinfo');
   if (!el) return;
   const s = _vadSel;
-  el.textContent = s ? ('🔍 Selección ' + (s.r1 - s.r0 + 1) + ' × ' + (s.c1 - s.c0 + 1) + ' → usa ＋ Fusionar / ⧉ Separar') : '';
+  el.textContent = s ? ('🔍 Selección ' + (s.r1 - s.r0 + 1) + ' × ' + (s.c1 - s.c0 + 1) + ' → ＋ Fusionar / ⧉ Separar / ↔ Ajuste texto en la columna') : '';
 }
 function _vadClearSel() {
   _vadSel = null;
@@ -11428,6 +11509,7 @@ function _vadSelectCell(r, c, shift) {
     }
   }
   _vadUpdateSelInfo();
+  _vadUpdateWrapBtn();
 }
 function vadSheetMerge() {
   if (!_vadSel) { toast('Selecciona un rango: haz clic en una celda y, con Shift, en la última del rango.'); return; }
@@ -11477,9 +11559,10 @@ function _vsTdsHtml(data, idx) {
 function _vsRowInnerHtml(r, idx) {
   const c = (v) => vdEsc(v ?? '');
   const linked = !!r.id;
+  const h = _vadRowHeight(r);
   return `
-  <tr class="vads-row" data-idx="${idx}" data-linked="${linked?'1':'0'}" data-rid="${c(_vadRowKey(r))}" style="${r.del?'opacity:.55':''}">
-    <td class="rownum" draggable="true" ondragstart="vadRowDragStart(event,this)" ondragover="vadRowDragOver(event)" ondragleave="vadRowDragLeave(event)" ondrop="vadRowDrop(event,this)" ondragend="vadRowDragEnd()" title="Arrastra para reordenar la fila">${idx+1} ⇅</td>
+  <tr class="vads-row" data-idx="${idx}" data-linked="${linked?'1':'0'}" data-rid="${c(_vadRowKey(r))}" style="${r.del?'opacity:.55':''}${h ? ';height:' + h + 'px' : ''}">
+    <td class="rownum" draggable="true" ondragstart="vadRowDragStart(event,this)" ondragover="vadRowDragOver(event)" ondragleave="vadRowDragLeave(event)" ondrop="vadRowDrop(event,this)" ondragend="vadRowDragEnd()" title="Arrastra para reordenar la fila, o usa ＋ para añadir una fila justo debajo"><div class="rnx">${idx+1} ⇅</div><button type="button" class="vads-btn vads-rnplus" draggable="false" data-act="addrow" title="Añadir una fila nueva justo debajo de esta">＋</button><span class="vresizer vresizer-h" data-rh="${c(_vadRowKey(r))}" title="Arrastra el borde inferior para cambiar el alto de esta fila"></span></td>
     ${_vsTdsHtml(r, idx)}
     <td style="text-align:center;min-width:40px"><input type="checkbox" data-act="delrow" ${r.del?'checked':''} title="Marcar para eliminar al Guardar"></td>
   </tr>${_vsSpRowHtml(r, idx)}`;
@@ -11524,6 +11607,7 @@ function vadSheetRender() {
   const tbody = document.getElementById('vad-sheet-tbody');
   if (!tbody) return;
   const s = _vadViewSetScroll();
+  _vadWrapBand = _vadBandEstimate();
   _vadSyncColgroup();
   _vadSyncThead();
   tbody.innerHTML = _vadSheetRows.map((r, i) => vadSheetRowHtml(r, i)).join('');
@@ -11531,6 +11615,9 @@ function vadSheetRender() {
   _vadSyncActiveSelections(tbody);
   _vadGrowTa(tbody);
   _vadUpdateSelInfo();
+  // Con las alturas reales se corrige la banda estimada y se repintan las filas
+  // que no eran textareas y sí deberían serlo (y al revés).
+  if (_vadSheetWrap) requestAnimationFrame(() => _vadRefreshBandRows(true));
 }
 // ═══ v56: anchos de columna (arrastrando el borde del título) ═══
 function _vadColgroupHtml() {
@@ -11580,9 +11667,11 @@ function _vadResizeTip(show, x, y, txt) {
 function _vadSheetOnMouseDown(e) {
   const h = e.target && e.target.closest ? e.target.closest('.vresizer') : null;
   if (!h) return;
+  // v56: tirador del borde inferior de la celda del número → ALTO de esa fila.
+  if (h.dataset && h.dataset.rh) { _vadStartRowResize(e, h); return; }
   const ck = String(h.dataset.ck || '');
   const colEl = _vadColEl(ck);
-  if (!colEl) return;
+  if (!ck || !colEl) return;
   e.preventDefault();
   e.stopPropagation();
   const startW = colEl.getBoundingClientRect().width || _vadColWidth(ck);
@@ -11617,10 +11706,17 @@ function _vadSheetOnMouseDown(e) {
   document.addEventListener('mousemove', move, true);
   document.addEventListener('mouseup', up, true);
 }
-// Doble clic sobre el tirador: vuelve esa columna a su ancho normal.
+// Doble clic sobre el tirador: vuelve esa columna (o esa fila) al tamaño normal.
 function _vadSheetOnDblClick(e) {
   const h = e.target && e.target.closest ? e.target.closest('.vresizer') : null;
   if (!h) return;
+  if (h.dataset && h.dataset.rh) {
+    if (_vadRowHs) delete _vadRowHs[h.dataset.rh];
+    _vadSaveSheetPrefs();
+    _vadRefreshBandRows(true);
+    toast('⇱ La fila vuelve a su alto normal');
+    return;
+  }
   const ck = String(h.dataset.ck || '');
   if (_vadColW) delete _vadColW[ck];
   _vadSaveSheetPrefs();
@@ -11633,17 +11729,97 @@ function vadSheetResetWidths() {
   _vadSyncColgroup();
   toast('⇹ Anchos de columna restaurados');
 }
-// Ajuste de texto: hace crecer los textareas vacíos no, con contenido sí.
+// v56 ── ALTO de fila: se arrastra el borde inferior de la celda del número.
+function _vadStartRowResize(e, handle) {
+  const rk = String(handle.dataset.rh || '');
+  const tr = handle.closest ? handle.closest('tr.vads-row') : null;
+  if (!rk || !tr) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const startH = tr.getBoundingClientRect().height || tr.offsetHeight;
+  const startY = e.clientY;
+  let last = startH;
+  document.body.style.userSelect = 'none';
+  document.body.style.cursor = 'row-resize';
+  _vadResizeTip(true, e.clientX, e.clientY, Math.round(startH) + ' px');
+  const move = (ev) => {
+    const h = Math.max(22, Math.round(startH + (ev.clientY - startY)));
+    last = h;
+    tr.style.height = h + 'px';
+    _vadResizeTip(true, ev.clientX, ev.clientY, h + ' px');
+    if (ev.preventDefault) ev.preventDefault();
+  };
+  const up = () => {
+    document.removeEventListener('mousemove', move, true);
+    document.removeEventListener('mouseup', up, true);
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+    _vadResizeTip(false);
+    _vadRowHs = _vadRowHs || {};
+    _vadRowHs[rk] = last;
+    _vadSaveSheetPrefs();
+  };
+  document.addEventListener('mousemove', move, true);
+  document.addEventListener('mouseup', up, true);
+}
+// v56 ── ＋ de la columna de números: fila en blanco justo debajo.
+function vadSheetAddRowAt(idx) {
+  const r = _vadNewRow('');
+  _vadSheetRows.splice(idx + 1, 0, r);
+  _vadRowKey(r);
+  _vadSaveLayout();
+  _vadClearMerges('fila añadida');
+  vadSheetRender();
+  const tr = document.querySelector('#vad-sheet-tbody tr[data-idx="' + (idx + 1) + '"] td.vads-data input[data-f="active"]');
+  if (tr) { try { tr.focus(); } catch (_) {} }
+  toast('＋ Fila añadida (nº ' + (idx + 2) + ')');
+}
+// v56 ── ＋ del título: abre el alta de columnas y deja el cursor en el desplegable.
+function vadSheetAddColPrompt() {
+  vadSheetColsModal();
+  const sel = document.getElementById('vadcc-add');
+  if (sel && sel.focus) setTimeout(() => { try { sel.focus(); } catch (_) {} }, 60);
+  toast('＋ Elige la columna nueva (por ejemplo SUB-SUBCATEGORÍA 4) y pulsa «➕ Añadir columna»');
+}
+// Ajuste de texto: los textareas con contenido se ajustan a su altura, pero
+// SOLO los que están a la vista. Medirlos todos (pueden ser miles) provoca
+// recálculos de maquetación en cadena y la hoja se congela.
 function _vadGrowTa(root) {
   if (!root) return;
-  const tas = root.querySelectorAll('textarea.vads-ta');
+  const tas = root.querySelectorAll ? root.querySelectorAll('textarea.vads-ta') : [];
   for (let i = 0; i < tas.length; i++) {
     const t = tas[i];
-    const empty = !String(t.value || '').trim();
-    t.style.height = 'auto';
-    if (empty) { t.style.height = (t.rows > 1 ? '2.9em' : '1.4em'); continue; }
-    t.style.height = (t.scrollHeight + 2) + 'px';
+    if (!String(t.value || '').trim()) {
+      t._vadGrown = true;                 // vacío: alto fijo, sin medir
+      t.style.height = (t.rows > 1 ? '2.9em' : '1.4em');
+    } else {
+      t._vadGrown = false;                // se medirá al entrar en pantalla
+      t.style.height = '';
+    }
   }
+  _vadGrowVisibleTa();
+}
+function _vadGrowVisibleTa() {
+  const box = document.getElementById('vad-sheet-scroll');
+  if (!box) return;
+  const top = box.scrollTop - 300;
+  const bottom = box.scrollTop + box.clientHeight + 300;
+  const tas = document.querySelectorAll('#vad-sheet-tbody textarea.vads-ta');
+  for (let i = 0; i < tas.length; i++) {
+    const t = tas[i];
+    if (t._vadGrown) continue;
+    const row = t.closest ? t.closest('tr') : null;
+    if (!row || row.offsetTop < top || row.offsetTop > bottom) continue;
+    t.style.height = 'auto';
+    t.style.height = (t.scrollHeight + 2) + 'px';
+    t._vadGrown = true;
+  }
+}
+function _vadGrowOneTa(t) {
+  if (!t || t._vadGrown) return;
+  t.style.height = 'auto';
+  t.style.height = (String(t.value || '').trim() ? (t.scrollHeight + 2) + 'px' : (t.rows > 1 ? '2.9em' : '1.4em'));
+  t._vadGrown = true;
 }
 // Indice de fila a partir de cualquier elemento dentro de su fila.
 function _vadIdxForEl(el) {
@@ -11668,7 +11844,7 @@ function _vadSheetOnInput(e) {
     if (f === 'active') return;          // el principio activo se confirma al salir de la celda (change)
     if (!r._dirty.m) r._dirty.m = {};
     r._dirty.m[f] = 1;
-    if (el.tagName === 'TEXTAREA') _vadGrowTa(el.parentNode || el);
+    if (el.tagName === 'TEXTAREA') _vadGrowOneTa(el);
     vadSheetPersistRow(idx);
     return;
   }
@@ -11718,7 +11894,7 @@ function _vadSheetOnChange(e) {
 function _vadSheetOnClick(e) {
   const t = e.target;
   if (!t || !t.closest) return;
-  // Botones de cabecera (✎ / ▦ / ◀ ▶)
+  // Botones de cabecera (✎ / ▦ / < >)
   const btn = t.closest('[data-cbtn]');
   if (btn) {
     const spec = String(btn.dataset.cbtn || '');
@@ -11726,6 +11902,7 @@ function _vadSheetOnClick(e) {
     const key = idx >= 0 ? spec.slice(idx + 1) : '';
     if (spec.startsWith('cols')) vadSheetColsModal(key);
     else if (spec.startsWith('lists')) vadSheetListsModal(key);
+    else if (spec.startsWith('addcol')) vadSheetAddColPrompt();
     else if (spec.startsWith('left')) vadSheetMoveCol(key, -1);
     else if (spec.startsWith('right')) vadSheetMoveCol(key, 1);
     return;
@@ -11739,6 +11916,7 @@ function _vadSheetOnClick(e) {
     if (act === 'addsp') { const idx = _vadIdxForEl(ab); if (idx >= 0) vadSheetAddSp(idx); return; }
     if (act === 'delsps') { const idx = _vadIdxForEl(ab); if (idx >= 0 && ab.dataset.sp != null) vadSheetDelSp(idx, parseInt(ab.dataset.sp, 10)); return; }
     if (act === 'delrow') return;
+    if (act === 'addrow') { const idx = _vadIdxForEl(ab); if (idx >= 0) vadSheetAddRowAt(idx); return; }
   }
   // Selección de celdas para fusionar (solo al pulsar el relleno de la celda)
   const ins = ['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'];
@@ -11762,6 +11940,8 @@ async function openVadSheet() {
   try { const w = await dbGet('settings','vademecum_sheet_wrap'); _vadSheetWrap = w ? !!w.value : true; } catch(_) { _vadSheetWrap = true; }
   try { const o = await dbGet('settings','vademecum_sheet_colopts'); _vadColOpts = (o && o.value) ? o.value : {}; } catch(_) { _vadColOpts = {}; }
   try { const cw = await dbGet('settings','vademecum_sheet_colw'); _vadColW = (cw && cw.value && typeof cw.value === 'object') ? cw.value : {}; } catch(_) { _vadColW = {}; }
+  try { const rh = await dbGet('settings','vademecum_sheet_rowh'); _vadRowHs = (rh && rh.value && typeof rh.value === 'object') ? rh.value : {}; } catch(_) { _vadRowHs = {}; }
+  try { const wk = await dbGet('settings','vademecum_sheet_wrapkeys'); if (wk && wk.value && typeof wk.value === 'object') Object.assign(_vadWrapKeys, wk.value); } catch(_) {}
   for (const k of Object.keys(_vadDefaultColOpts)) {
     if (!Array.isArray(_vadColOpts[k])) _vadColOpts[k] = _vadDefaultColOpts[k].slice();
   }
@@ -11786,10 +11966,17 @@ async function openVadSheet() {
     .vads th .thmove .vads-thbtn{ line-height:1; padding:0 5px; font-size:.7rem; cursor:pointer; }
     .vads th .vresizer{ position:absolute; top:0; right:-4px; width:9px; height:100%; cursor:col-resize; z-index:8; }
     .vads th .vresizer:hover{ background:rgba(46,109,164,.28); }
+    .vads th .vads-plus{ line-height:1; padding:0 6px; font-size:.72rem; cursor:pointer; border-color:#8fb4d4; background:#f2f8ff; color:#2e6da4; }
+    .vads th .vads-plus:hover{ background:#2e6da4; color:#fff; }
     .vads thead th.rnc{ left:0; z-index:7; }
     .vads td{ border:1px solid #d5d8dd; padding:2px; background:#fff; vertical-align:top; overflow:hidden; }
     .vads td.rownum{ position:sticky; left:0; background:#f2f3f5; text-align:center; color:#8a8f98; font-size:.66rem; min-width:34px; z-index:4; border-right:2px solid #c9ccd1; cursor:grab; white-space:nowrap; }
     .vads td.rownum.dragover{ background:#e3ecf5; box-shadow:inset 3px 0 0 0 #2e6da4; }
+    .vads td.rownum .rnx{ display:block; }
+    .vads td.rownum .vads-rnplus{ line-height:1; padding:0 5px; font-size:.72rem; cursor:pointer; border-color:#8fb4d4; background:#f2f8ff; color:#2e6da4; }
+    .vads td.rownum .vads-rnplus:hover{ background:#2e6da4; color:#fff; }
+    .vads td.rownum .vresizer-h{ position:absolute; left:0; bottom:-4px; width:100%; height:8px; cursor:row-resize; z-index:6; }
+    .vads td.rownum .vresizer-h:hover{ background:rgba(46,109,164,.28); }
     .vads td.vads-data{ cursor:cell; }
     .vads .vads-acell{ display:flex; gap:3px; align-items:center; min-width:0; }
     .vads .vads-acell input[type=text]{ min-width:0; }
@@ -11819,21 +12006,18 @@ async function openVadSheet() {
     <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">
       <div style="min-width:0">
         <div style="font-weight:700;font-size:.95rem">🧮 Vademécum · Hoja interna (v56)</div>
-        <div style="font-size:.7rem;color:var(--txt3);margin-top:1px">Plantilla en blanco para que tú pongas la información. La columna <b><span class="ltr" style="display:inline">A</span> Principio activo</b> lista todos los fármacos y <b>vincula a su ficha</b>. Cada título tiene <b>◀ ▶</b> para <b>mover la columna entera</b> (o <b>arrastra la letra</b>); en su <b>borde derecho</b> aparece la flecha ↔: <b>arrastrándola agrandas o reduces</b> esa columna y el ancho se guarda (doble clic para volver al normal, o <b>⇹ Anchos</b> para todas). <b>↔ Ajuste texto</b> parte el texto largo en varios renglones para que quepa entero. <b>💾 Guardar</b> actualiza <b>solo lo editado</b>: las celdas vacías no pisan la ficha.</div>
+        <div style="font-size:.7rem;color:var(--txt3);margin-top:1px">Plantilla en blanco para que tú pongas la información. La columna <b><span class="ltr" style="display:inline">A</span> Principio activo</b> lista todos los fármacos y <b>vincula a su ficha</b>. Cada título tiene <b>< ></b> para <b>mover la columna entera</b> (o <b>arrastra la letra</b>) y un <b>＋</b> para <b>añadir una columna nueva</b>; en su <b>borde derecho</b> aparece la flecha ↔: <b>arrastrándola agrandas o reduces</b> esa columna y el ancho se guarda (doble clic para volver al normal). En la columna de números, el <b>＋</b> añade una fila debajo y <b>arrastrando el borde inferior</b> cambias el alto de esa fila. <b>↔ Ajuste texto</b>: marca una celda o columna, pulsa y el texto se reparte en los renglones que quepan (mínimo 2). <b>💾 Guardar</b> actualiza <b>solo lo editado</b>: las celdas vacías no pisan la ficha.</div>
       </div>
       <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center">
         <button class="btn btn-primary btn-sm" onclick="saveVadSheet()" title="Aplica a las fichas solo las celdas que editaste (los vacíos no pisan)">💾 Guardar</button>
         <button class="btn btn-success btn-sm" onclick="saveVadSheet(true)" title="Guardar igual que 💾 pero sin cerrar la hoja">🔒 Guardar y seguir</button>
         <button class="btn btn-secondary btn-sm" onclick="vadSheetMerge()" title="Fusionar las celdas seleccionadas: haz clic en una celda y con Shift-clic en la última del rango, después pulsa aquí">＋ Fusionar</button>
         <button class="btn btn-secondary btn-sm" onclick="vadSheetUnmerge()" title="Separar la fusión de la zona seleccionada (o todas si no hay selección)">⧉ Separar</button>
-        <button class="btn btn-secondary btn-sm" id="vads-wrapbtn" onclick="vadSheetToggleWrap()" title="Mostrar el texto completo en varias renglones en las columnas de texto largo">↔ Ajuste texto</button>
+        <button class="btn btn-secondary btn-sm" id="vads-wrapbtn" onclick="vadSheetFitText()" title="Selecciona una celda o una columna y pulsa aquí: el texto se repartirá en varios renglones para que quepa entero dentro del ancho de la columna (mínimo 2 renglones). Vuelve a pulsarlo para quitarlo">↔ Ajuste texto</button>
         <button class="btn btn-secondary btn-sm" onclick="vadSheetColsModal()" title="Cambiar el nombre/tipo de columna (nombres compatibles con la app), moverlas, ocultarlas o añadir sub-sub-subcategorías">✎ Columnas</button>
         <button class="btn btn-secondary btn-sm" onclick="vadSheetListsModal()" title="Agregar o editar las opciones desplegables de las columnas con datos repetitivos">▦ Listas</button>
         <button class="btn btn-secondary btn-sm" onclick="vadSheetPaste()" title="Copia filas de Excel y pégalas aquí para agregarlas a la hoja">📋 Pegar</button>
         <button class="btn btn-secondary btn-sm" onclick="vadSheetAddRow()" title="Añadir una fila en blanco al final de la hoja">➕ Fármaco</button>
-        <button class="btn btn-secondary btn-sm" onclick="vadSheetResetCols()" title="Restaurar el orden original de columnas">↺ Col.</button>
-        <button class="btn btn-secondary btn-sm" id="vads-widthbtn" onclick="vadSheetResetWidths()" title="Devolver a todas las columnas su ancho original (para una sola columna: doble clic en su tirador del borde)">⇹ Anchos</button>
-        <button class="btn btn-secondary btn-sm" onclick="vadSheetResetRows()" title="Ordenar los fármacos alfabéticamente (se pierden filas añadidas, orden manual y fusiones)">↺ Filas</button>
         <button class="btn btn-secondary btn-sm" onclick="exportVadSheetXlsx()" title="Exportar a Excel .xlsx con el orden de filas y columnas que ves">📤 Excel</button>
         <button class="btn btn-secondary btn-sm" onclick="importVadSheetXlsx()" title="Leer un .xlsx y añadir sus fármacos a la hoja">📥 .xlsx</button>
         <button class="btn btn-secondary btn-sm" onclick="vadSheetClose()" title="Cerrar la hoja (guarda el orden y las preferencias)">Cerrar</button>
@@ -11859,14 +12043,38 @@ async function openVadSheet() {
   m.addEventListener('click', _vadSheetOnClick);
   m.addEventListener('mousedown', _vadSheetOnMouseDown);
   m.addEventListener('dblclick', _vadSheetOnDblClick);
+  m.addEventListener('focusin', _vadFocusInUpgrade);
+  // Al desplazar la hoja se ajustan los textareas que van apareciendo y se
+  // convierten en textarea las filas que entran en pantalla.
+  let _vadGrowRaf = 0;
+  m.querySelector('#vad-sheet-scroll').addEventListener('scroll', () => {
+    if (_vadGrowRaf) return;
+    _vadGrowRaf = requestAnimationFrame(() => {
+      _vadGrowRaf = 0;
+      _vadRefreshBandRows(false);
+      _vadGrowVisibleTa();
+    });
+  }, { passive: true });
   vadSheetRender();
   _vadInjectDatalists(m);
   _vadUpdateWrapBtn();
   _vadStartAutoSave();
 }
 
+// v56: filas con cambios pendientes de guardar (información o categorías).
+function _vadUnsavedRows() {
+  return _vadSheetRows.filter(r => r.del || _vsHasDirty(r)).length;
+}
 function vadSheetClose() {
   _vadStopAutoSave();
+  const n = _vadUnsavedRows();
+  if (n) {
+    // v56: antes se cerraba siempre y lo editado se perdía al reabrir, porque
+    // al abrir se reconstruyen las filas desde las fichas.
+    if (!window.confirm('Hay ' + n + ' fila(s) con cambios sin guardar.\n\n¿Guardar ahora antes de cerrar?\n(pulsa Cancelar si quieres seguir en la hoja)') ) { _vadStartAutoSave(); return; }
+    saveVadSheet(true);
+    return;
+  }
   _vadSaveLayout();
   _vadSaveSheetPrefs();
   document.getElementById('modal-vad-sheet')?.remove();
@@ -11880,6 +12088,7 @@ function vadSheetResetCols() {
   toast('↺ Columnas restauradas al orden original');
 }
 function vadSheetResetRows() {
+  if (_vadUnsavedRows() && !window.confirm('Vas a reconstruir las filas desde las fichas: se perderán los cambios sin guardar.\n\n¿Continuar?')) return;
   _vadRowOrderSaved = null;
   _vadSheetBuildRows();
   _vadClearMerges('');
@@ -11970,6 +12179,8 @@ async function _vadSaveSheetPrefs() {
   try { await dbPut('settings', { id: 'vademecum_sheet_colopts', value: _vadColOpts }); } catch(_) {}
   try { await dbPut('settings', { id: 'vademecum_sheet_wrap', value: !!_vadSheetWrap }); } catch(_) {}
   try { await dbPut('settings', { id: 'vademecum_sheet_colw', value: _vadColW || {} }); } catch(_) {}
+  try { await dbPut('settings', { id: 'vademecum_sheet_rowh', value: _vadRowHs || {} }); } catch(_) {}
+  try { await dbPut('settings', { id: 'vademecum_sheet_wrapkeys', value: _vadWrapKeys }); } catch(_) {}
 }
 function _vadInjectDatalists(m) {
   if (!m) return;
@@ -11993,18 +12204,56 @@ function _vadInjectDatalists(m) {
 function _vadUpdateWrapBtn() {
   const b = document.getElementById('vads-wrapbtn');
   if (!b) return;
-  b.textContent = '↔ Ajuste texto: ' + (_vadSheetWrap ? 'SÍ' : 'NO');
-  b.classList.toggle('btn-success', !!_vadSheetWrap);
-  b.classList.toggle('btn-secondary', !_vadSheetWrap);
-  b.setAttribute('aria-pressed', _vadSheetWrap ? 'true' : 'false');
-  b.style.outline = _vadSheetWrap ? '2px solid #2e9e5b' : '';
+  const ks = _vadSelCols();
+  const on = ks.length && ks.every(k => !!_vadWrapKeys[k]);
+  b.textContent = '↔ Ajuste texto' + (ks.length ? (on ? ': SÍ' : ': no') : '');
+  b.classList.toggle('btn-success', !!on);
+  b.classList.toggle('btn-secondary', !on);
+  b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  b.style.outline = on ? '2px solid #2e9e5b' : '';
+  b.title = 'Selecciona una celda o una columna y pulsa aquí: el texto se repartirá en varios renglones para que quepa entero dentro del ancho de la columna (mínimo 2 renglones). Vuelve a pulsarlo para quitarlo.';
+}
+// Columnas a las que se aplica «Ajuste texto»: la selección (o la celda enfocada).
+function _vadSelCols() {
+  const order = _vadOrderNow();
+  if (_vadSel) {
+    const a = Math.min(_vadSel.c0, _vadSel.c1), b = Math.max(_vadSel.c0, _vadSel.c1);
+    const out = [];
+    for (let i = a; i <= b; i++) if (order[i]) out.push(order[i]);
+    return out;
+  }
+  const ae = document.activeElement;
+  const k = ae && ae.dataset ? ae.dataset.f : null;
+  return k ? [k] : [];
+}
+function vadSheetFitText() {
+  const ks = _vadSelCols();
+  if (!ks.length) { toast('⚠ Selecciona primero la celda o la columna a la que quieres ajustar el texto (clic en la celda; Shift+clic para varias).'); return; }
+  const on = ks.every(k => !!_vadWrapKeys[k]);
+  if (on) for (const k of ks) delete _vadWrapKeys[k];
+  else { _vadSheetWrap = true; for (const k of ks) _vadWrapKeys[k] = 1; }
+  _vadSaveSheetPrefs();
+  _vadUpdateWrapBtn();
+  _vadWrapBand = _vadBandEstimate();
+  if (_vadSel) {
+    const a = Math.min(_vadSel.r0, _vadSel.r1), b = Math.max(_vadSel.r0, _vadSel.r1);
+    for (let i = a; i <= b; i++) _vsRefreshRowCells(i);
+  } else {
+    const f = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.f : null;
+    const idx = _vadIdxForEl(document.activeElement);
+    if (f && idx >= 0) _vsRefreshRowCells(idx);
+    else vadSheetRender();
+  }
+  if (_vadSheetWrap) requestAnimationFrame(() => _vadRefreshBandRows(true));
+  const nm = ks.length === 1 ? '«' + _vsPreset(ks[0]).t + '»' : ks.length + ' columnas';
+  toast('↔ Ajuste de texto ' + (on ? 'QUITADO en ' + nm + ': cada celda en un solo renglón' : 'ACTIVADO en ' + nm + ': el texto se parte en los renglones que quepan (mínimo 2)'));
 }
 function vadSheetToggleWrap() {
   _vadSheetWrap = !_vadSheetWrap;
   _vadSaveSheetPrefs();
   _vadUpdateWrapBtn();
   vadSheetRender();
-  toast('↔ Ajuste de texto ' + (_vadSheetWrap ? 'ACTIVADO: las columnas largas se muestran en varias líneas' : 'DESACTIVADO: cada celda en una sola línea'));
+  toast('↔ Ajuste de texto ' + (_vadSheetWrap ? 'ACTIVADO: las columnas marcadas se muestran en varias líneas' : 'DESACTIVADO: cada celda en una sola línea'));
 }
 // ── Autoguardado: aplica los cambios a las fichas cada 30 s ──
 function _vadStartAutoSave() {
@@ -12025,7 +12274,7 @@ function vadSheetColsModal(focusKey) {
     const p = _vsPreset(k);
     const opts = VAD_COL_PRESETS.map(pre => {
       const st = pre.k === k ? ' selected' : (order.includes(pre.k) ? ' disabled' : '');
-      return '<option value="' + pre.k + '"' + st + '>' + pre.t + ' (' + pre.l + ')</option>';
+      return '<option value="' + pre.k + '"' + st + '▶' + pre.t + ' (' + pre.l + ')</option>';
     }).join('');
     return '<div class="vcc-row" style="display:flex;gap:.4rem;align-items:center;padding:.25rem 0">' +
       '<span style="min-width:26px;font-weight:800;color:#1d2b3a;font-size:.75rem">' + p.l + '</span>' +
@@ -12159,24 +12408,42 @@ function vadSheetSaveLists() {
 function vadSheetCatChanged(idx, sel) {
   const r = _vadSheetRows[idx];
   if (!r) return;
+  const old = String(r.m.cat_label || '');
   r.m.cat_label = sel.value;
   if (!r._dirty.m) r._dirty.m = {};
   r._dirty.m.cat_label = 1;
+  // v56: al cambiar de categoría, la subcategoría y la sub-subcategoría que
+  // había quedan sin sentido (pertenecían a la categoría anterior). Antes se
+  // dejaban puestas y la ficha se guardaba con una ruta imposible, por eso se
+  // perdían las categorías. Ahora se limpian y se marcan como editadas.
+  if (sel.value !== old) {
+    r.m.subcat_label = '';
+    r.m.ss_label = '';
+    r._dirty.m.subcat_label = 1;
+    r._dirty.m.ss_label = 1;
+  }
   const tr = sel.closest('tr');
-  const subSel = tr.querySelector('select[data-f="subcat_label"]');
-  const ssSel = tr.querySelector('select[data-f="ss_label"]');
+  const subSel = tr ? tr.querySelector('select[data-f="subcat_label"]') : null;
+  const ssSel = tr ? tr.querySelector('select[data-f="ss_label"]') : null;
   if (subSel) subSel.innerHTML = _preserveOpt(vdExcelSubOptions(r.m.cat_label, r.m.subcat_label), r.m.subcat_label);
   if (ssSel) ssSel.innerHTML = _preserveOpt(vdExcelSsOptions(r.m.cat_label, r.m.subcat_label, r.m.ss_label), r.m.ss_label);
+  vadSheetPersistRow(idx);
 }
 function vadSheetSubChanged(idx, sel) {
   const r = _vadSheetRows[idx];
   if (!r) return;
+  const old = String(r.m.subcat_label || '');
   r.m.subcat_label = sel.value;
   if (!r._dirty.m) r._dirty.m = {};
   r._dirty.m.subcat_label = 1;
+  if (sel.value !== old) {
+    r.m.ss_label = '';
+    r._dirty.m.ss_label = 1;
+  }
   const tr = sel.closest('tr');
-  const ssSel = tr.querySelector('select[data-f="ss_label"]');
+  const ssSel = tr ? tr.querySelector('select[data-f="ss_label"]') : null;
   if (ssSel) ssSel.innerHTML = _preserveOpt(vdExcelSsOptions(r.m.cat_label, r.m.subcat_label, r.m.ss_label), r.m.ss_label);
+  vadSheetPersistRow(idx);
 }
 
 function vadSheetActiveChanged(idx, sel) {
@@ -12383,6 +12650,10 @@ function _vsApplyDirty(d, r) {
       if (!d.cats || !d.cats.length) d.cats = [st.labels[0]]; else d.cats[0] = st.labels[0];
       if (st.labels[1]) d.subcat_vad = st.labels[1];
       if (st.labels[2]) d.subsubcat_vad = st.labels[2];
+      // v56: si el usuario vació a propósito un nivel (por ejemplo al cambiar
+      // de categoría), la ficha no debe conservar el nivel viejo.
+      if (dm['subcat_label'] && !String(m.subcat_label || '').trim()) d.subcat_vad = '';
+      if (dm['ss_label'] && !String(m.ss_label || '').trim()) d.subsubcat_vad = '';
       const wantsDeep = Object.keys(dm).some(k => /^hier_\d+$/.test(k));
       if (!wantsDeep && Array.isArray(d.hier_vad) && d.hier_vad.length > st.labels.length) {
         let keep = st.labels.length <= d.hier_vad.length;
@@ -15305,7 +15576,7 @@ function vdConcOptsStr(which, selected) {
   const all = [...defs, ...extra];
   const ph = which === 'num' ? 'mg/µg/UI...' : 'ml/tab/cap...';
   return '<option value="">' + ph + '</option>' +
-    all.map(u => '<option value="' + u + '"' + (u.toLowerCase() === sel ? ' selected' : '') + '>' + u + '</option>').join('');
+    all.map(u => '<option value="' + u + '"' + (u.toLowerCase() === sel ? ' selected' : '') + '▶' + u + '</option>').join('');
 }
 
 function vdAddConcUnit(btn, which) {
@@ -15325,7 +15596,7 @@ function vdAddConcUnit(btn, which) {
 function vdDoseUnitOpts(selected) {
   const sel = String(selected||'').toLowerCase();
   return '<option value="">mg/kg</option>' +
-    [...VD_DOSE_UNITS, ...VD_DOSE_UNITS_EXTRA].map(u => '<option value="' + u + '"' + (u.toLowerCase() === sel ? ' selected' : '') + '>' + u + '</option>').join('') +
+    [...VD_DOSE_UNITS, ...VD_DOSE_UNITS_EXTRA].map(u => '<option value="' + u + '"' + (u.toLowerCase() === sel ? ' selected' : '') + '▶' + u + '</option>').join('') +
     '<option value="__custom__">+ Otra...</option>';
 }
 
@@ -17500,8 +17771,8 @@ function openRefView(spKey, idx) {
 
         <div style="display:flex;flex-direction:column;gap:.55rem;font-size:.82rem">
           ${spLabel?`<div><span style="color:var(--txt3)">Especie:</span> 🐾 <b>${spLabel}</b></div>`:''}
-          <div><span style="color:var(--txt3)">Categoría:</span> <b>${categoria}</b></div>
-          ${r.url?`<div><span style="color:var(--txt3)">Enlace:</span> <a href="${r.url}" target="_blank" rel="noopener noreferrer" style="color:var(--bl);word-break:break-all">${r.url}</a></div>`:''}
+          <div><span style="color:var(--txt3)">Categoría:</span> ⇅<b>${categoria}</b></div>
+          ${r.url?`<div><span style="color:var(--txt3)">Enlace:</span> ⇅<a href="${r.url}" target="_blank" rel="noopener noreferrer" style="color:var(--bl);word-break:break-all">${r.url}</a></div>`:''}
           ${r.notas?`<div><span style="color:var(--txt3)">Notas:</span><div style="background:var(--sur2);border-radius:var(--rxs);padding:.5rem .6rem;margin-top:.25rem;white-space:pre-wrap;font-size:.8rem">${r.notas}</div></div>`:''}
         </div>
 
@@ -18671,7 +18942,7 @@ function openEditGroup(gi) {
             <label style="display:flex;align-items:center;gap:.4rem;font-size:.8rem;cursor:pointer;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.3rem .45rem;flex-shrink:0">
               <input type="checkbox" class="grp-incluye-chk" value="${oi}" ${(existing?.incluyeGroups||[]).includes(og.nombre)?'checked':''} style="accent-color:var(--g5)">
               ${og.iconImg?`<img src="${og.iconImg}" style="width:16px;height:16px;object-fit:contain;flex-shrink:0">`:`<span style="font-size:.9rem;flex-shrink:0">${og.icon||'🐾'}</span>`}
-              <span style="flex:1;min-width:0"><b>${og.nombre}</b> <span style="color:var(--txt3);font-weight:400">(${(og.especies||[]).length} esp.)</span></span>
+              <span style="flex:1;min-width:0"><b>${og.nombre}</b> ⇅<span style="color:var(--txt3);font-weight:400">(${(og.especies||[]).length} esp.)</span></span>
             </label>`).join('') || '<div style="font-size:.72rem;color:var(--txt3);font-style:italic;padding:.2rem .4rem">Aún no hay otros grupos para incluir.</div>'}
           </div>
         </div>
@@ -18784,7 +19055,7 @@ function _enriqRenderGruposVinc() {
   if (!chipBox) return;
   const v = window._enriqGruposVinc || [];
   chipBox.innerHTML = v.length
-    ? v.map(g => `<span data-grp="${vdEsc(g)}" style="display:inline-flex;align-items:center;gap:.3rem;background:var(--g1);border:1px solid var(--g4);color:var(--g7);border-radius:20px;padding:.15rem .5rem;font-size:.75rem">🧩 <b>${vdEsc(g)}</b> <button onclick="_enriqQuitarGrupoVinc(this)" title="Quitar vínculo" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.9rem;padding:0;line-height:1">✕</button></span>`).join('')
+    ? v.map(g => `<span data-grp="${vdEsc(g)}" style="display:inline-flex;align-items:center;gap:.3rem;background:var(--g1);border:1px solid var(--g4);color:var(--g7);border-radius:20px;padding:.15rem .5rem;font-size:.75rem">🧩 <b>${vdEsc(g)}</b> ⇅<button onclick="_enriqQuitarGrupoVinc(this)" title="Quitar vínculo" style="background:none;border:none;color:var(--r5);cursor:pointer;font-size:.9rem;padding:0;line-height:1">✕</button></span>`).join('')
     : '<span style="font-size:.72rem;color:var(--txt3);font-style:italic">Ninguno. Usa "Agregar grupo" arriba para vincular especies.</span>';
 }
 function _enriqQuitarGrupoVinc(btn) {
@@ -23752,7 +24023,7 @@ function buscarEnfGen(q) {
   if (!resultados.length) { el.innerHTML='<p style="font-size:.78rem;color:var(--txt3);padding:.4rem">Sin resultados.</p>'; return; }
   el.innerHTML = '<div style="background:var(--sur2);border-radius:var(--rsm);padding:.4rem .6rem;margin-bottom:.5rem">'
     + '<div style="font-size:.7rem;font-weight:600;color:var(--g6);margin-bottom:.3rem">Resultados (' + resultados.length + ')</div>'
-    + resultados.map(({sist,enf,ei})=>'<div style="border-bottom:1px solid var(--bor);padding:.3rem 0"><span style="font-size:.75rem;font-weight:600">' + enf.nombre + '</span> <span style="font-size:.68rem;color:var(--txt3)">' + sist.icon + ' ' + sist.label + '</span></div>').join('')
+    + resultados.map(({sist,enf,ei})=>'<div style="border-bottom:1px solid var(--bor);padding:.3rem 0"><span style="font-size:.75rem;font-weight:600">' + enf.nombre + '</span> ⇅<span style="font-size:.68rem;color:var(--txt3)">' + sist.icon + ' ' + sist.label + '</span></div>').join('')
     + '</div>';
 }
 
@@ -24492,4 +24763,5 @@ init();
 </script>
 </body>
 </html>
+
 
