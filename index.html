@@ -974,7 +974,7 @@ textarea.form-control{resize:vertical;min-height:70px}
 // ─────────────────────────────────────
 // VERSIÓN DE LA APP (para detectar si una caché vieja está sirviendo otra build)
 // ─────────────────────────────────────
-const APP_VERSION = '56';
+const APP_VERSION='57';
 
 // ═══════════════════════════════════
 // DEFAULT SPECIES DB
@@ -11562,7 +11562,7 @@ function _vsRowInnerHtml(r, idx) {
   const h = _vadRowHeight(r);
   return `
   <tr class="vads-row" data-idx="${idx}" data-linked="${linked?'1':'0'}" data-rid="${c(_vadRowKey(r))}" style="${r.del?'opacity:.55':''}${h ? ';height:' + h + 'px' : ''}">
-    <td class="rownum" draggable="true" ondragstart="vadRowDragStart(event,this)" ondragover="vadRowDragOver(event)" ondragleave="vadRowDragLeave(event)" ondrop="vadRowDrop(event,this)" ondragend="vadRowDragEnd()" title="Arrastra para reordenar la fila, o usa ＋ para añadir una fila justo debajo"><div class="rnx">${idx+1} ⇅</div><button type="button" class="vads-btn vads-rnplus" draggable="false" data-act="addrow" title="Añadir una fila nueva justo debajo de esta">＋</button><span class="vresizer vresizer-h" data-rh="${c(_vadRowKey(r))}" title="Arrastra el borde inferior para cambiar el alto de esta fila"></span></td>
+    <td class="rownum" draggable="true" ondragstart="vadRowDragStart(event,this)" ondragover="vadRowDragOver(event)" ondragleave="vadRowDragLeave(event)" ondrop="vadRowDrop(event,this)" ondragend="vadRowDragEnd()" title="Arrastra para reordenar la fila. Usa ↑/↓ o arrastra el número."><div class="rnx">${idx+1}</div><div class="rnctrl"><button type="button" class="vads-btn vads-rnbtn" draggable="false" data-act="rnu" data-idx="${idx}" title="Subir fila">↑</button><button type="button" class="vads-btn vads-rnbtn" draggable="false" data-act="rnd" data-idx="${idx}" title="Bajar fila">↓</button></div><button type="button" class="vads-btn vads-rnplus" draggable="false" data-act="addrow" title="Añadir una fila nueva justo debajo de esta">＋</button><span class="vresizer vresizer-h" data-rh="${c(_vadRowKey(r))}" title="Arrastra el borde inferior para cambiar el alto de esta fila"></span></td>
     ${_vsTdsHtml(r, idx)}
     <td style="text-align:center;min-width:40px"><input type="checkbox" data-act="delrow" ${r.del?'checked':''} title="Marcar para eliminar al Guardar"></td>
   </tr>${_vsSpRowHtml(r, idx)}`;
@@ -11632,7 +11632,7 @@ function _vadColgroupHtml() {
 function _vadTheadHtml() {
   const order = _vadOrderNow();
   return '<thead><tr>' +
-    '<th class="rnc" title="Arrastra los números de fila para reordenarlas"># ⇅<span class="vresizer" data-ck="__rn" title="Arrastra para cambiar el ancho de la columna de números"></span></th>' +
+    '<th class="rnc" title="Arrastra los números de fila para reordenarlas">⇅<span class="vresizer" data-ck="__rn" title="Arrastra para cambiar el ancho de la columna de números"></span></th>' +
     order.map((k, i) => _vsThHtml(_vsPreset(k), i, order.length)).join('') +
     '<th style="white-space:nowrap" title="Marcar para eliminar al Guardar">Acciones<span class="vresizer" data-ck="__ac" title="Arrastra para cambiar el ancho de esta columna"></span></th>' +
     '</tr></thead>';
@@ -11917,6 +11917,8 @@ function _vadSheetOnClick(e) {
     if (act === 'delsps') { const idx = _vadIdxForEl(ab); if (idx >= 0 && ab.dataset.sp != null) vadSheetDelSp(idx, parseInt(ab.dataset.sp, 10)); return; }
     if (act === 'delrow') return;
     if (act === 'addrow') { const idx = _vadIdxForEl(ab); if (idx >= 0) vadSheetAddRowAt(idx); return; }
+    if (act === 'rnu') { const idx = (ab.dataset && ab.dataset.idx != null) ? parseInt(ab.dataset.idx,10) : _vadIdxForEl(ab); if (idx >= 1) vadSheetMoveRow(idx, -1); return; }
+    if (act === 'rnd') { const idx = (ab.dataset && ab.dataset.idx != null) ? parseInt(ab.dataset.idx,10) : _vadIdxForEl(ab); if (idx >= 0 && idx < (_vadSheetRows||[]).length-1) vadSheetMoveRow(idx, 1); return; }
   }
   // Selección de celdas para fusionar (solo al pulsar el relleno de la celda)
   const ins = ['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'];
@@ -11972,7 +11974,7 @@ async function openVadSheet() {
     .vads td{ border:1px solid #d5d8dd; padding:2px; background:#fff; vertical-align:top; overflow:hidden; }
     .vads td.rownum{ position:sticky; left:0; background:#f2f3f5; text-align:center; color:#8a8f98; font-size:.66rem; min-width:34px; z-index:4; border-right:2px solid #c9ccd1; cursor:grab; white-space:nowrap; }
     .vads td.rownum.dragover{ background:#e3ecf5; box-shadow:inset 3px 0 0 0 #2e6da4; }
-    .vads td.rownum .rnx{ display:block; }
+    .vads td.rownum .rnctrl{ display:flex; gap:1px; justify-content:center; margin-top:1px; }\n    .vads td.rownum .vads-rnbtn{ line-height:1; padding:0 4px; font-size:.58rem; cursor:pointer; }\n    .vads td.rownum .rnx{ display:block; }
     .vads td.rownum .vads-rnplus{ line-height:1; padding:0 5px; font-size:.72rem; cursor:pointer; border-color:#8fb4d4; background:#f2f8ff; color:#2e6da4; }
     .vads td.rownum .vads-rnplus:hover{ background:#2e6da4; color:#fff; }
     .vads td.rownum .vresizer-h{ position:absolute; left:0; bottom:-4px; width:100%; height:8px; cursor:row-resize; z-index:6; }
@@ -12527,6 +12529,7 @@ function vadSheetAddRow() {
   const c = document.getElementById('vad-sheet-scroll');
   if (c) c.scrollTop = c.scrollHeight;
 }
+function vadSheetMoveRow(idx, dir){ const rows=_vadSheetRows.slice(); if(idx<0||idx>=rows.length) return; const j=idx+dir; if(j<0||j>=rows.length) return; const tmp=rows[idx]; rows[idx]=rows[j]; rows[j]=tmp; _vadSheetRows=rows; _vadClearMerges('fila reordenada'); _vadClearSel(); _vadSaveLayout(); vadSheetRender(); }
 function vadSheetToggleDel(idx, el) {
   const r = _vadSheetRows[idx];
   if (!r) return;
