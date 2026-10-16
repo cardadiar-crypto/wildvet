@@ -974,7 +974,7 @@ textarea.form-control{resize:vertical;min-height:70px}
 // ─────────────────────────────────────
 // VERSIÓN DE LA APP (para detectar si una caché vieja está sirviendo otra build)
 // ─────────────────────────────────────
-const APP_VERSION='58';
+const APP_VERSION='59';
 
 // ═══════════════════════════════════
 // DEFAULT SPECIES DB
@@ -11304,6 +11304,129 @@ function _vadSyncActiveSelections(root) {
   }
 }
 
+// ═══ v59: buscador desplegable de "Principio activo" ═══
+// En cada celda A, al enfocar o escribir se despliega la lista completa de
+// principios activos de la app (orden alfabético, sin acentos para comparar).
+// Al teclear se filtran las coincidencias (primero las que empiezan por lo
+// tecleado y luego las que lo contienen) y al elegir una fila se vincula la
+// celda con la ficha de ese fármaco.
+let _vadAcItems = [];
+let _vadAcSel = -1;
+let _vadAcInput = null;
+function _vadAcNorm(s) {
+  return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+function _vadAcListEl() {
+  const m = document.getElementById('modal-vad-sheet');
+  if (!m) return null;
+  let el = document.getElementById('vad-ac-list');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'vad-ac-list';
+    el.style.cssText = 'position:fixed;display:none;z-index:1250;background:#fff;border:1px solid #b9c0c9;border-radius:8px;box-shadow:0 8px 22px rgba(0,0,0,.28);max-height:250px;overflow:auto;font-size:.72rem;padding:2px 0';
+    el.addEventListener('mousedown', ev => {
+      const it = ev.target && ev.target.closest ? ev.target.closest('.vad-ac-item') : null;
+      if (!it) return;
+      ev.preventDefault();
+      const i = parseInt(it.dataset.i, 10);
+      if (i >= 0) _vadAcPick(i);
+    });
+    m.appendChild(el);
+  }
+  return el;
+}
+function _vadAcFilter(q) {
+  _vadBuildActiveOpts();
+  const all = _vsOptsCache || [];
+  const nq = _vadAcNorm(q);
+  if (!nq) { _vadAcItems = all.slice(); return _vadAcItems; }
+  const starts = [], incl = [];
+  for (const v of all) {
+    const nv = _vadAcNorm(v);
+    if (nv.startsWith(nq)) starts.push(v);
+    else if (nv.indexOf(nq) !== -1) incl.push(v);
+    if (starts.length >= 200 && incl.length > 200) break;
+  }
+  _vadAcItems = starts.concat(incl).slice(0, 250);
+  return _vadAcItems;
+}
+function _vadAcPosition(inp) {
+  const el = document.getElementById('vad-ac-list');
+  if (!el || !inp) return;
+  const r = inp.getBoundingClientRect();
+  const w = Math.max(r.width, 230);
+  let left = r.left;
+  if (left + w > window.innerWidth - 8) left = Math.max(8, window.innerWidth - w - 8);
+  el.style.left = left + 'px';
+  el.style.top = (r.bottom + 2) + 'px';
+  el.style.width = w + 'px';
+}
+function _vadAcRender(q) {
+  const el = _vadAcListEl();
+  if (!el) return;
+  const items = _vadAcItems = _vadAcFilter(q);
+  _vadAcSel = items.length ? 0 : -1;
+  if (!items.length) {
+    el.innerHTML = '<div style="padding:.5rem .6rem;color:#8a929c;font-size:.7rem">Sin coincidencias. Pulsa Intro o sal para crearlo como nuevo principio activo.</div>';
+  } else {
+    el.innerHTML = items.map((v, i) =>
+      '<div class="vad-ac-item" data-i="' + i + '" style="padding:.34rem .6rem;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis' +
+      (i === 0 ? ';background:#e7f0fb' : '') + '">' + vdEsc(v) + '</div>').join('');
+  }
+}
+function _vadAcOpen(inp) {
+  if (!inp || !inp.dataset || inp.dataset.f !== 'active') return;
+  _vadAcInput = inp;
+  _vadAcRender(inp.value || '');
+  const el = _vadAcListEl();
+  if (!el) return;
+  _vadAcPosition(inp);
+  el.style.display = 'block';
+}
+function _vadAcClose() {
+  const el = document.getElementById('vad-ac-list');
+  if (el) el.style.display = 'none';
+  _vadAcSel = -1;
+}
+function _vadAcHighlight() {
+  const el = document.getElementById('vad-ac-list');
+  if (!el) return;
+  const items = el.querySelectorAll('.vad-ac-item');
+  for (let i = 0; i < items.length; i++) items[i].style.background = (i === _vadAcSel) ? '#e7f0fb' : '';
+  const cur = items[_vadAcSel];
+  if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest' });
+}
+function _vadAcPick(i) {
+  const inp = _vadAcInput;
+  const v = _vadAcItems[i];
+  _vadAcClose();
+  if (!inp || v == null) return;
+  const idx = _vadIdxForEl(inp);
+  if (idx < 0) return;
+  const r = _vadSheetRows[idx];
+  if (!r) return;
+  r.m.active = v;
+  r._newActive = false;
+  if (!r._dirty.m) r._dirty.m = {};
+  r._dirty.m.active = 1;
+  const t = _vadMatchDrug(v);
+  r.id = t ? t.id : '';
+  _vsRefreshRowCells(idx);
+  vadSheetPersistRow(idx);
+  toast(t ? ('🔗 Vinculado con la ficha de ' + (t.drug || v)) : '⚡ Nuevo principio activo — se creará su ficha al guardar');
+}
+function _vadAcKey(ev) {
+  const inp = ev.target;
+  if (!inp || !inp.dataset || inp.dataset.f !== 'active') return;
+  const el = document.getElementById('vad-ac-list');
+  const open = el && el.style.display === 'block';
+  if (ev.key === 'ArrowDown') { ev.preventDefault(); if (!open) { _vadAcOpen(inp); return; } if (_vadAcSel < _vadAcItems.length - 1) { _vadAcSel++; _vadAcHighlight(); } }
+  else if (ev.key === 'ArrowUp') { ev.preventDefault(); if (open && _vadAcSel > 0) { _vadAcSel--; _vadAcHighlight(); } }
+  else if (ev.key === 'Enter') { if (open && _vadAcSel >= 0) { ev.preventDefault(); _vadAcPick(_vadAcSel); } }
+  else if (ev.key === 'Escape') { _vadAcClose(); }
+  else if (ev.key === 'Tab') { _vadAcClose(); }
+}
+
 // ── v57 banda de filas con ajuste de texto ──
 // Los textareas solo existen en las filas visibles; el resto se pinta como
 // input normal y se convierte en textarea al entrar en pantalla.
@@ -11424,7 +11547,10 @@ function _vsCell(k, r, idx) {
       : (linked
         ? '<span class="vads-state" id="vad-sheet-st-' + idx + '" style="color:var(--g6)" title="Vinculado a su ficha">●</span>'
         : '<span class="vads-state" id="vad-sheet-st-' + idx + '" style="color:#b9b9b9" title="Sin ficha todavía: se creará al guardar">○</span>');
-    const activeCell = '<input type="text" list="vadl-active" data-f="active" value="' + c(r.m.active) + '" placeholder="Escribe o elige un principio activo… (si no existe, se crea al guardar)" style="min-width:0;flex:1 1 auto">';
+    // v59: buscador desplegable. Al enfocar o escribir se despliega la lista de
+    // todos los principios activos de la app (orden alfabético) filtrada por lo
+    // tecleado; al elegir uno se vincula con su ficha.
+    const activeCell = '<input type="text" data-f="active" autocomplete="off" spellcheck="false" value="' + c(r.m.active) + '" placeholder="Escribe para buscar un principio activo…" title="Escribe para buscar y elige de la lista; se vincula con su ficha" style="min-width:0;flex:1 1 auto">';
     return '<div class="vads-acell">' + est + activeCell + '<button type="button" class="vads-btn vads-link" data-act="ficha" title="' + (linked ? 'Abrir la ficha vinculada' : 'Sin ficha aún (se creará al guardar)') + '" style="' + (linked ? '' : 'opacity:.35') + '">↗</button></div>';
   }
   if (_VAD_HIER_LEVELS.indexOf(k) !== -1) {
@@ -11637,6 +11763,7 @@ function _vsMarkAllDirty(r) {
 function vadSheetRender() {
   const tbody = document.getElementById('vad-sheet-tbody');
   if (!tbody) return;
+  _vadAcClose();
   const s = _vadViewSetScroll();
   _vadWrapBand = _vadBandEstimate();
   _vadSyncColgroup();
@@ -11872,7 +11999,7 @@ function _vadSheetOnInput(e) {
     if (!r) return;
     if (el.tagName === 'SELECT') return; // los selects se tratan en change
     r.m[f] = el.value;
-    if (f === 'active') return;          // el principio activo se confirma al salir de la celda (change)
+    if (f === 'active') { _vadAcOpen(el); return; } // v59: filtra la lista al escribir; se confirma al salir de la celda (change)
     if (!r._dirty.m) r._dirty.m = {};
     r._dirty.m[f] = 1;
     if (el.tagName === 'TEXTAREA') _vadGrowOneTa(el);
@@ -11911,6 +12038,7 @@ function _vadSheetOnChange(e) {
     return;
   }
   if (f === 'active') { // input de "nuevo principio activo"
+    _vadAcClose();
     const idx = _vadIdxForEl(el);
     if (idx >= 0) vadSheetNewActive(idx, el);
     return;
@@ -11924,6 +12052,8 @@ function _vadSheetOnChange(e) {
 function _vadSheetOnClick(e) {
   const t = e.target;
   if (!t || !t.closest) return;
+  // v59: al pulsar la celda del principio activo se reabre su buscador.
+  if (t.tagName === 'INPUT' && t.dataset && t.dataset.f === 'active') { _vadAcOpen(t); return; }
   // Botones de cabecera (✎ / ▦ / < >)
   const btn = t.closest('[data-cbtn]');
   if (btn) {
@@ -12037,7 +12167,7 @@ async function openVadSheet() {
   <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.1rem 1.25rem;width:100%;max-width:1920px;height:96vh;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">
       <div style="min-width:0">
-        <div style="font-weight:700;font-size:.95rem">🧮 Vademécum · Hoja interna (v58)</div>
+        <div style="font-weight:700;font-size:.95rem">🧮 Vademécum · Hoja interna (v59)</div>
         <div style="font-size:.7rem;color:var(--txt3);margin-top:1px">Plantilla en blanco para que tú pongas la información. Las letras <b>A, B, C…</b> son la <b>posición</b> de cada columna (la primera siempre es A) y el nombre va debajo. La columna <b>Principio activo</b> lista todos los fármacos y <b>vincula a su ficha</b>; las columnas de <b>Categoría, Subcategoría, Sub-subcategoría…</b> son <b>desplegables encadenados</b> (al elegir una categoría se cargan sus subcategorías, y así hasta la sub-sub-subcategoría). Cada título tiene <b>&lt; &gt;</b> para <b>mover la columna entera</b> (o <b>arrastra la letra</b>) y un <b>＋</b> para <b>añadir una columna nueva</b>; en su <b>borde derecho</b> aparece la flecha ↔: <b>arrastrándola agrandas o reduces</b> esa columna y el ancho se guarda (doble clic para volver al normal). En la columna de números, el <b>＋</b> añade una fila debajo y <b>arrastrando el borde inferior</b> cambias el alto de esa fila. <b>↔ Ajuste texto</b>: marca una celda o columna, pulsa y el texto se reparte en los renglones que quepan (mínimo 2). <b>💾 Guardar</b> actualiza <b>solo lo editado</b>: las celdas vacías no pisan la ficha.</div>
       </div>
       <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center">
@@ -12076,10 +12206,20 @@ async function openVadSheet() {
   m.addEventListener('mousedown', _vadSheetOnMouseDown);
   m.addEventListener('dblclick', _vadSheetOnDblClick);
   m.addEventListener('focusin', _vadFocusInUpgrade);
+  // v59: el buscador de principio activo se abre al enfocar su celda y se
+  // cierra al salir (con un pequeño retardo para permitir pulsar una opción).
+  m.addEventListener('focusin', e => { if (e.target && e.target.dataset && e.target.dataset.f === 'active') _vadAcOpen(e.target); });
+  m.addEventListener('focusout', e => { if (e.target && e.target.dataset && e.target.dataset.f === 'active') setTimeout(_vadAcClose, 140); });
+  m.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { _vadAcClose(); return; }
+    if (e.target && e.target.dataset && e.target.dataset.f === 'active') _vadAcKey(e);
+  });
   // Al desplazar la hoja se ajustan los textareas que van apareciendo y se
   // convierten en textarea las filas que entran en pantalla.
   let _vadGrowRaf = 0;
   m.querySelector('#vad-sheet-scroll').addEventListener('scroll', () => {
+    const al = document.getElementById('vad-ac-list');
+    if (al && al.style.display === 'block') { if (_vadAcInput && _vadAcInput.isConnected) _vadAcPosition(_vadAcInput); else _vadAcClose(); }
     if (_vadGrowRaf) return;
     _vadGrowRaf = requestAnimationFrame(() => {
       _vadGrowRaf = 0;
@@ -12230,8 +12370,7 @@ function _vadInjectDatalists(m) {
     m.appendChild(dl);
   };
   for (const k of Object.keys(_vadColOpts || {})) mkDl('vadl-' + k, _vadColOpts[k]);
-  _vadBuildActiveOpts();
-  mkDl('vadl-active', _vsOptsCache);
+  _vadBuildActiveOpts(); // v59: el principio activo usa su propio buscador (no datalist)
 }
 function _vadUpdateWrapBtn() {
   const b = document.getElementById('vads-wrapbtn');
