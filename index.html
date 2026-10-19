@@ -582,6 +582,16 @@ textarea.form-control{resize:vertical;min-height:70px}
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"/></svg>
         </div>
       </div>
+      <div class="calc-option" style="text-align:left;padding:.9rem" onclick="showScreen('calc-frecuencias')">
+        <div style="display:flex;align-items:center;gap:.6rem">
+          <span style="font-size:1.6rem">❤️</span>
+          <div style="flex:1">
+            <div style="font-size:.82rem;font-weight:700">Monitor de frecuencias (FC / FR)</div>
+            <div style="font-size:.72rem;color:var(--txt3)">Temporizador + contador de latidos o respiraciones por minuto (15 s ×4, 30 s ×2 o 60 s)</div>
+          </div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"/></svg>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -634,6 +644,15 @@ textarea.form-control{resize:vertical;min-height:70px}
     </div>
     <p style="font-size:.82rem;color:var(--txt3);margin-bottom:1rem">Dilución simple (C₁·V₁ = C₂·V₂) y sólido a suspensión (V = M/C). Completa todas las variables menos una y la app calcula la que falta.</p>
     <div id="calc-diluciones-container"></div>
+  </div>
+
+  <!-- MONITOR DE FRECUENCIAS (FC / FR) -->
+  <div id="screen-calc-frecuencias" class="screen">
+    <div class="flex-between mb-2">
+      <h2 style="font-size:1.1rem;font-weight:700">⏱️ Monitor de Frecuencias (FC / FR)</h2>
+      <button class="btn btn-secondary btn-sm" onclick="showScreen('calculadoras')">← Calculadoras</button>
+    </div>
+    <div id="calc-frecuencias-container"></div>
   </div>
 
   <!-- CALCULADORAS NUTRICIONALES -->
@@ -974,7 +993,7 @@ textarea.form-control{resize:vertical;min-height:70px}
 // ─────────────────────────────────────
 // VERSIÓN DE LA APP (para detectar si una caché vieja está sirviendo otra build)
 // ─────────────────────────────────────
-const APP_VERSION='59';
+const APP_VERSION='61';
 
 // ═══════════════════════════════════
 // DEFAULT SPECIES DB
@@ -3574,6 +3593,7 @@ function showScreen(name, trackNav=true) {
     if (!navHistory.length) navHistory = [{ type: 'screen', name: 'home' }];
     if (name !== 'home') navHistory.push({ type: 'screen', name });
   }
+  if (name!=='calc-frecuencias' && typeof frAbort==='function') frAbort();
   if (name==='home') document.getElementById('bnav-home').classList.add('active');
   if (name==='admin') { renderAdminSpeciesList(); loadAdminEmails().then(renderAdminEmailsList); renderHcOptsAdmin(); renderHcGroupsAdmin(); renderGSheetConfig(); }
   if (name==='biblioteca') { loadBibliotecaGeneral().then(renderBiblioteca); }
@@ -3584,6 +3604,7 @@ function showScreen(name, trackNav=true) {
   if (name==='calc-fluidoterapia') { renderFluidoterapiaCalcScreen(); }
   if (name==='calc-tratamientos') { renderCalcTratamientosScreen(); }
   if (name==='calc-diluciones') { renderCalcDilucionesScreen(); }
+  if (name==='calc-frecuencias') { renderCalcFrecuenciasScreen(); }
   if (name==='historias') renderRecordsList();
   if (name==='vademecum') { syncAndRenderVademecum(); }
 }
@@ -9481,14 +9502,13 @@ function openAddDrug(editId=null, preselectedCat=null) {
         <input id="vd-cat-esp" class="form-control" value="${existing?.cat_esp||''}" placeholder="Ej: AINE, α2-adrenérgico, Aminoglucósido...">
       </div>
 
-      <!-- Vías de administración (múltiple) -->
+      <!-- Vías de administración (múltiple). v60: lista compartida y editable -->
       <div class="form-group">
-        <label>Vías de administración <span style="font-size:.7rem;font-weight:400;color:var(--txt3)">(selecciona todas las que apliquen)</span></label>
-        <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.25rem">
-          ${['IM','IV','SC','VO','IM dardo','IN','Tópico','Inhalatorio'].map(r=>`
-          <label style="display:inline-flex;align-items:center;gap:.2rem;cursor:pointer;font-size:.75rem;padding:.2rem .5rem;border-radius:20px;border:1px solid var(--bor)">
-            <input type="checkbox" class="vd-route-chk" value="${r}" ${(existing?.routes||[existing?.route]||[]).includes(r)?'checked':''} style="accent-color:var(--g5)"> ${r}
-          </label>`).join('')}
+        <label style="display:flex;align-items:center;justify-content:space-between;gap:.4rem;flex-wrap:wrap">Vías de administración <span style="font-size:.7rem;font-weight:400;color:var(--txt3)">(selecciona todas las que apliquen)</span>
+          <button type="button" class="btn btn-secondary btn-sm" style="font-size:.68rem" onclick="vadAddRoute()" title="Añadir una nueva vía de administración (aparecerá también en la Hoja)">＋ Añadir vía</button>
+        </label>
+        <div id="vd-routes-wrap" style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.25rem">
+          ${_vdRoutesChecksHtml((existing?.routes && existing.routes.length) ? existing.routes : (existing?.route ? [existing.route] : []))}
         </div>
       </div>
 
@@ -11086,6 +11106,48 @@ const _vadDefaultColOpts = {
   fuente: ['PLUMB','MSD','Vademécum','BDMV'],
   sp:     []
 };
+// v60: lista COMPARTIDA y editable de vías de administración. La usan tanto el
+// panel de fármacos (Agregar/Editar) como el desplegable de la columna "VÍAS"
+// de la Hoja, para que cualquier vía nueva salga en los dos sitios.
+const VAD_ROUTES_DEFAULT = ['IM','IV','SC','VO','IM dardo','IN','Tópico','Inhalatorio'];
+let VAD_ROUTES = null;
+function _vadRoutesList() { if (!VAD_ROUTES) VAD_ROUTES = VAD_ROUTES_DEFAULT.slice(); return VAD_ROUTES; }
+async function _vadLoadRoutes() {
+  try {
+    const o = await dbGet('settings', 'vad_routes');
+    VAD_ROUTES = (o && Array.isArray(o.value) && o.value.length) ? o.value.slice() : VAD_ROUTES_DEFAULT.slice();
+  } catch (_) { VAD_ROUTES = VAD_ROUTES_DEFAULT.slice(); }
+  return VAD_ROUTES;
+}
+async function _vadSaveRoutes() {
+  try { await dbPut('settings', { id: 'vad_routes', value: _vadRoutesList().slice() }); } catch (_) {}
+}
+// Casillas (checkbox) de vías para el panel de fármacos, según la lista actual.
+function _vdRoutesChecksHtml(selected) {
+  const sel = selected || [];
+  return _vadRoutesList().map(r =>
+    '<label style="display:inline-flex;align-items:center;gap:.2rem;cursor:pointer;font-size:.75rem;padding:.2rem .5rem;border-radius:20px;border:1px solid var(--bor)">' +
+    '<input type="checkbox" class="vd-route-chk" value="' + vdEsc(r) + '"' + (sel.includes(r) ? ' checked' : '') + ' style="accent-color:var(--g5)"> ' + vdEsc(r) +
+    '</label>').join('');
+}
+function _vdCurrentRouteChecks() {
+  return Array.from(document.querySelectorAll('#modal-add-drug .vd-route-chk:checked')).map(el => el.value);
+}
+// Añade una vía nueva desde el panel de fármacos; queda guardada y disponible
+// luego en el mismo panel y en el desplegable de la Hoja.
+function vadAddRoute() {
+  const name = prompt('Nueva vía de administración:');
+  if (!name || !name.trim()) return;
+  const v = name.trim();
+  const list = _vadRoutesList();
+  if (!list.some(x => String(x).toLowerCase() === v.toLowerCase())) { list.push(v); _vadSaveRoutes(); }
+  const sel = _vdCurrentRouteChecks();
+  if (!sel.some(x => String(x).toLowerCase() === v.toLowerCase())) sel.push(v);
+  const wrap = document.getElementById('vd-routes-wrap');
+  if (wrap) wrap.innerHTML = _vdRoutesChecksHtml(sel);
+  if (typeof _vadAcRefreshIfRoutes === 'function') _vadAcRefreshIfRoutes();
+  toast('✓ Vía añadida: ' + v);
+}
 function _vadDefaultColKeys() { return VAD_GRID_COLS.map(c => c.k); }
 // Orden posicional sin encabezados (esqueleto clásico del CSV)
 const VAD_GRID_KEYS = [
@@ -11313,6 +11375,7 @@ function _vadSyncActiveSelections(root) {
 let _vadAcItems = [];
 let _vadAcSel = -1;
 let _vadAcInput = null;
+let _vadAcField = 'active'; // 'active' (principios activos) | 'routes' (vías)
 function _vadAcNorm(s) {
   return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
@@ -11335,9 +11398,14 @@ function _vadAcListEl() {
   }
   return el;
 }
-function _vadAcFilter(q) {
+// Fuente de la lista según el campo: principios activos (active) o vías (routes).
+function _vadAcSource() {
+  if (_vadAcField === 'routes') return _vadRoutesList().map(String);
   _vadBuildActiveOpts();
-  const all = _vsOptsCache || [];
+  return (_vsOptsCache || []).slice();
+}
+function _vadAcTokens(v) { return String(v == null ? '' : v).split(/[,;]/).map(x => x.trim()).filter(Boolean); }
+function _vadAcFilterList(all, q) {
   const nq = _vadAcNorm(q);
   if (!nq) { _vadAcItems = all.slice(); return _vadAcItems; }
   const starts = [], incl = [];
@@ -11345,7 +11413,6 @@ function _vadAcFilter(q) {
     const nv = _vadAcNorm(v);
     if (nv.startsWith(nq)) starts.push(v);
     else if (nv.indexOf(nq) !== -1) incl.push(v);
-    if (starts.length >= 200 && incl.length > 200) break;
   }
   _vadAcItems = starts.concat(incl).slice(0, 250);
   return _vadAcItems;
@@ -11364,19 +11431,27 @@ function _vadAcPosition(inp) {
 function _vadAcRender(q) {
   const el = _vadAcListEl();
   if (!el) return;
-  const items = _vadAcItems = _vadAcFilter(q);
+  const items = _vadAcItems = _vadAcFilterList(_vadAcSource(), q);
   _vadAcSel = items.length ? 0 : -1;
+  const multi = _vadAcField === 'routes';
+  const sel = multi && _vadAcInput ? new Set(_vadAcTokens(_vadAcInput.value).map(_vadAcNorm)) : null;
   if (!items.length) {
-    el.innerHTML = '<div style="padding:.5rem .6rem;color:#8a929c;font-size:.7rem">Sin coincidencias. Pulsa Intro o sal para crearlo como nuevo principio activo.</div>';
+    el.innerHTML = '<div style="padding:.5rem .6rem;color:#8a929c;font-size:.7rem">' +
+      (multi ? 'Sin coincidencias. Puedes escribirla y se guardará como texto.' : 'Sin coincidencias. Pulsa Intro o sal para crearlo como nuevo principio activo.') + '</div>';
   } else {
-    el.innerHTML = items.map((v, i) =>
-      '<div class="vad-ac-item" data-i="' + i + '" style="padding:.34rem .6rem;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis' +
-      (i === 0 ? ';background:#e7f0fb' : '') + '">' + vdEsc(v) + '</div>').join('');
+    el.innerHTML = items.map((v, i) => {
+      const on = multi && sel.has(_vadAcNorm(v));
+      return '<div class="vad-ac-item" data-i="' + i + '" style="padding:.34rem .6rem;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis' +
+        (i === 0 ? ';background:#e7f0fb' : '') + '">' + (multi ? (on ? '☑ ' : '☐ ') : '') + vdEsc(v) + '</div>';
+    }).join('');
   }
 }
 function _vadAcOpen(inp) {
-  if (!inp || !inp.dataset || inp.dataset.f !== 'active') return;
+  if (!inp || !inp.dataset) return;
+  const f = inp.dataset.f;
+  if (f !== 'active' && f !== 'routes') return;
   _vadAcInput = inp;
+  _vadAcField = f;
   _vadAcRender(inp.value || '');
   const el = _vadAcListEl();
   if (!el) return;
@@ -11399,12 +11474,28 @@ function _vadAcHighlight() {
 function _vadAcPick(i) {
   const inp = _vadAcInput;
   const v = _vadAcItems[i];
-  _vadAcClose();
   if (!inp || v == null) return;
   const idx = _vadIdxForEl(inp);
-  if (idx < 0) return;
+  if (idx < 0) { _vadAcClose(); return; }
   const r = _vadSheetRows[idx];
-  if (!r) return;
+  if (!r) { _vadAcClose(); return; }
+  if (_vadAcField === 'routes') {
+    // Multi-selección: pulsar una vía la marca/desmarca en la celda (lista
+    // separada por comas). El desplegable se queda abierto para marcar varias.
+    const toks = _vadAcTokens(inp.value);
+    const pos = toks.findIndex(t => _vadAcNorm(t) === _vadAcNorm(v));
+    if (pos >= 0) toks.splice(pos, 1); else toks.push(v);
+    const nv = toks.join(', ');
+    inp.value = nv;
+    r.m.routes = nv;
+    if (!r._dirty.m) r._dirty.m = {};
+    r._dirty.m.routes = 1;
+    vadSheetPersistRow(idx);
+    _vadAcRender(inp.value);
+    _vadAcPosition(inp);
+    return;
+  }
+  _vadAcClose();
   r.m.active = v;
   r._newActive = false;
   if (!r._dirty.m) r._dirty.m = {};
@@ -11417,7 +11508,9 @@ function _vadAcPick(i) {
 }
 function _vadAcKey(ev) {
   const inp = ev.target;
-  if (!inp || !inp.dataset || inp.dataset.f !== 'active') return;
+  if (!inp || !inp.dataset) return;
+  const f = inp.dataset.f;
+  if (f !== 'active' && f !== 'routes') return;
   const el = document.getElementById('vad-ac-list');
   const open = el && el.style.display === 'block';
   if (ev.key === 'ArrowDown') { ev.preventDefault(); if (!open) { _vadAcOpen(inp); return; } if (_vadAcSel < _vadAcItems.length - 1) { _vadAcSel++; _vadAcHighlight(); } }
@@ -11425,6 +11518,14 @@ function _vadAcKey(ev) {
   else if (ev.key === 'Enter') { if (open && _vadAcSel >= 0) { ev.preventDefault(); _vadAcPick(_vadAcSel); } }
   else if (ev.key === 'Escape') { _vadAcClose(); }
   else if (ev.key === 'Tab') { _vadAcClose(); }
+}
+// v60: si la lista está abierta en la columna VÍAS, la repinta (p. ej. tras
+// añadir una vía nueva desde el panel de fármacos).
+function _vadAcRefreshIfRoutes() {
+  if (_vadAcField === 'routes' && _vadAcInput && _vadAcInput.isConnected) {
+    _vadAcRender(_vadAcInput.value || '');
+    _vadAcPosition(_vadAcInput);
+  }
 }
 
 // ── v57 banda de filas con ajuste de texto ──
@@ -11563,7 +11664,11 @@ function _vsCell(k, r, idx) {
   if (k === 'nombres')  return _vsTextTag('nombres', r.m.nombres, wk);
   if (k === 'conc')     return _vsTextTag('conc', r.m.conc, wk);
   if (k === 'cat_esp')  return _vsTextTag('cat_esp', r.m.cat_esp, wk);
-  if (k === 'routes')   return _vsTextTag('routes', r.m.routes, wk);
+  if (k === 'routes') {
+    // v60: desplegable de vías de administración (lista compartida con el panel
+    // de fármacos). Permite marcar varias; el valor se guarda separado por comas.
+    return '<input type="text" data-f="routes" autocomplete="off" spellcheck="false" value="' + c(r.m.routes) + '" placeholder="Elige o escribe las vías…" title="Despliega la lista de vías de administración" style="min-width:0;width:100%">';
+  }
   if (k === 'indic')    return _vsTextTag('indic', r.m.indic, wk);
   if (k === 'ci')       return _vsTextTag('ci', r.m.ci, wk);
   if (k === 'info')     return _vsTextTag('info', r.m.info, wk);
@@ -12004,6 +12109,7 @@ function _vadSheetOnInput(e) {
     r._dirty.m[f] = 1;
     if (el.tagName === 'TEXTAREA') _vadGrowOneTa(el);
     vadSheetPersistRow(idx);
+    if (f === 'routes') _vadAcOpen(el); // v60: filtra el desplegable de vías mientras escribe
     return;
   }
   if (spf != null && el.dataset.sp != null) {
@@ -12053,7 +12159,7 @@ function _vadSheetOnClick(e) {
   const t = e.target;
   if (!t || !t.closest) return;
   // v59: al pulsar la celda del principio activo se reabre su buscador.
-  if (t.tagName === 'INPUT' && t.dataset && t.dataset.f === 'active') { _vadAcOpen(t); return; }
+  if (t.tagName === 'INPUT' && t.dataset && (t.dataset.f === 'active' || t.dataset.f === 'routes')) { _vadAcOpen(t); return; }
   // Botones de cabecera (✎ / ▦ / < >)
   const btn = t.closest('[data-cbtn]');
   if (btn) {
@@ -12167,8 +12273,8 @@ async function openVadSheet() {
   <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.1rem 1.25rem;width:100%;max-width:1920px;height:96vh;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">
       <div style="min-width:0">
-        <div style="font-weight:700;font-size:.95rem">🧮 Vademécum · Hoja interna (v59)</div>
-        <div style="font-size:.7rem;color:var(--txt3);margin-top:1px">Plantilla en blanco para que tú pongas la información. Las letras <b>A, B, C…</b> son la <b>posición</b> de cada columna (la primera siempre es A) y el nombre va debajo. La columna <b>Principio activo</b> lista todos los fármacos y <b>vincula a su ficha</b>; las columnas de <b>Categoría, Subcategoría, Sub-subcategoría…</b> son <b>desplegables encadenados</b> (al elegir una categoría se cargan sus subcategorías, y así hasta la sub-sub-subcategoría). Cada título tiene <b>&lt; &gt;</b> para <b>mover la columna entera</b> (o <b>arrastra la letra</b>) y un <b>＋</b> para <b>añadir una columna nueva</b>; en su <b>borde derecho</b> aparece la flecha ↔: <b>arrastrándola agrandas o reduces</b> esa columna y el ancho se guarda (doble clic para volver al normal). En la columna de números, el <b>＋</b> añade una fila debajo y <b>arrastrando el borde inferior</b> cambias el alto de esa fila. <b>↔ Ajuste texto</b>: marca una celda o columna, pulsa y el texto se reparte en los renglones que quepan (mínimo 2). <b>💾 Guardar</b> actualiza <b>solo lo editado</b>: las celdas vacías no pisan la ficha.</div>
+        <div style="font-weight:700;font-size:.95rem">🧮 Vademécum · Hoja interna (v61)</div>
+        <div style="font-size:.7rem;color:var(--txt3);margin-top:1px">Plantilla en blanco para que tú pongas la información. Las letras <b>A, B, C…</b> son la <b>posición</b> de cada columna (la primera siempre es A) y el nombre va debajo. La columna <b>Principio activo</b> lista todos los fármacos y <b>vincula a su ficha</b>; las columnas de <b>Categoría, Subcategoría, Sub-subcategoría…</b> son <b>desplegables encadenados</b> (al elegir una categoría se cargan sus subcategorías, y así hasta la sub-sub-subcategoría). La columna <b>VÍAS</b> es un <b>desplegable</b> con las vías del panel de fármacos (marca una o varias; se añaden más desde el botón <b>＋ Añadir vía</b> del panel de fármacos). Cada título tiene <b>&lt; &gt;</b> para <b>mover la columna entera</b> (o <b>arrastra la letra</b>) y un <b>＋</b> para <b>añadir una columna nueva</b>; en su <b>borde derecho</b> aparece la flecha ↔: <b>arrastrándola agrandas o reduces</b> esa columna y el ancho se guarda (doble clic para volver al normal). En la columna de números, el <b>＋</b> añade una fila debajo y <b>arrastrando el borde inferior</b> cambias el alto de esa fila. <b>↔ Ajuste texto</b>: marca una celda o columna, pulsa y el texto se reparte en los renglones que quepan (mínimo 2). <b>💾 Guardar</b> actualiza <b>solo lo editado</b>: las celdas vacías no pisan la ficha.</div>
       </div>
       <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center">
         <button class="btn btn-primary btn-sm" onclick="saveVadSheet()" title="Aplica a las fichas solo las celdas que editaste (los vacíos no pisan)">💾 Guardar</button>
@@ -12208,11 +12314,11 @@ async function openVadSheet() {
   m.addEventListener('focusin', _vadFocusInUpgrade);
   // v59: el buscador de principio activo se abre al enfocar su celda y se
   // cierra al salir (con un pequeño retardo para permitir pulsar una opción).
-  m.addEventListener('focusin', e => { if (e.target && e.target.dataset && e.target.dataset.f === 'active') _vadAcOpen(e.target); });
-  m.addEventListener('focusout', e => { if (e.target && e.target.dataset && e.target.dataset.f === 'active') setTimeout(_vadAcClose, 140); });
+  m.addEventListener('focusin', e => { if (e.target && e.target.dataset && (e.target.dataset.f === 'active' || e.target.dataset.f === 'routes')) _vadAcOpen(e.target); });
+  m.addEventListener('focusout', e => { if (e.target && e.target.dataset && (e.target.dataset.f === 'active' || e.target.dataset.f === 'routes')) setTimeout(_vadAcClose, 140); });
   m.addEventListener('keydown', e => {
     if (e.key === 'Escape') { _vadAcClose(); return; }
-    if (e.target && e.target.dataset && e.target.dataset.f === 'active') _vadAcKey(e);
+    if (e.target && e.target.dataset && (e.target.dataset.f === 'active' || e.target.dataset.f === 'routes')) _vadAcKey(e);
   });
   // Al desplazar la hoja se ajustan los textareas que van apareciendo y se
   // convierten en textarea las filas que entran en pantalla.
@@ -16121,6 +16227,148 @@ function calcTreatDose(input) {
 // ═══════════════════════════════════
 // CAMBIO v49: calculadora de diluciones (simple y sólido a suspensión)
 // ═══════════════════════════════════
+// ===== v61 · MONITOR DE FRECUENCIAS (FC / FR) =====
+// Temporizador + contador para medir latidos o respiraciones por minuto.
+// El botón principal es MUY sensible: registra cada pulsación al instante
+// (evento pointerdown) para no perder cuentas con frecuencias altas (aves).
+// Se puede medir 15 s (×4), 30 s (×2) o el minuto completo (×1).
+let _fr = { running: false, count: 0, start: 0, timer: null, elapsed: 0 };
+function _frEls() {
+  return {
+    btn:    document.getElementById('fr-btn'),
+    count:  document.getElementById('fr-count'),
+    time:   document.getElementById('fr-time'),
+    result: document.getElementById('fr-result'),
+    detail: document.getElementById('fr-detail'),
+    hint:   document.getElementById('fr-hint')
+  };
+}
+function frPaint() {
+  const e = _frEls();
+  if (e.count) e.count.value = String(_fr.count);
+  if (e.time) e.time.value = (_fr.elapsed || 0).toFixed(1);
+  if (e.btn) {
+    if (_fr.running) {
+      e.btn.innerHTML = '<span style="font-size:3rem;font-weight:900;line-height:1">' + _fr.count +
+        '</span><span style="font-size:.6rem;font-weight:600;opacity:.85;margin-top:.2rem">pulsa en cada latido / respiración</span>';
+    } else if ((_fr.elapsed || 0) > 0) {
+      e.btn.innerHTML = '▶ Iniciar de nuevo';
+    } else {
+      e.btn.innerHTML = '▶ Iniciar';
+    }
+  }
+  if (e.hint) {
+    e.hint.textContent = _fr.running
+      ? 'Contando… pulsa el botón en cada latido o respiración.'
+      : ((_fr.elapsed || 0) > 0
+        ? 'Pulsa «Parar» para calcular, o «Iniciar de nuevo» para otra medición.'
+        : 'Pulsa para iniciar el temporizador; luego pulsa en cada latido o respiración.');
+  }
+}
+// Pulsación del botón principal: la 1.ª inicia el temporizador; las siguientes cuentan.
+function frTap(ev) {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  if (!_fr.running) { frStart(); return; }
+  _fr.count++;
+  frPaint();
+  if (navigator.vibrate) { try { navigator.vibrate(6); } catch (_) {} }
+}
+function frStart() {
+  if (_fr.timer) { clearInterval(_fr.timer); _fr.timer = null; }
+  _fr.running = true;
+  _fr.count = 0;
+  _fr.elapsed = 0;
+  _fr.start = (window.performance && performance.now) ? performance.now() : Date.now();
+  const e = _frEls();
+  if (e.result) { e.result.textContent = '—'; e.result.style.color = 'var(--txt)'; }
+  if (e.detail) e.detail.textContent = '';
+  frPaint();
+  _fr.timer = setInterval(frTick, 100);
+}
+function _frNow() { return (window.performance && performance.now) ? performance.now() : Date.now(); }
+function frTick() {
+  _fr.elapsed = (_frNow() - _fr.start) / 1000;
+  const e = _frEls();
+  if (e.time) e.time.value = _fr.elapsed.toFixed(1);
+  if (_fr.elapsed >= 60) frStop(); // minuto completo: se detiene solo (×1)
+}
+function frStop() {
+  if (!_fr.running) return;
+  _fr.running = false;
+  if (_fr.timer) { clearInterval(_fr.timer); _fr.timer = null; }
+  _fr.elapsed = (_frNow() - _fr.start) / 1000;
+  if (_fr.elapsed > 60) _fr.elapsed = 60;
+  const t = _fr.elapsed;
+  // Base más cercana: 15 s (×4), 30 s (×2) o 60 s (×1).
+  let base, mult;
+  if (t < 22.5) { base = 15; mult = 4; }
+  else if (t < 45) { base = 30; mult = 2; }
+  else { base = 60; mult = 1; }
+  const result = _fr.count * mult;
+  frPaint();
+  const e = _frEls();
+  if (e.result) { e.result.textContent = result + ' /min'; e.result.style.color = 'var(--g7)'; }
+  if (e.detail) {
+    e.detail.textContent = t.toFixed(1) + ' s medidos → ' + _fr.count + ' pulsaciones × ' + mult +
+      ' = ' + result + ' /min (base ' + base + ' s)' + (t < 10 ? ' — ⚠️ conteo muy corto' : '');
+  }
+  if (navigator.vibrate) { try { navigator.vibrate([10, 40, 10]); } catch (_) {} }
+}
+function frReset() {
+  if (_fr.timer) { clearInterval(_fr.timer); _fr.timer = null; }
+  _fr = { running: false, count: 0, start: 0, timer: null, elapsed: 0 };
+  const e = _frEls();
+  if (e.result) { e.result.textContent = '—'; e.result.style.color = 'var(--txt)'; }
+  if (e.detail) e.detail.textContent = '';
+  frPaint();
+}
+// Limpieza al salir de la pantalla (evita que el temporizador siga corriendo).
+function frAbort() {
+  if (_fr.timer) { clearInterval(_fr.timer); _fr.timer = null; }
+  if (_fr.running || _fr.count || _fr.elapsed) {
+    _fr = { running: false, count: 0, start: 0, timer: null, elapsed: 0 };
+    frPaint();
+  }
+}
+function renderCalcFrecuenciasScreen() {
+  const c = document.getElementById('calc-frecuencias-container');
+  if (!c) return;
+  c.innerHTML = `
+    <div style="background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rsm);padding:.9rem">
+      <div style="font-size:.82rem;font-weight:700;margin-bottom:.1rem">⏱️ Medir frecuencia cardiaca o respiratoria</div>
+      <div style="font-size:.7rem;color:var(--txt3);margin-bottom:.6rem">Pulsa <b>Iniciar</b> y luego el mismo botón en <b>cada latido o respiración</b>. Al pulsar <b>Parar</b>: si mediste ~15 s se multiplica ×4, si ~30 s ×2, y en el minuto completo (se detiene solo a los 60 s) no se multiplica.</div>
+      <button id="fr-btn" type="button" class="btn btn-primary"
+        style="width:100%;height:140px;font-size:1.6rem;font-weight:800;border-radius:var(--rsm);touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center"
+        onpointerdown="frTap(event)" oncontextmenu="return false">▶ Iniciar</button>
+      <div id="fr-hint" style="font-size:.68rem;color:var(--txt3);text-align:center;margin-top:.3rem">Pulsa para iniciar el temporizador; luego pulsa en cada latido o respiración.</div>
+      <div style="display:flex;gap:.4rem;margin-top:.5rem">
+        <button id="fr-stop" type="button" class="btn btn-secondary" style="flex:1;font-weight:700" onclick="frStop()">■ Parar</button>
+      </div>
+      <div style="display:flex;gap:.4rem;margin-top:.4rem">
+        <button type="button" class="btn btn-secondary" style="flex:1;font-weight:700" onclick="frReset()">↺ Reset</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-top:.7rem">
+        <div>
+          <label style="font-size:.72rem;color:var(--txt3)">Pulsaciones (conteo)</label>
+          <input id="fr-count" class="form-control" readonly value="0" style="text-align:center;font-size:1.3rem;font-weight:800">
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:var(--txt3)">Tiempo (segundos)</label>
+          <input id="fr-time" class="form-control" readonly value="0.0" style="text-align:center;font-size:1.3rem;font-weight:800">
+        </div>
+      </div>
+      <div style="margin-top:.6rem">
+        <label style="font-size:.72rem;color:var(--txt3)">Resultado — frecuencia por minuto</label>
+        <div id="fr-result" style="margin-top:.2rem;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rxs);padding:.7rem;text-align:center;font-size:1.6rem;font-weight:900;color:var(--txt)">—</div>
+        <div id="fr-detail" style="font-size:.7rem;color:var(--txt3);text-align:center;margin-top:.25rem"></div>
+      </div>
+    </div>
+    <div style="background:var(--g1);border:1px solid var(--g4);border-radius:var(--rxs);padding:.5rem .6rem;font-size:.7rem;color:var(--g7);margin-top:.75rem">
+      💡 Consejos: sostén la auscultación durante todo el conteo. En aves y animales pequeños conviene 15 s (×4). Si el animal se mueve o el conteo queda incompleto, pulsa <b>Reset</b> y repite.
+    </div>`;
+  frPaint();
+}
+// ===== fin MONITOR DE FRECUENCIAS =====
 function renderCalcDilucionesScreen() {
   const c = document.getElementById('calc-diluciones-container');
   if (!c) return;
@@ -24822,6 +25070,8 @@ async function init() {
   pushNav({ type: 'screen', name: 'home' });
   // Precargar el historial de cálculos de tratamientos para el buscador principal
   loadCalcTratHist();
+  // v60: precargar la lista compartida de vías de administración
+  try { await _vadLoadRoutes(); } catch (_) {}
 }
 function renderDietasEnEspecie(sp, isAdmin) {
   const dietasEsp = (DIETAS_GUARDADAS || []).filter(d =>
