@@ -11714,7 +11714,7 @@ function _vsSpRowHtml(r, idx) {
   const c = (v) => vdEsc(v ?? '');
   if (!r.open) return '';
   return `
-    <tr class="vads-sps" id="vad-sheet-sps-${idx}">
+    <tr class="vads-sps" id="vad-sheet-sps-${idx}" data-idx="${idx}">
       <td colspan="${_vadOrderNow().length + 2}" style="padding:6px 8px;background:#fafafa">
         <div style="font-weight:700;font-size:.68rem;color:#445;margin-bottom:4px">🩺 Especies y dosis — ${c(r.m.drug || r.m.active || 'nuevo fármaco')}</div>
         <div style="overflow:auto;border:1px solid #dfe6ee;border-radius:6px;margin-bottom:4px">
@@ -11849,7 +11849,7 @@ function _vsRowInnerHtml(r, idx) {
   <tr class="vads-row" data-idx="${idx}" data-linked="${linked?'1':'0'}" data-rid="${c(_vadRowKey(r))}" style="${r.del?'opacity:.55':''}${h ? ';height:' + h + 'px' : ''}">
     <td class="rownum" draggable="true" ondragstart="vadRowDragStart(event,this)" ondragover="vadRowDragOver(event)" ondragleave="vadRowDragLeave(event)" ondrop="vadRowDrop(event,this)" ondragend="vadRowDragEnd()" title="Arrastra para reordenar la fila. Usa ↑/↓ o arrastra el número."><div class="rnx">${idx+1}</div><div class="rnctrl"><button type="button" class="vads-btn vads-rnbtn" draggable="false" data-act="rnu" data-idx="${idx}" title="Subir fila">↑</button><button type="button" class="vads-btn vads-rnbtn" draggable="false" data-act="rnd" data-idx="${idx}" title="Bajar fila">↓</button></div><button type="button" class="vads-btn vads-rnplus" draggable="false" data-act="addrow" title="Añadir una fila nueva justo debajo de esta">＋</button><span class="vresizer vresizer-h" data-rh="${c(_vadRowKey(r))}" title="Arrastra el borde inferior para cambiar el alto de esta fila"></span></td>
     ${_vsTdsHtml(r, idx)}
-    <td style="text-align:center;min-width:40px"><input type="checkbox" data-act="delrow" title="Marcar esta fila como revisada y guardar sus datos tal como están"></td>
+    <td style="text-align:center;min-width:40px"${r._verify ? ' title="Fila verificada: sus datos se guardaron tal como están. Vuelve a pulsar para quitar la marca (no se borra nada)."' : ''}><input type="checkbox" data-act="delrow" ${r._verify ? 'checked' : ''} style="cursor:pointer;width:16px;height:16px;accent-color:#2e7d32" title="Marca esta fila cuando ya hayas comprobado todos sus datos: se guarda tal como está. Esta casilla NO borra la fila."></td>
   </tr>${_vsSpRowHtml(r, idx)}`;
 }
 function vadSheetRowHtml(r, idx) {
@@ -11920,7 +11920,7 @@ function _vadTheadHtml() {
   return '<thead><tr>' +
     '<th class="rnc" title="Arrastra los números de fila para reordenarlas">⇅<span class="vresizer" data-ck="__rn" title="Arrastra para cambiar el ancho de la columna de números"></span></th>' +
     order.map((k, i) => _vsThHtml(_vsPreset(k), i, order.length)).join('') +
-    '<th style="white-space:nowrap" title="Marcar para eliminar al Guardar">Acciones<span class="vresizer" data-ck="__ac" title="Arrastra para cambiar el ancho de esta columna"></span></th>' +
+    '<th style="white-space:nowrap" title="Marca la casilla de una fila cuando ya hayas comprobado todos sus datos: la fila se guarda tal como está (esta columna ya NO borra filas)"><span class="ltr">✓</span><span class="sub">VERIFICAR</span><span class="vresizer" data-ck="__ac" title="Arrastra para cambiar el ancho de esta columna"></span></th>' +
     '</tr></thead>';
 }
 function _vadSyncColgroup() {
@@ -12127,11 +12127,31 @@ function _vadGrowOneTa(t) {
   t._vadGrown = true;
 }
 // Indice de fila a partir de cualquier elemento dentro de su fila.
+// v65: también resuelve elementos dentro del panel de especies (`tr.vads-sps`),
+// que es una fila HERMANA de `tr.vads-row` (no está anidada), y que antes
+// devolvía -1 y hacía que «➕ Añadir especie» y las celdas de dosis no hicieran nada.
 function _vadIdxForEl(el) {
-  const tr = el && el.closest ? el.closest('tr.vads-row') : null;
-  if (!tr || !tr.dataset.rid) return -1;
-  const rid = tr.dataset.rid;
-  for (let i = 0; i < _vadSheetRows.length; i++) if (_vadRowKey(_vadSheetRows[i]) === rid) return i;
+  if (!el || !el.closest) return -1;
+  const tr = el.closest('tr.vads-row');
+  if (tr) {
+    if (tr.dataset.idx != null && tr.dataset.idx !== '') {
+      const d = parseInt(tr.dataset.idx, 10);
+      if (!isNaN(d) && _vadSheetRows[d]) return d;
+    }
+    if (tr.dataset.rid) {
+      const rid = tr.dataset.rid;
+      for (let i = 0; i < _vadSheetRows.length; i++) if (_vadRowKey(_vadSheetRows[i]) === rid) return i;
+    }
+  }
+  const spr = el.closest('tr.vads-sps');
+  if (spr) {
+    if (spr.dataset.idx != null && spr.dataset.idx !== '') {
+      const d = parseInt(spr.dataset.idx, 10);
+      if (!isNaN(d)) return d;
+    }
+    const mm = String(spr.id || '').match(/^vad-sheet-sps-(\d+)$/);
+    if (mm) return parseInt(mm[1], 10);
+  }
   return -1;
 }
 // ── Delegación de eventos (una sola escucha por modal, sin on* por celda) ──
@@ -12222,7 +12242,11 @@ function _vadSheetOnClick(e) {
   if (act) {
     if (act === 'ficha') { const idx = _vadIdxForEl(ab); if (idx >= 0) vadSheetFichaOn(idx); return; }
     if (act === 'sps') { const idx = _vadIdxForEl(ab); if (idx >= 0) vadSheetToggleSps(idx); return; }
-    if (act === 'addsp') { const idx = _vadIdxForEl(ab); if (idx >= 0) { try { vadSheetAddSp(idx); } catch(e) {} return; }
+    if (act === 'addsp') {
+      const idx = _vadIdxForEl(ab);
+      if (idx >= 0) { try { vadSheetAddSp(idx); } catch(e) {} }
+      return;
+    }
     if (act === 'delsps') { const idx = _vadIdxForEl(ab); if (idx >= 0 && ab.dataset.sp != null) vadSheetDelSp(idx, parseInt(ab.dataset.sp, 10)); return; }
     if (act === 'delrow') return;
     if (act === 'addrow') { const idx = _vadIdxForEl(ab); if (idx >= 0) vadSheetAddRowAt(idx); return; }
@@ -12851,22 +12875,50 @@ function vadSheetAddRow() {
   if (c) c.scrollTop = c.scrollHeight;
 }
 function vadSheetMoveRow(idx, dir){ const rows=_vadSheetRows.slice(); if(idx<0||idx>=rows.length) return; const j=idx+dir; if(j<0||j>=rows.length) return; const tmp=rows[idx]; rows[idx]=rows[j]; rows[j]=tmp; _vadSheetRows=rows; _vadClearMerges('fila reordenada'); _vadClearSel(); _vadSaveLayout(); vadSheetRender(); }
+// ── Columna ACCIONES (v65): VERIFICAR ────────────────────────────────────
+// Antes esta casilla marcaba la fila para ELIMINARLA al guardar, y por eso al
+// pulsarla «desaparecía» todo lo subido. Ahora significa lo contrario:
+//   · casilla vacía → se marca la fila como verificada y se guarda EXACTAMENTE
+//     como está (todos sus campos, incluidas las especies/dosis).
+//   · casilla marcada → al pulsarla otra vez sólo se quita la marca; NUNCA
+//     borra datos ni la fila.
 function vadSheetToggleDel(idx, el) {
   const r = _vadSheetRows[idx];
   if (!r) return;
-  // Columna Acciones: ahora sirve para "verificar y guardar" esta fila
-  // al pulsar, la marcamos como lista para guardar (se fuerza persistencia)
-  if (el && el.checked) {
-    r._verify = true;
-    if (!r._dirty.m) r._dirty.m = {};
-    if (!r._dirty.s) r._dirty.s = {};
-    r._spsDirty = true;
-    vadSheetPersistRow(idx);
-    toast('✓ Fila marcada como revisada — se guardará al pulsar Guardar');
-    if (el) el.checked = false;
+  if (el && !el.checked) {
+    // Solo quitar la marca de verificación. No se toca ningún dato.
+    r._verify = false;
+    toast('Fila ' + (idx + 1) + ': marca de verificación quitada (no se ha borrado nada)');
     return;
   }
-  r.del = !!(el && el.checked);
+  r.del = false; // por seguridad: esta casilla nunca elimina
+  r._verify = true;
+  // Marcar como "pendiente de guardar" todos los campos que tengan contenido,
+  // para que al guardar se escriba la fila completa tal como se ve.
+  r._dirty = r._dirty || { m: {}, s: {} };
+  if (!r._dirty.m) r._dirty.m = {};
+  if (!r._dirty.s) r._dirty.s = {};
+  try { if (typeof _vsMarkAllDirty === 'function') _vsMarkAllDirty(r); } catch (e) {}
+  if (!r.sps || !r.sps.length) r._spsDirty = true;
+  const finish = (saved) => {
+    const cb = document.querySelector('#vad-sheet-tbody tr[data-idx="' + idx + '"] input[data-act="delrow"]');
+    if (cb) cb.checked = true;
+    if (saved && r.id) {
+      const tr = document.querySelector('#vad-sheet-tbody tr[data-idx="' + idx + '"]');
+      if (tr) tr.dataset.linked = '1';
+      const st = document.getElementById('vad-sheet-st-' + idx);
+      if (st) { st.textContent = '●'; st.style.color = 'var(--g6)'; }
+      r._dirty = { m: {}, s: {} };
+      r._spsDirty = false;
+      toast('✓ Fila ' + (idx + 1) + ' verificada y guardada tal como está');
+    } else {
+      toast('✓ Fila ' + (idx + 1) + ' marcada como verificada. Añade el principio activo o el nombre y pulsa Guardar para crear su ficha.');
+    }
+  };
+  try { clearTimeout(_vadPersistTimers[idx]); delete _vadPersistTimers[idx]; } catch (e) {}
+  try {
+    Promise.resolve(_vadSheetPutRow(r)).then(res => finish(!!(res && res.id))).catch(() => finish(false));
+  } catch (e) { finish(false); }
 }
 
 // Conviene una fila a un objeto fármaco (igual esquema que _drugFromGroup).
