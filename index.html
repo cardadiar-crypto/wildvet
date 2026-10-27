@@ -993,7 +993,7 @@ textarea.form-control{resize:vertical;min-height:70px}
 // ─────────────────────────────────────
 // VERSIÓN DE LA APP (para detectar si una caché vieja está sirviendo otra build)
 // ─────────────────────────────────────
-const APP_VERSION='65';
+const APP_VERSION='66';
 
 // ═══════════════════════════════════
 // DEFAULT SPECIES DB
@@ -8895,6 +8895,16 @@ function importVadDrug(vadId) {
   // Vía de administración
   const routeEl = document.getElementById('sdrug-route');
   if (routeEl && d.route) routeEl.value = d.route;
+  // v66: unidades de dosis/concentración, duración, espectro y farmacocinética
+  const _u = vdSplitUnit(d.dose_unit || 'mg/kg');
+  setVal('sdrug-dnum', d.dose_unit_num || _u.num || 'mg');
+  setVal('sdrug-dden', d.dose_unit_den || _u.den || 'kg');
+  const _c0 = (Array.isArray(d.concs) && d.concs[0]) ? d.concs[0] : (vdParseConc(d.conc) || null);
+  setVal('sdrug-conc-num', d.conc_num || (_c0 && _c0.num) || 'mg');
+  setVal('sdrug-conc-den', d.conc_den || (_c0 && _c0.den) || 'ml');
+  setVal('sdrug-dur', d.duration || '');
+  setVal('sdrug-spectrum', d.spectrum || '');
+  setVal('sdrug-pk', d.pk || '');
   // Categorías — checkboxes múltiples
   const cats = d.cats?.length ? d.cats : (d.category ? [d.category] : []);
   document.querySelectorAll('.sdrug-cat-chk').forEach(chk => {
@@ -8938,20 +8948,55 @@ function openAddSpeciesDrug() {
           <input id="sdrug-cat-esp" class="form-control" placeholder="Ej: AINE, Aminoglucósido, α2-adrenérgico..." style="font-size:.82rem">
         </div>
       </div>
-      <div class="form-group"><label>Concentración (mg/ml)</label><input id="sdrug-conc" class="form-control" type="number" step="0.01" value="100" placeholder="100"></div>
+      <div class="form-group"><label>Concentración</label>
+        <div style="display:flex;gap:.2rem;align-items:center">
+          <input id="sdrug-conc" class="form-control" type="number" step="0.01" value="100" placeholder="100" style="flex:1;min-width:0">
+          <div data-ugroup="num" style="display:flex;gap:.15rem;align-items:center">
+            <select id="sdrug-conc-num" class="form-control" data-uk="num" style="width:74px;font-size:.74rem">${vdUnitOpts('num','mg')}</select>
+            <button type="button" class="icon-btn" style="width:26px;height:28px;flex-shrink:0" onclick="event.stopPropagation();vdUnitAdd(this,'num')" title="Agregar unidad al numerador">＋</button>
+          </div>
+          <span style="color:var(--txt3)">/</span>
+          <div data-ugroup="den" style="display:flex;gap:.15rem;align-items:center">
+            <select id="sdrug-conc-den" class="form-control" data-uk="den" style="width:74px;font-size:.74rem">${vdUnitOpts('den','ml')}</select>
+            <button type="button" class="icon-btn" style="width:26px;height:28px;flex-shrink:0" onclick="event.stopPropagation();vdUnitAdd(this,'den')" title="Agregar unidad al denominador">＋</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div style="background:var(--g0);border-radius:var(--rsm);padding:.5rem;margin-bottom:.5rem">
-      <label style="font-size:.72rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.35rem">Dosis (mg/kg) — Rango</label>
+      <label style="font-size:.72rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.35rem">Dosis — Rango</label>
       <div class="form-row" style="margin-bottom:0">
         <div class="form-group"><label>Mínima</label><input id="sdrug-dmin" class="form-control" type="number" step="0.001" placeholder="1.0"></div>
-        <div class="form-group"><label>Recomendada</label><input id="sdrug-dose" class="form-control" type="number" step="0.001" value="2" placeholder="2.0"></div>
+        <div class="form-group"><label>Dosis básica</label><input id="sdrug-dose" class="form-control" type="number" step="0.001" value="2" placeholder="2.0"></div>
         <div class="form-group"><label>Máxima</label><input id="sdrug-dmax" class="form-control" type="number" step="0.001" placeholder="4.0"></div>
+      </div>
+      <div class="form-row" style="margin-top:.35rem;margin-bottom:0">
+        <div class="form-group"><label>Unidad numerador</label>
+          <div data-ugroup="dosenum" style="display:flex;gap:.15rem;align-items:center">
+            <select id="sdrug-dnum" class="form-control" data-uk="dosenum" style="flex:1;font-size:.74rem">${vdUnitOpts('dosenum','mg')}</select>
+            <button type="button" class="icon-btn" style="width:26px;height:28px;flex-shrink:0" onclick="event.stopPropagation();vdUnitAdd(this,'dosenum')" title="Agregar unidad al numerador">＋</button>
+          </div>
+        </div>
+        <div class="form-group"><label>Unidad denominador</label>
+          <div data-ugroup="doseden" style="display:flex;gap:.15rem;align-items:center">
+            <select id="sdrug-dden" class="form-control" data-uk="doseden" style="flex:1;font-size:.74rem">${vdUnitOpts('doseden','kg')}</select>
+            <button type="button" class="icon-btn" style="width:26px;height:28px;flex-shrink:0" onclick="event.stopPropagation();vdUnitAdd(this,'doseden')" title="Agregar unidad al denominador">＋</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Vía de administración</label><input id="sdrug-route" class="form-control" placeholder="IM, IV, VO..."></div>
+      <div class="form-group"><label>Vía de administración</label>
+        <div style="display:flex;gap:.2rem">
+          <input id="sdrug-route" class="form-control" list="vd-routes-dl" placeholder="IM, IV, VO..." style="flex:1;min-width:0">
+          <button type="button" class="icon-btn" style="width:28px;height:30px;flex-shrink:0" onclick="event.stopPropagation();vdAddRouteToInput(document.getElementById('sdrug-route'))" title="Agregar una vía nueva">＋</button>
+        </div>
+      </div>
       <div class="form-group"><label>Frecuencia</label><input id="sdrug-freq" class="form-control" placeholder="SID x 7 días..."></div>
+      <div class="form-group"><label>Duración</label><input id="sdrug-dur" class="form-control" placeholder="Ej: 7 días, dosis única..."></div>
     </div>
+    <div class="form-group"><label>Espectro de acción <span style="font-size:.7rem;color:var(--txt3)">(antiinfecciosos / antiparasitarios)</span></label><input id="sdrug-spectrum" class="form-control" list="vd-spectrum-dl" placeholder="Gram +, Gram −, aerobios, anaerobios, hongos…"></div>
+    <div class="form-group"><label>Farmacocinética</label><textarea id="sdrug-pk" class="form-control" style="min-height:45px" placeholder="Absorción, distribución, metabolismo, excreción, vida media…"></textarea></div>
     <div class="form-group"><label>Indicaciones</label><textarea id="sdrug-indic" class="form-control" style="min-height:50px" placeholder="Para qué se usa, cuándo indicar..."></textarea></div>
     <div class="form-group"><label>Contraindicaciones</label><textarea id="sdrug-contra" class="form-control" style="min-height:50px" placeholder="Cuándo NO usar, precauciones..."></textarea></div>
     <div class="form-group"><label>Efectos adversos</label><input id="sdrug-effects" class="form-control" placeholder="Bradicardia, hipotensión..."></div>
@@ -8960,6 +9005,7 @@ function openAddSpeciesDrug() {
       <button class="btn btn-secondary" onclick="closeModal('modal-species-drug')">Cancelar</button>
       <button class="btn btn-primary" style="flex:1" onclick="saveSpeciesDrug()">💾 Agregar fármaco</button>
     </div>`;
+  try { vdEnsureSpeciesDatalists(); } catch (e) {}
   document.getElementById('modal-species-drug').classList.add('open');
 }
 
@@ -8993,7 +9039,11 @@ async function syncDrugToVademecum(drug, speciesName, speciesSci) {
       category:         drugCatsSync[0] || 'Otro',
       cat_esp:          drug.cat_esp || '',
       conc:             drug.conc || 0,
+      conc_num:         drug.conc_num || 'mg',
+      conc_den:         drug.conc_den || 'ml',
       route:            drug.route || 'IM',
+      spectrum:         drug.spectrum || '',
+      pk:               drug.pk || '',
       info:             drug.effects || drug.info || '',
       indic:            drug.indic || '',
       contraindications:drug.contra || drug.contraindications || '',
@@ -9006,12 +9056,24 @@ async function syncDrugToVademecum(drug, speciesName, speciesSci) {
     if (speciesName) {
       existing.species_doses.push({
         species: speciesLabel,
+        sci: speciesSci || '',
         dose: drug.dose || 0,
         dose_min: drug.dose_min || 0,
         dose_max: drug.dose_max || 0,
+        dose_unit: drug.dose_unit || vdJoinUnit(drug.dose_unit_num, drug.dose_unit_den) || 'mg/kg',
+        dose_unit_num: drug.dose_unit_num || 'mg',
+        dose_unit_den: drug.dose_unit_den || 'kg',
+        dosis: [{
+          min: drug.dose_min || 0, rec: drug.dose || 0, max: drug.dose_max || 0,
+          unit: drug.dose_unit || vdJoinUnit(drug.dose_unit_num, drug.dose_unit_den) || 'mg/kg',
+          unit_num: drug.dose_unit_num || 'mg', unit_den: drug.dose_unit_den || 'kg', fuente: null
+        }],
         route: drug.route || '',
         freq: drug.freq || '',
+        duration: drug.duration || '',
         conc: drug.conc || 0,
+        conc_num: drug.conc_num || 'mg',
+        conc_den: drug.conc_den || 'ml',
         notes: drug.notes || ''
       });
       await dbPutSync('vademecum', existing);
@@ -9026,12 +9088,24 @@ async function syncDrugToVademecum(drug, speciesName, speciesSci) {
   if (!existingDose) {
     existing.species_doses.push({
       species: speciesLabel,
+      sci: speciesSci || '',
       dose: drug.dose || 0,
       dose_min: drug.dose_min || 0,
       dose_max: drug.dose_max || 0,
+      dose_unit: drug.dose_unit || vdJoinUnit(drug.dose_unit_num, drug.dose_unit_den) || 'mg/kg',
+      dose_unit_num: drug.dose_unit_num || 'mg',
+      dose_unit_den: drug.dose_unit_den || 'kg',
+      dosis: [{
+        min: drug.dose_min || 0, rec: drug.dose || 0, max: drug.dose_max || 0,
+        unit: drug.dose_unit || vdJoinUnit(drug.dose_unit_num, drug.dose_unit_den) || 'mg/kg',
+        unit_num: drug.dose_unit_num || 'mg', unit_den: drug.dose_unit_den || 'kg', fuente: null
+      }],
       route: drug.route || '',
       freq: drug.freq || '',
+      duration: drug.duration || '',
       conc: drug.conc || 0,
+      conc_num: drug.conc_num || 'mg',
+      conc_den: drug.conc_den || 'ml',
       notes: drug.notes || ''
     });
     await dbPutSync('vademecum', existing);
@@ -9055,6 +9129,10 @@ async function saveSpeciesDrug() {
   const name = document.getElementById('sdrug-name').value.trim();
   if (!name) { toast('⚠ Ingresa el nombre del fármaco'); return; }
   const _cats = Array.from(document.querySelectorAll('.sdrug-cat-chk:checked')).map(el=>el.value);
+  const _unum = document.getElementById('sdrug-dnum')?.value || 'mg';
+  const _uden = document.getElementById('sdrug-dden')?.value || 'kg';
+  const _cnum = document.getElementById('sdrug-conc-num')?.value || 'mg';
+  const _cden = document.getElementById('sdrug-conc-den')?.value || 'ml';
   const drug = {
     name,
     active:   document.getElementById('sdrug-active')?.value.trim()||'',
@@ -9062,11 +9140,19 @@ async function saveSpeciesDrug() {
     cat:      _cats.join(', ')||'Otro',
     cat_esp:  document.getElementById('sdrug-cat-esp')?.value.trim()||'',
     conc:     parseFloat(document.getElementById('sdrug-conc')?.value)||0,
+    conc_num: _cnum,
+    conc_den: _cden,
     dose:     parseFloat(document.getElementById('sdrug-dose')?.value)||0,
     dose_min: parseFloat(document.getElementById('sdrug-dmin')?.value)||0,
     dose_max: parseFloat(document.getElementById('sdrug-dmax')?.value)||0,
+    dose_unit: vdJoinUnit(_unum, _uden) || 'mg/kg',
+    dose_unit_num: _unum,
+    dose_unit_den: _uden,
     route:    document.getElementById('sdrug-route')?.value||'IM',
     freq:     document.getElementById('sdrug-freq')?.value||'',
+    duration: document.getElementById('sdrug-dur')?.value||'',
+    spectrum: document.getElementById('sdrug-spectrum')?.value||'',
+    pk:       document.getElementById('sdrug-pk')?.value||'',
     indic:    document.getElementById('sdrug-indic')?.value||'',
     contra:   document.getElementById('sdrug-contra')?.value||'',
     effects:  document.getElementById('sdrug-effects')?.value||'',
@@ -9518,6 +9604,18 @@ function openAddDrug(editId=null, preselectedCat=null) {
         <input id="vd-freq" class="form-control" value="${existing?.freq||''}" placeholder="Ej: SID, BID, cada 24h, dosis única...">
       </div>
 
+      <!-- v66: ESPECTRO DE ACCIÓN (antiinfecciosos / antiparasitarios) -->
+      <div class="form-group">
+        <label>Espectro de acción <span style="font-size:.7rem;font-weight:400;color:var(--txt3)">(antiinfecciosos / antiparasitarios: Gram +, Gram −, aerobios, anaerobios, hongos…)</span></label>
+        <input id="vd-spectrum" class="form-control" list="vd-spectrum-dl" value="${existing?.spectrum||''}" placeholder="Ej: Gram +, Gram −, aerobios, anaerobios, Mycoplasma…">
+      </div>
+
+      <!-- v66: FARMACOCINÉTICA -->
+      <div class="form-group">
+        <label>Farmacocinética <span style="font-size:.7rem;font-weight:400;color:var(--txt3)">(absorción, distribución, metabolismo, excreción, vida media…)</span></label>
+        <textarea id="vd-pk" class="form-control" style="min-height:55px" placeholder="Ej: Absorción oral variable; metabolismo hepático; excreción renal; t½ 6-8 h…">${existing?.pk||''}</textarea>
+      </div>
+
       <div class="form-group"><label>Indicaciones</label>
         <textarea id="vd-indic" class="form-control" style="min-height:50px">${existing?.indic||''}</textarea>
       </div>
@@ -9563,34 +9661,7 @@ function openAddDrug(editId=null, preselectedCat=null) {
           <button onclick="addVdSpeciesDoseRow()" class="btn btn-admin btn-sm">+ Agregar especie</button>
         </div>
         <div id="vd-species-rows">
-          ${(existing?.species_doses||[]).map(s=>`
-          <div class="vd-sp-row" style="background:var(--sur2);border-radius:var(--rsm);padding:.5rem;margin-bottom:.4rem;border:1px solid var(--bor)">
-            <div style="display:flex;gap:.3rem;margin-bottom:.3rem;align-items:center">
-              <input class="form-control vds-sp" value="${s.species||''}" placeholder="Nombre común" style="flex:1;font-size:.78rem" list="sp-hist-dl" oninput="autofillSciInRow(this)" onchange="autofillSciInRow(this)">
-              <input class="form-control vds-sci" value="${s.sci||''}" placeholder="Nombre científico" style="flex:1;font-size:.78rem">
-              <button onclick="this.closest('.vd-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .35rem;font-size:.7rem;flex-shrink:0">✕</button>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin:.15rem 0">
-              <span style="font-size:.65rem;color:var(--txt3);font-weight:600">Dosis registradas <span style="font-weight:400">(varias por especie, cada una con su fuente)</span></span>
-              <button onclick="addVdsdEntry(this.closest('.vd-sp-row'))" class="btn btn-secondary btn-sm" style="font-size:.68rem">+ Dosis</button>
-            </div>
-            <div class="vdsd-entries">
-              ${vdDoseEntriesOf(s).map(de=>vddEntryHtml(de)).join('')}
-            </div>
-            <div style="margin-top:.3rem">
-              <label style="font-size:.65rem;color:var(--txt3);display:block;margin-bottom:.15rem">Vías de administración</label>
-              <div class="vds-routes-wrap" style="display:flex;flex-wrap:wrap;gap:.25rem">
-                ${['IM','IV','SC','VO','IM dardo','IN','Tópico'].map(r=>`
-                <label style="display:inline-flex;align-items:center;gap:.15rem;font-size:.68rem;cursor:pointer;padding:.1rem .35rem;border-radius:15px;border:1px solid var(--bor);background:var(--sur)">
-                  <input type="checkbox" class="vds-route-chk" value="${r}" ${(s.routes||[s.route]||[]).includes(r)?'checked':''} style="accent-color:var(--g5);width:12px;height:12px"> ${r}
-                </label>`).join('')}
-              </div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 2fr;gap:.3rem;margin-top:.3rem">
-              <div><label style="font-size:.65rem;color:var(--txt3)">Frecuencia</label><input class="form-control vds-freq" value="${s.freq||''}" placeholder="SID x 7 días" style="font-size:.78rem"></div>
-              <div><label style="font-size:.65rem;color:var(--txt3)">Notas</label><input class="form-control vds-notes" value="${s.notes||''}" placeholder="Observaciones..." style="font-size:.78rem"></div>
-            </div>
-          </div>`).join('')}
+          ${(existing?.species_doses||[]).map(s=>vdSpCardHtml(s,{ctx:'panel'})).join('')}
         </div>
       </div>
 
@@ -9601,6 +9672,7 @@ function openAddDrug(editId=null, preselectedCat=null) {
     </div>`;
   document.body.appendChild(m);
   buildSpeciesDatalist('sp-hist-dl');
+  try { vdEnsureSpeciesDatalists(); } catch (e) {}
 }
 
 function addVdNombreRow() {
@@ -9634,34 +9706,11 @@ function addVdSpeciesDoseRow() {
   const rows = document.getElementById('vd-species-rows');
   if (!rows) return;
   buildSpeciesDatalist('sp-hist-dl');
-  rows.insertAdjacentHTML('beforeend', `
-    <div class="vd-sp-row" style="background:var(--sur2);border-radius:var(--rsm);padding:.5rem;margin-bottom:.4rem;border:1px solid var(--bor)">
-      <div style="display:flex;gap:.3rem;margin-bottom:.3rem;align-items:center">
-        <input class="form-control vds-sp" value="" placeholder="Nombre común" style="flex:1;font-size:.78rem" list="sp-hist-dl" oninput="autofillSciInRow(this)" onchange="autofillSciInRow(this)">
-        <input class="form-control vds-sci" value="" placeholder="Nombre científico" style="flex:1;font-size:.78rem">
-        <button onclick="this.closest('.vd-sp-row').remove()" style="background:var(--r1);border:1px solid var(--r5);border-radius:var(--rxs);color:var(--r5);cursor:pointer;padding:.2rem .35rem;font-size:.7rem;flex-shrink:0">✕</button>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin:.15rem 0">
-        <span style="font-size:.65rem;color:var(--txt3);font-weight:600">Dosis registradas <span style="font-weight:400">(varias por especie, cada una con su fuente)</span></span>
-        <button onclick="addVdsdEntry(this.closest('.vd-sp-row'))" class="btn btn-secondary btn-sm" style="font-size:.68rem">+ Dosis</button>
-      </div>
-      <div class="vdsd-entries">
-        ${vddEntryHtml(null)}
-      </div>
-      <div style="margin-top:.3rem">
-        <label style="font-size:.65rem;color:var(--txt3);display:block;margin-bottom:.15rem">Vías de administración</label>
-        <div class="vds-routes-wrap" style="display:flex;flex-wrap:wrap;gap:.25rem">
-          ${['IM','IV','SC','VO','IM dardo','IN','Tópico'].map(r=>`
-          <label style="display:inline-flex;align-items:center;gap:.15rem;font-size:.68rem;cursor:pointer;padding:.1rem .35rem;border-radius:15px;border:1px solid var(--bor);background:var(--sur)">
-            <input type="checkbox" class="vds-route-chk" value="${r}" style="accent-color:var(--g5);width:12px;height:12px"> ${r}
-          </label>`).join('')}
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 2fr;gap:.3rem;margin-top:.3rem">
-        <div><label style="font-size:.65rem;color:var(--txt3)">Frecuencia</label><input class="form-control vds-freq" placeholder="SID x 7 días" style="font-size:.78rem"></div>
-        <div><label style="font-size:.65rem;color:var(--txt3)">Notas</label><input class="form-control vds-notes" placeholder="Observaciones..." style="font-size:.78rem"></div>
-      </div>
-    </div>`);
+  try { vdEnsureSpeciesDatalists(); } catch (e) {}
+  rows.insertAdjacentHTML('beforeend', vdSpCardHtml(null, { ctx: 'panel' }));
+  const row = rows.lastElementChild;
+  const inp = row ? row.querySelector('.vds-sp') : null;
+  if (inp) { try { inp.focus(); } catch (e) {} }
 }
 
 async function saveDrug(editId='') {
@@ -9691,36 +9740,9 @@ async function saveDrug(editId='') {
   });
   const species_doses = [];
   document.querySelectorAll('#vd-species-rows .vd-sp-row').forEach(row => {
-    const sp = row.querySelector('.vds-sp')?.value.trim();
-    if (!sp) return;
-    const spRoutes = Array.from(row.querySelectorAll('.vds-route-chk:checked')).map(el=>el.value);
-    const dosis = [];
-    row.querySelectorAll('.vdsd-entry').forEach(ent => {
-      const dmin = parseFloat(ent.querySelector('.vdsd-min')?.value) || 0;
-      const drec = parseFloat(ent.querySelector('.vdsd-rec')?.value) || 0;
-      const dmax = parseFloat(ent.querySelector('.vdsd-max')?.value) || 0;
-      dosis.push({
-        min: dmin,
-        rec: drec,
-        max: dmax,
-        unit: ent.querySelector('.vdsd-unit')?.value || 'mg/kg',
-        fuente: vdBibReadSel(ent)
-      });
-    });
-    const first = dosis[0] || {};
-    species_doses.push({
-      species:  sp,
-      sci:      row.querySelector('.vds-sci')?.value.trim()||'',
-      dosis,
-      dose_min: first.min || 0,
-      dose:     first.rec || 0,
-      dose_max: first.max || 0,
-      dose_unit: first.unit || 'mg/kg',
-      route:    spRoutes[0]||'IM',
-      routes:   spRoutes.length ? spRoutes : ['IM'],
-      freq:     row.querySelector('.vds-freq')?.value||'',
-      notes:    row.querySelector('.vds-notes')?.value||''
-    });
+    const sd = vdReadSpCard(row);
+    if (!sd || !sd.species) return;
+    species_doses.push(sd);
   });
 
   const drugData = {
@@ -9739,6 +9761,8 @@ async function saveDrug(editId='') {
     route:            routes[0]||'IM',
     routes:           routes.length ? routes : [],
     freq:             document.getElementById('vd-freq')?.value||'',
+    spectrum:         document.getElementById('vd-spectrum')?.value||'',
+    pk:               document.getElementById('vd-pk')?.value||'',
     indic:            document.getElementById('vd-indic')?.value||'',
     contraindications:document.getElementById('vd-contra')?.value||'',
     info:             document.getElementById('vd-info')?.value||'',
@@ -9802,6 +9826,13 @@ async function syncVadToSpecies(vadId) {
         dose_min: spDose.dose_min||existingDrug.dose_min,
         dose_max: spDose.dose_max||existingDrug.dose_max,
         dose_unit: spDose.dose_unit||existingDrug.dose_unit||'mg/kg',
+        dose_unit_num: spDose.dose_unit_num||existingDrug.dose_unit_num||'',
+        dose_unit_den: spDose.dose_unit_den||existingDrug.dose_unit_den||'',
+        duration: spDose.duration||existingDrug.duration||'',
+        conc_num: spDose.conc_num||existingDrug.conc_num||'mg',
+        conc_den: spDose.conc_den||existingDrug.conc_den||'ml',
+        spectrum: vd.spectrum||existingDrug.spectrum||'',
+        pk: vd.pk||existingDrug.pk||'',
         route: spDose.route||existingDrug.route,
         freq: spDose.freq||existingDrug.freq,
       });
@@ -11048,16 +11079,17 @@ const VAD_GRID_COLS = [
   { k:'ss_label',     l:'G', t:'SUB-SUBCATEGORÍA' },
   { k:'cat_esp',      l:'H', t:'CAT. ESPECÍFICA' },
   { k:'routes',       l:'I', t:'VÍAS' },
-  { k:'indic',        l:'J', t:'INDICACIONES' },
-  { k:'ci',           l:'K', t:'CONTRAINDICACIONES' },
-  { k:'info',         l:'L', t:'EFECTOS ADVERSOS' },
-  { k:'notes',        l:'M', t:'NOTAS CLÍNICAS' },
-  { k:'mech',         l:'N', t:'MECANISMO (TÉCNICO)' },
-  { k:'mech_simple',  l:'O', t:'MECANISMO RESUMIDO' },
-  { k:'desc',         l:'P', t:'DESCRIPCIÓN' },
-  { k:'keywords',     l:'Q', t:'PALABRAS CLAVE' },
-  { k:'bib',          l:'R', t:'BIBLIOGRAFÍA' },
-  { k:'sps',          l:'S', t:'ESPECIES Y DOSIS' }
+  { k:'spectrum',     l:'J', t:'ESPECTRO DE ACCIÓN' },
+  { k:'indic',        l:'K', t:'INDICACIONES' },
+  { k:'ci',           l:'L', t:'CONTRAINDICACIONES' },
+  { k:'info',         l:'M', t:'EFECTOS ADVERSOS' },
+  { k:'notes',        l:'N', t:'NOTAS CLÍNICAS' },
+  { k:'mech',         l:'O', t:'MECANISMO (TÉCNICO)' },
+  { k:'mech_simple',  l:'P', t:'MECANISMO RESUMIDO' },
+  { k:'pk',           l:'Q', t:'FARMACOCINÉTICA' },
+  { k:'keywords',     l:'R', t:'PALABRAS CLAVE' },
+  { k:'bib',          l:'S', t:'BIBLIOGRAFÍA' },
+  { k:'sps',          l:'T', t:'ESPECIES Y DOSIS' }
 ];
 // Catálogo de columnas disponibles (nombres compatibles con la app, incluidos
 // los niveles profundos sub-sub-subcategoría: hier_3 = SUB-SUBCATEGORÍA 4, …).
@@ -11075,14 +11107,14 @@ function _vsPreset(k) {
 // Columnas de texto largo: con "↔ Ajuste texto" activo se muestran en un
 // textarea que crece solo (varias líneas). v57: se amplió la lista y además
 // parte palabras largas (URL, nombres químicos) para que SIEMBRA quepa el texto.
-const _vadWrapKeys = { drug:1, nombres:1, conc:1, cat_esp:1, routes:1, spectrum:1, indic:1, ci:1, info:1, notes:1, mech:1, mech_simple:1, keywords:1, bib:1 };
+const _vadWrapKeys = { drug:1, nombres:1, conc:1, cat_esp:1, routes:1, spectrum:1, indic:1, ci:1, info:1, notes:1, mech:1, mech_simple:1, pk:1, keywords:1, bib:1 };
 // Anchura por defecto de cada columna (px) — v57 también es el valor inicial
 // del redimensionado arrastrando el borde del título.
 function _vsTdDefaultW(k) {
   if (k === '__rn') return 44;
   if (k === '__ac') return 48;
   if (/^hier_\d+$/.test(k)) return 150;
-  return { active:190, drug:150, nombres:140, conc:130, cat_label:170, subcat_label:180, ss_label:170, cat_esp:120, routes:120, spectrum:200, indic:170, ci:170, info:150, notes:150, mech:180, mech_simple:150, keywords:130, bib:150, sps:160 }[k] || 120;
+  return { active:190, drug:150, nombres:140, conc:130, cat_label:170, subcat_label:180, ss_label:170, cat_esp:120, routes:120, spectrum:200, indic:170, ci:170, info:150, notes:150, mech:180, mech_simple:150, pk:200, keywords:130, bib:150, sps:160 }[k] || 120;
 }
 // Ancho elegido por el usuario (arrastrando el borde del título). Se guarda.
 let _vadColW = {};
@@ -11121,6 +11153,7 @@ const _vadDefaultColOpts = {
   unit:   ['mg/kg','mg/ml','ml/kg','UI/kg','µg/kg','g/kg','mg','g','UI','mEq','mmol'],
   freq:   ['SID','BID','TID','QID','PRN','cada 24 h','cada 48 h','cada 72 h','semanal','mensual','una vez'],
   fuente: ['PLUMB','MSD','Vademécum','BDMV'],
+  spectrum: ['Gram +','Gram −','Gram positivos','Gram negativos','Aerobios','Anaerobios','Mycoplasma','Hongos','Levaduras','Protozoos','Helmintos','Ácaros','Pulgas','Garrapatas','Rickettsias','Chlamydias','Espiroquetas','Micobacterias','Pseudomonas','Enterobacterias'],
   sp:     []
 };
 // v60: lista COMPARTIDA y editable de vías de administración. La usan tanto el
@@ -11206,19 +11239,32 @@ function _vadMatchDrug(active) {
 }
 
 function _vadSheetSpFromSd(sd) {
-  const de = (Array.isArray(sd.dosis) && sd.dosis.length) ? sd.dosis[0] : {};
-  const min = (de.min != null) ? de.min : (sd.dose_min || '');
-  const max = (de.max != null) ? de.max : (sd.dose_max || '');
+  const list = (Array.isArray(sd.dosis) && sd.dosis.length) ? sd.dosis : [];
+  const de = list[0] || {};
+  const unit = de.unit || sd.dose_unit || 'mg/kg';
+  const u = vdSplitUnit(unit);
+  const nz = (v) => (v === '' || v == null || Number(v) === 0) ? '' : v;
+  const concs = Array.isArray(sd.concs) ? sd.concs : [];
+  const c0 = concs[0] || null;
+  const cu = vdSplitUnit((sd.conc_units && sd.conc_units[0]) || '');
   return {
     sp: sd.species||'',
     sci: sd.sci||'',
-    dmin: (min==='' || Number(min)===0) ? '' : min,
-    dmax: (max==='' || Number(max)===0) ? '' : max,
-    unit: de.unit || sd.dose_unit || 'mg/kg',
-    fuente: _bibText(de.fuente||sd.fuente),
+    dmin: nz(de.min != null ? de.min : sd.dose_min),
+    drec: nz(de.rec != null ? de.rec : sd.dose),
+    dmax: nz(de.max != null ? de.max : sd.dose_max),
+    dnum: de.unit_num || sd.dose_unit_num || u.num || 'mg',
+    dden: de.unit_den || sd.dose_unit_den || u.den || 'kg',
+    unit,
+    conc: nz(sd.conc != null ? sd.conc : (c0 ? c0.val : '')),
+    cnum: sd.conc_num || (c0 && c0.num) || cu.num || 'mg',
+    cden: sd.conc_den || (c0 && c0.den) || cu.den || 'ml',
+    fuente: (() => { const b = de.fuente || sd.fuente; return (typeof b === 'string') ? b : _bibText(b); })(),
     via: (sd.routes && sd.routes.length) ? sd.routes.join(', ') : (sd.route||''),
     freq: sd.freq||'',
-    notes: sd.notes||''
+    dur: sd.duration||'',
+    notes: sd.notes||'',
+    dosisExtra: list.slice(1)
   };
 }
 
@@ -11241,13 +11287,14 @@ function _vadSheetDrugToRow(d) {
       ss_label: d.subsubcat_vad||'',
       cat_esp: d.cat_esp||'',
       routes: (d.routes && d.routes.length) ? d.routes.join(', ') : (d.route||''),
+      spectrum: d.spectrum||'',
       indic: d.indic||'',
       ci: d.contraindications||'',
       info: d.info||'',
       notes: d.notes||'',
       mech: d.mech||'',
       mech_simple: d.mech_simple||'',
-      desc: d.desc||'',
+      pk: d.pk||'',
       keywords: (d.keywords||[]).join(', '),
       bib: vdExcelBibStr(d),
       ...deep
@@ -11281,6 +11328,15 @@ function _vadApplyColOrder() {
   const order = [];
   const saved = Array.isArray(_vadColOrderSaved) ? _vadColOrderSaved : null;
   if (saved) for (const k of saved) if (_vadIsKnownKey(k) && !order.includes(k)) order.push(k);
+  // v66: las columnas nuevas (ESPECTRO DE ACCIÓN y FARMACOCINÉTICA) se colocan
+  // junto a su columna de referencia, no al final, para que la hoja no cambie
+  // de aspecto al actualizar desde una versión anterior.
+  const placeAfter = (k, anchor) => {
+    if (order.includes(k)) return;
+    const i = order.indexOf(anchor);
+    if (i >= 0) order.splice(i + 1, 0, k); else order.push(k);
+  };
+  if (saved) { placeAfter('spectrum', 'routes'); placeAfter('pk', 'mech_simple'); }
   for (const k of def) if (!order.includes(k)) order.push(k);
   if (!order.includes('active')) order.unshift('active');
   _vadColOrder = order;
@@ -11695,6 +11751,7 @@ function _vsCell(k, r, idx) {
   if (k === 'notes')    return _vsTextTag('notes', r.m.notes, wk);
   if (k === 'mech')     return _vsTextTag('mech', r.m.mech, wk);
   if (k === 'mech_simple') return _vsTextTag('mech_simple', r.m.mech_simple, wk);
+  if (k === 'pk') return _vsTextTag('pk', r.m.pk, wk);
   if (k === 'spectrum') {
     const list = (_vadColOpts && _vadColOpts[k] && _vadColOpts[k].length) ? ' list="vadl-' + k + '"' : '';
     return '<input type="text" value="' + vdEsc(r.m.spectrum||'') + '" data-f="spectrum"' + list + ' placeholder="Gram +, Gram -, aerobios, anaerobios..." style="min-width:0;width:100%">';
@@ -11710,36 +11767,322 @@ function _vsCell(k, r, idx) {
   }
   return '';
 }
+// ═══════════════════════════════════════════════════════════════════════
+// v66 — Especie + dosis con el mismo estilo que la calculadora de
+// tratamientos: unidades numerador/denominador con botón «＋», concentración,
+// vía con botón de agregar, frecuencia, duración y notas.
+// Se usa en tres sitios: panel «Agregar fármaco», panel «Agregar especie» y
+// la Hoja interna (tabla).
+// ═══════════════════════════════════════════════════════════════════════
+function vdSplitUnit(u) {
+  const s = String(u == null ? '' : u).trim();
+  if (!s) return { num: '', den: '' };
+  const i = s.indexOf('/');
+  if (i < 0) return { num: s, den: '' };
+  return { num: s.slice(0, i).trim(), den: s.slice(i + 1).trim() };
+}
+function vdJoinUnit(n, d) {
+  const a = String(n == null ? '' : n).trim();
+  const b = String(d == null ? '' : d).trim();
+  if (a && b) return a + '/' + b;
+  return a || b || '';
+}
+function vdUnitList(kind) {
+  const numLike = (kind === 'dosenum' || kind === 'num');
+  const defs = numLike
+    ? ['mg', 'µg', 'mcg', 'UI', 'g', 'mEq', 'mmol']
+    : (kind === 'doseden' ? ['kg', 'g', 'lb', 'animal', 'm²'] : ['ml', 'tab', 'cap', 'got', 'sachet', 'ampolla', 'frasco', 'parche']);
+  const extra = (typeof HC_UNITS_EXTRA !== 'undefined' && HC_UNITS_EXTRA && HC_UNITS_EXTRA[kind]) ? HC_UNITS_EXTRA[kind] : [];
+  const out = defs.slice();
+  extra.forEach(u => { if (!out.some(x => String(x).toLowerCase() === String(u).toLowerCase())) out.push(u); });
+  return out;
+}
+function vdUnitOpts(kind, selected) {
+  const sel = String(selected == null ? '' : selected).trim().toLowerCase();
+  const ph = { dosenum: 'mg/µg/UI…', doseden: 'kg/g/lb…', num: 'mg/µg/UI…', den: 'ml/tab/cap…' }[kind] || 'unidad…';
+  return '<option value="">' + ph + '</option>' +
+    vdUnitList(kind).map(u => '<option value="' + vdEsc(u) + '"' + (String(u).toLowerCase() === sel ? ' selected' : '') + '>' + vdEsc(u) + '</option>').join('');
+}
+// Agrega una unidad nueva (persistente, compartida con la calculadora) y la
+// deja seleccionada en el grupo de unidades desde el que se pulsó «＋».
+function vdUnitAdd(btn, kind) {
+  const esDen = (kind === 'doseden' || kind === 'den');
+  const nuevo = (prompt('Nueva unidad ' + (esDen ? 'denominador' : 'numerador') + ' (ej: ' + (esDen ? 'kg, g, lb, animal, m²' : 'mg, µg, UI, mEq') + '):') || '').trim();
+  if (!nuevo) return;
+  if (typeof HC_UNITS_EXTRA === 'undefined' || !HC_UNITS_EXTRA) window.HC_UNITS_EXTRA = { num: [], den: [], dosenum: [], doseden: [] };
+  const list = HC_UNITS_EXTRA[kind] || (HC_UNITS_EXTRA[kind] = []);
+  const ya = list.some(x => String(x).toLowerCase() === nuevo.toLowerCase());
+  if (!ya) { list.push(nuevo); try { hcSaveUnits(); } catch (e) {} }
+  document.querySelectorAll('select[data-uk="' + kind + '"]').forEach(s => {
+    const keep = s.value;
+    s.innerHTML = vdUnitOpts(kind, keep);
+    if (keep) s.value = keep;
+  });
+  const group = btn && btn.closest ? btn.closest('[data-ugroup]') : null;
+  const sel = group ? group.querySelector('select[data-uk="' + kind + '"]') : null;
+  if (sel) {
+    sel.value = nuevo;
+    try { sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+    if (typeof hcRefreshUnits === 'function') { try { hcRefreshUnits(kind); } catch (e) {} }
+  }
+  toast(ya ? ('⚠ Esa unidad ya existía: ' + nuevo) : ('✓ Unidad ' + nuevo + ' agregada' + (sel ? '' : '')));
+}
+// Datalist de vías (compartida con la Hoja y el panel de fármacos)
+function vdEnsureRoutesDatalist() {
+  let dl = document.getElementById('vd-routes-dl');
+  if (!dl) { dl = document.createElement('datalist'); dl.id = 'vd-routes-dl'; document.body.appendChild(dl); }
+  dl.innerHTML = _vadRoutesList().map(r => '<option value="' + vdEsc(r) + '"></option>').join('');
+  return dl;
+}
+// Sugerencias de espectro de acción (compartidas por panel de fármaco,
+// panel de especie y Hoja interna).
+function vdSpectrumList() {
+  const base = ['Gram +','Gram −','Gram positivos','Gram negativos','Aerobios','Anaerobios','Facultativos','Mycoplasma','Hongos','Levaduras','Protozoos','Helmintos','Ácaros','Pulgas','Garrapatas','Rickettsias','Chlamydias','Espiroquetas','Micobacterias','Pseudomonas','Enterobacterias','Cocos','Bacilos'];
+  const extra = (_vadColOpts && Array.isArray(_vadColOpts.spectrum)) ? _vadColOpts.spectrum : [];
+  const out = base.slice();
+  extra.forEach(v => { if (!out.some(x => String(x).toLowerCase() === String(v).toLowerCase())) out.push(v); });
+  return out;
+}
+function vdEnsureSpectrumDatalist() {
+  let dl = document.getElementById('vd-spectrum-dl');
+  if (!dl) { dl = document.createElement('datalist'); dl.id = 'vd-spectrum-dl'; document.body.appendChild(dl); }
+  dl.innerHTML = vdSpectrumList().map(v => '<option value="' + vdEsc(v) + '"></option>').join('');
+  return dl;
+}
+// Historial de especies (enriquecimientos, recintos, grupos, fichas…) y
+// nombres científicos. v66: incluye también los GRUPOS como sugerencia.
+function vdEnsureSpeciesDatalists() {
+  const hist = (typeof getSpeciesHistory === 'function') ? getSpeciesHistory() : [];
+  const grupos = (typeof SPECIES_GROUPS !== 'undefined' && Array.isArray(SPECIES_GROUPS)) ? SPECIES_GROUPS : [];
+  let dl = document.getElementById('vd-sp-hist-dl');
+  if (!dl) { dl = document.createElement('datalist'); dl.id = 'vd-sp-hist-dl'; document.body.appendChild(dl); }
+  dl.innerHTML =
+    grupos.map(g => '<option value="' + vdEsc(g.nombre) + '" label="👥 Grupo — ' + ((g.especies || []).length) + ' especie(s)">' + vdEsc(g.nombre) + '</option>').join('') +
+    hist.map(h => '<option value="' + vdEsc(h.nombre) + '" label="' + vdEsc(h.sci || '') + '"></option>').join('');
+  let sd = document.getElementById('vd-sci-hist-dl');
+  if (!sd) { sd = document.createElement('datalist'); sd.id = 'vd-sci-hist-dl'; document.body.appendChild(sd); }
+  const scis = Array.from(new Set(hist.map(h => String(h.sci || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'es'));
+  sd.innerHTML = scis.map(s => '<option value="' + vdEsc(s) + '"></option>').join('');
+  vdEnsureRoutesDatalist();
+  vdEnsureSpectrumDatalist();
+}
+// Elegir un grupo taxonómico como “especie” (la dosis vale para el grupo).
+function vdSpPickGroup(sel) {
+  const row = sel && sel.closest ? sel.closest('.vd-sp-row') : null;
+  if (!row) return;
+  const name = sel.value;
+  if (!name) return;
+  const spInp = row.querySelector('.vds-sp');
+  const sciInp = row.querySelector('.vds-sci');
+  if (spInp) { spInp.value = name; try { spInp.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {} }
+  if (sciInp) { sciInp.value = ''; try { sciInp.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {} }
+  toast('👥 Grupo aplicado: ' + name);
+}
+function vdAddRouteToInput(inp) {
+  const name = (prompt('Nueva vía de administración (ej: IM, IV, SC, VO, IN, Tópico):') || '').trim();
+  if (!name) return;
+  const list = _vadRoutesList();
+  if (!list.some(x => String(x).toLowerCase() === name.toLowerCase())) { list.push(name); try { _vadSaveRoutes(); } catch (e) {} }
+  if (inp) {
+    const cur = String(inp.value || '').split(/[,;]+/).map(x => x.trim()).filter(Boolean);
+    if (!cur.some(x => x.toLowerCase() === name.toLowerCase())) cur.push(name);
+    inp.value = cur.join(', ');
+    try { inp.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
+  }
+  vdEnsureRoutesDatalist();
+  toast('✓ Vía ' + name + ' agregada');
+}
+// Normaliza las líneas de dosis de una especie (panel y hoja)
+function vdSpEntriesOf(sp) {
+  if (!sp) return [{ min: '', rec: '', max: '', num: 'mg', den: 'kg', fuente: null }];
+  const mapDe = (de) => {
+    de = de || {};
+    const u = vdSplitUnit(de.unit || de.dose_unit || 'mg/kg');
+    return {
+      min: de.min != null ? de.min : '',
+      rec: de.rec != null ? de.rec : '',
+      max: de.max != null ? de.max : '',
+      num: de.unit_num || u.num || 'mg',
+      den: de.unit_den || u.den || 'kg',
+      fuente: de.fuente || null
+    };
+  };
+  if (Array.isArray(sp.dosis) && sp.dosis.length) return sp.dosis.map(mapDe);
+  const u = vdSplitUnit(sp.unit || sp.dose_unit || 'mg/kg');
+  const base = {
+    min: (sp.dmin !== undefined ? sp.dmin : sp.dose_min) || '',
+    rec: (sp.drec !== undefined ? sp.drec : sp.dose) || '',
+    max: (sp.dmax !== undefined ? sp.dmax : sp.dose_max) || '',
+    num: sp.dnum || u.num || 'mg',
+    den: sp.dden || u.den || 'kg',
+    fuente: sp.fuente || null
+  };
+  // La Hoja muestra una sola línea de dosis, pero las dosis adicionales de la
+  // ficha se conservan (no se pierden al guardar).
+  const extra = Array.isArray(sp.dosisExtra) ? sp.dosisExtra.map(mapDe) : [];
+  return [base].concat(extra);
+}
+function _vdSpA(ctx, si, f) {
+  return ctx === 'sheet' ? (' data-sp="' + si + '" data-spf="' + f + '"') : '';
+}
+function _vdSpUnitGroup(kind, field, value, ctx, si) {
+  const attr = _vdSpA(ctx, si, field);
+  const cls = (_vdCardUnitClass(kind));
+  return '<div data-ugroup="' + kind + '" style="display:flex;gap:.2rem;align-items:center;min-width:0">' +
+    '<select class="form-control ' + cls + '" data-uk="' + kind + '"' + attr + ' style="flex:1;font-size:.72rem;min-width:0">' + vdUnitOpts(kind, value) + '</select>' +
+    '<button type="button" class="icon-btn" style="width:26px;height:28px;flex-shrink:0;font-size:.72rem" onclick="event.stopPropagation();vdUnitAdd(this,\'' + kind + '\')" title="Agregar una unidad nueva (queda guardada)">＋</button>' +
+    '</div>';
+}
+function _vdCardUnitClass(kind) {
+  return kind === 'dosenum' ? 'vdsd-dnum' : kind === 'doseden' ? 'vdsd-dden' : kind === 'num' ? 'vdsd-cnum' : 'vdsd-cden';
+}
+// Tarjeta de especie + dosis (estilo calculadora). ctx: 'panel' | 'sheet'
+function vdSpCardHtml(sp, opts) {
+  opts = opts || {};
+  const ctx = opts.ctx || 'panel';
+  const si = (opts.si != null) ? opts.si : null;
+  const entries = vdSpEntriesOf(sp);
+  const single = !!opts.single;               // Hoja: una sola línea de dosis
+  const species = (sp && (sp.sp !== undefined ? sp.sp : sp.species)) || '';
+  const sci = (sp && sp.sci) || '';
+  const viaVal = (sp && (sp.via !== undefined ? sp.via : ((sp.routes && sp.routes.length) ? sp.routes.join(', ') : (sp.route || '')))) || '';
+  const conc = (sp && sp.conc !== undefined ? sp.conc : (sp && sp.conc_val)) || '';
+  const cnum = (sp && sp.cnum) || (sp && sp.conc_num) || 'mg';
+  const cden = (sp && sp.cden) || (sp && sp.conc_den) || 'ml';
+  const freq = (sp && sp.freq) || '';
+  const dur = (sp && (sp.dur !== undefined ? sp.dur : sp.duration)) || '';
+  const notes = (sp && sp.notes) || '';
+  const grupos = (typeof SPECIES_GROUPS !== 'undefined' && Array.isArray(SPECIES_GROUPS)) ? SPECIES_GROUPS : [];
+  const groupSel = '<select class="form-control vds-grp" onchange="vdSpPickGroup(this)" style="flex:0 0 auto;width:auto;min-width:96px;font-size:.68rem" title="Elegir un grupo taxonómico del historial de enriquecimientos">' +
+    '<option value="">👥 Grupo…</option>' +
+    grupos.map(g => '<option value="' + vdEsc(g.nombre) + '">' + vdEsc(g.nombre) + '</option>').join('') + '</select>';
+  const delim = ctx === 'sheet' ? ' data-act="delsps" data-sp="' + si + '"' : '';
+  const cardDel = '<button type="button" class="vads-btn vads-del vads-delsp" ' + delim + ' onclick="' + (ctx === 'sheet' ? '' : "this.closest('.vd-sp-row').remove()") + '" title="Quitar esta especie">✕</button>';
+  const dosisRows = entries.map((de, li) => {
+    if (single && li > 0) return '';
+    const entAttr = ctx === 'sheet' ? ' data-sp="' + si + '"' : '';
+    const urlOn = de.fuente && de.fuente.kind === 'url';
+    const fuentePanel = '<label style="font-size:.6rem;color:var(--txt3);flex-shrink:0">Fuente</label>' +
+      '<select class="form-control vdsd-fuente" onchange="vdBibMode(this)" style="flex:1 1 140px;font-size:.68rem;min-width:0">' + vdBibLibOptions(de.fuente) + '</select>' +
+      '<input class="form-control vdsd-fuente-url" placeholder="Enlace o cita de la fuente…" value="' + vdEsc(urlOn ? (de.fuente.text || '') : '') + '" style="flex:1 1 140px;font-size:.68rem;display:' + (urlOn ? 'block' : 'none') + '">';
+    const fuenteSheet = '<label style="font-size:.6rem;color:var(--txt3);flex-shrink:0">Fuente</label>' +
+      '<input class="form-control" type="text"' + _vdSpA(ctx, si, 'fuente') + ' value="' + vdEsc(typeof de.fuente === 'string' ? de.fuente : (de.fuente && de.fuente.text ? de.fuente.text : '')) + '" placeholder="Cita o enlace…" style="flex:1 1 140px;font-size:.68rem;min-width:0">';
+    const fuenteHtml = (ctx === 'sheet') ? fuenteSheet : fuentePanel;
+    const rm = (single && entries.length <= 1) ? '' : '<button type="button" onclick="this.closest(\'.vdsd-entry\').remove()" class="icon-btn danger" style="width:24px;height:26px;font-size:.65rem;flex-shrink:0" title="Quitar esta dosis">✕</button>';
+    return '<div class="vdsd-entry"' + entAttr + ' style="background:var(--sur2);border:1px dashed var(--bor);border-radius:7px;padding:.4rem;margin-bottom:.3rem">' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;align-items:end">' +
+        '<div><label style="font-size:.6rem;color:var(--txt3)">Dosis mín</label><input class="form-control vdsd-min" type="number" step="0.001" value="' + vdEsc(de.min) + '" placeholder="1" style="font-size:.74rem"' + _vdSpA(ctx, si, 'dmin') + '></div>' +
+        '<div><label style="font-size:.6rem;color:var(--txt3);font-weight:700">Dosis básica</label><input class="form-control vdsd-rec" type="number" step="0.001" value="' + vdEsc(de.rec) + '" placeholder="2" style="font-size:.74rem"' + _vdSpA(ctx, si, 'drec') + '></div>' +
+        '<div><label style="font-size:.6rem;color:var(--txt3)">Dosis máx</label><input class="form-control vdsd-max" type="number" step="0.001" value="' + vdEsc(de.max) + '" placeholder="4" style="font-size:.74rem"' + _vdSpA(ctx, si, 'dmax') + '></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-top:.3rem;align-items:end">' +
+        '<div><label style="font-size:.6rem;color:var(--txt3)">Unidad numerador <span style="color:var(--g6)">＋</span></label>' + _vdSpUnitGroup('dosenum', 'dnum', de.num, ctx, si) + '</div>' +
+        '<div><label style="font-size:.6rem;color:var(--txt3)">Unidad denominador <span style="color:var(--g6)">＋</span></label>' + _vdSpUnitGroup('doseden', 'dden', de.den, ctx, si) + '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:.25rem;margin-top:.3rem;align-items:center;flex-wrap:wrap">' + fuenteHtml + rm + '</div>' +
+    '</div>';
+  }).join('');
+  const addDoseBtn = single ? '' : '<button type="button" class="btn btn-secondary btn-sm" style="font-size:.66rem" onclick="this.closest(\'.vd-sp-row\').querySelector(\'.vdsd-entries\').insertAdjacentHTML(\'beforeend\', vdSpDoseEntryHtml())">+ Dosis</button>';
+  return '<div class="vd-sp-row"' + (ctx === 'sheet' ? ' data-sp="' + si + '"' : '') + ' style="background:var(--sur);border:1px solid var(--bor);border-radius:8px;padding:.55rem;margin-bottom:.45rem">' +
+    '<div style="display:flex;align-items:center;gap:.35rem;margin-bottom:.35rem">' +
+      '<span style="font-size:.62rem;font-weight:800;letter-spacing:.06em;color:var(--txt3)">ESPECIE Y DOSIS</span>' +
+      '<span style="flex:1"></span>' + cardDel +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem">' +
+      '<div><label style="font-size:.6rem;color:var(--txt3)">Nombre común <span style="color:var(--g6)">(historial / grupo)</span></label>' +
+        '<div style="display:flex;gap:.2rem"><input class="form-control vds-sp" list="vd-sp-hist-dl" value="' + vdEsc(species) + '" placeholder="Ej: Perro, Primates…" style="flex:1;font-size:.78rem"' + _vdSpA(ctx, si, 'sp') + ' oninput="autofillSciInRow(this)" onchange="autofillSciInRow(this)">' + groupSel + '</div></div>' +
+      '<div><label style="font-size:.6rem;color:var(--txt3)">Nombre científico</label>' +
+        '<input class="form-control vds-sci" list="vd-sci-hist-dl" value="' + vdEsc(sci) + '" placeholder="Ej: Canis lupus familiaris" style="font-size:.78rem"' + _vdSpA(ctx, si, 'sci') + '></div>' +
+    '</div>' +
+    '<div class="vdsd-entries" style="margin-top:.35rem">' + dosisRows + '</div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:.1rem">' + addDoseBtn + '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-top:.4rem;align-items:end">' +
+      '<div><label style="font-size:.6rem;color:var(--txt3)">Concentración</label><input class="form-control vdsd-conc" type="number" step="0.01" value="' + vdEsc(conc) + '" placeholder="Ej: 100" style="font-size:.74rem"' + _vdSpA(ctx, si, 'conc') + '></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.25rem;align-items:end">' +
+        '<div><label style="font-size:.6rem;color:var(--txt3)">Num.</label>' + _vdSpUnitGroup('num', 'cnum', cnum, ctx, si) + '</div>' +
+        '<div><label style="font-size:.6rem;color:var(--txt3)">Den.</label>' + _vdSpUnitGroup('den', 'cden', cden, ctx, si) + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:.3rem;margin-top:.4rem;align-items:end">' +
+      '<div><label style="font-size:.6rem;color:var(--txt3)">Vía <span style="color:var(--g6)">＋</span></label>' +
+        '<div style="display:flex;gap:.2rem"><input class="form-control vds-via" list="vd-routes-dl" value="' + vdEsc(viaVal) + '" placeholder="IM, IV…" style="flex:1;font-size:.74rem;min-width:0"' + _vdSpA(ctx, si, 'via') + '>' +
+        '<button type="button" class="icon-btn" style="width:26px;height:28px;flex-shrink:0;font-size:.72rem" onclick="event.stopPropagation();vdAddRouteToInput(this.closest(\'[data-ugroup],div\').querySelector(\'.vds-via\'))" title="Agregar una vía nueva">＋</button></div></div>' +
+      '<div><label style="font-size:.6rem;color:var(--txt3)">Frecuencia</label><input class="form-control vds-freq" value="' + vdEsc(freq) + '" placeholder="SID…" style="font-size:.74rem"' + _vdSpA(ctx, si, 'freq') + '></div>' +
+      '<div><label style="font-size:.6rem;color:var(--txt3)">Duración</label><input class="form-control vds-dur" value="' + vdEsc(dur) + '" placeholder="7 días…" style="font-size:.74rem"' + _vdSpA(ctx, si, 'dur') + '></div>' +
+    '</div>' +
+    '<div style="margin-top:.4rem"><label style="font-size:.6rem;color:var(--txt3)">Notas</label><input class="form-control vds-notes" value="' + vdEsc(notes) + '" placeholder="Observaciones de la dosis…" style="font-size:.74rem"' + _vdSpA(ctx, si, 'notes') + '></div>' +
+  '</div>';
+}
+// Línea de dosis vacía (botón «+ Dosis» del panel)
+function vdSpDoseEntryHtml() {
+  return '<div class="vdsd-entry" style="background:var(--sur2);border:1px dashed var(--bor);border-radius:7px;padding:.4rem;margin-bottom:.3rem">' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;align-items:end">' +
+      '<div><label style="font-size:.6rem;color:var(--txt3)">Dosis mín</label><input class="form-control vdsd-min" type="number" step="0.001" placeholder="1" style="font-size:.74rem"></div>' +
+      '<div><label style="font-size:.6rem;color:var(--txt3);font-weight:700">Dosis básica</label><input class="form-control vdsd-rec" type="number" step="0.001" placeholder="2" style="font-size:.74rem"></div>' +
+      '<div><label style="font-size:.6rem;color:var(--txt3)">Dosis máx</label><input class="form-control vdsd-max" type="number" step="0.001" placeholder="4" style="font-size:.74rem"></div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-top:.3rem;align-items:end">' +
+      '<div><label style="font-size:.6rem;color:var(--txt3)">Unidad numerador <span style="color:var(--g6)">＋</span></label>' + _vdSpUnitGroup('dosenum', 'dnum', 'mg', 'panel', null) + '</div>' +
+      '<div><label style="font-size:.6rem;color:var(--txt3)">Unidad denominador <span style="color:var(--g6)">＋</span></label>' + _vdSpUnitGroup('doseden', 'dden', 'kg', 'panel', null) + '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:.25rem;margin-top:.3rem;align-items:center;flex-wrap:wrap">' +
+      '<label style="font-size:.6rem;color:var(--txt3);flex-shrink:0">Fuente</label>' +
+      '<select class="form-control vdsd-fuente" onchange="vdBibMode(this)" style="flex:1 1 140px;font-size:.68rem;min-width:0">' + vdBibLibOptions(null) + '</select>' +
+      '<input class="form-control vdsd-fuente-url" placeholder="Enlace o cita de la fuente…" style="flex:1 1 140px;font-size:.68rem;display:none">' +
+      '<button type="button" onclick="this.closest(\'.vdsd-entry\').remove()" class="icon-btn danger" style="width:24px;height:26px;font-size:.65rem;flex-shrink:0" title="Quitar esta dosis">✕</button>' +
+    '</div>' +
+  '</div>';
+}
+// Lector común de una tarjeta de especie (panel Agregar fármaco / Agregar especie)
+function vdReadSpCard(row) {
+  if (!row) return null;
+  const species = row.querySelector('.vds-sp') ? row.querySelector('.vds-sp').value.trim() : '';
+  const sci = row.querySelector('.vds-sci') ? row.querySelector('.vds-sci').value.trim() : '';
+  const dosis = [];
+  row.querySelectorAll('.vdsd-entry').forEach(ent => {
+    const q = s => ent.querySelector(s);
+    const min = parseFloat(q('.vdsd-min') ? q('.vdsd-min').value : '') || 0;
+    const rec = parseFloat(q('.vdsd-rec') ? q('.vdsd-rec').value : '') || 0;
+    const max = parseFloat(q('.vdsd-max') ? q('.vdsd-max').value : '') || 0;
+    const num = q('.vdsd-dnum') ? q('.vdsd-dnum').value : '';
+    const den = q('.vdsd-dden') ? q('.vdsd-dden').value : '';
+    if (!min && !rec && !max && !num && !den) return;
+    dosis.push({ min, rec, max, unit_num: num, unit_den: den, unit: vdJoinUnit(num, den) || 'mg/kg', fuente: vdBibReadSel(ent) });
+  });
+  const chk = Array.from(row.querySelectorAll('.vds-route-chk:checked')).map(el => el.value);
+  const viaInp = row.querySelector('.vds-via');
+  const viaTxt = viaInp ? String(viaInp.value || '').split(/[,;]+/).map(x => x.trim()).filter(Boolean) : [];
+  const routes = chk.length ? chk : viaTxt;
+  const first = dosis[0] || {};
+  const conc = parseFloat(row.querySelector('.vdsd-conc') ? row.querySelector('.vdsd-conc').value : '') || 0;
+  const durInp = row.querySelector('.vds-dur');
+  return {
+    species, sci, dosis,
+    dose_min: first.min || 0, dose: first.rec || 0, dose_max: first.max || 0,
+    dose_unit: first.unit || 'mg/kg', dose_unit_num: first.unit_num || '', dose_unit_den: first.unit_den || '',
+    conc, conc_num: row.querySelector('.vdsd-cnum') ? row.querySelector('.vdsd-cnum').value : 'mg',
+    conc_den: row.querySelector('.vdsd-cden') ? row.querySelector('.vdsd-cden').value : 'ml',
+    route: routes[0] || 'IM', routes: routes.length ? routes : ['IM'],
+    freq: row.querySelector('.vds-freq') ? row.querySelector('.vds-freq').value : '',
+    duration: durInp ? durInp.value : '',
+    notes: row.querySelector('.vds-notes') ? row.querySelector('.vds-notes').value : ''
+  };
+}
 function _vsSpRowHtml(r, idx) {
   const c = (v) => vdEsc(v ?? '');
   if (!r.open) return '';
+  try { vdEnsureSpeciesDatalists(); } catch (e) {}
   return `
     <tr class="vads-sps" id="vad-sheet-sps-${idx}" data-idx="${idx}">
-      <td colspan="${_vadOrderNow().length + 2}" style="padding:6px 8px;background:#fafafa">
-        <div style="font-weight:700;font-size:.68rem;color:#445;margin-bottom:4px">🩺 Especies y dosis — ${c(r.m.drug || r.m.active || 'nuevo fármaco')}</div>
-        <div style="overflow:auto;border:1px solid #dfe6ee;border-radius:6px;margin-bottom:4px">
-          <table class="vads-sub" style="width:100%;border-collapse:collapse;font-size:.68rem">
-            <thead><tr>
-              ${['Nombre común','Nombre científico','Dosis mín','Dosis máx','Unidad','Fuente','Vía','Frecuencia','Notas (esp.)',''].map(h=>'<th style="padding:3px 5px;text-align:left;border:1px solid #c7d8ea;background:#e8f0f8;font-size:.6rem;color:#335;white-space:nowrap">'+h+'</th>').join('')}
-            </tr></thead>
-            <tbody>
-              ${(r.sps||[]).map((s, si) => `
-                <tr data-sp="${si}">
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(si, 'sp', s.sp)}</td>
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(si, 'sci', s.sci)}</td>
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(si, 'dmin', s.dmin)}</td>
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(si, 'dmax', s.dmax)}</td>
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(si, 'unit', s.unit)}</td>
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee">${_vsSpIn(si, 'fuente', s.fuente)}</td>
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(si, 'via', s.via)}</td>
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee;white-space:nowrap">${_vsSpIn(si, 'freq', s.freq)}</td>
-                  <td style="padding:1px 3px;border:1px solid #dfe6ee">${_vsSpIn(si, 'notes', s.notes)}</td>
-                  <td style="padding:2px 3px;border:1px solid #dfe6ee;text-align:center"><button type="button" class="vads-btn vads-del vads-delsp" data-act="delsps" data-sp="${si}" title="Quitar esta especie">✕</button></td>
-                </tr>`).join('') || '<tr><td colspan="10" style="padding:4px;color:#999;font-size:.64rem">Sin especies todavía → añade la primera:</td></tr>'}
-            </tbody>
-          </table>
+      <td colspan="${_vadOrderNow().length + 2}" style="padding:8px;background:#f7f9fb">
+        <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem">
+          <span style="font-weight:800;font-size:.7rem;color:#445">🩺 Especies y dosis — ${c(r.m.drug || r.m.active || 'nuevo fármaco')}</span>
+          <span style="flex:1"></span>
+          <button type="button" class="btn btn-secondary btn-sm" style="font-size:.66rem" data-act="addsp" title="Añadir una especie con su dosis">➕ Añadir especie</button>
         </div>
-        <button type="button" class="btn btn-secondary btn-sm" style="font-size:.66rem" data-act="addsp" title="Añadir una fila de especie y dosis">➕ Añadir especie</button>
+        <div id="vad-sheet-sps-list-${idx}">
+          ${(r.sps || []).map((s, si) => vdSpCardHtml(s, { ctx: 'sheet', si, single: true })).join('') || '<div style="color:#999;font-size:.66rem;padding:.3rem">Sin especies todavía → pulsa «➕ Añadir especie».</div>'}
+        </div>
       </td>
     </tr>`;
 }
@@ -12340,7 +12683,7 @@ async function openVadSheet() {
   <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.1rem 1.25rem;width:100%;max-width:1920px;height:96vh;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">
       <div style="min-width:0">
-        <div style="font-weight:700;font-size:.95rem">🧮 Vademécum · Hoja interna (v65)</div>
+        <div style="font-weight:700;font-size:.95rem">🧮 Vademécum · Hoja interna (v66)</div>
         <div style="font-size:.7rem;color:var(--txt3);margin-top:1px">Plantilla en blanco para que tú pongas la información. Las letras <b>A, B, C…</b> son la <b>posición</b> de cada columna (la primera siempre es A) y el nombre va debajo. La columna <b>Principio activo</b> lista todos los fármacos y <b>vincula a su ficha</b>; las columnas de <b>Categoría, Subcategoría, Sub-subcategoría…</b> son <b>desplegables encadenados</b> (al elegir una categoría se cargan sus subcategorías, y así hasta la sub-sub-subcategoría). La columna <b>VÍAS</b> es un <b>desplegable</b> con las vías del panel de fármacos (marca una o varias; se añaden más desde el botón <b>＋ Añadir vía</b> del panel de fármacos). Cada título tiene <b>&lt; &gt;</b> para <b>mover la columna entera</b> (o <b>arrastra la letra</b>) y un <b>＋</b> para <b>añadir una columna nueva</b>; en su <b>borde derecho</b> aparece la flecha ↔: <b>arrastrándola agrandas o reduces</b> esa columna y el ancho se guarda (doble clic para volver al normal). En la columna de números, el <b>＋</b> añade una fila debajo y <b>arrastrando el borde inferior</b> cambias el alto de esa fila. <b>↔ Ajuste texto</b>: marca una celda o columna, pulsa y el texto se reparte en los renglones que quepan (mínimo 2). <b>💾 Guardar</b> actualiza <b>solo lo editado</b>: las celdas vacías no pisan la ficha.</div>
       </div>
       <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center">
@@ -12850,7 +13193,10 @@ function vadSheetToggleSps(idx) {
 function vadSheetAddSp(idx) {
   const r = _vadSheetRows[idx];
   if (!r) return;
-  r.sps.push({ sp:'', sci:'', dmin:'', dmax:'', unit:'mg/kg', fuente:'', via:'', freq:'', notes:'' });
+  r.sps.push({
+    sp:'', sci:'', dmin:'', drec:'', dmax:'', dnum:'mg', dden:'kg', unit:'mg/kg',
+    conc:'', cnum:'mg', cden:'ml', fuente:'', via:'', freq:'', dur:'', notes:'', dosisExtra:[]
+  });
   r.open = true;
   r._spsDirty = true;
   _vsRefreshRowCells(idx);
@@ -12924,32 +13270,12 @@ function vadSheetToggleDel(idx, el) {
 // Conviene una fila a un objeto fármaco (igual esquema que _drugFromGroup).
 function _vadSheetRowToDrug(r) {
   const m = r.m || {};
-  const sps = (r.sps||[]).filter(s =>
-    String(s.sp||'').trim() || String(s.sci||'').trim() ||
-    s.dmin || s.dmax || s.unit || s.via || s.freq || s.fuente || s.notes);
   const active = String(m.active||'').trim();
   const nombres = String(m.nombres||'').split(/[;\/]/).map(x=>x.trim()).filter(Boolean);
   const concObjs = vdParseConcStr(m.conc);
   const routes = String(m.routes||'').split(/[,;]/).map(x=>x.trim()).filter(Boolean);
   const catLabel = String(m.cat_label||'').trim();
-  const species_doses = [];
-  for (const s of sps) {
-    const min = parseFloat(s.dmin) || 0;
-    const max = parseFloat(s.dmax) || 0;
-    const viaList = String(s.via||'').split(/[,;]/).map(x=>x.trim()).filter(Boolean);
-    const rec = (min && max) ? Math.round(((min + max) / 2) * 1000) / 1000 : 0;
-    const unit = String(s.unit||'').trim() || 'mg/kg';
-    species_doses.push({
-      species: String(s.sp||'').trim(),
-      sci: String(s.sci||'').trim(),
-      dosis: [{ min, rec, max, unit, fuente: _parseBibOne(s.fuente) }],
-      dose_min: min, dose: rec, dose_max: max, dose_unit: unit,
-      route: viaList[0] || 'IM',
-      routes: viaList.length ? viaList : ['IM'],
-      freq: String(s.freq||'').trim(),
-      notes: String(s.notes||'').trim()
-    });
-  }
+  const species_doses = _spsFromRow(r);
   return {
     drug: String(m.drug||'').trim() || nombres[0] || active,
     nombres: nombres.length ? nombres : (active ? [active] : []),
@@ -12974,6 +13300,7 @@ function _vadSheetRowToDrug(r) {
   notes: String(m.notes||'').trim(),
   mech: String(m.mech||'').trim(),
   mech_simple: String(m.mech_simple||'').trim(),
+  pk: String(m.pk||'').trim(),
   desc: '',
   keywords: String(m.keywords||'').split(/[,;]+/).map(k=>k.trim()).filter(Boolean),
   bibliografia: vdParseBibStr(m.bib),
@@ -12985,22 +13312,36 @@ function _vadSheetRowToDrug(r) {
 function _spsFromRow(r) {
   const sps = (r.sps||[]).filter(s =>
     String(s.sp||'').trim() || String(s.sci||'').trim() ||
-    s.dmin || s.dmax || s.unit || s.via || s.freq || s.fuente || s.notes);
+    s.dmin || s.drec || s.dmax || s.unit || s.dnum || s.dden ||
+    s.conc || s.via || s.freq || s.dur || s.fuente || s.notes);
   const species_doses = [];
   for (const s of sps) {
     const min = parseFloat(s.dmin) || 0;
     const max = parseFloat(s.dmax) || 0;
+    const rec0 = parseFloat(s.drec) || 0;
+    const rec = rec0 || ((min && max) ? Math.round(((min + max) / 2) * 1000) / 1000 : 0);
+    const unitRaw = String(s.unit||'').trim() || vdJoinUnit(s.dnum, s.dden) || 'mg/kg';
+    const us = vdSplitUnit(unitRaw);
+    const dnum = s.dnum || us.num || 'mg';
+    const dden = s.dden || us.den || 'kg';
+    const unit = vdJoinUnit(dnum, dden) || unitRaw;
     const viaList = String(s.via||'').split(/[,;]/).map(x=>x.trim()).filter(Boolean);
-    const rec = (min && max) ? Math.round(((min + max) / 2) * 1000) / 1000 : 0;
-    const unit = String(s.unit||'').trim() || 'mg/kg';
+    const dosis = [{ min, rec, max, unit, unit_num: dnum, unit_den: dden, fuente: _parseBibOne(s.fuente) }];
+    (Array.isArray(s.dosisExtra) ? s.dosisExtra : []).forEach(de => {
+      if (de && (de.min || de.rec || de.max || de.unit || de.unit_num)) dosis.push(de);
+    });
     species_doses.push({
       species: String(s.sp||'').trim(),
       sci: String(s.sci||'').trim(),
-      dosis: [{ min, rec, max, unit, fuente: _parseBibOne(s.fuente) }],
+      dosis,
       dose_min: min, dose: rec, dose_max: max, dose_unit: unit,
+      dose_unit_num: dnum, dose_unit_den: dden,
+      conc: parseFloat(s.conc) || 0,
+      conc_num: s.cnum || 'mg', conc_den: s.cden || 'ml',
       route: viaList[0] || 'IM',
       routes: viaList.length ? viaList : ['IM'],
       freq: String(s.freq||'').trim(),
+      duration: String(s.dur||'').trim(),
       notes: String(s.notes||'').trim()
     });
   }
@@ -13055,6 +13396,7 @@ function _vsApplyDirty(d, r) {
   set('notes', () => { d.notes = String(m.notes||'').trim(); });
   set('mech', () => { d.mech = String(m.mech||'').trim(); });
   set('mech_simple', () => { d.mech_simple = String(m.mech_simple||'').trim(); });
+  set('pk', () => { d.pk = String(m.pk||'').trim(); });
   set('spectrum', () => { d.spectrum = String(m.spectrum||'').trim(); });
   d.desc = ''; // v63: eliminar
   set('keywords', () => { d.keywords = String(m.keywords||'').split(/[,;]+/).map(x=>x.trim()).filter(Boolean); });
@@ -13115,7 +13457,7 @@ async function _vadSheetPutRow(r) {
     cat_esp: d.cat_esp, conc: d.conc, concs: d.concs, conc_units: d.conc_units,
     route: d.route, routes: d.routes, freq: d.freq || '',
     indic: d.indic, contraindications: d.contraindications, info: d.info, notes: d.notes,
-    mech: d.mech, mech_simple: d.mech_simple, desc: '', spectrum: d.spectrum||'', keywords: d.keywords,
+    mech: d.mech, mech_simple: d.mech_simple, pk: d.pk||'', desc: '', spectrum: d.spectrum||'', keywords: d.keywords,
     bibliografia: d.bibliografia, species_doses: d.species_doses };
   VADEMECUM_DB.push(newDrug);
   r.id = newDrug.id;
@@ -14702,6 +15044,8 @@ function _buildVadDrugCard(d, isAdmin, showBreadcrumb) {
       <div style="padding:.5rem .85rem;display:grid;gap:.2rem">
         ${(d.concs?.length||d.conc)?`<p style="margin:0;font-size:.8rem"><strong>Concentración:</strong> ${vdConcListLabel(d)}</p>`:''}
         ${(d.routes?.length||d.route)?`<p style="margin:0;font-size:.8rem"><strong>Vías de administración:</strong> ${(d.routes?.length ? d.routes.join(', ') : d.route||'—')}</p>`:''}
+        ${d.spectrum?`<p style="margin:0;font-size:.8rem;color:var(--txt2)"><strong style="color:var(--g6)">🧪 Espectro de acción:</strong> ${d.spectrum}</p>`:''}
+        ${d.pk?`<p style="margin:0;font-size:.8rem;color:var(--txt2)"><strong style="color:var(--g6)">⏱ Farmacocinética:</strong> ${d.pk}</p>`:''}
         ${d.freq?`<p style="margin:0;font-size:.8rem"><strong>Frecuencia:</strong> ${d.freq}</p>`:''}
         ${d.indic?`<p style="margin:0;font-size:.8rem;color:var(--txt2)"><strong style="color:var(--g6)">✅ Indicaciones:</strong> ${d.indic}</p>`:''}
         ${d.contraindications?`<div style="background:var(--r1);border-radius:var(--rxs);padding:.3rem .5rem;font-size:.78rem;color:var(--r5)">⚠ <strong>Contraindicaciones:</strong> ${d.contraindications}</div>`:''}
@@ -14730,6 +15074,7 @@ function _buildVadDrugCard(d, isAdmin, showBreadcrumb) {
               <th style="padding:.25rem .4rem;text-align:left;border-bottom:1px solid var(--bor);color:var(--txt3)">Fuente</th>
               <th style="padding:.25rem .4rem;text-align:left;border-bottom:1px solid var(--bor);color:var(--txt3)">Vía(s)</th>
               <th style="padding:.25rem .4rem;text-align:left;border-bottom:1px solid var(--bor);color:var(--txt3)">Frecuencia</th>
+              <th style="padding:.25rem .4rem;text-align:left;border-bottom:1px solid var(--bor);color:var(--txt3)">Duración</th>
               <th style="padding:.25rem .4rem;text-align:center;border-bottom:1px solid var(--bor);color:var(--g6)">Resultado</th>
             </tr></thead>
             <tbody>
@@ -14747,6 +15092,7 @@ function _buildVadDrugCard(d, isAdmin, showBreadcrumb) {
                       <td style="padding:.3rem .4rem">
                         <div style="font-weight:600;font-size:.8rem">${(s.species||'').split('(')[0].trim()}</div>
                         ${s.sci?`<div style="font-size:.65rem;color:var(--txt3);font-style:italic">${s.sci}</div>`:''}
+                        ${s.conc?`<div style="font-size:.62rem;color:var(--txt3)">Conc: ${vddFmt(s.conc)} ${s.conc_num||'mg'}/${s.conc_den||'ml'}</div>`:''}
                       </td>
                       <td style="padding:.3rem .4rem;text-align:center;color:var(--txt3);font-family:var(--mono)">${vddFmt(de.min)}</td>
                       <td style="padding:.3rem .4rem;text-align:center;font-weight:700;color:var(--g5);font-family:var(--mono)">${vddFmt(de.rec)}</td>
@@ -14755,6 +15101,7 @@ function _buildVadDrugCard(d, isAdmin, showBreadcrumb) {
                       <td style="padding:.3rem .4rem;font-size:.7rem">${de.fuente ? vdBibChipHtml(de.fuente) : '—'}</td>
                       <td style="padding:.3rem .4rem;font-size:.72rem">${(s.routes?.length ? s.routes.join(', ') : s.route||'—')}</td>
                       <td style="padding:.3rem .4rem;font-size:.75rem">${s.freq||'—'}</td>
+                      <td style="padding:.3rem .4rem;font-size:.72rem">${s.duration||'—'}</td>
                       <td style="padding:.3rem .4rem;text-align:center;font-size:.72rem;color:var(--g6)">${vol}</td>
                     </tr>`);
                   });
@@ -15936,6 +16283,12 @@ function hcRefreshUnits(which) {
     const keep = sel.value;
     sel.innerHTML = hcDoseUnitOpts(which, sel.dataset.ph || ph[which]);
     sel.value = keep;
+  });
+  // v66: los selectores de unidades del vademécum/hoja comparten la lista.
+  document.querySelectorAll('select[data-uk="' + which + '"]').forEach(sel=>{
+    const keep = sel.value;
+    sel.innerHTML = vdUnitOpts(which, keep);
+    if (keep) sel.value = keep;
   });
 }
 function hcAddUnit(btn, which) {
