@@ -502,16 +502,16 @@ textarea.form-control{resize:vertical;min-height:70px}
     </div>
     <!-- Buscador por especie -->
     <div style="display:flex;gap:.4rem;margin-bottom:.75rem">
-      <input id="enriq-search" class="form-control" placeholder="Buscar por nombre común o científico..." oninput="filterEnriqBySpecies(this.value)" style="flex:1">
-      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('enriq-search').value='';renderEnriquecimientoScreen()">✕</button>
+      <input id="enriq-search" class="form-control" placeholder="Buscar por nombre común o científico..." oninput="if(typeof _enriqState!=='undefined'){_enriqState.q=this.value;}renderEnriqUnified()" style="flex:1">
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('enriq-search').value='';if(typeof _enriqState!=='undefined'){_enriqState.q='';}renderEnriqUnified()">✕</button>
     </div>
     <div id="enriq-tabs" style="overflow-x:auto;white-space:nowrap;margin-bottom:1rem;padding-bottom:.3rem">
-      <button class="tab-filter-btn active" onclick="filterEnriq('todos',this)">Todos</button>
-      <button class="tab-filter-btn" onclick="filterEnriq('alimenticio',this)">🍎 Alimenticios</button>
-      <button class="tab-filter-btn" onclick="filterEnriq('sensorial',this)">👁 Sensoriales</button>
-      <button class="tab-filter-btn" onclick="filterEnriq('fisico',this)">🏃 Físicos</button>
-      <button class="tab-filter-btn" onclick="filterEnriq('cognitivo',this)">🧠 Cognitivos</button>
-      <button class="tab-filter-btn" onclick="filterEnriq('social',this)">👥 Sociales</button>
+      <button class="tab-filter-btn active" onclick="if(typeof _enriqState!=='undefined'){_enriqState.cat='todos';}document.querySelectorAll('#enriq-tabs .tab-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');renderEnriqUnified()">Todos</button>
+      <button class="tab-filter-btn" onclick="if(typeof _enriqState!=='undefined'){_enriqState.cat='alimenticio';}document.querySelectorAll('#enriq-tabs .tab-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');renderEnriqUnified()">🍎 Alimenticios</button>
+      <button class="tab-filter-btn" onclick="if(typeof _enriqState!=='undefined'){_enriqState.cat='sensorial';}document.querySelectorAll('#enriq-tabs .tab-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');renderEnriqUnified()">👁 Sensoriales</button>
+      <button class="tab-filter-btn" onclick="if(typeof _enriqState!=='undefined'){_enriqState.cat='fisico';}document.querySelectorAll('#enriq-tabs .tab-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');renderEnriqUnified()">🏃 Físicos</button>
+      <button class="tab-filter-btn" onclick="if(typeof _enriqState!=='undefined'){_enriqState.cat='cognitivo';}document.querySelectorAll('#enriq-tabs .tab-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');renderEnriqUnified()">🧠 Cognitivos</button>
+      <button class="tab-filter-btn" onclick="if(typeof _enriqState!=='undefined'){_enriqState.cat='social';}document.querySelectorAll('#enriq-tabs .tab-filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');renderEnriqUnified()">👥 Sociales</button>
     </div>
     <div id="enriq-list"></div>
   </div>
@@ -993,7 +993,7 @@ textarea.form-control{resize:vertical;min-height:70px}
 // ─────────────────────────────────────
 // VERSIÓN DE LA APP (para detectar si una caché vieja está sirviendo otra build)
 // ─────────────────────────────────────
-const APP_VERSION='67';
+const APP_VERSION='68';
 
 // ═══════════════════════════════════
 // DEFAULT SPECIES DB
@@ -8892,9 +8892,12 @@ function importVadDrug(vadId) {
   setVal('sdrug-indic',   d.indic || '');
   setVal('sdrug-contra',  d.contraindications || '');
   setVal('sdrug-effects', d.info || '');
-  // Vía de administración
-  const routeEl = document.getElementById('sdrug-route');
-  if (routeEl && d.route) routeEl.value = d.route;
+  // Vías de administración (múltiple)
+  const rwrap = document.getElementById('sdrug-routes-wrap');
+  if (rwrap) {
+    const rsel = (d.routes && d.routes.length) ? d.routes : (d.route ? [d.route] : []);
+    rwrap.innerHTML = _vdRoutesChecksHtml(rsel);
+  }
   // v66: unidades de dosis/concentración, duración, espectro y farmacocinética
   const _u = vdSplitUnit(d.dose_unit || 'mg/kg');
   setVal('sdrug-dnum', d.dose_unit_num || _u.num || 'mg');
@@ -8986,10 +8989,13 @@ function openAddSpeciesDrug() {
       </div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Vía de administración</label>
-        <div style="display:flex;gap:.2rem">
-          <input id="sdrug-route" class="form-control" list="vd-routes-dl" placeholder="IM, IV, VO..." style="flex:1;min-width:0">
-          <button type="button" class="icon-btn" style="width:28px;height:30px;flex-shrink:0" onclick="event.stopPropagation();vdAddRouteToInput(document.getElementById('sdrug-route'))" title="Agregar una vía nueva">＋</button>
+      <div class="form-group" style="grid-column:1/-1"><label>Vías de administración <span style="font-size:.7rem;color:var(--txt3)">(selección múltiple)</span></label>
+        <div class="vds-routes-wrap" id="sdrug-routes-wrap" style="display:flex;flex-wrap:wrap;gap:.25rem">
+          ${(function(){ const sel = (existing?.routes && existing.routes.length) ? existing.routes : (existing?.route ? [existing.route] : []); return _vdRoutesChecksHtml(sel); })()}
+        </div>
+        <div style="display:flex;gap:.25rem;margin-top:.3rem">
+          <input id="sdrug-route-add" class="form-control" list="vd-routes-dl" placeholder="Agregar nueva vía..." style="flex:1;min-width:0;font-size:.78rem">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="vdAddRouteToInput(document.getElementById('sdrug-route-add'))">＋ Añadir</button>
         </div>
       </div>
       <div class="form-group"><label>Frecuencia</label><input id="sdrug-freq" class="form-control" placeholder="SID x 7 días..."></div>
@@ -9133,6 +9139,7 @@ async function saveSpeciesDrug() {
   const _uden = document.getElementById('sdrug-dden')?.value || 'kg';
   const _cnum = document.getElementById('sdrug-conc-num')?.value || 'mg';
   const _cden = document.getElementById('sdrug-conc-den')?.value || 'ml';
+  const routesSel = Array.from(document.querySelectorAll('#sdrug-routes-wrap .vd-route-chk:checked')).map(el=>el.value);
   const drug = {
     name,
     active:   document.getElementById('sdrug-active')?.value.trim()||'',
@@ -9148,7 +9155,8 @@ async function saveSpeciesDrug() {
     dose_unit: vdJoinUnit(_unum, _uden) || 'mg/kg',
     dose_unit_num: _unum,
     dose_unit_den: _uden,
-    route:    document.getElementById('sdrug-route')?.value||'IM',
+    route:    routesSel[0]||'IM',
+    routes:   routesSel,
     freq:     document.getElementById('sdrug-freq')?.value||'',
     duration: document.getElementById('sdrug-dur')?.value||'',
     spectrum: document.getElementById('sdrug-spectrum')?.value||'',
@@ -11153,13 +11161,30 @@ const _vadDefaultColOpts = {
   unit:   ['mg/kg','mg/ml','ml/kg','UI/kg','µg/kg','g/kg','mg','g','UI','mEq','mmol'],
   freq:   ['SID','BID','TID','QID','PRN','cada 24 h','cada 48 h','cada 72 h','semanal','mensual','una vez'],
   fuente: ['PLUMB','MSD','Vademécum','BDMV'],
-  spectrum: ['Gram +','Gram −','Gram positivos','Gram negativos','Aerobios','Anaerobios','Mycoplasma','Hongos','Levaduras','Protozoos','Helmintos','Ácaros','Pulgas','Garrapatas','Rickettsias','Chlamydias','Espiroquetas','Micobacterias','Pseudomonas','Enterobacterias'],
+  spectrum: [
+    '[Gram-positivos aerobios] (Ej: Staphylococcus spp., Streptococcus spp., Enterococcus spp.)',
+    '[Gram-negativos aerobios] (Ej: E. coli, Klebsiella spp., Pseudomonas spp., Salmonella spp.)',
+    '[Anaerobios estrictos] (Ej: Bacteroides fragilis, Clostridioides spp., Fusobacterium spp.)',
+    '[Bacterias atípicas / Intracelulares] (Ej: Mycoplasma, Chlamydia, Rickettsia, Coxiella, Ehrlichia)',
+    '[Mycobacterium spp.] (Ej: M. tuberculosis, M. bovis, M. avium)',
+    '[Dermatofitos] (Ej: Trichophyton, Microsporum, Epidermophyton)',
+    '[Levaduras / Opportunistas] (Ej: Candida spp., Cryptococcus spp.)',
+    '[Hongos dimórficos / Sistémicos] (Ej: Histoplasma, Blastomyces, Coccidioides)',
+    '[Hongos filamentosos / Mohos] (Ej: Aspergillus spp., Mucor, Rhizopus)',
+    '[Protozoos intestinales] (Ej: Giardia, Entamoeba, Cryptosporidium)',
+    '[Protozoos tisulares / Sanguíneos] (Ej: Leishmania, Trypanosoma, Toxoplasma, Plasmodium, Babesia)',
+    '[Nematodos / Gusanos redondos] (Ej: Ascaris, Ancylostoma, Toxocara, Dirofilaria, Strongyloides)',
+    '[Cestodos y Trematodos / Gusanos planos] (Ej: Taenia, Echinococcus, Fasciola, Dipylidium)',
+    '[Ectoparasiticida] (Ej: Ácaros de la sarna, Garrapatas, Pulgas, Piojos)',
+    '[Virus ADN] (Ej: Herpesviridae, Poxviridae, Adenoviridae)',
+    '[Virus ARN / Retrotranscritos] (Ej: Retrovirus, Retroviridae, Orthomyxoviridae, Paramyxoviridae, Flaviviridae)'
+  ],
   sp:     []
 };
 // v60: lista COMPARTIDA y editable de vías de administración. La usan tanto el
 // panel de fármacos (Agregar/Editar) como el desplegable de la columna "VÍAS"
 // de la Hoja, para que cualquier vía nueva salga en los dos sitios.
-const VAD_ROUTES_DEFAULT = ['IM','IV','SC','VO','IM dardo','IN','Tópico','Inhalatorio'];
+const VAD_ROUTES_DEFAULT = ['IM','IV','SC','VO','IN','Tópico','Tópica','Oftálmico','Auricular','Rectal','Intranasal'];
 let VAD_ROUTES = null;
 function _vadRoutesList() { if (!VAD_ROUTES) VAD_ROUTES = VAD_ROUTES_DEFAULT.slice(); return VAD_ROUTES; }
 async function _vadLoadRoutes() {
@@ -11177,7 +11202,7 @@ function _vdRoutesChecksHtml(selected) {
   const sel = selected || [];
   return _vadRoutesList().map(r =>
     '<label style="display:inline-flex;align-items:center;gap:.2rem;cursor:pointer;font-size:.75rem;padding:.2rem .5rem;border-radius:20px;border:1px solid var(--bor)">' +
-    '<input type="checkbox" class="vd-route-chk" value="' + vdEsc(r) + '"' + (sel.includes(r) ? ' checked' : '') + ' style="accent-color:var(--g5)"> ' + vdEsc(r) +
+    '<input type="checkbox" class="vd-route-chk" value="' + vdEsc(r) + '"' + (selected.includes(r) ? ' checked' : '') + ' style="accent-color:var(--g5)"> ' + vdEsc(r) +
     '</label>').join('');
 }
 function _vdCurrentRouteChecks() {
@@ -11474,6 +11499,13 @@ function _vadAcListEl() {
 // Fuente de la lista según el campo: principios activos (active) o vías (routes).
 function _vadAcSource() {
   if (_vadAcField === 'routes') return _vadRoutesList().map(String);
+  if (_vadAcField === 'spectrum') {
+    const base = vdSpectrumList ? vdSpectrumList() : [];
+    const extra = (_vadColOpts && Array.isArray(_vadColOpts.spectrum)) ? _vadColOpts.spectrum : [];
+    const out = base.slice();
+    extra.forEach(v => { if (!out.some(x => String(x).toLowerCase() === String(v).toLowerCase())) out.push(v); });
+    return out;
+  }
   _vadBuildActiveOpts();
   return (_vsOptsCache || []).slice();
 }
@@ -11522,7 +11554,7 @@ function _vadAcRender(q) {
 function _vadAcOpen(inp) {
   if (!inp || !inp.dataset) return;
   const f = inp.dataset.f;
-  if (f !== 'active' && f !== 'routes') return;
+  if (f !== 'active' && f !== 'routes' && f !== 'spectrum') return;
   _vadAcInput = inp;
   _vadAcField = f;
   _vadAcRender(inp.value || '');
@@ -11552,17 +11584,18 @@ function _vadAcPick(i) {
   if (idx < 0) { _vadAcClose(); return; }
   const r = _vadSheetRows[idx];
   if (!r) { _vadAcClose(); return; }
-  if (_vadAcField === 'routes') {
-    // Multi-selección: pulsar una vía la marca/desmarca en la celda (lista
+  if (_vadAcField === 'routes' || _vadAcField === 'spectrum') {
+    // Multi-selección: pulsar una opción la marca/desmarca en la celda (lista
     // separada por comas). El desplegable se queda abierto para marcar varias.
     const toks = _vadAcTokens(inp.value);
     const pos = toks.findIndex(t => _vadAcNorm(t) === _vadAcNorm(v));
     if (pos >= 0) toks.splice(pos, 1); else toks.push(v);
     const nv = toks.join(', ');
     inp.value = nv;
-    r.m.routes = nv;
+    if (_vadAcField === 'routes') r.m.routes = nv;
+    else if (_vadAcField === 'spectrum') r.m.spectrum = nv;
     if (!r._dirty.m) r._dirty.m = {};
-    r._dirty.m.routes = 1;
+    r._dirty.m[_vadAcField] = 1;
     vadSheetPersistRow(idx);
     _vadAcRender(inp.value);
     _vadAcPosition(inp);
@@ -11583,7 +11616,7 @@ function _vadAcKey(ev) {
   const inp = ev.target;
   if (!inp || !inp.dataset) return;
   const f = inp.dataset.f;
-  if (f !== 'active' && f !== 'routes') return;
+  if (f !== 'active' && f !== 'routes' && f !== 'spectrum') return;
   const el = document.getElementById('vad-ac-list');
   const open = el && el.style.display === 'block';
   if (ev.key === 'ArrowDown') { ev.preventDefault(); if (!open) { _vadAcOpen(inp); return; } if (_vadAcSel < _vadAcItems.length - 1) { _vadAcSel++; _vadAcHighlight(); } }
@@ -11754,7 +11787,7 @@ function _vsCell(k, r, idx) {
   if (k === 'pk') return _vsTextTag('pk', r.m.pk, wk);
   if (k === 'spectrum') {
     const list = (_vadColOpts && _vadColOpts[k] && _vadColOpts[k].length) ? ' list="vadl-' + k + '"' : '';
-    return '<input type="text" value="' + vdEsc(r.m.spectrum||'') + '" data-f="spectrum"' + list + ' placeholder="Gram +, Gram -, aerobios, anaerobios..." style="min-width:0;width:100%">';
+    return '<input type="text" data-f="spectrum" autocomplete="off" spellcheck="false" value="' + vdEsc(r.m.spectrum||'') + '"' + list + ' placeholder="Selecciona o escribe el espectro..." title="Despliega la lista de espectro de acción" style="min-width:0;width:100%">';
   }
   if (k === 'keywords') return _vsTextTag('keywords', r.m.keywords, wk);
   if (k === 'bib')      return _vsTextTag('bib', r.m.bib, wk);
@@ -11837,7 +11870,24 @@ function vdEnsureRoutesDatalist() {
 // Sugerencias de espectro de acción (compartidas por panel de fármaco,
 // panel de especie y Hoja interna).
 function vdSpectrumList() {
-  const base = ['Gram +','Gram −','Gram positivos','Gram negativos','Aerobios','Anaerobios','Facultativos','Mycoplasma','Hongos','Levaduras','Protozoos','Helmintos','Ácaros','Pulgas','Garrapatas','Rickettsias','Chlamydias','Espiroquetas','Micobacterias','Pseudomonas','Enterobacterias','Cocos','Bacilos'];
+  const base = [
+    '[Gram-positivos aerobios] (Ej: Staphylococcus spp., Streptococcus spp., Enterococcus spp.)',
+    '[Gram-negativos aerobios] (Ej: E. coli, Klebsiella spp., Pseudomonas spp., Salmonella spp.)',
+    '[Anaerobios estrictos] (Ej: Bacteroides fragilis, Clostridioides spp., Fusobacterium spp.)',
+    '[Bacterias atípicas / Intracelulares] (Ej: Mycoplasma, Chlamydia, Rickettsia, Coxiella, Ehrlichia)',
+    '[Mycobacterium spp.] (Ej: M. tuberculosis, M. bovis, M. avium)',
+    '[Dermatofitos] (Ej: Trichophyton, Microsporum, Epidermophyton)',
+    '[Levaduras / Opportunistas] (Ej: Candida spp., Cryptococcus spp.)',
+    '[Hongos dimórficos / Sistémicos] (Ej: Histoplasma, Blastomyces, Coccidioides)',
+    '[Hongos filamentosos / Mohos] (Ej: Aspergillus spp., Mucor, Rhizopus)',
+    '[Protozoos intestinales] (Ej: Giardia, Entamoeba, Cryptosporidium)',
+    '[Protozoos tisulares / Sanguíneos] (Ej: Leishmania, Trypanosoma, Toxoplasma, Plasmodium, Babesia)',
+    '[Nematodos / Gusanos redondos] (Ej: Ascaris, Ancylostoma, Toxocara, Dirofilaria, Strongyloides)',
+    '[Cestodos y Trematodos / Gusanos planos] (Ej: Taenia, Echinococcus, Fasciola, Dipylidium)',
+    '[Ectoparasiticida] (Ej: Ácaros de la sarna, Garrapatas, Pulgas, Piojos)',
+    '[Virus ADN] (Ej: Herpesviridae, Poxviridae, Adenoviridae)',
+    '[Virus ARN / Retrotranscritos] (Ej: Retrovirus, Retroviridae, Orthomyxoviridae, Paramyxoviridae, Flaviviridae)'
+  ];
   const extra = (_vadColOpts && Array.isArray(_vadColOpts.spectrum)) ? _vadColOpts.spectrum : [];
   const out = base.slice();
   extra.forEach(v => { if (!out.some(x => String(x).toLowerCase() === String(v).toLowerCase())) out.push(v); });
@@ -12683,7 +12733,7 @@ async function openVadSheet() {
   <div style="background:var(--sur);border-radius:var(--r) var(--r) 0 0;padding:1.1rem 1.25rem;width:100%;max-width:1920px;height:96vh;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">
       <div style="min-width:0">
-        <div style="font-weight:700;font-size:.95rem">🧮 Vademécum · Hoja interna (v67)</div>
+        <div style="font-weight:700;font-size:.95rem">🧮 Vademécum · Hoja interna (v68)</div>
         <div style="font-size:.7rem;color:var(--txt3);margin-top:1px">Plantilla en blanco para que tú pongas la información. Las letras <b>A, B, C…</b> son la <b>posición</b> de cada columna (la primera siempre es A) y el nombre va debajo. La columna <b>Principio activo</b> lista todos los fármacos y <b>vincula a su ficha</b>; las columnas de <b>Categoría, Subcategoría, Sub-subcategoría…</b> son <b>desplegables encadenados</b> (al elegir una categoría se cargan sus subcategorías, y así hasta la sub-sub-subcategoría). La columna <b>VÍAS</b> es un <b>desplegable</b> con las vías del panel de fármacos (marca una o varias; se añaden más desde el botón <b>＋ Añadir vía</b> del panel de fármacos). Cada título tiene <b>&lt; &gt;</b> para <b>mover la columna entera</b> (o <b>arrastra la letra</b>) y un <b>＋</b> para <b>añadir una columna nueva</b>; en su <b>borde derecho</b> aparece la flecha ↔: <b>arrastrándola agrandas o reduces</b> esa columna y el ancho se guarda (doble clic para volver al normal). En la columna de números, el <b>＋</b> añade una fila debajo y <b>arrastrando el borde inferior</b> cambias el alto de esa fila. <b>↔ Ajuste texto</b>: marca una celda o columna, pulsa y el texto se reparte en los renglones que quepan (mínimo 2). <b>💾 Guardar</b> actualiza <b>solo lo editado</b>: las celdas vacías no pisan la ficha.</div>
       </div>
       <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center">
@@ -19392,6 +19442,20 @@ function _getFotoSrc(foto) {
   return foto.data || foto.url || '';
 }
 
+if (typeof window._enriqState === 'undefined') window._enriqState = { cat: 'todos', q: '' };
+function renderEnriqUnified() {
+  const cat = (window._enriqState && window._enriqState.cat) ? window._enriqState.cat : 'todos';
+  const q = (window._enriqState && window._enriqState.q) ? String(window._enriqState.q) : '';
+  document.querySelectorAll('#enriq-tabs .tab-filter-btn').forEach(b => {
+    if (b.dataset && b.dataset.enr) b.classList.toggle('active', b.dataset.enr === cat);
+  });
+  const inp = document.getElementById('enriq-search');
+  if (inp && document.activeElement !== inp) inp.value = q;
+  if (q && q.trim()) {
+    if (typeof filterEnriqBySpecies === 'function') { filterEnriqBySpecies(q); return; }
+  }
+  if (typeof renderEnriquecimientoScreen === 'function') renderEnriquecimientoScreen(cat);
+}
 function renderEnriquecimientoScreen(filter='todos') {
   buildSpeciesDatalist('sp-hist-dl'); // Actualizar historial siempre
   const el = document.getElementById('enriq-list');
@@ -19506,9 +19570,14 @@ function openEnriqDetail(i) {
 function filterEnriqBySpecies(q) {
   const el = document.getElementById('enriq-list');
   if (!el) return;
-  if (!q.trim()) { renderEnriquecimientoScreen(); return; }
+  if (!q.trim()) { 
+    if (typeof renderEnriqUnified === 'function') { renderEnriqUnified(); return; }
+    renderEnriquecimientoScreen(); 
+    return; 
+  }
+  const cat = (typeof window._enriqState !== 'undefined' && window._enriqState.cat) ? window._enriqState.cat : 'todos';
   const term = q.toLowerCase().trim();
-  const filtered = ENRIQUECIMIENTOS_DB.filter(e => {
+  let filtered = ENRIQUECIMIENTOS_DB.filter(e => {
     if ((e.nombre||'').toLowerCase().includes(term)) return true;
     // Formato nuevo: {sp, sci}
     if ((e.especies||[]).some(sp =>
@@ -19522,6 +19591,9 @@ function filterEnriqBySpecies(q) {
     if ((e.objetivo||'').toLowerCase().includes(term)) return true;
     return false;
   });
+  if (cat && cat !== 'todos') {
+    filtered = filtered.filter(e => (e.categorias||[e.categoria||'alimenticio']).includes(cat));
+  }
   if (!filtered.length) {
     el.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--txt3)">Sin enriquecimientos para "<strong>${q}</strong>".</div>`;
     return;
