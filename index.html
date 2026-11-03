@@ -11538,14 +11538,14 @@ function _vadAcRender(q) {
   if (!el) return;
   const items = _vadAcItems = _vadAcFilterList(_vadAcSource(), q);
   _vadAcSel = items.length ? 0 : -1;
-  const multi = _vadAcField === 'routes';
+  const multi = (_vadAcField === 'routes' || _vadAcField === 'spectrum');
   const sel = multi && _vadAcInput ? new Set(_vadAcTokens(_vadAcInput.value).map(_vadAcNorm)) : null;
   if (!items.length) {
     el.innerHTML = '<div style="padding:.5rem .6rem;color:#8a929c;font-size:.7rem">' +
       (multi ? 'Sin coincidencias. Puedes escribirla y se guardará como texto.' : 'Sin coincidencias. Pulsa Intro o sal para crearlo como nuevo principio activo.') + '</div>';
   } else {
     el.innerHTML = items.map((v, i) => {
-      const on = multi && sel.has(_vadAcNorm(v));
+      const on = multi && sel && sel.has(_vadAcNorm(v));
       return '<div class="vad-ac-item" data-i="' + i + '" style="padding:.34rem .6rem;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis' +
         (i === 0 ? ';background:#e7f0fb' : '') + '">' + (multi ? (on ? '☑ ' : '☐ ') : '') + vdEsc(v) + '</div>';
     }).join('');
@@ -11623,7 +11623,7 @@ function _vadAcKey(ev) {
   else if (ev.key === 'ArrowUp') { ev.preventDefault(); if (open && _vadAcSel > 0) { _vadAcSel--; _vadAcHighlight(); } }
   else if (ev.key === 'Enter') { if (open && _vadAcSel >= 0) { ev.preventDefault(); _vadAcPick(_vadAcSel); } }
   else if (ev.key === 'Escape') { _vadAcClose(); }
-  else if (ev.key === 'Tab') { _vadAcClose(); }
+  else if (ev.key === 'Tab') { /* allow tab to move but keep dropdown behavior consistent */ }
 }
 // v60: si la lista está abierta en la columna VÍAS, la repinta (p. ej. tras
 // añadir una vía nueva desde el panel de fármacos).
@@ -11776,7 +11776,7 @@ function _vsCell(k, r, idx) {
   if (k === 'routes') {
     // v60: desplegable de vías de administración (lista compartida con el panel
     // de fármacos). Permite marcar varias; el valor se guarda separado por comas.
-    return '<input type="text" data-f="routes" autocomplete="off" spellcheck="false" value="' + c(r.m.routes) + '" placeholder="Elige o escribe las vías…" title="Despliega la lista de vías de administración" style="min-width:0;width:100%">';
+    return '<input type="text" data-f="routes" autocomplete="off" spellcheck="false" value="' + c(r.m.routes) + '" placeholder="Elige o escribe las vías…" title="Despliega la lista de vías de administración (múltiple)" style="min-width:0;width:100%">';
   }
   if (k === 'indic')    return _vsTextTag('indic', r.m.indic, wk);
   if (k === 'ci')       return _vsTextTag('ci', r.m.ci, wk);
@@ -12778,7 +12778,7 @@ async function openVadSheet() {
   m.addEventListener('focusout', e => { if (e.target && e.target.dataset && (e.target.dataset.f === 'active' || e.target.dataset.f === 'routes')) setTimeout(_vadAcClose, 140); });
   m.addEventListener('keydown', e => {
     if (e.key === 'Escape') { _vadAcClose(); return; }
-    if (e.target && e.target.dataset && (e.target.dataset.f === 'active' || e.target.dataset.f === 'routes')) _vadAcKey(e);
+    if (e.target && e.target.dataset && (e.target.dataset.f === 'active' || e.target.dataset.f === 'routes' || e.target.dataset.f === 'spectrum')) _vadAcKey(e);
   });
   // Al desplazar la hoja se ajustan los textareas que van apareciendo y se
   // convierten en textarea las filas que entran en pantalla.
